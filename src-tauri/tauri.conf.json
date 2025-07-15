@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "carrypigeon-desktop",
+        "resizable": true,
         "width": 800,
         "height": 600
       }

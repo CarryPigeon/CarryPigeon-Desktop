@@ -1,5 +1,8 @@
-<script setup lang="ts"></script>
+<template>
+</template>
 
-<template></template>
+<script setup lang="ts">
+</script>
 
-<style></style>
+<style lang="sass">
+</style>
