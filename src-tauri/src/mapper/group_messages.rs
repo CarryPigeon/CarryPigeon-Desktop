@@ -1,4 +1,4 @@
-use sqlx::FromRow;
+use sqlx::{types::JsonValue, FromRow};
 
 #[derive(Clone, Debug, FromRow)]
 pub struct PrivateMessages {
@@ -7,6 +7,6 @@ pub struct PrivateMessages {
     pub message_id: u32,
     pub date: String,
     pub data: String,
-    pub json: String,
+    pub json: JsonValue,
     pub file_path: String,
 }

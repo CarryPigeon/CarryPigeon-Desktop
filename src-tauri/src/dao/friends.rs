@@ -1,12 +1,13 @@
 use crate::dao::SQLITE_POOL;
 use crate::mapper::friends::Friend;
-use sqlx::Error;
+
+#[derive(Copy, Clone)]
 struct FriendDataBase;
 
 impl FriendDataBase {
     pub async fn get_friend_table() -> anyhow::Result<Vec<Friend>> {
         let v = Box::new(
-            sqlx::query_as::<_, Friend>("SELECT * from friend")
+            sqlx::query_as::<_, Friend>("SELECT * from friend;")
                 .fetch_all(SQLITE_POOL.get().unwrap())
                 .await?,
         );

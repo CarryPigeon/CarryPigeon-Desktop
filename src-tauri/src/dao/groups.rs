@@ -1,1 +1,34 @@
+use crate::dao::SQLITE_POOL;
+use crate::mapper::groups::Groups;
 
+#[derive(Copy, Clone)]
+struct GroupDataBase;
+
+impl GroupDataBase {
+    pub async fn get_group_table() -> anyhow::Result<Vec<Groups>> {
+        let v = Box::new(
+            sqlx::query_as::<_, Groups>("SELECT * from group;")
+                .fetch_all(SQLITE_POOL.get().unwrap())
+                .await?,
+        );
+        Ok(*v)
+    }
+    pub async fn get_groups_by_id(id: u32) -> anyhow::Result<Groups> {
+        let v = Box::new(
+            sqlx::query_as::<_, Groups>("SELECT from friend where id = ?;")
+                .bind(id)
+                .fetch_one(SQLITE_POOL.get().unwrap())
+                .await?,
+        );
+        Ok(*v)
+    }
+    pub async fn get_friend_by_name(name: &str) -> anyhow::Result<Groups> {
+        let v = Box::new(
+            sqlx::query_as::<_, Groups>("SELECT from friend where id = ?;")
+                .bind(name)
+                .fetch_one(SQLITE_POOL.get().unwrap())
+                .await?,
+        );
+        Ok(*v)
+    }
+}
