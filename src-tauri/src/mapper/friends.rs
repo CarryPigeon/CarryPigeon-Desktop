@@ -1,7 +1,7 @@
 use sqlx::FromRow;
 
 #[derive(Clone, Debug, FromRow)]
-struct Friend {
+pub struct Friend {
     id: u32,
     name: String,
 }

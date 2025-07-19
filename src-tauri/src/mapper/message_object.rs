@@ -1,7 +1,7 @@
 use sqlx::FromRow;
 
 #[derive(Clone, Debug, FromRow)]
-struct MessageObject {
+pub struct MessageObject {
     pub snow_id: u32,
     pub from_id: u32,
     pub to_id: u32,
