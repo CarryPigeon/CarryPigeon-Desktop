@@ -6,7 +6,7 @@ struct GroupMessageDataBase {
 }
 
 impl GroupMessageDataBase {
-    async fn new(group_id: u32) -> GroupMessageDataBase {
+    fn new(group_id: u32) -> GroupMessageDataBase {
         GroupMessageDataBase { group_id }
     }
     async fn add_message(&self, message: GroupMessage)  -> anyhow::Result<()>{
