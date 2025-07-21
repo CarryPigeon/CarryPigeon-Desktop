@@ -1,7 +1,7 @@
 use sqlx::{types::JsonValue, FromRow};
 
 #[derive(Clone, Debug, FromRow)]
-pub struct PrivateMessages {
+pub struct GroupMessage {
     pub from_id: u32,
     pub to_id: u32,
     pub message_id: u32,

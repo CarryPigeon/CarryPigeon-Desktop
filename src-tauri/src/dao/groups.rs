@@ -15,7 +15,7 @@ impl GroupDataBase {
     }
     pub async fn get_groups_by_id(id: u32) -> anyhow::Result<Groups> {
         let v = Box::new(
-            sqlx::query_as::<_, Groups>("SELECT from friend where id = ?;")
+            sqlx::query_as::<_, Groups>("SELECT * from group where id = ?;")
                 .bind(id)
                 .fetch_one(SQLITE_POOL.get().unwrap())
                 .await?,
@@ -24,7 +24,7 @@ impl GroupDataBase {
     }
     pub async fn get_friend_by_name(name: &str) -> anyhow::Result<Groups> {
         let v = Box::new(
-            sqlx::query_as::<_, Groups>("SELECT from friend where id = ?;")
+            sqlx::query_as::<_, Groups>("SELECT * from group where id = ?;")
                 .bind(name)
                 .fetch_one(SQLITE_POOL.get().unwrap())
                 .await?,

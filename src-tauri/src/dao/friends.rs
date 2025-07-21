@@ -15,7 +15,7 @@ impl FriendDataBase {
     }
     pub async fn get_friend_by_id(id: u32) -> anyhow::Result<Friend> {
         let v = Box::new(
-            sqlx::query_as::<_, Friend>("SELECT from friend where id = ?;")
+            sqlx::query_as::<_, Friend>("SELECT * from friend where id = ?;")
                 .bind(id)
                 .fetch_one(SQLITE_POOL.get().unwrap())
                 .await?,
@@ -24,7 +24,7 @@ impl FriendDataBase {
     }
     pub async fn get_friend_by_name(name: &str) -> anyhow::Result<Friend> {
         let v = Box::new(
-            sqlx::query_as::<_, Friend>("SELECT from friend where id = ?;")
+            sqlx::query_as::<_, Friend>("SELECT * from friend where id = ?;")
                 .bind(name)
                 .fetch_one(SQLITE_POOL.get().unwrap())
                 .await?,

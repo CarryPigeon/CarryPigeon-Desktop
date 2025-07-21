@@ -1,8 +1,8 @@
 pub mod friends;
-pub mod group_messages;
+pub mod group_message;
 pub mod groups;
 mod message_object;
-pub mod private_messages;
+pub mod private_message;
 
 use sqlx::{Pool, Sqlite, SqlitePool};
 use tokio::sync::OnceCell;
