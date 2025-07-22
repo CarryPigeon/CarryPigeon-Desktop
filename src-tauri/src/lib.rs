@@ -1,5 +1,6 @@
 pub mod dao;
 pub mod mapper;
+pub mod service;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
