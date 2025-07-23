@@ -6,7 +6,10 @@ use tracing_subscriber::{
     filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Registry,
 };
 
-fn main() {
+use carrypigeon_desktop_lib::service::net::receive::ReceiveService;
+
+#[tokio::main]
+async fn main() {
     // 处理tracing输出和调用
     let env_filter =
     // 此处过滤了info以下的信息
@@ -31,6 +34,11 @@ fn main() {
         .with(formatting_layer)
         .with(file_layer)
         .init();
+
+    tracing::info!("CarryPigeon Desktop Started");
+
+    let receive_service = ReceiveService::new();
+    tokio::spawn(async move { receive_service.receive_loop().await });
 
     carrypigeon_desktop_lib::run()
 }
