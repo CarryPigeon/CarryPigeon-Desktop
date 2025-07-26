@@ -18,12 +18,15 @@ impl Default for Router {
 
 impl Router {
     pub fn new() -> Self {
-        Router {
+        let v = Router {
             route_map: HashMap::new(),
-        }
+        };
+        //TODO
+        //v.attach_route()
+        v
     }
 
-    pub fn attach_route(&mut self, route: String, function: FunctionPointer) {
+    fn attach_route(&mut self, route: String, function: FunctionPointer) {
         self.route_map.insert(route, function);
     }
 

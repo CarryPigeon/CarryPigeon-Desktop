@@ -9,7 +9,7 @@ use tracing_subscriber::{
 use carrypigeon_desktop_lib::service::net::receive::ReceiveService;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // 处理tracing输出和调用
     let env_filter =
     // 此处过滤了info以下的信息

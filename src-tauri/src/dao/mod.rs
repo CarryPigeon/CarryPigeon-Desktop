@@ -10,9 +10,10 @@ use tracing::instrument;
 
 pub static SQLITE_POOL: OnceCell<SqlitePool> = OnceCell::const_new();
 
+// TODO: 使用anyhow简化错误处理
 #[instrument]
 pub async fn init_pool() {
-    let url = ""; // TODO: 后续获取
+    let url = ""; // TODO: 后续读取配置文件获取
     match Pool::<Sqlite>::connect(format!("sqlite::memory:{url}").as_str()).await {
         Ok(v) => match SQLITE_POOL.set(v) {
             Ok(_) => {}
