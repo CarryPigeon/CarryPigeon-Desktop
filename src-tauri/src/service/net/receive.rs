@@ -1,6 +1,6 @@
 use crate::mapper::common_message::CommonNoticeMessage;
 use crate::service::message::notification::notification;
-use std::rc::Rc;
+use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio::spawn;
@@ -43,11 +43,11 @@ impl ReceiveService {
         let mut reader = tokio::io::BufReader::new(tcp_stream);
         let _ = reader.read_exact(&mut buf).await;
 
-        let value: Rc<CommonNoticeMessage> = Rc::new(serde_json::from_slice(&buf)?);
+        let value: Arc<CommonNoticeMessage> = Arc::new(serde_json::from_slice(&buf)?);
 
         // TODO: 任务分发
         // TODO: 允许该服务被注册到tauri
-        notification(value)?;
+        notification(value).await?;
         // TODO: 处理接受信息部分的错误
         Ok(())
     }

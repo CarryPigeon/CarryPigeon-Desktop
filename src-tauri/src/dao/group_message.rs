@@ -1,10 +1,9 @@
 use crate::dao::SQLITE_POOL;
 use crate::mapper::group_message::GroupMessage;
 
-async fn add_message(group_id: u32, message: GroupMessage) -> anyhow::Result<()> {
-    let _ = sqlx::query(format!("INSERT INTO group_{group_id} (from_id, to_id, date, data, json, file_path) VALUES (?,?,?,?,?,?);").as_str())
+pub async fn add_message(message: GroupMessage) -> anyhow::Result<()> {
+    let _ = sqlx::query(format!("INSERT INTO group_{} (from_id, to_id, date, data, json, file_path) VALUES (?,?,?,?,?,?);",message.to_id).as_str())
             .bind(message.from_id)
-            .bind(message.to_id)
             .bind(message.date)
             .bind(message.data)
             .bind(message.json)
@@ -13,14 +12,14 @@ async fn add_message(group_id: u32, message: GroupMessage) -> anyhow::Result<()>
             .await?;
     Ok(())
 }
-async fn remove_message(group_id: u32, message_id: u32) -> anyhow::Result<()> {
+pub async fn remove_message(group_id: u32, message_id: u32) -> anyhow::Result<()> {
     let _ = sqlx::query(format!("DELETE FROM group_{group_id} WHERE message_id = ?;").as_str())
         .bind(message_id)
         .execute(SQLITE_POOL.get().unwrap())
         .await?;
     Ok(())
 }
-async fn get_message(group_id: u32, message_id: u32) -> anyhow::Result<GroupMessage> {
+pub async fn get_message(group_id: u32, message_id: u32) -> anyhow::Result<GroupMessage> {
     let message = sqlx::query_as::<_, GroupMessage>(
         format!("SELECT * FROM group_{group_id} WHERE group_id = ?;").as_str(),
     )
@@ -30,7 +29,7 @@ async fn get_message(group_id: u32, message_id: u32) -> anyhow::Result<GroupMess
     .await?;
     Ok(message)
 }
-async fn get_messages_from_target_message_id(
+pub async fn get_messages_from_target_message_id(
     group_id: u32,
     message_id: u32,
 ) -> anyhow::Result<Vec<GroupMessage>> {

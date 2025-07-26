@@ -13,7 +13,7 @@ fn get_user_sort_id(id_1: u32, id_2: u32) -> (u32, u32) {
     }
 }
 
-async fn add_message(message: PrivateMessage) -> anyhow::Result<()> {
+pub async fn add_message(message: PrivateMessage) -> anyhow::Result<()> {
     let (user_1, user_2) = get_user_sort_id(message.from_id, message.to_id);
     let _ = sqlx::query(format!("INSERT INTO private_message_{} (user_1, user_2, message_id, date, data, json, file_path) VALUES (?, ?, ?, ?, ?, ?, ?);", message.to_id).as_str())
                 .bind(user_1)
@@ -27,7 +27,7 @@ async fn add_message(message: PrivateMessage) -> anyhow::Result<()> {
                 .await?;
     Ok(())
 }
-async fn get_message(message_id: u32) -> anyhow::Result<PrivateMessage> {
+pub async fn get_message(message_id: u32) -> anyhow::Result<PrivateMessage> {
     let v = Box::new(
         sqlx::query_as::<_, PrivateMessage>(
             format!("SELECT * FROM private_message_{message_id} WHERE message_id = ?;",).as_str(),
@@ -38,7 +38,7 @@ async fn get_message(message_id: u32) -> anyhow::Result<PrivateMessage> {
     );
     Ok(*v)
 }
-async fn remove_message(to_id: u32, message_id: u32) -> anyhow::Result<()> {
+pub async fn remove_message(to_id: u32, message_id: u32) -> anyhow::Result<()> {
     let _ =
         sqlx::query(format!("DELETE FROM private_message_{to_id} WHERE message_id = ?;",).as_str())
             .bind(message_id)
@@ -46,7 +46,7 @@ async fn remove_message(to_id: u32, message_id: u32) -> anyhow::Result<()> {
             .await?;
     Ok(())
 }
-async fn get_messages_from_id(to_id: u32, from_id: u32) -> anyhow::Result<Vec<PrivateMessage>> {
+pub async fn get_messages_from_id(to_id: u32, from_id: u32) -> anyhow::Result<Vec<PrivateMessage>> {
     let v = sqlx::query_as::<_, PrivateMessage>(
         format!("SELECT * FROM private_message_{to_id} WHERE user_1 = ? OR user_2 = ?;").as_str(),
     )
