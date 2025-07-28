@@ -11,3 +11,28 @@ pub struct PrivateMessage {
     pub json: String,
     pub file_path: String,
 }
+
+impl PrivateMessage {
+    pub fn new(
+        from_id: u32,
+        to_id: u32,
+        message_id: u32,
+        date: String,
+        data: String,
+        json: String,
+        file_path: String,
+    ) -> Self {
+        PrivateMessage {
+            from_id,
+            to_id,
+            message_id,
+            date,
+            data,
+            json,
+            file_path,
+        }
+    }
+    pub fn from_string(v: String) -> Self {
+        serde_json::from_str(&v).unwrap()
+    }
+}
