@@ -1,5 +1,8 @@
+pub mod config;
+pub mod controller;
 pub mod dao;
 pub mod mapper;
+pub mod model;
 pub mod service;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/

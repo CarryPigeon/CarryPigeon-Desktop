@@ -1,15 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use carrypigeon_desktop_lib::config::get_config;
+use carrypigeon_desktop_lib::service::net::receive::ReceiveService;
 use tracing_appender::{non_blocking, rolling};
 use tracing_subscriber::{
     filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Registry,
 };
 
-use carrypigeon_desktop_lib::service::net::receive::ReceiveService;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let config = get_config().await?;
+    tracing::info!("{:?}", config);
+
     // 处理tracing输出和调用
     let env_filter =
     // 此处过滤了info以下的信息
