@@ -10,10 +10,17 @@ use std::path::Path;
 ///
 /// # Errors
 /// 当文件读取失败或JSON解析失败时会返回相应的错误
-pub async fn get_config() -> anyhow::Result<Value> {
+pub async fn get_config() -> Option<Value> {
     // 读取配置文件内容
     let config_file = Path::new("./config");
-    let data = Box::new(tokio::fs::read_to_string(config_file).await?);
+    let data = Box::new(tokio::fs::read_to_string(config_file).await);
+    let data = match *data {
+        Ok(data) => data,
+        Err(err) => {
+            tracing::error!("Failed to read config file: {}", err);
+            return None;
+        },
+    };
     // 将字符串数据解析为HashMap并返回
-    Ok(serde_json::from_str(&data)?)
+    serde_json::from_str(&data).unwrap_or(None)
 }

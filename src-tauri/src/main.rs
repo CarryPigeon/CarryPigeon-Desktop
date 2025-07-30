@@ -38,9 +38,6 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("CarryPigeon Desktop Started");
 
     let config_result = get_config().await;
-    if let Err(e) = &config_result {
-        tracing::error!("{:?}", e);
-    }
     tracing::info!("{:?}", config_result);
 
     let receive_service = ReceiveService::new();

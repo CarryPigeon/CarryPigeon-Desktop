@@ -36,7 +36,7 @@ impl DeleteMessage{
         let config_result = get_config().await;
         match config_result {
             // 配置获取成功，继续处理
-            Ok(config) => {
+            Some(config) => {
                 // 检查指定频道是否存在配置
                 if config.get(format!("channel_{channel_name}")).is_none() {
                     tracing::event!(Level::ERROR, "{channel_name} channel not found");
@@ -62,9 +62,9 @@ impl DeleteMessage{
                 }
             }
             // 配置获取失败处理
-            Err(e) => {
+            None => {
                 // TODO: 调用前端函数提示出错
-                tracing::event!(Level::ERROR, "{e}");
+                tracing::event!(Level::ERROR, "Failed to read config file");
             }
         }
     }
