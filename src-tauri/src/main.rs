@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use carrypigeon_desktop_lib::config::get_config;
-use carrypigeon_desktop_lib::service::net::receive::ReceiveService;
+use carrypigeon_desktop_lib::service::net::receive_message::ReceiveService;
 use tracing_appender::{non_blocking, rolling};
 use tracing_subscriber::{
     filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Registry,
@@ -10,9 +10,6 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = get_config().await?;
-    tracing::info!("{:?}", config);
-
     // 处理tracing输出和调用
     let env_filter =
     // 此处过滤了info以下的信息
@@ -39,6 +36,12 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     tracing::info!("CarryPigeon Desktop Started");
+
+    let config_result = get_config().await;
+    if let Err(e) = &config_result {
+        tracing::error!("{:?}", e);
+    }
+    tracing::info!("{:?}", config_result);
 
     let receive_service = ReceiveService::new();
     tokio::spawn(async move { receive_service.receive_loop().await });
