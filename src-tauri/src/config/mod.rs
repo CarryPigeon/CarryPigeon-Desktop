@@ -19,7 +19,7 @@ pub async fn get_config() -> Option<Value> {
         Err(err) => {
             tracing::error!("Failed to read config file: {}", err);
             return None;
-        },
+        }
     };
     // 将字符串数据解析为HashMap并返回
     serde_json::from_str(&data).unwrap_or(None)

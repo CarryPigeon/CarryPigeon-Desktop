@@ -1,7 +1,5 @@
-use crate::dao::groups::get_group_table;
 use crate::dao::private_message;
 use crate::mapper::private_message::PrivateMessage;
-use crate::service::message::notification::notification;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;

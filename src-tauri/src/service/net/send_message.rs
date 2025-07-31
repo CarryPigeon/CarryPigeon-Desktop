@@ -1,9 +1,7 @@
 use crate::config::get_config;
 use crate::model::send_message::{SendMessage, TextData};
-use reqwest::get;
 use serde_json::Value;
 use std::sync::Arc;
-use tracing::instrument;
 use tracing::Level;
 
 pub enum SendService<T> {

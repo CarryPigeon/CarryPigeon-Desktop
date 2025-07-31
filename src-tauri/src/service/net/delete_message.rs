@@ -1,37 +1,35 @@
-use std::sync::Arc;
+use crate::config::get_config;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use tracing::Level;
-use crate::config::get_config;
 
 #[derive(Serialize, Deserialize)]
-pub struct DeleteData{
+pub struct DeleteData {
     pub mid: u64,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct DeleteMessage{
+pub struct DeleteMessage {
     pub id: u64,
     pub route: String,
     pub data: DeleteData,
 }
 
-impl DeleteMessage{
-    pub fn new(id: u64, mid: u64) -> Self{
-       DeleteMessage{
+impl DeleteMessage {
+    pub fn new(id: u64, mid: u64) -> Self {
+        DeleteMessage {
             id,
             route: "/core/msg/delete".to_string(),
-            data: DeleteData{
-                mid,
-            },
-       }
+            data: DeleteData { mid },
+        }
     }
-    pub fn new_task(self:Arc<Self>,id: u64, mid: u64, channel_name: String){
+    pub fn new_task(self: Arc<Self>, id: u64, mid: u64, channel_name: String) {
         let v = DeleteMessage::new(id, mid);
         let v = serde_json::to_value(v).unwrap();
-        tokio::spawn(async move {self.delete_message(v, channel_name).await});
+        tokio::spawn(async move { self.delete_message(v, channel_name).await });
     }
-    pub async fn delete_message(&self, v: Value, channel_name: String){
+    pub async fn delete_message(&self, v: Value, channel_name: String) {
         let client = reqwest::Client::new();
         let config_result = get_config().await;
         match config_result {
@@ -51,7 +49,7 @@ impl DeleteMessage{
                     .unwrap();
                 let result = client.delete(socket).json(&v).send().await;
                 match result {
-                    Ok(v) => {
+                    Ok(_v) => {
                         // TODO： http返回值的处理
                     }
                     // HTTP请求失败处理
