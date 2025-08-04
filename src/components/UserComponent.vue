@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import setting from '/settings.svg?url';
+import add from '/add.svg?url';
+
 const props = defineProps({
   avatar: String,
   name: String,
@@ -7,11 +10,13 @@ const props = defineProps({
 </script>
 
 <template>
-<div class="container">
-  <img class ="image" :src="props.avatar" alt="avatar"/>
-  <p class="username"> {{props.name}} </p>
-  <p class="description"> {{props.description}} </p>
-</div>
+  <div class="container">
+    <img class="image" :src="props.avatar" alt="avatar"/>
+    <p class="username"> {{ props.name }} </p>
+    <p class="description"> {{ props.description }} </p>
+    <img class="setting-icon" :src="setting" alt=""/>
+    <img class="add-icon" :src="add" alt=""/>
+  </div>
 </template>
 
 <style scoped lang="sass">
@@ -23,6 +28,7 @@ const props = defineProps({
   height: 60px
   opacity: 1
   background: rgba(229, 231, 235, 1)
+
 .image
   background-size: 30px 30px
   left: 86px
@@ -31,6 +37,7 @@ const props = defineProps({
   height: 30px
   opacity: 1
   background: rgba(204, 204, 204, 1)
+
 .username
   position: fixed
   left: 128px
@@ -47,6 +54,7 @@ const props = defineProps({
   color: rgba(0, 0, 0, 1)
   text-align: left
   vertical-align: middle
+
 .description
   position: fixed
   left: 128px
@@ -63,4 +71,14 @@ const props = defineProps({
   color: rgba(35, 66, 87, 1)
   text-align: left
   vertical-align: middle
+
+.setting-icon
+  position: fixed
+  left: 239px
+  top: calc(100vh - 39px)
+
+.add-icon
+  position: fixed
+  left: 275px
+  top: calc(100vh - 39px)
 </style>

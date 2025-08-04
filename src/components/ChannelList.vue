@@ -75,6 +75,9 @@ defineExpose({
   display: flex
   flex-direction: column
   align-items: center
+  margin-left: 0
+  padding-left: 0
+  margin-top: 0
   width: 100%
   gap: 10px
   overflow-y: auto
