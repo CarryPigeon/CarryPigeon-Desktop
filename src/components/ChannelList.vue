@@ -1,92 +1,47 @@
 <script setup lang="ts">
-import { reactive, Ref } from 'vue'
+import ChannelModel, {ChannelModelProps} from "./ChannelModel.vue";
+import {reactive} from "vue";
 
-interface ChannelProps {
-  channel: string
-  active: boolean
-  imageUrl: Ref<string>
-  onClick: () => void
-}
+const channel_props = reactive([] as ChannelModelProps[]);
 
-interface AvatarProps {
-  username: Ref<string>
-  imageUrl: Ref<string>
-  onClick: () => void
-}
-
-const avatar_props = reactive<AvatarProps>({} as AvatarProps);
-const channel_props = reactive<ChannelProps[]>([] as ChannelProps[]);
-
-function addChannel(channel: string, active: boolean, imageUrl: string, onClick: () => void) {
-  channel_props.push({channel, active, imageUrl, onClick});
+function addChannel(channel: ChannelModelProps) {
+  channel_props.push(channel);
 }
 
 function deleteChannel(channel: string) {
-  const index = channel_props.findIndex(item => item.channel === channel);
+  const index = channel_props.findIndex(item => item.channelName === channel);
   if (index !== -1) {
     channel_props.splice(index, 1);
   }
 }
 
-function getAvatar(username: string, imageUrl: string, onClick: () => void) {
-  avatar_props.username = username;
-  avatar_props.imageUrl = imageUrl;
-  avatar_props.onClick = onClick;
-}
-
 defineExpose({
   addChannel,
-  deleteChannel,
-  getAvatar,
+  deleteChannel
 })
+
 </script>
 
 <template>
-<div class="list">
-  <img class="avatar" :src="avatar_props.imageUrl" alt="avatar" @click="avatar_props.onClick">
-  <ul class="channel_item_list">
-    <li v-for="item in channel_props" :key="item.channel" @click="item.onClick">
-      <img class="image" :src="item.imageUrl" :alt="item.channel">
-    </li>
-  </ul>
-</div>
+  <div class="channelList">
+    <ul>
+      <li v-for="item in channel_props">
+        <ChannelModel v-bind="item"/>
+      </li>
+    </ul>
+  </div>
 </template>
 
 <style scoped lang="sass">
-.list
-  display: flex
-  flex-direction: column
-  align-items: center
-  width: 65px
-  height: 100vh
-  background: rgba(17, 24, 39, 1)
-  padding: 10px 0
-  box-sizing: border-box
-
-.avatar
-  width: 48px
-  height: 48px
-  border-radius: 8px
-  margin-bottom: 15px
-  cursor: pointer
-  flex-shrink: 0
-
-.channel_item_list
-  display: flex
-  flex-direction: column
-  align-items: center
-  margin-left: 0
-  padding-left: 0
-  margin-top: 0
-  width: 100%
-  gap: 10px
+.channelList
+  position: absolute
+  left: 63px
+  top: 60px
+  width: 255px
+  height: calc(100vh - 120px)
+  // 60px(top) + 20px(底部边距)
+  opacity: 1
+  background: rgba(243, 244, 246, 1)
+  border: 1px solid rgba(231, 232, 236, 1)
   overflow-y: auto
-  flex: 1
-
-.image
-  width: 48px
-  height: 48px
-  border-radius: 8px
-  cursor: pointer
-  flex-shrink: 0
 </style>

@@ -1,18 +1,18 @@
 <script setup lang="ts">
-export interface GroupModelProps {
+export interface ChannelModelProps {
   imgUrl: string
-  groupName: string
+  channelName: string
   latestMsg: string
   onClick: () => void
 }
-const props = defineProps<GroupModelProps>()
+const props = defineProps<ChannelModelProps>()
 </script>
 
 <template>
-  <div class="groupModel">
+  <div class="channelModel">
     <img :src="props.imgUrl" alt=""/>
     <div class="info">
-      <p class="groupName">{{props.groupName}}</p>
+      <p class="channelName">{{ props.channelName }}</p>
       <p class="latestMsg">{{props.latestMsg}}</p>
     </div>
   </div>
