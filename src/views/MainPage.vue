@@ -5,6 +5,7 @@ import ChannelList from "../components/ChannelList.vue";
 import {invoke} from "@tauri-apps/api/core";
 import UserComponent from "../components/UserComponent.vue";
 import SearchBar from "../components/SearchBar.vue";
+import TextArea from "../components/TextArea.vue";
 
 invoke("to_chat_window_size");
 
@@ -16,6 +17,7 @@ invoke("to_chat_window_size");
   <ChannelList/>
   <UserComponent/>
   <SearchBar/>
+  <TextArea />
 </template>
 <style scoped lang="sass">
 </style>
