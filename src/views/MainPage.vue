@@ -6,6 +6,7 @@ import {invoke} from "@tauri-apps/api/core";
 import UserComponent from "../components/UserComponent.vue";
 import SearchBar from "../components/SearchBar.vue";
 import TextArea from "../components/TextArea.vue";
+import ParticipantsList from "../components/ParticipantsList.vue";
 
 invoke("to_chat_window_size");
 
@@ -17,7 +18,8 @@ invoke("to_chat_window_size");
   <ChannelList/>
   <UserComponent/>
   <SearchBar/>
-  <TextArea />
+  <TextArea/>
+  <ParticipantsList :length="0" :online="0" :member="[]"/>
 </template>
 <style scoped lang="sass">
 </style>
