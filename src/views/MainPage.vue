@@ -7,6 +7,7 @@ import UserComponent from "../components/UserComponent.vue";
 import SearchBar from "../components/SearchBar.vue";
 import TextArea from "../components/TextArea.vue";
 import ParticipantsList from "../components/ParticipantsList.vue";
+import ChatBox from "../components/ChatBox.vue";
 
 invoke("to_chat_window_size");
 
@@ -20,6 +21,7 @@ invoke("to_chat_window_size");
   <SearchBar/>
   <TextArea/>
   <ParticipantsList :length="0" :online="0" :member="[]"/>
+  <ChatBox />
 </template>
 <style scoped lang="sass">
 </style>

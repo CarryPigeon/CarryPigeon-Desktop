@@ -1,16 +1,51 @@
 <script setup lang="ts">
-import {ref} from "vue";
+import {h, onMounted, ref, render} from "vue";
+import UserMessageBubble from './UserMessageBubble.vue';
+import Avatar from '/test_avatar.jpg?url';
 
-const text = ref('')
+let container:HTMLElement | null = null;
+const text = ref('');
+
+onMounted(() => {
+  container = document.querySelector('.chat-box-container');
+});
+
+function sendMessage() {
+  if (text.value.length == 0) {
+    return;
+  }
+  let date = new Date().toDateString();
+  let vNode = h(UserMessageBubble, {
+    name: "shirasawa",
+    message: text.value,
+    avatar: Avatar,
+    date: date,
+  });
+
+  let renderer = document.createElement("div");
+  render(vNode, renderer);
+  // 获取真实DOM并添加到容器
+  if (container && renderer.firstChild) {
+    container.appendChild(renderer.firstChild);
+    text.value = '';
+
+    // 自动滚动到底部
+    requestAnimationFrame(() => {
+      container!.scrollTop = container!.scrollHeight;
+    });
+  }
+}
 </script>
 
 <template>
   <div class="text-area">
     <textarea
+        id="text-area-item"
         v-model="text"
         placeholder=""
         class="text-area-item"
         wrap="soft"
+        @keydown.enter="sendMessage"
     ></textarea>
   </div>
 </template>
