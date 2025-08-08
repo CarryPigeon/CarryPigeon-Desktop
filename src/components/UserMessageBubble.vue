@@ -22,13 +22,16 @@ const props = defineProps<{
   display: flex
   align-items: flex-start
   justify-content: flex-end
-  margin-bottom: 10px
+  margin-top: 5px
+  margin-bottom: 20px
+  margin-right: 5px
   background: transparent
 
 .member-avatar
   width: 40px
   height: 40px
-  margin-right: 10px
+  margin-right: 0
+  margin-top: 5px
   border-radius: 50%
   object-fit: cover
 
@@ -36,7 +39,7 @@ const props = defineProps<{
   background: rgba(224, 231, 255, 1)
   border-radius: 10px
   padding: 10px
-  margin-top: 30px
+  margin-top: 20px
   margin-right: -60px
   max-width: 70%
 // 防止消息过长挤占太多空间
