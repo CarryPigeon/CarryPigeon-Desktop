@@ -12,7 +12,7 @@ const props = defineProps<{
     <div class="member-bubble-content">{{ props.message }}</div>
     <div class="member-name">{{ props.name }}</div>
     <div class="member-bubble-avatar">
-      <img class="member-avatar" :src="props.avatar" alt="">
+      <img class="member-avatar" :src="props.avatar" alt=""/>
     </div>
   </div>
 </template>
