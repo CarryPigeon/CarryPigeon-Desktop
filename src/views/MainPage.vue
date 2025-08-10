@@ -6,11 +6,19 @@ import {invoke} from "@tauri-apps/api/core";
 import UserComponent from "../components/UserComponent.vue";
 import SearchBar from "../components/SearchBar.vue";
 import TextArea from "../components/TextArea.vue";
-import ParticipantsList from "../components/ParticipantsList.vue";
+import ParticipantsList, {Member} from "../components/ParticipantsList.vue";
 import ChatBox from "../components/ChatBox.vue";
+import Avatar from "/test_avatar.jpg?url";
 
 invoke("to_chat_window_size");
 
+
+const a : Member ={
+  id: 1,
+  name: '张三',
+  avatar: Avatar,
+  description: '111',
+};
 </script>
 
 <template>
@@ -20,7 +28,7 @@ invoke("to_chat_window_size");
   <UserComponent/>
   <SearchBar/>
   <TextArea/>
-  <ParticipantsList :length="0" :online="0" :member="[]"/>
+  <ParticipantsList :length="1" :online="1" :member="[a]"/>
   <ChatBox />
 </template>
 <style scoped lang="sass">

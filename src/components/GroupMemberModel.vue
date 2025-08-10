@@ -14,12 +14,17 @@ const props = defineProps<{
 
 <style scoped lang="sass">
 .group-member-model
-  display: grid
+  //display: flex
   align-items: center
 .member-avatar
+  width: 40px
+  height: 40px
   margin-left: 15px
-  // 头像为已裁切图片
-  background-size: 30px, 30px
+  margin-right: 0
+  margin-top: 50px
+  border-radius: 50%
+  object-fit: cover
 .member-name
-  margin-left: 15px
+  margin-left: 100px
+  margin-top: -40px
 </style>

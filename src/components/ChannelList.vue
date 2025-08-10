@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ChannelModel, {ChannelModelProps} from "./ChannelModel.vue";
 import {reactive} from "vue";
+import Avatar from "/test_avatar.jpg?url";
 
 const channel_props = reactive([] as ChannelModelProps[]);
 
@@ -20,11 +21,20 @@ defineExpose({
   deleteChannel
 })
 
+const a: ChannelModelProps = {
+  channelName: '111',
+  imgUrl: Avatar,
+  latestMsg: '111',
+  onClick: () => {
+  }
+};
+addChannel(a);
+
 </script>
 
 <template>
   <div class="channelList">
-    <ul>
+    <ul style="list-style-type: none; padding: 0;">
       <li v-for="item in channel_props">
         <ChannelModel v-bind="item"/>
       </li>

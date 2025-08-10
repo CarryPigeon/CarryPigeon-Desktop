@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { reactive, Ref } from 'vue'
+import {reactive, Ref} from 'vue'
+import Avatar from "/test_avatar.jpg?url";
 
 interface ChannelProps {
   channel: string
@@ -39,6 +40,9 @@ defineExpose({
   deleteChannel,
   getAvatar,
 })
+
+addChannel("111", false, Avatar, () => {});
+
 </script>
 
 <template>

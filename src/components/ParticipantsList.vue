@@ -13,7 +13,6 @@ const props = defineProps<{
   online: number
   member: Member[]
 }>()
-
 </script>
 
 <template>
@@ -22,7 +21,7 @@ const props = defineProps<{
     <p>participants - {{props.length}}</p>
   </div>
   <div class="list">
-    <ul :style="{padding: 0}">
+    <ul style="list-style-type: none; padding: 0;">
       <li v-for="item in props.member" :key="item.id">
         <GroupMemberModel :avatar="item.avatar" :name="item.name"/>
       </li>

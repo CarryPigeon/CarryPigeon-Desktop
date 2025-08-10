@@ -10,9 +10,9 @@ const props = defineProps<{
 <template>
 <div class="member-bubble">
   <div class="member-bubble-avatar">
-    <img :src="props.avatar" alt=""/>
+    <img class="member-avatar" :src="props.avatar" alt=""/>
   </div>
-  <div class="member-name">{{props.name}}</div>
+  <div class="member-name">{{props.name}} - {{props.date}}</div>
   <div class="member-bubble-content">{{props.message}}</div>
 </div>
 </template>
@@ -28,15 +28,16 @@ const props = defineProps<{
 .member-avatar
   width: 40px
   height: 40px
-  margin-left: 0
+  margin-right: 0
   margin-top: 5px
   border-radius: 50%
   object-fit: cover
 .member-bubble-content
-  background: rgba(224, 231, 255, 1)
+  background: rgba(229, 231, 235, 1)
   border-radius: 10px
   padding: 10px
-  margin-left: -60px
+  margin-top: 20px
+  margin-left: -25px
   max-width: 70% // 防止消息过长挤占太多空间
 .member-name
   font-size: 14px

@@ -6,3 +6,7 @@ CarryPigeon的桌面端
 ```shell
 pnpm run tauri dev
 ```
+## 打包
+```shell
+pnpm tauri build
+```

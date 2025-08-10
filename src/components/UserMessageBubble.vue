@@ -10,7 +10,7 @@ const props = defineProps<{
 <template>
   <div class="member-bubble">
     <div class="member-bubble-content">{{ props.message }}</div>
-    <div class="member-name">{{ props.name }}</div>
+    <div class="member-name">{{ props.date }} - {{ props.name }}</div>
     <div class="member-bubble-avatar">
       <img class="member-avatar" :src="props.avatar" alt=""/>
     </div>
@@ -26,7 +26,6 @@ const props = defineProps<{
   margin-bottom: 20px
   margin-right: 5px
   background: transparent
-
 .member-avatar
   width: 40px
   height: 40px
@@ -34,7 +33,6 @@ const props = defineProps<{
   margin-top: 5px
   border-radius: 50%
   object-fit: cover
-
 .member-bubble-content
   background: rgba(224, 231, 255, 1)
   border-radius: 10px
