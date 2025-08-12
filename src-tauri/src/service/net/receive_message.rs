@@ -13,8 +13,8 @@ impl ReceiveService {
         ReceiveService
     }
 
-    pub async fn receive_loop(self) -> anyhow::Result<()> {
-        let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+    pub async fn receive_loop(self, socket: String) -> anyhow::Result<()> {
+        let tcp_listener = tokio::net::TcpListener::bind(socket).await?;
         loop {
             let (tcp_stream, _) = tcp_listener.accept().await?;
             spawn(async move { self.receive_message(tcp_stream).await });
