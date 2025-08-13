@@ -1,4 +1,4 @@
-use tauri::{AppHandle, LogicalSize, Manager, Window};
+use tauri::{AppHandle, LogicalSize, Manager};
 
 #[tauri::command]
 pub fn to_chat_window_size(app: AppHandle) {

@@ -3,7 +3,7 @@
 
 use carrypigeon_desktop_lib::config::get_config;
 use carrypigeon_desktop_lib::service::net::receive_message::ReceiveService;
-use carrypigeon_desktop_lib::service::net::tcp_service::TcpService;
+use carrypigeon_desktop_lib::service::net::tcp_service::{TcpService, TCP_SERVICE};
 use tracing_appender::{non_blocking, rolling};
 use tracing_subscriber::{
     filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Registry,
@@ -42,8 +42,10 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("{:?}", config_result);
 
     // TODO: 配置文件读取
-    let mut tcp_service = TcpService::new("127.0.0.1:8080".to_string()).await?;
-    tcp_service.receive_message().await?;
+    let mut tcp_service = TcpService::new("127.0.0.1:8080".to_string()).await;
+    unsafe {
+        TCP_SERVICE.get_mut().unwrap().receive_message().await?;
+    }
 
     carrypigeon_desktop_lib::run()
 }

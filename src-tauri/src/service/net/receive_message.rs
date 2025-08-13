@@ -5,7 +5,7 @@ use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio::spawn;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct ReceiveService;
 
 impl ReceiveService {
