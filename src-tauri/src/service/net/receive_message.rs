@@ -1,22 +1,25 @@
 use crate::mapper::common_message::CommonNoticeMessage;
 use crate::service::message::notification::notification;
+use std::rc::Rc;
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
-use tokio::net::TcpStream;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
-#[derive(Copy, Clone, Default, Debug)]
-pub struct ReceiveService;
+#[derive(Clone, Debug)]
+pub struct ReceiveService {
+    tcp_listener: Rc<TcpListener>,
+}
 
 impl ReceiveService {
-    pub fn new() -> Self {
-        ReceiveService
+    pub async fn new(socket: String) -> Self {
+        let tcp_listener = Rc::new(TcpListener::bind(socket).await.unwrap());
+        ReceiveService { tcp_listener }
     }
 
     pub async fn receive_loop(self, socket: String) -> anyhow::Result<()> {
-        let tcp_listener = tokio::net::TcpListener::bind(socket).await?;
         loop {
-            let (tcp_stream, _) = tcp_listener.accept().await?;
+            let (tcp_stream, _) = self.tcp_listener.accept().await?;
             spawn(async move { self.receive_message(tcp_stream).await });
         }
     }
@@ -50,5 +53,15 @@ impl ReceiveService {
         notification(value).await?;
         // TODO: 处理接受信息部分的错误
         Ok(())
+    }
+    pub async fn receive_rsa(&self) -> String {
+        while let Ok((mut tcp_stream, _)) = self.tcp_listener.accept().await {
+            let len = self.get_tcp_packet_len(&mut tcp_stream).await;
+            let mut buf = vec![0u8; len];
+            let mut reader = tokio::io::BufReader::new(tcp_stream);
+            let _ = reader.read_exact(&mut buf).await;
+
+            return buf.to_string();
+        }
     }
 }
