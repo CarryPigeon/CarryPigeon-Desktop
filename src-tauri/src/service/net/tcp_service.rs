@@ -1,13 +1,9 @@
-use crate::controller::encryption::Encryption;
 use crate::service::net::receive_message::ReceiveService;
 use base64::decode;
-use pem::Pem;
 use ring::agreement::UnparsedPublicKey;
 use ring::rsa::PublicKey;
 use ring::signature::{RsaKeyPair, RsaPublicKeyComponents};
 use ring::{agreement, signature};
-use rsa::pkcs1::DecodeRsaPublicKey;
-use rsa::RsaPublicKey;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
@@ -20,7 +16,7 @@ pub struct TcpService {
     socket: String,
     stream: TcpStream,
     receiver: ReceiveService,
-    encryption: Encryption,
+    encryption: None,
 }
 
 impl TcpService {
@@ -84,7 +80,7 @@ impl TcpService {
             socket: socket.clone(),
             stream: tcp,
             receiver: ReceiveService::new(socket.clone()),
-            encryption: Encryption::new(),
+            encryption: None
         })
     }
 
