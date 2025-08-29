@@ -33,7 +33,7 @@ export async function praseAESKeyPair(base64Key: string): Promise<CryptoKey> {
 
 export async function  decrypt(publicKey: CryptoKey, encryptedData: string): Promise<string> {
     const encoder = new TextEncoder();
-    await window.crypto.subtle.decrypt(
+    let a = await window.crypto.subtle.decrypt(
         {
             name: "ECDSA",
             iv: new Uint8Array(16),
@@ -41,5 +41,7 @@ export async function  decrypt(publicKey: CryptoKey, encryptedData: string): Pro
         publicKey,
         encoder.encode(encryptedData),
     );
+    const decoder = new TextDecoder();
+    return decoder.decode(a);
 }
 
