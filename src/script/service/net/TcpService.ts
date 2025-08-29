@@ -23,18 +23,20 @@ export async function keepAlive(instance: AxiosInstance) {
     });
 }
 
-export async function getRequest(instance: AxiosInstance, path: string) {
-    return await instance.get(path,{});
+export async function getRequest(instance: AxiosInstance, path: string, data:any) {
+    return await instance.get(path,{
+        params: {data}
+    });
 }
 
-export async function postRequest(instance: AxiosInstance, path: string) {
-    return await instance.post(path,{});
+export async function postRequest(instance: AxiosInstance, path: string, data:string) {
+    return await instance.post(path,{data});
 }
 
-export async function putRequest(instance: AxiosInstance, path: string) {
-    return await instance.put(path,{});
+export async function putRequest(instance: AxiosInstance, path: string, data:string) {
+    return await instance.put(path,{data});
 }
 
-export async function deleteRequest(instance: AxiosInstance, path: string) {
-    return await instance.delete(path,{});
+export async function deleteRequest(instance: AxiosInstance, path: string,data:string) {
+    return await instance.delete(path,{data});
 }

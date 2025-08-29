@@ -19,7 +19,7 @@ export async function generateECCKeyPair(): Promise<{privateKey: CryptoKey, publ
 
 export async function praseAESKeyPair(base64Key: string): Promise<CryptoKey> {
     const keyBuffer = Uint8Array.from(base64Key);
-    const key = await window.crypto.subtle.importKey(
+    return await window.crypto.subtle.importKey(
         "raw",
         keyBuffer,
         {
@@ -29,6 +29,17 @@ export async function praseAESKeyPair(base64Key: string): Promise<CryptoKey> {
         true,
         ["encrypt", "decrypt"],
     );
-    return key;
+}
+
+export async function  decrypt(publicKey: CryptoKey, encryptedData: string): Promise<string> {
+    const encoder = new TextEncoder();
+    await window.crypto.subtle.decrypt(
+        {
+            name: "ECDSA",
+            iv: new Uint8Array(16),
+        },
+        publicKey,
+        encoder.encode(encryptedData),
+    );
 }
 
