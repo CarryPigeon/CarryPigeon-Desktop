@@ -2,15 +2,15 @@ import {database} from "./Init.ts";
 import {table} from "../mapper/GroupMessage.ts";
 import {between, eq} from "drizzle-orm";
 
-export async function getAllLocalMessagesData(groupId: number) {
+export async function selectAllLocalMessagesData(groupId: number) {
     return database.select().from(table).where(eq(table.groupId, groupId));
 }
 
-export async function getOneLocalMessageData(groupId: number, messageId: number) {
+export async function selectOneLocalMessageData(groupId: number, messageId: number) {
     return database.select().from(table).where(eq(table.groupId, groupId) && eq(table.messageId, messageId));
 }
 
-export async function getRangeLocalMessageData(groupId: number, start: number, end: number) {
+export async function selectRangeLocalMessageData(groupId: number, start: number, end: number) {
     return database.select().from(table).where(eq(table.groupId, groupId) && between(table.messageId, start, end));
 }
 
