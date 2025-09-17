@@ -1,13 +1,15 @@
+/*
 pub mod config;
 pub mod controller;
 pub mod dao;
 pub mod mapper;
 pub mod model;
 pub mod service;
-pub mod windows;
+
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-
+ */
+pub mod windows;
 use windows::to_chat_window_size;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,3 +21,4 @@ pub fn run() -> anyhow::Result<()> {
         .expect("error while running tauri application");
     Ok(())
 }
+
