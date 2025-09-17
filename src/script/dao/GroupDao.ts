@@ -28,3 +28,12 @@ export async function updateGroup(groupInfo: any) {
         console.log(e);
     }
 }
+
+export async function deleteGroup(groupId: number) {
+    try{
+        await database.delete(table).where(eq(table.id, groupId));
+    }
+    catch (e) {
+        console.log(e);
+    }
+}
