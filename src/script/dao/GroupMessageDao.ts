@@ -1,5 +1,5 @@
 import {database} from "./Init.ts";
-import {table} from "../mapper/GroupMessage.ts";
+import {table} from "../mapper/ChannelMessage.ts";
 import {between, eq} from "drizzle-orm";
 
 export async function selectAllLocalMessagesData(groupId: number) {

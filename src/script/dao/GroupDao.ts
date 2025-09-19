@@ -1,4 +1,4 @@
-import {table} from "../mapper/Group.ts";
+import {table} from "../mapper/Channel.ts";
 import {database} from "./Init.ts";
 import {eq} from "drizzle-orm";
 

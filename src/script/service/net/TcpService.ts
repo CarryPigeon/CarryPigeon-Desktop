@@ -1,6 +1,6 @@
 import axios, {AxiosInstance} from "axios";
 
-export function crateConnection(socket: string):AxiosInstance  {
+export function createConnection(socket: string): AxiosInstance  {
     return axios.create({
         baseURL: socket,
         timeout: 5000,
