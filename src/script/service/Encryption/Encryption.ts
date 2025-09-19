@@ -58,36 +58,33 @@ export class OfficialEncryptClass implements EncryptClass {
     }
 
     public encrypt(data: string): string {
-        return CryptoJS.AES.encrypt(data, this.AESKey as string).toString();
+        if (this.AESKey === undefined) {
+            throw new Error("AESKey is undefined");
+        }
+        return CryptoJS.AES.encrypt(data, this.AESKey).toString();
     }
 
     public decrypt(data: string): string {
-        return CryptoJS.AES.decrypt(data, this.AESKey as string).toString();
+        if (this.AESKey === undefined) {
+            throw new Error("AESKey is undefined");
+        }
+        return CryptoJS.AES.decrypt(data, this.AESKey).toString();
     }
 }
 
-export class Encryption {
-    private encryptClass: EncryptClass;
-
-    constructor(encryptClass: EncryptClass) {
-        this.encryptClass = encryptClass;
-    }
+export interface Encryption {
 
     /**
      * 第三方加密
      * @param data 待加密数据
      * @returns 加密后数据
      */
-    public thirdPartyEncrypt(data: string): string {
-        return this.encryptClass.encrypt(data);
-    }
+    encrypt(data: string): string;
 
     /**
      * 第三方解密
      * @param data 待解密数据
      * @returns 解密后数据
      */
-    public thirdPartyDecrypt(data: string): string {
-        return this.encryptClass.decrypt(data);
-    }
+    decrypt(data: string): string;
 }
