@@ -3,12 +3,50 @@ import * as CryptoJS from "crypto-js";
 import {createConnection} from "../net/TcpService";
 import {generateECCKeyPair} from "./ECC";
 
-interface EncryptClass {
+export interface EncryptInterface {
     encrypt: (data: string) => string
     decrypt: (data: string) => string
 }
 
-export class OfficialEncryptClass implements EncryptClass {
+export abstract class EncryptClass implements EncryptInterface {
+    //protected constructor(socket: string) ;
+    public abstract encrypt(data: string): string;
+    public abstract decrypt(data: string): string;
+}
+
+export type EncryptClassWithConstructor<T extends EncryptClass> = new (socket: string) => T;
+
+export class Encryption {
+    private encryptClass: EncryptInterface;
+
+    constructor(socket: string, encryptClass?: EncryptClassWithConstructor<EncryptClass>) {
+        if(encryptClass) {
+            this.encryptClass = new encryptClass(socket);
+        } else {
+            this.encryptClass = new OfficialEncryptClass(socket);
+        }
+    }
+
+    /**
+     * 第三方加密
+     * @param data 待加密数据
+     * @returns 加密后数据
+     */
+    public encrypt(data: string): string {
+        return this.encryptClass.encrypt(data);
+    }
+
+    /**
+     * 第三方解密
+     * @param data 待解密数据
+     * @returns 解密后数据
+     */
+    public decrypt(data: string): string {
+        return this.encryptClass.decrypt(data);
+    }
+}
+
+export class OfficialEncryptClass implements EncryptInterface {
     public instance: AxiosInstance;
     private ECCPrivateKey: CryptoKey | undefined;
     private AESKey: string | undefined;
@@ -72,19 +110,3 @@ export class OfficialEncryptClass implements EncryptClass {
     }
 }
 
-export interface Encryption {
-
-    /**
-     * 第三方加密
-     * @param data 待加密数据
-     * @returns 加密后数据
-     */
-    encrypt(data: string): string;
-
-    /**
-     * 第三方解密
-     * @param data 待解密数据
-     * @returns 解密后数据
-     */
-    decrypt(data: string): string;
-}
