@@ -1,6 +1,5 @@
-import {AxiosInstance} from "axios";
 import * as CryptoJS from "crypto-js";
-import {createConnection} from "../net/TcpService";
+import {TcpService} from "../net/TcpService";
 import {generateECCKeyPair} from "./ECC";
 
 export interface EncryptInterface {
@@ -47,12 +46,12 @@ export class Encryption {
 }
 
 export class OfficialEncryptClass implements EncryptInterface {
-    public instance: AxiosInstance;
+    public instance: TcpService;
     private ECCPrivateKey: CryptoKey | undefined;
     private AESKey: string | undefined;
 
     constructor(socket: string) {
-        this.instance = createConnection(socket);
+        this.instance = new TcpService(socket);
     }
 
     private async sendECCPrivateKey(userId: number) {
@@ -63,7 +62,7 @@ export class OfficialEncryptClass implements EncryptInterface {
             "key": ECCKeyPair.publicKey,
         }
         const bodyJson = JSON.stringify(body);
-        return this.instance.post(bodyJson);
+        return this.instance.send(bodyJson);
     }
 
     private async decryptAESKey(data: string) {
@@ -82,17 +81,15 @@ export class OfficialEncryptClass implements EncryptInterface {
             const decoder = new TextDecoder('utf-8');
             this.AESKey = decoder.decode(tmp);
         } catch (e) {
-
         }
     }
 
     public async swapKey(userId: number) {
-        const result = await this.sendECCPrivateKey(userId);
-        if ( result.status === 200){
-            await this.decryptAESKey(result.data);
-        } else {
-            throw new Error("swap key error");
-        }
+        await this.sendECCPrivateKey(userId);
+        this.instance.client.once("swapKey", (data: string) => {
+                this.decryptAESKey(data);
+            });
+        this.instance.send(this.decrypt("verification"));
     }
 
     public encrypt(data: string): string {
