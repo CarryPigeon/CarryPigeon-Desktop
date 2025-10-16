@@ -17,14 +17,14 @@ function getConfig(filePath: string) {
         return createInitConfig();
     }
     const absolutePath = path.resolve(filePath);
-    fs.readFile(absolutePath, 'utf-8', (err, config) => {
-        if (err) {
-            // TODO: 创建初始化配置文件
-            console.error(err);
-            return createInitConfig();
-        }
+    try {
+        const config = fs.readFileSync(absolutePath, 'utf-8');
         return JSON.parse(config);
-    });
+    } catch (err) {
+        // TODO: 创建初始化配置文件
+        console.error(err);
+        return createInitConfig();
+    }
 }
 
 export {
