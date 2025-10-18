@@ -7,6 +7,7 @@ export var Config = getConfig(configPath);
 
 function createInitConfig() {
     return {
+        maxWorkers: 4,
         socket: "",
      };
 }

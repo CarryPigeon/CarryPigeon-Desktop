@@ -5,7 +5,7 @@ interface FileUploadAPI {
     sha256: string|undefined;
 }
 
-class FileAPIService{
+export class FileAPIService{
     public requestUpload(size:number,sha256:string){
         const context: FileUploadAPI = {
             size: size,
