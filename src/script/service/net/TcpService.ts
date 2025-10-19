@@ -1,11 +1,14 @@
 import * as net from "node:net";
 import {pushTask} from "./praseJsonBody.ts";
 import { Config} from "../../config/Config.ts";
+import { Encryption } from "../Encryption/Encryption.ts";
 
 class TcpService {
     public client: net.Socket
+    public encrypter: Encryption
 
     constructor(socket: string) {
+        this.encrypter = new Encryption(socket);
         this.client = net.connect(socket);
     }
 
@@ -20,12 +23,13 @@ class TcpService {
     }
 
     public send(data: string) {
-        this.client.write(data);
+        let en_data = this.encrypter?.decrypt(data);
+         this.client.write(en_data);
     }
 
-    public receive(callback: (data: string) => void) {
+    public receive(callback: (data: string) => any) {
         this.client.on("data", (data) => {
-            callback(data.toString());
+            callback(this.encrypter.decrypt(data.toString()));
         });
     }
 

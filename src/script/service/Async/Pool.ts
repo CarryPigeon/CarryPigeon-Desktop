@@ -1,4 +1,4 @@
-import {Config} from "../../config/Config.ts";
+import { Config } from "../../config/Config.ts";
 
-export const WorkerPool = require('worker_pool').pool;
-export const pool = WorkerPool({maxWorkers: Config["maxWorkers"]});
+const WorkerPool = require("worker_pool").pool;
+export const pool = WorkerPool({ maxWorkers: Config["maxWorkers"] });

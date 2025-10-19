@@ -1,5 +1,7 @@
+import { TCP_SERVICE } from "../../script/service/net/TcpService";
+
 export interface MessageCommon {
-    router: string;
+    route: string;
     data: {
         // 简略信息，特殊消息可以为：[表情]，[图片]这种，文本可截取前20个字符
         scontent: string;
@@ -12,11 +14,12 @@ export interface MessageCommon {
     }
 }
 
-export async function paseChannelMessage(message: MessageCommon) {
-    switch (message.router) {
-        case "channel":
-            break;
-        default:
-            break;
-    }
+export interface UIMessageCommon{
+    route: string;
+    data: string;
+}
+
+export async function praseChannelMessage(message: string) {
+    const value = JSON.parse(message);
+    //TCP_SERVICE.send()
 }
