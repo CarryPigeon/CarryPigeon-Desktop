@@ -89,7 +89,6 @@ export class OfficialEncryptClass implements EncryptInterface {
         this.instance.client.once("swapKey", (data: string) => {
                 this.decryptAESKey(data);
             });
-        this.instance.send(this.decrypt("verification"));
     }
 
     public encrypt(data: string): string {
