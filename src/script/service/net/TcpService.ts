@@ -27,7 +27,7 @@ class TcpService {
          this.client.write(en_data);
     }
 
-    public receive(callback: (data: string) => any) {
+    public receive(callback: (data: string) => any) => any {
         this.client.on("data", (data) => {
             callback(this.encrypter.decrypt(data.toString()));
         });
