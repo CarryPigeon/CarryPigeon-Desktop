@@ -2,15 +2,18 @@ import { TCP_SERVICE } from "../../script/service/net/TcpService";
 import { CommandMessage } from "../CommandMessage";
 
 export abstract class BaseChannelAPI {
-    protected sendRequest(route: string, data?: any): void {
+    protected sendRequest(route: string, data?: any, callback?: (data?: any) => any) {
         const context: CommandMessage = {
             route,
             data
         };
         TCP_SERVICE.send(JSON.stringify(context));
+        if (callback){
+            return callback();
+        }
     }
     
-    protected sendRequestWithResponse(route: string, data?: any, customResponseHandler?: (data: any) => any): any {
+    protected sendRequestWithResponse(route: string, data?: any, callback?: (data: any) => any): any {
         const context: CommandMessage = {
             route,
             data
@@ -18,8 +21,8 @@ export abstract class BaseChannelAPI {
         TCP_SERVICE.send(JSON.stringify(context));
         
         const response = TCP_SERVICE.receive((responseData) => {
-            if (customResponseHandler) {
-                return customResponseHandler(responseData);
+            if (callback) {
+                return callback(responseData);
             }
             return responseData;
         });

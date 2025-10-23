@@ -1,7 +1,7 @@
-import { BaseChannelAPI } from "./BaseAPI";
+import {BaseChannelAPI} from "./BaseAPI";
 
 // 频道基本操作服务类
-class ChannelBasicService extends BaseChannelAPI {
+export class ChannelBasicService extends BaseChannelAPI {
     /**
      * 创建频道
      * @returns 创建的频道信息
@@ -9,11 +9,11 @@ class ChannelBasicService extends BaseChannelAPI {
     createChannel() {
         return this.sendRequestWithResponse("core/channel/create", undefined, (data) => {
             const value = JSON.parse(data);
-            if (value["channel"] != null) {
-                return value["channel"];
+            if (value["cid"] != null) {
+                return value["cid"];
             } else {
                 // TODO: 弹窗提示创建失败
-                return null;
+                return value["msg"];
             }
         });
     }
@@ -23,9 +23,7 @@ class ChannelBasicService extends BaseChannelAPI {
      * @param cid 频道ID
      */
     deleteChannel(cid: number) {
-        const result = this.sendRequestWithResponse("core/channel/delete", { cid });
-        // 错误处理已在基类中完成
-        return result;
+        return this.sendRequestWithResponse("core/channel/delete", { cid });
     }
 
     /**
@@ -67,7 +65,7 @@ class ChannelBasicService extends BaseChannelAPI {
 }
 
 // 频道消息服务类
-class ChannelMessageService extends BaseChannelAPI {
+export class ChannelMessageService extends BaseChannelAPI {
     /**
      * 获取消息列表
      * @param cid 频道ID
@@ -89,12 +87,11 @@ class ChannelMessageService extends BaseChannelAPI {
      * @param content 消息内容
      */
     sendMessage(type: string, content: string) {
-        const response = this.sendRequestWithResponse("core/channel/message/create", {
+        // 错误处理已在基类中完成
+        return this.sendRequestWithResponse("core/channel/message/create", {
             type,
             content
         });
-        // 错误处理已在基类中完成
-        return response;
     }
 
     /**
@@ -109,7 +106,7 @@ class ChannelMessageService extends BaseChannelAPI {
 }
 
 // 频道成员服务类
-class ChannelMemberService extends BaseChannelAPI {
+export class ChannelMemberService extends BaseChannelAPI {
     /**
      * 获取所有成员
      * @param cid 频道ID
@@ -125,23 +122,21 @@ class ChannelMemberService extends BaseChannelAPI {
      * @param uid 用户ID
      */
     deleteChannelMember(cid: number, uid: number) {
-        const response = this.sendRequestWithResponse("core/channel/member/delete", { cid, uid });
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/member/delete", {cid, uid});
     }
 }
 
 // 频道管理员服务类
-class ChannelAdminService extends BaseChannelAPI {
+export class ChannelAdminService extends BaseChannelAPI {
     /**
      * 创建频道管理员
      * @param cid 频道ID
      * @param uid 用户ID
      */
     createChannelAdmin(cid: number, uid: number) {
-        const response = this.sendRequestWithResponse("core/channel/admin/create", { cid, uid });
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/admin/create", {cid, uid});
     }
 
     /**
@@ -150,22 +145,20 @@ class ChannelAdminService extends BaseChannelAPI {
      * @param uid 用户ID
      */
     deleteChannelAdmin(cid: number, uid: number) {
-        const response = this.sendRequestWithResponse("core/channel/admin/delete", { cid, uid });
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/admin/delete", {cid, uid});
     }
 }
 
 // 频道申请服务类
-class ChannelApplicationService extends BaseChannelAPI {
+export class ChannelApplicationService extends BaseChannelAPI {
     /**
      * 申请加入频道
      * @param cid 频道ID
      */
     applyChannel(cid: number) {
-        const response = this.sendRequestWithResponse("core/channel/application", { cid });
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/application", {cid});
     }
 
     /**
@@ -182,14 +175,13 @@ class ChannelApplicationService extends BaseChannelAPI {
      * @param table 申请表
      */
     getAllChannelsApplication(table: GetAllChannelsApplicationTable[]) {
-        const response = this.sendRequestWithResponse("core/channel/application/list", table);
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/application/list", table);
     }
 }
 
 // 频道封禁服务类
-class ChannelBanService extends BaseChannelAPI {
+export class ChannelBanService extends BaseChannelAPI {
     /**
      * 创建成员封禁
      * @param cid 频道ID
@@ -199,15 +191,14 @@ class ChannelBanService extends BaseChannelAPI {
      * @param admin_id 管理员ID
      */
     createMemberBan(cid: number, uid: number, duration: number, state: number, admin_id: number) {
-        const response = this.sendRequestWithResponse("core/channel/ban/create", {
+        // 错误处理已在基类中完成
+        return this.sendRequestWithResponse("core/channel/ban/create", {
             cid,
             uid,
             duration,
             state,
             admin_id
         });
-        // 错误处理已在基类中完成
-        return response;
     }
 
     /**
@@ -216,9 +207,8 @@ class ChannelBanService extends BaseChannelAPI {
      * @param uid 用户ID
      */
     deleteMemberBan(cid: number, uid: number) {
-        const response = this.sendRequestWithResponse("core/channel/ban/delete", { cid, uid });
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/ban/delete", {cid, uid});
     }
 
     /**
@@ -231,14 +221,6 @@ class ChannelBanService extends BaseChannelAPI {
     }
 }
 
-// 创建服务实例
-const channelBasicService = new ChannelBasicService();
-const channelMessageService = new ChannelMessageService();
-const channelMemberService = new ChannelMemberService();
-const channelAdminService = new ChannelAdminService();
-const channelApplicationService = new ChannelApplicationService();
-const channelBanService = new ChannelBanService();
-
 // 导出接口
 export interface GetAllChannelsApplicationTable {
     aid: number,
@@ -247,58 +229,3 @@ export interface GetAllChannelsApplicationTable {
     msg: string,
     uid: number,
 }
-
-// 导出函数，保持与原有API兼容
-export const createChannel = () => channelBasicService.createChannel();
-export const deleteChannel = (cid: number) => channelBasicService.deleteChannel(cid);
-export const getChannelMessage = (cid: number) => channelBasicService.getChannelMessage(cid);
-export const updateChannelMessage = (cid: number, name: string, owner: string, message: string, brief: string, avatar: string) => 
-    channelBasicService.updateChannelMessage(cid, name, owner, message, brief, avatar);
-export const getAllChannels = () => channelBasicService.getAllChannels();
-
-export const getMessages = (cid: number, start_time: number, count: number) => 
-    channelMessageService.getMessages(cid, start_time, count);
-export const sendMessage = (type: string, content: string) => 
-    channelMessageService.sendMessage(type, content);
-export const deleteMessage = (mid: number) => channelMessageService.deleteMessage(mid);
-
-export const getAllMembers = (cid: number) => channelMemberService.getAllMembers(cid);
-export const deleteChannelMember = (cid: number, uid: number) => 
-    channelMemberService.deleteChannelMember(cid, uid);
-
-export const createChannelAdmin = (cid: number, uid: number) => 
-    channelAdminService.createChannelAdmin(cid, uid);
-export const deleteChannelAdmin = (cid: number, uid: number) => 
-    channelAdminService.deleteChannelAdmin(cid, uid);
-
-export const applyChannel = (cid: number) => channelApplicationService.applyChannel(cid);
-export const processChannelApplication = (aid: number, result: number) => 
-    channelApplicationService.processChannelApplication(aid, result);
-export const getAllChannelsApplication = (table: GetAllChannelsApplicationTable[]) => 
-    channelApplicationService.getAllChannelsApplication(table);
-
-export const createMemberBan = (cid: number, uid: number, duration: number, state: number, admin_id: number) => 
-    channelBanService.createMemberBan(cid, uid, duration, state, admin_id);
-export const deleteMemberBan = (cid: number, uid: number) => 
-    channelBanService.deleteMemberBan(cid, uid);
-export const getAllMemberBansList = (cid: number) => channelBanService.getAllMemberBansList(cid);
-
-// 导出服务类，供需要直接使用的场景
-export {
-    ChannelBasicService,
-    ChannelMessageService,
-    ChannelMemberService,
-    ChannelAdminService,
-    ChannelApplicationService,
-    ChannelBanService
-};
-
-// 导出服务实例
-export {
-    channelBasicService,
-    channelMessageService,
-    channelMemberService,
-    channelAdminService,
-    channelApplicationService,
-    channelBanService
-};
