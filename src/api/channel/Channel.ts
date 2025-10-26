@@ -1,7 +1,7 @@
-import {BaseChannelAPI} from "./BaseAPI";
+import {BaseAPI} from "../BaseAPI";
 
 // 频道基本操作服务类
-export class ChannelBasicService extends BaseChannelAPI {
+export class ChannelBasicService extends BaseAPI {
     /**
      * 创建频道
      * @returns 创建的频道信息
@@ -65,7 +65,7 @@ export class ChannelBasicService extends BaseChannelAPI {
 }
 
 // 频道消息服务类
-export class ChannelMessageService extends BaseChannelAPI {
+export class ChannelMessageService extends BaseAPI {
     /**
      * 获取消息列表
      * @param cid 频道ID
@@ -106,7 +106,7 @@ export class ChannelMessageService extends BaseChannelAPI {
 }
 
 // 频道成员服务类
-export class ChannelMemberService extends BaseChannelAPI {
+export class ChannelMemberService extends BaseAPI {
     /**
      * 获取所有成员
      * @param cid 频道ID
@@ -128,7 +128,7 @@ export class ChannelMemberService extends BaseChannelAPI {
 }
 
 // 频道管理员服务类
-export class ChannelAdminService extends BaseChannelAPI {
+export class ChannelAdminService extends BaseAPI {
     /**
      * 创建频道管理员
      * @param cid 频道ID
@@ -151,7 +151,7 @@ export class ChannelAdminService extends BaseChannelAPI {
 }
 
 // 频道申请服务类
-export class ChannelApplicationService extends BaseChannelAPI {
+export class ChannelApplicationService extends BaseAPI {
     /**
      * 申请加入频道
      * @param cid 频道ID
@@ -181,7 +181,7 @@ export class ChannelApplicationService extends BaseChannelAPI {
 }
 
 // 频道封禁服务类
-export class ChannelBanService extends BaseChannelAPI {
+export class ChannelBanService extends BaseAPI {
     /**
      * 创建成员封禁
      * @param cid 频道ID

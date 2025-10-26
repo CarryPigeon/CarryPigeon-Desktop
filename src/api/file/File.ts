@@ -12,7 +12,6 @@ export class FileAPIService{
             sha256: sha256
         };
         TCP_SERVICE.send(JSON.stringify(context));
-        
     }
 }
 

@@ -1,7 +1,7 @@
-import { TCP_SERVICE } from "../../script/service/net/TcpService";
-import { CommandMessage } from "../CommandMessage";
+import { TCP_SERVICE } from "../script/service/net/TcpService";
+import { CommandMessage } from "./CommandMessage";
 
-export abstract class BaseChannelAPI {
+export abstract class BaseAPI {
     protected sendRequest(route: string, data?: any, callback?: (data?: any) => any) {
         const context: CommandMessage = {
             route,
