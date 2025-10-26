@@ -190,9 +190,9 @@ export class ChannelBanService extends BaseAPI {
      * @param state 状态
      * @param admin_id 管理员ID
      */
-    createMemberBan(cid: number, uid: number, duration: number, state: number, admin_id: number) {
+    async createMemberBan(cid: number, uid: number, duration: number, state: number, admin_id: number) {
         // 错误处理已在基类中完成
-        return this.sendRequestWithResponse("core/channel/ban/create", {
+        return await this.sendRequestWithResponse("core/channel/ban/create", {
             cid,
             uid,
             duration,
@@ -206,9 +206,9 @@ export class ChannelBanService extends BaseAPI {
      * @param cid 频道ID
      * @param uid 用户ID
      */
-    deleteMemberBan(cid: number, uid: number) {
+    async deleteMemberBan(cid: number, uid: number) {
         // 错误处理已在基类中完成
-        return this.sendRequestWithResponse("core/channel/ban/delete", {cid, uid});
+        return await this.sendRequestWithResponse("core/channel/ban/delete", {cid, uid});
     }
 
     /**
@@ -216,8 +216,8 @@ export class ChannelBanService extends BaseAPI {
      * @param cid 频道ID
      * @returns 封禁列表
      */
-    getAllMemberBansList(cid: number) {
-        return this.sendRequestWithResponse("core/channel/ban/list", { cid });
+    async getAllMemberBansList(cid: number) {
+        return await this.sendRequestWithResponse("core/channel/ban/list", { cid });    
     }
 }
 

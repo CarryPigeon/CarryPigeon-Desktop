@@ -95,7 +95,7 @@ fileService.requestUpload(1024, "a1b2c3d4e5f6...");
 import { TCP_SERVICE } from "../../script/service/net/TcpService";
 
 // 发送数据
-TCP_SERVICE.send(JSON.stringify(data));
+await TCP_SERVICE.send(JSON.stringify(data));
 ```
 
 ### praseJsonBody 模块

@@ -2,23 +2,23 @@ import { TCP_SERVICE } from "../script/service/net/TcpService";
 import { CommandMessage } from "./CommandMessage";
 
 export abstract class BaseAPI {
-    protected sendRequest(route: string, data?: any, callback?: (data?: any) => any) {
+    protected async sendRequest(route: string, data?: any, callback?: (data?: any) => any) {
         const context: CommandMessage = {
             route,
             data
         };
-        TCP_SERVICE.send(JSON.stringify(context));
+        await TCP_SERVICE.send(JSON.stringify(context));
         if (callback){
             return callback();
         }
     }
     
-    protected sendRequestWithResponse(route: string, data?: any, callback?: (data: any) => any): any {
+    protected async sendRequestWithResponse(route: string, data?: any, callback?: (data: any) => any): Promise<any> {
         const context: CommandMessage = {
             route,
             data
         };
-        TCP_SERVICE.send(JSON.stringify(context));
+        await TCP_SERVICE.send(JSON.stringify(context));
         
         const response = TCP_SERVICE.receive((responseData) => {
             if (callback) {
