@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ChannelModel, {ChannelModelProps} from "./ChannelModel.vue";
+import ChannelModel, {ChannelModelProps} from "../items/ChannelModel.vue";
 import {reactive} from "vue";
 import Avatar from "/test_avatar.jpg?url";
 

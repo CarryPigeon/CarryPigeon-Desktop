@@ -4,6 +4,6 @@ enum StatusCode {
 }
 
 class HandleStatusCode{
-  public async HandleTcpNetStatusCode(code: StatusCode){}
-  public async HandleHttpNetStatusCode(code: StatusCode) {}
+  public async HandleTcpNetStatusCode(_code: StatusCode){}
+  public async HandleHttpNetStatusCode(_code: StatusCode) {}
 }

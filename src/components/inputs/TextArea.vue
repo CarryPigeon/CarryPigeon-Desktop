@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {h, onMounted, ref, render} from "vue";
-import UserMessageBubble from './UserMessageBubble.vue';
+import UserMessageBubble from '../messages/UserMessageBubble.vue';
 import Avatar from '/test_avatar.jpg?url';
 
 let container:HTMLElement | null = null;

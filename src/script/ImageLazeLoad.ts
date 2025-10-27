@@ -1,4 +1,4 @@
-function getAvatarId(token:string) {
+function getAvatarId(_token:string) {
 
 }
 
