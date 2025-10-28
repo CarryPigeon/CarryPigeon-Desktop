@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "pnpm": {
+    "overrides":{"drizzle-kit>@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"}
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
@@ -11,32 +14,33 @@
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",
-    "@tauri-apps/api": "^2.8.0",
-    "@tauri-apps/plugin-opener": "^2.5.0",
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-opener": "^2.5.2",
     "better-sqlite3": "^12.4.1",
     "crypto-js": "^4.2.0",
-    "drizzle-orm": "^0.44.6",
+    "drizzle-orm": "^0.44.7",
     "vue": "^3.5.22"
   },
   "devDependencies": {
     "@eslint/css": "^0.13.0",
-    "@eslint/js": "^9.37.0",
-    "@tauri-apps/cli": "^2.8.4",
+    "@eslint/js": "^9.38.0",
+    "@tauri-apps/cli": "^2.9.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/crypto-js": "^4.2.2",
-    "@types/node": "^24.7.2",
+    "@types/node": "^24.9.1",
     "@vitejs/plugin-vue": "^6.0.1",
     "drizzle-kit": "^0.31.5",
-    "eslint": "^9.37.0",
+    "eslint": "^9.38.0",
     "eslint-plugin-vue": "^10.5.1",
     "globals": "^16.4.0",
     "jiti": "^2.6.1",
     "sass": "^1.93.2",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.1",
-    "vite": "^7.1.10",
+  "typescript": "~5.9.3",
+  "@typescript-eslint/eslint-plugin": "^8.46.2",
+  "@typescript-eslint/parser": "^8.46.2",
+    "vite": "^7.1.12",
     "vue-i18n": "^11.1.12",
     "vue-router": "^4.6.3",
-    "vue-tsc": "^3.1.1"
+    "vue-tsc": "^3.1.2"
   }
 }

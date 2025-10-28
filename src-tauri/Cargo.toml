@@ -15,19 +15,19 @@ name = "carrypigeon_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
 # tokio
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.48.0", features = ["full"] }
 
 # tauri
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
+tauri = { version = "2.9.1", features = [] }
+tauri-plugin-opener = "2.5.2"
 
 # 日志输出
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-error = "0.2.0"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 anyhow = "1"
