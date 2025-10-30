@@ -5,8 +5,8 @@ export class User extends BaseAPI{
         return await this.sendRequestWithResponse("core/user/register",
             {email: email, code: code},
             (data) => {
-                if (data["token"] != undefined){
-                    return data["token"];
+                if (JSON.parse(<string>data)["token"] != undefined){
+                    return JSON.parse(<string>data)["token"];
                 } //else  TODO：弹窗提示注册失败
             }
         );
@@ -15,8 +15,8 @@ export class User extends BaseAPI{
         return await this.sendRequestWithResponse("core/user/login/email",
             {token: token},
             (data) => {
-            if (data["msg"] == undefined){
-                return data["msg"];
+            if (JSON.parse(<string>data)["msg"] == undefined){
+                return JSON.parse(<string>data)["msg"];
             } //else  TODO：弹窗提示登录失败
             }
             );
@@ -26,8 +26,8 @@ export class User extends BaseAPI{
             "core/user/login/token",
             {token: token},
             (data) => {
-                if (data["msg"] == undefined){
-                    return data["msg"];
+                if (JSON.parse(<string>data)["msg"] == undefined){
+                    return JSON.parse(<string>data)["msg"];
                 } //else  TODO：弹窗提示登录失败
             }
         );
@@ -43,7 +43,7 @@ export class User extends BaseAPI{
             "core/user/profile/" + uid,
             {uid: uid},
             (data) => {
-                return JSON.parse(data);
+                return JSON.parse(<string>data);
             }
         );
     }

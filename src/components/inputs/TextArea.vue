@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {h, onMounted, ref, render} from "vue";
 import UserMessageBubble from '../messages/UserMessageBubble.vue';
-import Avatar from '/test_avatar.jpg?url';
+import {ChannelMessageService} from "../../api/channel/Channel.ts";
+import {userData} from "../../script/struct/UserData.ts";
 
 let container:HTMLElement | null = null;
 const text = ref('');
@@ -14,11 +15,13 @@ function sendMessage() {
   if (text.value.length == 0) {
     return;
   }
+  const sender = new ChannelMessageService();
+  sender.sendMessage(1,text.value);
   let date = new Date().toDateString();
   let vNode = h(UserMessageBubble, {
-    name: "shirasawa",
+    name: userData.getUsername(),
     message: text.value,
-    avatar: Avatar,
+    avatar: userData.getAvatar(),
     date: date,
   });
 

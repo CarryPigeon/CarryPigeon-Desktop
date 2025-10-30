@@ -8,7 +8,7 @@ export class ChannelBasicService extends BaseAPI {
      */
     createChannel() {
         return this.sendRequestWithResponse("core/channel/create", undefined, (data) => {
-            const value = JSON.parse(data);
+            const value = JSON.parse(<string>data);
             if (value["cid"] != null) {
                 return value["cid"];
             } else {
@@ -86,7 +86,7 @@ export class ChannelMessageService extends BaseAPI {
      * @param type 消息类型
      * @param content 消息内容
      */
-    sendMessage(type: string, content: string) {
+    sendMessage(type: number, content: string) {
         // 错误处理已在基类中完成
         return this.sendRequestWithResponse("core/channel/message/create", {
             type,
@@ -99,9 +99,8 @@ export class ChannelMessageService extends BaseAPI {
      * @param mid 消息ID
      */
     deleteMessage(mid: number) {
-        const response = this.sendRequestWithResponse("core/channel/message/delete", { mid });
         // 错误处理已在基类中完成
-        return response;
+        return this.sendRequestWithResponse("core/channel/message/delete", {mid});
     }
 }
 
@@ -219,6 +218,9 @@ export class ChannelBanService extends BaseAPI {
     async getAllMemberBansList(cid: number) {
         return await this.sendRequestWithResponse("core/channel/ban/list", { cid });    
     }
+}
+export class ChannelReceiveService{
+
 }
 
 // 导出接口

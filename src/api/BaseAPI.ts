@@ -1,8 +1,8 @@
 import { TCP_SERVICE } from "../script/service/net/TcpService";
-import { CommandMessage } from "./CommandMessage";
+import { CommandMessage, DataObject } from "./CommandMessage";
 
 export abstract class BaseAPI {
-    protected async sendRequest(route: string, data?: any, callback?: (data?: any) => any) {
+    protected async sendRequest(route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
         const context: CommandMessage = {
             route,
             data
@@ -13,25 +13,25 @@ export abstract class BaseAPI {
         }
     }
     
-    protected async sendRequestWithResponse(route: string, data?: any, callback?: (data: any) => any): Promise<any> {
+    protected async sendRequestWithResponse(route: string, data?: DataObject | undefined, callback?: (data: unknown) => unknown): Promise<unknown> {
         const context: CommandMessage = {
             route,
             data
         };
         await TCP_SERVICE.send(JSON.stringify(context));
         
-        const response = TCP_SERVICE.receive((responseData) => {
+        return await TCP_SERVICE.receive((responseData) => {
             if (callback) {
                 return callback(responseData);
             }
-            return responseData;
+            try{
+                return parseInt(responseData);
+            } catch(err){ return null;}
         });
-        
-        if (typeof response === "number") {
-            this.handleError(response);
-        }
-        
-        return response;
+    }
+
+    protected async receive() {
+        return await TCP_SERVICE.receive(()=>{});
     }
     
     protected handleError(code: number): void {
