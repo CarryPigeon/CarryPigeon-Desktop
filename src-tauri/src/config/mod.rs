@@ -1,5 +1,5 @@
-use serde_json::Value;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::{io::Write, path::Path};
 
 /// 异步获取配置文件内容
 ///
@@ -10,17 +10,27 @@ use std::path::Path;
 ///
 /// # Errors
 /// 当文件读取失败或JSON解析失败时会返回相应的错误
-pub async fn get_config() -> Option<Value> {
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub socket: String,
+    pub port: u16,
+}
+#[tauri::command]
+pub async fn get_config() -> String {
     // 读取配置文件内容
     let config_file = Path::new("./config");
     let data = Box::new(tokio::fs::read_to_string(config_file).await);
-    let data = match *data {
+    match *data {
         Ok(data) => data,
-        Err(err) => {
-            tracing::error!("Failed to read config file: {}", err);
-            return None;
+        Err(_) => {
+            let mut file = std::fs::File::create(config_file).unwrap();
+            file.write_all(
+                serde_json::to_string(&Config::default())
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
+            serde_json::to_string(&Config::default()).unwrap()
         }
-    };
-    // 将字符串数据解析为HashMap并返回
-    serde_json::from_str(&data).unwrap_or(None)
+    }
 }

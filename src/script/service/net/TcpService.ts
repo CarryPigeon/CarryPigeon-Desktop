@@ -2,7 +2,6 @@ import * as net from "node:net";
 import { pushTask } from "./praseJsonBody.ts";
 import { Config } from "../../config/Config.ts";
 import { Encryption } from "../Encryption/Encryption.ts";
-import { pool } from "../Async/Pool.ts";
 
 export class TcpService {
     public client: net.Socket;
@@ -26,34 +25,32 @@ export class TcpService {
     }
 
     public async send(data: string): Promise<any> {
-        return pool.exec(
-            new Promise((resolve, reject) => {
-                try {
-                    let en_data = this.encrypter?.encrypt(data); // 修正为encrypt
-                    const success = this.client.write(en_data, (err) => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            resolve(success);
-                        }
-                    });
-                    // 如果写入缓冲区已满，write返回false
-                    if (!success) {
-                        // 监听drain事件，表示缓冲区已清空可以继续写入
-                        this.client.once("drain", () => resolve(true));
-                    }
-                } catch (error) {
-                    reject(error);
-                }
-                this.receiveOnce()
-                    .then((data) => {
-                        resolve(data);
-                    })
-                    .catch((err) => {
+        return new Promise((resolve, reject) => {
+            try {
+                let en_data = this.encrypter?.encrypt(data); // 修正为encrypt
+                const success = this.client.write(en_data, (err) => {
+                    if (err) {
                         reject(err);
-                    });
-            }),
-        );
+                    } else {
+                        resolve(success);
+                    }
+                });
+                // 如果写入缓冲区已满，write返回false
+                if (!success) {
+                    // 监听drain事件，表示缓冲区已清空可以继续写入
+                    this.client.once("drain", () => resolve(true));
+                }
+            } catch (error) {
+                reject(error);
+            }
+            this.receiveOnce()
+                .then((data) => {
+                    resolve(data);
+                })
+                .catch((err) => {
+                    reject(err);
+                });
+        });
     }
 
     /**
@@ -89,4 +86,4 @@ export class TcpService {
     }
 }
 
-export var TCP_SERVICE: TcpService = new TcpService(Config["socket"]);
+export var TCP_SERVICE: TcpService = new TcpService(<string>Config["socket"]);

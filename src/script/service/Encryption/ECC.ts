@@ -1,5 +1,3 @@
-import {unescape} from "querystring";
-
 export async function generateECCKeyPair(): Promise<{privateKey: CryptoKey, publicKey: string}> {
     let keyPair = await window.crypto.subtle.generateKey(
         {
