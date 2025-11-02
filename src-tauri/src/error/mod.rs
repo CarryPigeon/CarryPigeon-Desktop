@@ -1,3 +1,3 @@
-enum Error{
+enum Error {
     TokioIOError(tokio::io::Error),
 }

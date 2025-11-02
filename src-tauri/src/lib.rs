@@ -6,16 +6,21 @@ pub mod error;
 pub mod service;
 pub mod windows;
 
-use windows::to_chat_window_size;
 use config::get_config;
+use service::tcp::{listen_tcp_service, send_tcp_service};
+use windows::to_chat_window_size;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> anyhow::Result<()> {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![to_chat_window_size, get_config])
+        .invoke_handler(tauri::generate_handler![
+            to_chat_window_size,
+            get_config,
+            send_tcp_service,
+            listen_tcp_service
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
     Ok(())
 }
-

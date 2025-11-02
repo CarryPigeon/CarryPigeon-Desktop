@@ -20,9 +20,7 @@ async fn main() -> anyhow::Result<()> {
     //let file_appender = Box::new(rolling::never("logs", "log.txt"));
     //let (non_blocking_appender, _guard) = non_blocking(file_appender);
     let file_layer = Box::new(
-        fmt::layer()
-            .with_ansi(false)
-            //.with_writer(non_blocking_appender),
+        fmt::layer().with_ansi(false), //.with_writer(non_blocking_appender),
     );
 
     // 注册
@@ -33,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     tracing::info!("CarryPigeon Desktop Started");
-/*
+    /*
     let config_result = get_config().await;
     tracing::info!("{:?}", config_result);
 
