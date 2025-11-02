@@ -7,7 +7,7 @@ pub mod service;
 pub mod windows;
 
 use config::get_config;
-use service::tcp::{listen_tcp_service, send_tcp_service};
+use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service};
 use windows::to_chat_window_size;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,7 +18,8 @@ pub fn run() -> anyhow::Result<()> {
             to_chat_window_size,
             get_config,
             send_tcp_service,
-            listen_tcp_service
+            listen_tcp_service,
+            add_tcp_service
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

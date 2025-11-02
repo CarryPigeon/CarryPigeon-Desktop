@@ -6,12 +6,12 @@ interface FileUploadAPI {
 }
 
 export class FileAPIService{
-    public async requestUpload(size:number,sha256:string){
+    public async requestUpload(channel_id:number,size:number,sha256:string){
         const context: FileUploadAPI = {
             size: size,
             sha256: sha256
         };
-        await TCP_SERVICE.send(JSON.stringify(context));
+        await TCP_SERVICE.send(channel_id,JSON.stringify(context));
     }
 }
 

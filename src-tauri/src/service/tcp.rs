@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
-use tokio::sync::RwLock;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::RwLock;
 
 pub struct TcpService {
     listener: TcpListener,
@@ -130,12 +130,23 @@ pub fn init_tcp_service() -> SharedTcpMapService {
         .clone()
 }
 
+#[tauri::command]
+pub fn add_tcp_service(channel_id: i32, socket: String) {
+    let service = TCP_SERVICE.get().cloned().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        let mut lock = service.write().await;
+        let tcp_service = TcpService::new(socket).await.unwrap();
+        lock.add(channel_id, Box::new(tcp_service));
+    });
+}
+
 // 提供线程安全的全局访问方法
 #[tauri::command]
 pub fn send_tcp_service(channel_id: i32, data: String) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async { 
+    runtime.block_on(async {
         let mut lock = service.write().await;
         lock.send(channel_id, data).await.unwrap();
     });
@@ -145,7 +156,7 @@ pub fn send_tcp_service(channel_id: i32, data: String) {
 pub async fn listen_tcp_service(channel_id: i32, app: AppHandle) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async { 
+    runtime.block_on(async {
         let mut lock = service.write().await;
         lock.listen(channel_id, app).await.unwrap();
     });
@@ -154,7 +165,7 @@ pub async fn listen_tcp_service(channel_id: i32, app: AppHandle) {
 pub async fn remove_tcp_service(channel_id: i32) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let _ = runtime.block_on(async { 
+    let _ = runtime.block_on(async {
         let mut lock = service.write().await;
         lock.remove(channel_id)
     });
@@ -163,7 +174,7 @@ pub async fn remove_tcp_service(channel_id: i32) {
 pub async fn contains_tcp_service(channel_id: i32) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let _ = runtime.block_on(async { 
+    let _ = runtime.block_on(async {
         let lock = service.write().await;
         lock.contains(channel_id)
     });
