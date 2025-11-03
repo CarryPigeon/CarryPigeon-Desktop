@@ -37,52 +37,36 @@ pub async fn get_config() -> String {
     }
 }
 
-pub async fn get_config_value(key: &str) -> Value{
-    let config_str = get_config().await;
-    let value = serde_json::from_str(&config_str).unwrap();
-    if let Value::Object(map) = value {
-        map.get(key).cloned().unwrap_or(Value::Null)
-    } else {
-        Value::Null
+trait ConfigValueExtractor<T> {
+    fn extract(value: &Value) -> T;
+}
+
+impl ConfigValueExtractor<u32> for u32{
+    fn extract(value: &Value) -> u32 {
+        value.as_number().and_then(|v| v.as_u64()).unwrap_or(0) as u32
     }
 }
 
-pub async fn get_config_value_as_u32(key: &str) -> u32 {
-    let config_str = get_config().await;
-    let value = serde_json::from_str(&config_str).unwrap();
-    if let Value::Object(map) = value {
-        map.get(key).and_then(|v| v.as_number()).map(|n| n.as_u64().unwrap_or(0) as u32).unwrap_or(0)
-    } else {
-        0
+impl ConfigValueExtractor<u64> for u64 {
+    fn extract(value: &Value) -> u64 {
+        value.as_number().and_then(|v| v.as_u64()).unwrap_or(0)
     }
 }
 
-pub async fn get_config_value_as_u64(key: &str) -> u64 {
-    let config_str = get_config().await;
-    let value = serde_json::from_str(&config_str).unwrap();
-    if let Value::Object(map) = value {
-        map.get(key).and_then(|v| v.as_number()).map(|n| n.as_u64().unwrap_or(0)).unwrap_or(0)
-    } else {
-        0
+impl ConfigValueExtractor<String> for String {
+    fn extract(value: &Value) -> String {
+        value.as_str().unwrap_or("").to_string()
     }
 }
 
-pub async fn get_config_value_as_string(key: &str) -> String {
+pub async fn get_config_value<T>(key: &str) -> T
+where T: ConfigValueExtractor<T> + Default
+{
     let config_str = get_config().await;
     let value = serde_json::from_str(&config_str).unwrap();
     if let Value::Object(map) = value {
-        map.get(key).and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or_default()
+        map.get(key).map(|v| T::extract(v)).unwrap_or_default()
     } else {
-        String::new()
-    }
-}
-
-pub async fn get_config_value_as_bool(key: &str) -> bool {
-    let config_str = get_config().await;
-    let value = serde_json::from_str(&config_str).unwrap();
-    if let Value::Object(map) = value {
-        map.get(key).and_then(|v| v.as_bool()).unwrap_or(false)
-    } else {
-        false
+        T::default()
     }
 }
