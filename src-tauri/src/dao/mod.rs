@@ -1,29 +1,33 @@
-pub mod friends;
-pub mod group_message;
-pub mod groups;
-mod message_object;
-pub mod plugin;
-pub mod private_message;
+pub mod channel;
+pub mod message;
 
-use sqlx::{Pool, Sqlite, SqlitePool};
-use tokio::sync::OnceCell;
-use tracing::instrument;
+use std::sync::{Arc, OnceLock};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
-pub static SQLITE_POOL: OnceCell<SqlitePool> = OnceCell::const_new();
+use crate::config::get_config_value_as_u32;
 
-// TODO: 使用anyhow简化错误处理
-#[instrument]
-pub async fn init_pool() {
-    let url = ""; // TODO: 后续读取配置文件获取
-    match Pool::<Sqlite>::connect(format!("sqlite::memory:{url}").as_str()).await {
-        Ok(v) => match SQLITE_POOL.set(v) {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::error!("Failed to set SQLite POOL: {}", e);
-            }
-        },
-        Err(e) => {
-            tracing::error!("Failed to connect to SQLite POOL: {}", e);
+pub struct CPDatabase{
+    pub connection: DatabaseConnection,
+}
+
+impl CPDatabase {
+    pub async fn new(url: &str) -> Self {
+        let mut options = ConnectOptions::new(url);
+        options
+            .max_connections(get_config_value_as_u32("database_pool_max_connections").await) //config
+            .connect_timeout(std::time::Duration::from_secs(3))
+            .idle_timeout(std::time::Duration::from_secs(10))
+            .min_connections(get_config_value_as_u32("database_pool_min_connections").await) //config
+            .max_lifetime(std::time::Duration::from_secs(3600));
+        Self {
+            connection: Database::connect(options).await.unwrap(),
         }
     }
+}
+
+pub const DATABASE_POOL: OnceLock<Arc<CPDatabase>> = OnceLock::new();
+
+pub async fn connect(url: &str) {
+    let _ = DATABASE_POOL.set(Arc::new(CPDatabase::new(url).await));
+    //let a: Option<channels::Model> = channels::Entity::find_by_id(1_u32).one(&DATABASE_POOL.get().unwrap().connection).await.unwrap();
 }

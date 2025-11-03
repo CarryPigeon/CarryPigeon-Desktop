@@ -37,7 +37,7 @@ const props = defineProps<{
   border-radius: 10px
   padding: 10px
   margin-top: 20px
-  margin-left: -25px
+  margin-left: -95px
 
   max-width: 70% // 防止消息过长挤占太多空间
 .member-name
