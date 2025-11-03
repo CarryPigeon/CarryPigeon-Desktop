@@ -25,7 +25,7 @@ impl CPDatabase {
     }
 }
 
-pub const DATABASE_POOL: OnceLock<Arc<CPDatabase>> = OnceLock::new();
+pub static DATABASE_POOL: OnceLock<Arc<CPDatabase>> = OnceLock::new();
 
 pub async fn connect(url: &str) {
     let _ = DATABASE_POOL.set(Arc::new(CPDatabase::new(url).await));

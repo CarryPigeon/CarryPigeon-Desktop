@@ -37,7 +37,7 @@ pub async fn get_config() -> String {
     }
 }
 
-trait ConfigValueExtractor<T> {
+pub trait ConfigValueExtractor<T> {
     fn extract(value: &Value) -> T;
 }
 
