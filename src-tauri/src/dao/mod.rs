@@ -1,12 +1,12 @@
 pub mod channel;
 pub mod message;
 
-use std::sync::{Arc, OnceLock};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use std::sync::{Arc, OnceLock};
 
 use crate::config::get_config_value;
 
-pub struct CPDatabase{
+pub struct CPDatabase {
     pub connection: DatabaseConnection,
 }
 

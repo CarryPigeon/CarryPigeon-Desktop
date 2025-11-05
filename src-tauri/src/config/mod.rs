@@ -41,7 +41,7 @@ pub trait ConfigValueExtractor<T> {
     fn extract(value: &Value) -> T;
 }
 
-impl ConfigValueExtractor<u32> for u32{
+impl ConfigValueExtractor<u32> for u32 {
     fn extract(value: &Value) -> u32 {
         value.as_number().and_then(|v| v.as_u64()).unwrap_or(0) as u32
     }
@@ -60,7 +60,8 @@ impl ConfigValueExtractor<String> for String {
 }
 
 pub async fn get_config_value<T>(key: &str) -> T
-where T: ConfigValueExtractor<T> + Default
+where
+    T: ConfigValueExtractor<T> + Default,
 {
     let config_str = get_config().await;
     let value = serde_json::from_str(&config_str).unwrap();

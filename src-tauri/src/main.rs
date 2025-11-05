@@ -3,7 +3,7 @@
 
 use tracing_appender::{non_blocking, rolling};
 use tracing_subscriber::{
-    filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Registry,
+    Registry, filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
 #[tokio::main]
