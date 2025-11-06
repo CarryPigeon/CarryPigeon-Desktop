@@ -2,25 +2,25 @@ import { TCP_SERVICE } from "../script/service/net/TcpService";
 import { CommandMessage, DataObject } from "./CommandMessage";
 
 export abstract class BaseAPI {
-    protected async sendRequest(route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
+    protected async sendRequest(channel_id: number ,route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
         const context: CommandMessage = {
             route,
             data
         };
-        await TCP_SERVICE.send(JSON.stringify(context));
+        await TCP_SERVICE.send(channel_id,JSON.stringify(context));
         if (callback){
             return callback();
         }
     }
     
-    protected async sendRequestWithResponse(route: string, data?: DataObject | undefined, callback?: (data: unknown) => unknown): Promise<unknown> {
+    protected async sendRequestWithResponse(channel_id: number, route: string, data?: DataObject | undefined, callback?: (data: unknown) => unknown): Promise<unknown> {
         const context: CommandMessage = {
             route,
             data
         };
-        await TCP_SERVICE.send(JSON.stringify(context));
+        await TCP_SERVICE.send(channel_id,JSON.stringify(context));
         
-        return await TCP_SERVICE.receive((responseData) => {
+        return await TCP_SERVICE.receive(channel_id, (responseData) => {
             if (callback) {
                 return callback(responseData);
             }

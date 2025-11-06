@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import MemberMessageBubble from "./MemberMessageBubble.vue";
 import Avatar from '/test_avatar.jpg?url';
-import {TCP_SERVICE} from "../../script/service/net/TcpService.ts";
 
 // 定义消息接口
 interface Message {
@@ -34,7 +33,6 @@ const messages = ref<Message[]>([
 class MessageReceiveService{
   private readonly channelName: string;
   private readonly channelServer: string;
-  private unsubscribe?: () => void;
 
   constructor(channelServer:string) {
     this.channelName = "";
@@ -48,21 +46,6 @@ class MessageReceiveService{
     return this.channelServer;
   }
   
-  // 启动消息监听
-  public startListening() {
-    TCP_SERVICE.receive((data: string) => {
-      this.showNewMessage(data);
-    }).then((unsubscribeFn) => {
-      this.unsubscribe = unsubscribeFn;
-    });
-  }
-  
-  // 停止消息监听
-  public stopListening() {
-    if (this.unsubscribe) {
-      this.unsubscribe();
-    }
-  }
   
   // 处理接收到的新消息
   public showNewMessage(messageData: string){
@@ -96,20 +79,9 @@ class MessageReceiveService{
     }
   }
 }
-
 const messageReceiveService = new MessageReceiveService("");
-
-// 组件挂载时开始监听消息
-onMounted(() => {
-  messageReceiveService.startListening();
-});
-
-// 组件卸载时停止监听消息
-onUnmounted(() => {
-  messageReceiveService.stopListening();
-});
-
 </script>
+
 <template>
   <div class="chat-box-container">
     <!-- 使用v-for遍历消息数组，动态渲染消息组件 -->

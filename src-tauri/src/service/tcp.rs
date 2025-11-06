@@ -10,8 +10,10 @@ pub struct TcpService {
     stream: TcpStream,
 }
 
+#[derive(Default)]
 pub struct TcpMapService {
     map: HashMap<i32, Box<TcpService>>,
+    id_list: Vec<u32>,
 }
 
 type SharedTcpMapService = Arc<RwLock<TcpMapService>>;
@@ -43,7 +45,7 @@ impl TcpService {
                         Ok(n) => match String::from_utf8(buffer[..n].to_vec()) {
                             Ok(res) => {
                                 if let Err(e) = app.emit("tcp-message", res) {
-                                    tracing::error!("Failed to emit TCP message: {:?}", e);
+                                    tracing::warn!("Failed to emit TCP message: {:?}", e);
                                 }
                             }
                             Err(e) => {
@@ -73,11 +75,10 @@ impl TcpService {
     }
 }
 
+
 impl TcpMapService {
     pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn add(&mut self, channel_id: i32, service: Box<TcpService>) {

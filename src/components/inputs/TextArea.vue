@@ -2,7 +2,7 @@
 import {h, onMounted, ref, render} from "vue";
 import UserMessageBubble from '../messages/UserMessageBubble.vue';
 import {ChannelMessageService} from "../../api/channel/Channel.ts";
-import {userData} from "../../script/struct/UserData.ts";
+import { userData } from "../../script/struct/UserData.ts";
 
 let container:HTMLElement | null = null;
 const text = ref('');
