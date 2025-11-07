@@ -28,12 +28,16 @@ export abstract class BaseAPI {
         }
     }
     
-    protected async sendRequestWithResponse(channel_id: number, route: string, callback: (data: string) => void, data?: DataObject | undefined): Promise<void> {
+    protected async send(channel_id: number, route: string, data?: DataObject | undefined, callback?: (data: string) => void): Promise<void> {
         const context: CommandMessage = {
             route,
             data
         };
-        await TCP_SERVICE.sendWithResponse(channel_id,JSON.stringify(context),callback);
+        if (callback === undefined) { 
+            await TCP_SERVICE.send(channel_id, JSON.stringify(context));
+        } else {
+            await TCP_SERVICE.sendWithResponse(channel_id,JSON.stringify(context),callback);
+        }
     }
     
     protected handleError(code: number): void {

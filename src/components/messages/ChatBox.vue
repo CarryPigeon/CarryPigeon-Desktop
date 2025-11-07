@@ -2,7 +2,9 @@
 import { ref } from 'vue';
 import MemberMessageBubble from "./MemberMessageBubble.vue";
 import Avatar from '/test_avatar.jpg?url';
+</script>
 
+<script lang="ts">
 // 标记ServerSocket和ChannelId
 let serverSocket = ref<string>("");
 let channelId = ref<number>(0);
