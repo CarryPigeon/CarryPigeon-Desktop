@@ -3,6 +3,17 @@ import { ref } from 'vue';
 import MemberMessageBubble from "./MemberMessageBubble.vue";
 import Avatar from '/test_avatar.jpg?url';
 
+// 标记ChannelId
+export var channelId = ref<number>(0);
+
+export function setChannelId(id: number){
+  channelId.value = id;
+}
+
+export function getChannelId(){
+  return channelId.value;
+}
+
 // 定义消息接口
 interface Message {
   id: string;
@@ -30,7 +41,7 @@ const messages = ref<Message[]>([
   }
 ]);
 
-class MessageReceiveService{
+export class MessageReceiveService{
   private readonly channelName: string;
   private readonly channelServer: string;
 
@@ -64,6 +75,7 @@ class MessageReceiveService{
       
       // 将新消息添加到消息列表
       messages.value.push(newMessage);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       // 如果不是有效JSON，直接使用原始数据
       const newMessage: Message = {
@@ -79,7 +91,7 @@ class MessageReceiveService{
     }
   }
 }
-const messageReceiveService = new MessageReceiveService("");
+export var messageReceiveService = new MessageReceiveService("");
 </script>
 
 <template>

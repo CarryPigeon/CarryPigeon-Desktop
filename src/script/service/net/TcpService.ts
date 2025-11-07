@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Config } from "../../config/Config.ts";
 import { Encryption } from "../Encryption/Encryption.ts";
 import { invoke } from "@tauri-apps/api/core";
+import { messageReceiveService } from "../../../components/messages/ChatBox.vue";
 
 class FuncMap{
     private map: Map<number, (data:string) => void>;
@@ -97,6 +98,8 @@ export class TcpService {
         // TODO: 处理捕获信息
         if (value["id"] != -1) {
             this.funcMap.call(value["id"], value);
+        } else {
+            messageReceiveService.showNewMessage(value);
         }
     }
 }

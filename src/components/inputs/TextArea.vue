@@ -3,6 +3,7 @@ import {h, onMounted, ref, render} from "vue";
 import UserMessageBubble from '../messages/UserMessageBubble.vue';
 import {ChannelMessageService} from "../../api/channel/Channel.ts";
 import { userData } from "../../script/struct/UserData.ts";
+import { getChannelId } from "../messages/ChatBox.vue";
 
 let container:HTMLElement | null = null;
 const text = ref('');
@@ -15,7 +16,7 @@ function sendMessage() {
   if (text.value.length == 0) {
     return;
   }
-  const sender = new ChannelMessageService();
+  const sender = new ChannelMessageService(getChannelId());
   sender.sendMessage(1,text.value);
   let date = new Date().toDateString();
   let vNode = h(UserMessageBubble, {
