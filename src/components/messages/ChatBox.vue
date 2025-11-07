@@ -3,8 +3,17 @@ import { ref } from 'vue';
 import MemberMessageBubble from "./MemberMessageBubble.vue";
 import Avatar from '/test_avatar.jpg?url';
 
-// 标记ChannelId
-export var channelId = ref<number>(0);
+// 标记ServerSocket和ChannelId
+let serverSocket = ref<string>("");
+let channelId = ref<number>(0);
+
+export function setServerSocket(socket: string){
+  serverSocket.value = socket;
+}
+
+export function getServerSocket(){
+  return serverSocket.value;
+}
 
 export function setChannelId(id: number){
   channelId.value = id;
