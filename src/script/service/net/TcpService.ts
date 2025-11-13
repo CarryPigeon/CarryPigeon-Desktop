@@ -98,9 +98,11 @@ export class TcpService {
         // TODO: 处理捕获信息
         if (value["id"] != -1) {
             this.funcMap.call(value["id"], value);
+        } else if (value["key"]) {
+            await this.encrypter.decryptAESKey(value["key"]);
         } else {
             messageReceiveService.showNewMessage(value);
-        }
+        } 
     }
 }
 

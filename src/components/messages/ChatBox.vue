@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import MemberMessageBubble from "./MemberMessageBubble.vue";
 import Avatar from '/test_avatar.jpg?url';
+import MessageBubbleComponents from './MessageBubbleComponents.vue';
+
+const props = defineProps<{
+  user_id: number,
+}>();
+
 </script>
 
 <script lang="ts">
@@ -26,29 +31,32 @@ export function getChannelId(){
 }
 
 // 定义消息接口
-interface Message {
+export interface Message {
+  from_id: number;
   id: string;
   name: string;
   avatar: string;
   content: string;
-  date: string;
+  timestamp: string;
 }
 
 // 使用ref创建响应式消息列表，并添加初始的mock数据
 const messages = ref<Message[]>([
   {
     id: '1',
+    from_id: 1,
     name: '张三',
     avatar: Avatar,
     content: '你好！欢迎使用聊天系统。',
-    date: new Date().toLocaleTimeString()
+    timestamp: new Date().toLocaleTimeString()
   },
   {
     id: '2',
+    from_id: 2,
     name: '系统',
     avatar: Avatar,
     content: '这是一条系统消息，请开始您的对话。',
-    date: new Date().toLocaleTimeString()
+    timestamp: new Date().toLocaleTimeString()
   }
 ]);
 
@@ -77,28 +85,19 @@ export class MessageReceiveService{
       
       // 创建新消息对象
       const newMessage: Message = {
-        id: Date.now().toString(),
-        name: parsedData.name || '未知用户',
+        id: parsedData["id"],
+        from_id: parsedData["user_id"],
+        name: parsedData.name,
         avatar: Avatar,
-        content: parsedData.message || messageData,
-        date: new Date().toLocaleTimeString()
+        content: parsedData.message,
+        timestamp: new Date().toLocaleTimeString(),
       };
       
       // 将新消息添加到消息列表
       messages.value.push(newMessage);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      // 如果不是有效JSON，直接使用原始数据
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        name: '系统',
-        avatar: Avatar,
-        content: messageData,
-        date: new Date().toLocaleTimeString()
-      };
-      
-      // 将新消息添加到消息列表
-      messages.value.push(newMessage);
+      // TODO:处理问题
     }
   }
 }
@@ -108,14 +107,7 @@ export var messageReceiveService = new MessageReceiveService("");
 <template>
   <div class="chat-box-container">
     <!-- 使用v-for遍历消息数组，动态渲染消息组件 -->
-    <MemberMessageBubble
-      v-for="message in messages"
-      :key="message.id"
-      :name="message.name"
-      :avatar="message.avatar"
-      :message="message.content"
-      :date="message.date"
-    ></MemberMessageBubble>
+    <MessageBubbleComponents :user_id="props.user_id" />
   </div>
 </template>
 

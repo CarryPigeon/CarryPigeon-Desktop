@@ -1,4 +1,4 @@
-export type DataObject = Record<string, any>;
+export type DataObject = Record<string, unknown>;
 
 export interface CommandMessage{
     route: string,

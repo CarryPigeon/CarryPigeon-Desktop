@@ -29,7 +29,7 @@ const a : Member ={
   <SearchBar/>
   <TextArea/>
   <ParticipantsList :length="1" :online="1" :member="[a]"/>
-  <ChatBox />
+  <ChatBox :user_id="a.id" />
 </template>
 <style scoped lang="sass">
 </style>

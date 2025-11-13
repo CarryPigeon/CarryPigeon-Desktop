@@ -5,12 +5,14 @@ import {generateECCKeyPair} from "./ECC";
 export interface EncryptInterface {
     encrypt: (data: string) => string
     decrypt: (data: string) => string
+    decryptAESKey(key: string): Promise<void>
 }
 
 export abstract class EncryptClass implements EncryptInterface {
     //protected constructor(socket: string) ;
     public abstract encrypt(data: string): string;
     public abstract decrypt(data: string): string;
+    public abstract decryptAESKey(key: string): Promise<void>;
 }
 
 export type EncryptClassWithConstructor<T extends EncryptClass> = new (socket: string) => T;
@@ -43,6 +45,10 @@ export class Encryption {
     public decrypt(data: string): string {
         return this.encryptClass.decrypt(data);
     }
+
+    public async decryptAESKey(key: string) {
+        await this.encryptClass.decryptAESKey(key);
+    }
 }
 
 export class OfficialEncryptClass implements EncryptInterface {
@@ -62,10 +68,10 @@ export class OfficialEncryptClass implements EncryptInterface {
             "key": ECCKeyPair.publicKey,
         }
         const bodyJson = JSON.stringify(body);
-        return this.instance.send(bodyJson);
+        return this.instance.send(0, bodyJson);
     }
 
-    private async decryptAESKey(data: string) {
+    public async decryptAESKey(data: string) {
         if (this.ECCPrivateKey === undefined) {
             throw new Error("ECCPrivateKey is undefined");
         }
@@ -86,9 +92,6 @@ export class OfficialEncryptClass implements EncryptInterface {
 
     public async swapKey(userId: number) {
         await this.sendECCPrivateKey(userId);
-        this.instance.client.once("swapKey", (data: string) => {
-                this.decryptAESKey(data);
-            });
     }
 
     public encrypt(data: string): string {

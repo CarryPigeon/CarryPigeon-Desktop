@@ -175,7 +175,7 @@ export class ChannelApplicationService extends BaseAPI {
      */
     getAllChannelsApplication(table: GetAllChannelsApplicationTable[]) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(),"core/channel/application/list", table);
+        return this.send(this.getChannelId(),"core/channel/application/list", { table });
     }
 }
 

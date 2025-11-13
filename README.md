@@ -9,4 +9,6 @@ pnpm run tauri dev
 ## 打包
 ```shell
 pnpm tauri build
+pnpm tauri build --no-bundle
 ```
+
