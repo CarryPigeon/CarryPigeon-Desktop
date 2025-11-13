@@ -1,5 +1,4 @@
 import * as CryptoJS from "crypto-js";
-import {TcpService} from "../net/TcpService";
 import {generateECCKeyPair} from "./ECC";
 
 export interface EncryptInterface {
@@ -109,4 +108,3 @@ export class OfficialEncryptClass implements EncryptInterface {
         return CryptoJS.AES.decrypt(data, this.AESKey).toString();
     }
 }
-
