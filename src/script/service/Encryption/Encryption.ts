@@ -24,7 +24,7 @@ export class Encryption {
         if(encryptClass) {
             this.encryptClass = new encryptClass(socket);
         } else {
-            this.encryptClass = new OfficialEncryptClass(socket);
+            this.encryptClass = new OfficialEncryptClass();
         }
     }
 
@@ -52,13 +52,9 @@ export class Encryption {
 }
 
 export class OfficialEncryptClass implements EncryptInterface {
-    public instance: TcpService;
+    // 移除对TcpService的直接依赖
     private ECCPrivateKey: CryptoKey | undefined;
     private AESKey: string | undefined;
-
-    constructor(socket: string) {
-        this.instance = new TcpService(socket);
-    }
 
     private async sendECCPrivateKey(userId: number) {
         const ECCKeyPair = await generateECCKeyPair();
@@ -68,7 +64,12 @@ export class OfficialEncryptClass implements EncryptInterface {
             "key": ECCKeyPair.publicKey,
         }
         const bodyJson = JSON.stringify(body);
-        return this.instance.send(0, bodyJson);
+        import("../net/TcpService").then(module => {
+            if (module.TCP_SERVICE) {
+                return module.TCP_SERVICE.send(0, bodyJson);
+            }
+        });
+        return Promise.resolve();
     }
 
     public async decryptAESKey(data: string) {

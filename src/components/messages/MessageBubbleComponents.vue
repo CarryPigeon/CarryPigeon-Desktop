@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, computed, ref } from 'vue';
+import { defineProps, defineComponent, computed, ref } from 'vue';
 import MemberMessageBubble from './MemberMessageBubble.vue';
 import UserMessageBubble from './UserMessageBubble.vue';
 import type { Message } from './ChatBox.vue';
