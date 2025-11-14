@@ -1,10 +1,10 @@
 <script lang="ts">
-import { defineProps, defineComponent, computed, ref } from 'vue';
+import { defineComponent, computed, ref } from 'vue';
 import MemberMessageBubble from './MemberMessageBubble.vue';
 import UserMessageBubble from './UserMessageBubble.vue';
 import type { Message } from './ChatBox.vue';
-
-const componentProps = defineProps<{ user_id: number }>();
+import name from '../users/UserComponent.vue';
+import id from '../users/UserComponent.vue';
 
 const messageList = ref<Message[]>([]);
 
@@ -47,11 +47,20 @@ export default defineComponent({
         const orderedMessages = computed(() =>
             [...messageList.value].sort((a, b) => resolveTimestamp(a) - resolveTimestamp(b))
         );
+        
+        const getIdValue = computed(() => {
+            return id.value;
+        });
+        
+        const getNameValue = computed(() => {
+            return name.value;
+        });
 
         return {
             orderedMessages,
             isMemberMessage,
-            componentProps, // 将props返回，使模板可以访问
+            getIdValue,
+            getNameValue
         };
     },
 });
@@ -64,8 +73,8 @@ export default defineComponent({
             v-for="(message, index) in orderedMessages"
             :key="message.id ?? message.from_id ?? message.timestamp ?? index"
         >
-            <MemberMessageBubble v-if="isMemberMessage(message, componentProps.user_id)" :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" />
-            <UserMessageBubble v-else :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" />
+            <MemberMessageBubble v-if="isMemberMessage(message, getIdValue ?? 0)" :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" />
+            <UserMessageBubble v-else :name="getNameValue ?? 'error'" :message="message.content" :avatar="message.avatar" :date="message.timestamp" />
         </template>
     </div>
 </template>

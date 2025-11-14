@@ -1,19 +1,40 @@
 <script setup lang="ts">
 import setting from '/settings.svg?url';
 import add from '/add.svg?url';
+import { ref } from 'vue';
 
 const props = defineProps({
   avatar: String,
   name: String,
   description: String,
+  id: Number,
 })
+
+const avatar = ref(props.avatar);
+const name = ref(props.name);
+const description = ref(props.description);
+const id = ref(props.id);
+
+/*
+function updateAvatar(newAvatar: string) {
+  avatar.value = newAvatar;
+}
+
+function updateName(newName: string) {
+  name.value = newName;
+}
+
+function updateDescription(newDescription: string) {
+  description.value = newDescription;
+}
+*/
 </script>
 
 <template>
   <div class="container">
-    <img class="image" :src="props.avatar" alt="avatar"/>
-    <p class="username"> {{ props.name }} </p>
-    <p class="description"> {{ props.description }} </p>
+    <img class="image" :src="avatar" alt="avatar"/>
+    <p class="username"> {{ name }} - {{ id }} </p>
+    <p class="description"> {{ description }} </p>
     <img class="setting-icon" :src="setting" alt=""/>
     <img class="add-icon" :src="add" alt=""/>
   </div>

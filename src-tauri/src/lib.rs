@@ -6,11 +6,13 @@ pub mod dao;
 pub mod error;
 pub mod service;
 pub mod windows;
+pub mod log;
 
 use config::get_config;
 use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service};
 use windows::to_chat_window_size;
 use dao::{channel::*,message::*};
+use log::{log_info, log_error, log_warning};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> anyhow::Result<()> {
@@ -36,6 +38,9 @@ pub fn run() -> anyhow::Result<()> {
             get_messages_by_keyword,
             get_messages_by_user_id,
             get_messages_by_time_range,
+            log_info,
+            log_error,
+            log_warning,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

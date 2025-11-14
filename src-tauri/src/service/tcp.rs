@@ -10,14 +10,20 @@ pub struct TcpService {
     stream: TcpStream,
 }
 
-#[derive(Default)]
 pub struct TcpMapService {
     map: HashMap<i32, Box<TcpService>>,
-    id_list: Vec<u32>,
 }
 
 type SharedTcpMapService = Arc<RwLock<TcpMapService>>;
 pub static TCP_SERVICE: OnceLock<SharedTcpMapService> = OnceLock::new();
+
+impl Default for TcpMapService {
+    fn default() -> Self {
+        TcpMapService {
+            map: HashMap::new(),
+        }
+    }
+}
 
 impl TcpService {
     pub async fn new(socket: String) -> anyhow::Result<Self> {
@@ -92,12 +98,12 @@ impl TcpMapService {
         self.map.insert(channel_id, service);
     }
 
-    pub async fn send(&mut self, channel_id: i32, data: String) -> anyhow::Result<()> {
-        match self.map.get_mut(&channel_id) {
+    pub async fn send(&mut self, server_id: i32, data: String) -> anyhow::Result<()> {
+        match self.map.get_mut(&server_id) {
             Some(service) => service.send(data).await,
             None => Err(anyhow::anyhow!(
                 "TCP service not found for channel_id: {}",
-                channel_id
+                server_id
             )),
         }
     }
