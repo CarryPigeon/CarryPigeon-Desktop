@@ -13,4 +13,4 @@ pnpm tauri build --no-bundle
 ```
 
 TODO
-用户本人的user_id传导
+部分按钮重画（登录）
