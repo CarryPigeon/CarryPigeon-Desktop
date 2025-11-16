@@ -18,7 +18,7 @@ const props = defineProps<{
 <template>
 <div class="participants-list">
   <div class = "participants-number">
-    <p>participants - {{props.length}}</p>
+    <p>{{$t('participants')}} - {{props.length}}</p>
   </div>
   <div class="list">
     <ul style="list-style-type: none; padding: 0;">
