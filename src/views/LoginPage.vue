@@ -4,10 +4,13 @@ import { useRouter } from 'vue-router';
 
 const email = ref('');
 const code = ref('');
+const loading = ref(false);
 
 const router = useRouter();
 
-function login(){
+async function login(){
+    loading.value = true;
+    await new Promise(resolve => setTimeout(resolve, 1000));
     router.push('/chat');
 }
 
@@ -19,11 +22,17 @@ function login(){
   <image class="user-image" alt="User Image"/>
   <input class="email-input" v-model="email" type="email" :placeholder="$t('email')" />
   <input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
-  <button @click="login">{{ $t('login') }}</button>
+  <button class = "login-button" @click="login">
+      <span v-if="loading">{{ $t('loading') }}</span>
+      <span v-else>{{ $t('login') }}</span>
+  </button>
 </div>
 </template>
 
 <style scoped lang="sass">
+.user-image
+    width: 100px;
+    hight: 100px;
 .login-page
     display: flex;
     flex-direction: column;

@@ -7,9 +7,9 @@ const search_value = ref('')
 
 <template>
 <div class="search-bar">
-  <img class="search-icon" :src="search" alt="search" />
+  <img class="search-icon" :src="search" alt="search"/>
   <div class="researcher">
-    <input class="input" v-model="search_value" />
+    <input class="input" v-model="search_value" :placeholder="$t('search_bar')"/>
   </div>
 </div>
 </template>

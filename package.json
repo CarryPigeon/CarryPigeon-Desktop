@@ -3,11 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "pnpm": {
-    "overrides": {
-      "drizzle-kit>@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
-    }
-  },
+  "pnpm": {},
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
@@ -15,19 +11,15 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.15",
     "@tauri-apps/api": "^2.9.0",
     "@tauri-apps/plugin-opener": "^2.5.2",
-    "better-sqlite3": "^12.4.1",
     "crypto-js": "^4.2.0",
-    "drizzle-orm": "^0.44.7",
     "vue": "^3.5.24"
   },
   "devDependencies": {
     "@eslint/css": "^0.13.0",
     "@eslint/js": "^9.39.1",
     "@tauri-apps/cli": "^2.9.4",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/crypto-js": "^4.2.2",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",

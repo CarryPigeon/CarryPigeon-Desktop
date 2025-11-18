@@ -2,6 +2,7 @@
 import setting from '/settings.svg?url';
 import add from '/add.svg?url';
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 const props = defineProps({
   avatar: String,
@@ -14,6 +15,12 @@ const avatar = ref(props.avatar);
 const name = ref(props.name);
 const description = ref(props.description);
 const id = ref(props.id);
+
+const router = useRouter();
+
+function click_setting(){
+    router.push("/settings");
+}
 
 /*
 function updateAvatar(newAvatar: string) {
@@ -35,7 +42,7 @@ function updateDescription(newDescription: string) {
     <img class="image" :src="avatar" alt="avatar"/>
     <p class="username"> {{ name }} - {{ id }} </p>
     <p class="description"> {{ description }} </p>
-    <img class="setting-icon" :src="setting" alt=""/>
+    <img class="setting-icon" :src="setting" @click="click_setting" alt=""/>
     <img class="add-icon" :src="add" alt=""/>
   </div>
 </template>

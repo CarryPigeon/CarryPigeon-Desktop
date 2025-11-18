@@ -6,4 +6,6 @@ export const zh_cn = {
     email: '邮箱',
     login_code: '验证码',
     participants: '频道成员',
+    loading: '加载中...',
+    search_bar: '搜索',
 };
