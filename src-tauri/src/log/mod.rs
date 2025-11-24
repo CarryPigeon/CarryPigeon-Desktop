@@ -1,16 +1,16 @@
-use tracing::{info, error, warn};
+use tracing::{error, info, warn};
 
 #[tauri::command]
-pub fn log_info(info: String){
+pub fn log_info(info: String) {
     info!("{}", info);
 }
 
 #[tauri::command]
-pub fn log_error(error: String){
+pub fn log_error(error: String) {
     error!("{}", error);
 }
 
 #[tauri::command]
-pub fn log_warning(warning: String){
+pub fn log_warning(warning: String) {
     warn!("{}", warning);
 }

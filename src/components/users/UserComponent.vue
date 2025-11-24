@@ -104,9 +104,11 @@ function updateDescription(newDescription: string) {
   position: fixed
   left: 239px
   top: calc(100vh - 39px)
+  cursor: pointer
 
 .add-icon
   position: fixed
   left: 275px
   top: calc(100vh - 39px)
+  cursor: pointer
 </style>

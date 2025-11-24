@@ -28,7 +28,9 @@ pub async fn get_all_channels() -> Result<Vec<Model>, String> {
 }
 
 #[tauri::command]
-pub async fn get_all_channels_by_server_socket(server_socket: String) -> Result<Vec<Model>, String> {
+pub async fn get_all_channels_by_server_socket(
+    server_socket: String,
+) -> Result<Vec<Model>, String> {
     Entity::find()
         .filter(Column::ServerSocket.eq(server_socket))
         .all(&DATABASE_POOL.get().unwrap().connection)
@@ -37,7 +39,10 @@ pub async fn get_all_channels_by_server_socket(server_socket: String) -> Result<
 }
 
 #[tauri::command]
-pub async fn get_channel_by_id(server_socket: String, channel_id: u32) -> Result<Option<Model>, String> {
+pub async fn get_channel_by_id(
+    server_socket: String,
+    channel_id: u32,
+) -> Result<Option<Model>, String> {
     Entity::find()
         .filter(Column::ServerSocket.eq(server_socket))
         .filter(Column::Id.eq(channel_id))
@@ -47,7 +52,10 @@ pub async fn get_channel_by_id(server_socket: String, channel_id: u32) -> Result
 }
 
 #[tauri::command]
-pub async fn get_channel_by_name(server_socket: String, name: String) -> Result<Option<Model>, String> {
+pub async fn get_channel_by_name(
+    server_socket: String,
+    name: String,
+) -> Result<Option<Model>, String> {
     Entity::find()
         .filter(Column::ServerSocket.eq(server_socket))
         .filter(Column::Name.eq(name))
@@ -57,7 +65,10 @@ pub async fn get_channel_by_name(server_socket: String, name: String) -> Result<
 }
 
 #[tauri::command]
-pub async fn get_channel_by_owner_id(server_socket: String, owner_id: u32) -> Result<Option<Model>, String> {
+pub async fn get_channel_by_owner_id(
+    server_socket: String,
+    owner_id: u32,
+) -> Result<Option<Model>, String> {
     Entity::find()
         .filter(Column::ServerSocket.eq(server_socket))
         .filter(Column::OwnerId.eq(owner_id))
@@ -67,7 +78,10 @@ pub async fn get_channel_by_owner_id(server_socket: String, owner_id: u32) -> Re
 }
 
 #[tauri::command]
-pub async fn get_channel_by_admin_ids(server_socket: String, admin_ids: String) -> Result<Vec<Model>, String> {
+pub async fn get_channel_by_admin_ids(
+    server_socket: String,
+    admin_ids: String,
+) -> Result<Vec<Model>, String> {
     Entity::find()
         .filter(Column::ServerSocket.eq(server_socket))
         .filter(Column::AdminIds.eq(admin_ids))

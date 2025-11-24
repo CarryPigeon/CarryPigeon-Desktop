@@ -31,12 +31,12 @@ function sendMessage() {
   // 获取真实DOM并添加到容器
   if (container && renderer.firstChild) {
     container.appendChild(renderer.firstChild);
-    text.value = '';
 
     // 自动滚动到底部
     requestAnimationFrame(() => {
       container!.scrollTop = container!.scrollHeight;
     });
+    text.value = '';
   }
 }
 </script>
@@ -46,7 +46,6 @@ function sendMessage() {
     <textarea
         id="text-area-item"
         v-model="text"
-        placeholder=""
         class="text-area-item"
         wrap="soft"
         @keydown.enter="sendMessage"
@@ -61,18 +60,19 @@ function sendMessage() {
   grid-template-rows: 1fr
   position: fixed
   left: 319px
-  top: calc(100vh - 100px)
-  width: calc(100vw - 558px)
-  height: 100px
+  top: calc(100vh - 200px)
+  width: 54%
+  height: 200px
   opacity: 1
   background: rgba(243, 244, 246, 1)
   border: 1px solid rgba(231, 232, 236, 1)
   box-sizing: border-box
 
 .text-area-item
-  width: 98% !important
-  height: 95% !important
-  margin: 10px 10px 5px
+  font-size: 16px
+  //width: 53% !important
+  //height: 95% !important
+  margin: 20px 10px 5px 10px
   border: none
   background: transparent
   outline: none

@@ -1,18 +1,19 @@
 /*
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
  */
+pub mod api;
 pub mod config;
 pub mod dao;
 pub mod error;
+pub mod log;
 pub mod service;
 pub mod windows;
-pub mod log;
 
-use config::get_config;
+use config::{get_config_value, get_server_config_value, update_config};
+use dao::{channel::*, message::*};
+use log::{log_error, log_info, log_warning};
 use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service};
 use windows::to_chat_window_size;
-use dao::{channel::*,message::*};
-use log::{log_info, log_error, log_warning};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> anyhow::Result<()> {
@@ -20,7 +21,9 @@ pub fn run() -> anyhow::Result<()> {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             to_chat_window_size,
-            get_config,
+            get_config_value,
+            get_server_config_value,
+            update_config,
             send_tcp_service,
             listen_tcp_service,
             add_tcp_service,

@@ -117,7 +117,7 @@ export var messageReceiveService = new MessageReceiveService("");
   position: fixed
   top: 61px
   left: 318px
-  height: calc(100vh - 161px)
+  height: calc(65vh - 15px)
   width: calc(100vw - 558px)
   overflow-y: auto
 </style>

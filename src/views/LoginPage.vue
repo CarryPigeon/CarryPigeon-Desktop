@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { Input } from 'tdesign-vue-next';
 
 const email = ref('');
 const code = ref('');
@@ -20,8 +21,8 @@ async function login(){
 <div class="login-page">
   <h1>{{ $t('login') }}</h1>
   <image class="user-image" alt="User Image"/>
-  <input class="email-input" v-model="email" type="email" :placeholder="$t('email')" />
-  <input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
+  <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
+  <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
   <button class = "login-button" @click="login">
       <span v-if="loading">{{ $t('loading') }}</span>
       <span v-else>{{ $t('login') }}</span>
@@ -45,27 +46,28 @@ async function login(){
     box-sizing: border-box;
 
 .email-input
-    width: 50%;
-    padding: 10px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 16px;
-    box-sizing: border-box;
+    padding: 0
+    width: 50%
+    padding: 0px
+    margin-top: 10px
+    margin-bottom: 10px
+    border: 1px solid #ccc
+    border-radius: 4px
+    font-size: 16px
+    box-sizing: border-box
 .code-input
-    width: 50%;
-    padding: 10px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 16px;
-    box-sizing: border-box;
+    width: 50%
+    padding: 0
+    margin-top: 10px
+    margin-bottom: 10px
+    border: 1px solid #ccc
+    border-radius: 4px
+    font-size: 16px
+    box-sizing: border-box
 
 .user-image
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    margin-bottom: 20px;
+    width: 100px
+    height: 100px
+    border-radius: 50%
+    margin-bottom: 20px
 </style>

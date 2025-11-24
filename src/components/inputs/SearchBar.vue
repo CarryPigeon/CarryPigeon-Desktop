@@ -2,6 +2,7 @@
 import {ref} from "vue";
 import search from '/search.svg?url';
 
+
 const search_value = ref('')
 </script>
 
@@ -9,7 +10,7 @@ const search_value = ref('')
 <div class="search-bar">
   <img class="search-icon" :src="search" alt="search"/>
   <div class="researcher">
-    <input class="input" v-model="search_value" :placeholder="$t('search_bar')"/>
+    <Input class="input" v-model="search_value" :placeholder="$t('search_bar')"/>
   </div>
 </div>
 </template>

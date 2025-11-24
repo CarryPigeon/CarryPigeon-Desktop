@@ -79,5 +79,5 @@ export default defineComponent({
     </div>
 </template>
 
-<style lang="sass">
+<style scoped lang="sass">
 </style>

@@ -39,7 +39,8 @@ pub async fn create_message(
         updated_at: Set(updated_at),
     };
     temp.insert(&DATABASE_POOL.get().unwrap().connection)
-        .await.map_err(|e| e.to_string())?;
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -63,7 +64,8 @@ pub async fn update_message(
         updated_at: Set(updated_at),
     };
     temp.update(&DATABASE_POOL.get().unwrap().connection)
-        .await.map_err(|e| e.to_string())?;
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -74,7 +76,8 @@ pub async fn delete_message(message_id: u64) -> Result<(), String> {
         ..Default::default()
     };
     temp.delete(&DATABASE_POOL.get().unwrap().connection)
-        .await.map_err(|e| e.to_string())?;
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -89,7 +92,8 @@ pub async fn get_message_by_message_id(
         .filter(Column::ChannelId.eq(channel_id))
         .filter(Column::MessageId.eq(message_id))
         .one(&DATABASE_POOL.get().unwrap().connection)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -105,7 +109,8 @@ pub async fn get_messages_by_channel_id(
         .filter(Column::MessageId.gt(from_id))
         .filter(Column::MessageId.lt(to_id))
         .all(&DATABASE_POOL.get().unwrap().connection)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

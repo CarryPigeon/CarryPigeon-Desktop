@@ -8,4 +8,12 @@ export const zh_cn = {
     participants: '频道成员',
     loading: '加载中...',
     search_bar: '搜索',
+    account: '账号',
+    privacy: '隐私',
+    notifications: '通知',
+    edit_in_file: '编辑配置',
+    security: '安全',
+    logout: '退出登录',
+    username: '用户名',
+    auto_login: '自动登录',
 };
