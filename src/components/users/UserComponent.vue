@@ -105,10 +105,14 @@ function updateDescription(newDescription: string) {
   left: 239px
   top: calc(100vh - 39px)
   cursor: pointer
+  &:hover
+    background-color: #f0f0f0
 
 .add-icon
   position: fixed
   left: 275px
   top: calc(100vh - 39px)
   cursor: pointer
+  &:hover
+    background-color: #f0f0f0
 </style>
