@@ -11,7 +11,7 @@ const props = defineProps<{
 const value = ref(props.value);
 
 const onChange: SwitchProps['onChange'] = (val) => {
-    invoke('update_config', { key: props.text, value: val });
+    invoke('update_config_bool', { key: props.text, value: val });
 };
 
 </script>

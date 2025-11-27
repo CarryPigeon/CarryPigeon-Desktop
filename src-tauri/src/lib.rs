@@ -9,7 +9,11 @@ pub mod log;
 pub mod service;
 pub mod windows;
 
-use config::{get_config_value, get_server_config_value, update_config};
+use config::{
+    get_config_bool, get_config_string, get_config_u32, get_config_u64, get_server_config_bool,
+    get_server_config_string, get_server_config_u32, get_server_config_u64, update_config_bool,
+    update_config_string, update_config_u32, update_config_u64,
+};
 use dao::{channel::*, message::*};
 use log::{log_error, log_info, log_warning};
 use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service};
@@ -20,10 +24,9 @@ pub fn run() -> anyhow::Result<()> {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            // window commands
             to_chat_window_size,
-            get_config_value,
-            get_server_config_value,
-            update_config,
+            //tcp service commands
             send_tcp_service,
             listen_tcp_service,
             add_tcp_service,
@@ -41,9 +44,23 @@ pub fn run() -> anyhow::Result<()> {
             get_messages_by_keyword,
             get_messages_by_user_id,
             get_messages_by_time_range,
+            //log commands
             log_info,
             log_error,
             log_warning,
+            //config commands
+            get_config_bool,
+            get_config_u32,
+            get_config_u64,
+            get_config_string,
+            get_server_config_string,
+            get_server_config_u32,
+            get_server_config_u64,
+            get_server_config_bool,
+            update_config_bool,
+            update_config_u32,
+            update_config_u64,
+            update_config_string,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

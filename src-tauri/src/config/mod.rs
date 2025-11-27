@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{io::Write, path::Path};
-use tauri::utils::config;
 
 /// 异步获取配置文件内容
 ///
@@ -101,7 +100,6 @@ impl ConfigValueExtractor<bool> for bool {
 /// # Errors
 /// 当文件读取失败或JSON解析失败时会返回相应的错误
 /// 当键值不存在时会返回默认值
-#[tauri::command]
 pub async fn get_config_value<T>(key: String) -> T
 where
     T: ConfigValueExtractor<T> + Default,
@@ -131,7 +129,6 @@ where
 /// # Errors
 /// 当文件读取失败或JSON解析失败时会返回相应的错误
 /// 当服务器配置不存在时会返回默认值
-#[tauri::command]
 pub async fn get_server_config_value<T>(server_socket: String) -> T
 where
     T: ConfigValueExtractor<T> + Default,
@@ -149,19 +146,18 @@ where
                     .iter()
                     .find(|v| v.as_str().unwrap() == server_socket)
                     .map(|v| T::extract(v))
-                    .unwrap_or_default()
+                    .unwrap_or_else(|| T::default())
             })
-            .unwrap_or_default()
+            .unwrap_or_else(|| T::default())
     } else {
         tracing::error!("Config file is not a valid JSON object");
         T::default()
     }
 }
 
-#[tauri::command]
 pub async fn update_config<T>(key: String, value: T)
 where
-    T: ConfigValueExtractor<T>,
+    T: ConfigValueExtractor<T> + Default,
 {
     let config_str = get_config().await;
     let mut config_value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
@@ -183,4 +179,64 @@ where
     } else {
         tracing::error!("Config file is not a valid JSON object");
     }
+}
+
+#[tauri::command]
+pub async fn get_config_bool(key: String) -> bool {
+    get_config_value::<bool>(key).await
+}
+
+#[tauri::command]
+pub async fn get_config_u32(key: String) -> u32 {
+    get_config_value::<u32>(key).await
+}
+
+#[tauri::command]
+pub async fn get_config_u64(key: String) -> u64 {
+    get_config_value::<u64>(key).await
+}
+
+#[tauri::command]
+pub async fn get_config_string(key: String) -> String {
+    get_config_value::<String>(key).await
+}
+
+#[tauri::command]
+pub async fn get_server_config_string(server_socket: String) -> String {
+    get_server_config_value::<String>(server_socket).await
+}
+
+#[tauri::command]
+pub async fn get_server_config_u32(server_socket: String) -> u32 {
+    get_server_config_value::<u32>(server_socket).await
+}
+
+#[tauri::command]
+pub async fn get_server_config_u64(server_socket: String) -> u64 {
+    get_server_config_value::<u64>(server_socket).await
+}
+
+#[tauri::command]
+pub async fn get_server_config_bool(server_socket: String) -> bool {
+    get_server_config_value::<bool>(server_socket).await
+}
+
+#[tauri::command]
+pub async fn update_config_bool(key: String, value: bool) {
+    update_config::<bool>(key, value).await;
+}
+
+#[tauri::command]
+pub async fn update_config_u32(key: String, value: u32) {
+    update_config::<u32>(key, value).await;
+}
+
+#[tauri::command]
+pub async fn update_config_u64(key: String, value: u64) {
+    update_config::<u64>(key, value).await;
+}
+
+#[tauri::command]
+pub async fn update_config_string(key: String, value: String) {
+    update_config::<String>(key, value).await;
 }

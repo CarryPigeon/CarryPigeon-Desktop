@@ -8,7 +8,7 @@ const props = defineProps<{
 }>();
 
 const onChange: InputProps['onChange'] = (val) =>  {
-    invoke('update_config', { key: props.text, value: val });
+    invoke('update_config_string', { key: props.text, value: val });
 };
 
 </script>
