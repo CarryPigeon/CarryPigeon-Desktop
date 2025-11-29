@@ -1,24 +1,20 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core';
 import { Input, InputProps } from 'tdesign-vue-next';
 
 const props = defineProps<{
-    text: string;
-    placeholder: string;
+  text: string;
+  placeholder: string;
+  onChange?: InputProps['onChange'];
 }>();
-
-const onChange: InputProps['onChange'] = (val) =>  {
-    invoke('update_config_string', { key: props.text, value: val });
-};
 
 </script>
 
 <template>
-<div class="setting-item-content">
+  <div class="setting-item-content">
     <div class="setting-item-content-item-title">{{ $t(props.text) }}
-        <Input class="setting-item-content-item-value" :placeholder="props.placeholder" @change="onChange"/>
+      <Input class="setting-item-content-item-value" :placeholder="props.placeholder" @change="props.onChange" />
     </div>
-</div>
+  </div>
 </template>
 
 <style scoped lang="sass">

@@ -6,6 +6,7 @@ export const router = createRouter({
     routes:[
         { path: '/', component: LoginPage},
         { path: '/chat', component: () => import("../views/MainPage.vue")},
-        { path: '/settings', component: () => import("../views/SettingPage.vue") }
+        { path: '/settings', component: () => import("../views/SettingPage.vue") },
+        { path: '/user_info', name: 'UserInfoPage', component: () => import("../views/UserInfoPage.vue") },
     ]
 });

@@ -48,7 +48,7 @@ function sendMessage() {
         v-model="text"
         class="text-area-item"
         wrap="soft"
-        @keydown.enter="sendMessage"
+        @keydown.enter.prevent="sendMessage"
     ></textarea>
   </div>
 </template>

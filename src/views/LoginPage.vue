@@ -9,7 +9,7 @@ const loading = ref(false);
 
 const router = useRouter();
 
-async function login(){
+async function login() {
     loading.value = true;
     await new Promise(resolve => setTimeout(resolve, 1000));
     router.push('/chat');
@@ -18,32 +18,63 @@ async function login(){
 </script>
 
 <template>
-<div class="login-page">
-  <h1>{{ $t('login') }}</h1>
-  <image class="user-image" alt="User Image"/>
-  <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
-  <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
-  <button class = "login-button" @click="login">
-      <span v-if="loading">{{ $t('loading') }}</span>
-      <span v-else>{{ $t('login') }}</span>
-  </button>
-</div>
+    <div class="login-page">
+            <h1>{{ $t('login') }}</h1>
+            <image class="user-image" alt="User Image" />
+            <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
+            <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')" />
+            <button class="login-button" @click="login">
+                <span v-if="loading">{{ $t('loading') }}</span>
+                <span v-else>{{ $t('login') }}</span>
+            </button>
+    </div>
 </template>
 
 <style scoped lang="sass">
 .user-image
-    width: 100px;
-    hight: 100px;
+    width: 100px
+    height: 100px
+
 .login-page
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    width: 100vw;
-    background-color: #f5f5f5;
-    padding: 20px;
-    box-sizing: border-box;
+  display: flex
+  flex-direction: column
+  align-items: center
+  justify-content: center
+  height: 100vh
+  width: 100vw
+  background-color: #f5f5f5
+  padding: 20px
+  box-sizing: border-box
+  display: flex
+  align-items: center
+  justify-content: center
+  height: 100vh
+  width: 100vw
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+  padding: 20px
+  box-sizing: border-box
+  
+  &::before
+    content: ''
+    position: absolute
+    top: 0
+    left: 0
+    right: 0
+    bottom: 0
+    background-image: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%)
+    pointer-events: none
+
+
+//.login-page
+//    display: flex;
+//    flex-direction: column;
+//    align-items: center;
+//    justify-content: center;
+//    height: 100vh;
+//    width: 100vw;
+//    background-color: #f5f5f5;
+//    padding: 20px;
+//    box-sizing: border-box;
 
 .email-input
     padding: 0

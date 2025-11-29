@@ -1,22 +1,33 @@
 <script setup lang="ts">
-import { Switch, SwitchProps } from 'tdesign-vue-next';
+import { TreeSelectProps } from 'tdesign-vue-next';
 import { ref } from 'vue';
+
+interface TreeNode {
+  label: string;
+  value: string;
+  children?: TreeNode[];
+}
 
 const props = defineProps<{
   text: string;
-  value: boolean;
-  onChange?: SwitchProps['onChange'];
+  data: TreeNode[];
+  value: string;
+  onChange?: TreeSelectProps['onChange'];
 }>();
 
 const value = ref(props.value);
-
 
 </script>
 
 <template>
   <div class="setting-item-content">
     <div class="setting-item-content-item-title">{{ $t(props.text) }}
-      <Switch class="setting-item-content-item-switch" v-model="value" @change="props.onChange" />
+      <t-tree-select
+        class="setting-item-content-item-tree-select"
+        :data="props.data"
+        v-model="value"
+        @change="props.onChange"
+      />
     </div>
   </div>
 </template>
@@ -26,12 +37,12 @@ const value = ref(props.value);
   display: flex
   align-items: center
   justify-content: space-between
-  
+
 .setting-item-content-item-title
   flex: 1
   display: flex
   align-items: center
-.setting-item-content-item-switch
+.setting-item-content-item-tree-select
   margin-left: auto
   text-align: right
 </style>

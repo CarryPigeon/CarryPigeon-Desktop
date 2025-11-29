@@ -11,7 +11,7 @@ const config = Config;
 
 <template>
     <div class="setting-page">
-        <div class="back-button" @click="router.push('/chat')">{{ $t('back') }}</div>
+        <div class="back-button" @click="router.back()">{{ $t('back') }}</div>
         <ul class="side-bar">
             <li class="account">{{ $t('account') }}</li>
             <li class="security">{{ $t('security') }}</li>
@@ -22,7 +22,6 @@ const config = Config;
         <div class="content">
             <h1 class="setting-item-title">{{ $t('account') }}</h1>
             <hr />
-            <div class="setting-item-content">
                 <SettingInput text='username' :placeholder="config.username" />
                 <hr />
                 <SettingInput text='email' :placeholder="config.email" />
@@ -34,7 +33,6 @@ const config = Config;
                 <SettingSwitch text='check_for_updates' :value="config.check_for_updates" />
                 <hr />
             </div>
-        </div>
     </div>
 </template>
 

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import {reactive, Ref} from 'vue'
 import Avatar from "/test_avatar.jpg?url";
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+function click_avatar() {
+    router.push("/user_info");
+}
 
 interface ChannelProps {
   channel: string
@@ -12,7 +19,6 @@ interface ChannelProps {
 interface AvatarProps {
   username: Ref<string>
   imageUrl: Ref<string>
-  onClick: () => void
 }
 
 const avatar_props = reactive<AvatarProps>({} as AvatarProps);
@@ -29,10 +35,9 @@ function deleteChannel(channel: string) {
   }
 }
 
-function getAvatar(username: string, imageUrl: string, onClick: () => void) {
+function getAvatar(username: string, imageUrl: string) {
   avatar_props.username = username;
   avatar_props.imageUrl = imageUrl;
-  avatar_props.onClick = onClick;
 }
 
 defineExpose({
@@ -47,7 +52,7 @@ addChannel("111", false, Avatar, () => {});
 
 <template>
 <div class="list">
-  <img class="avatar" :src="avatar_props.imageUrl" alt="avatar" @click="avatar_props.onClick">
+  <img class="avatar" :src="avatar_props.imageUrl" alt="avatar" @click="click_avatar"/>
   <ul class="server_item_list">
     <li v-for="item in channel_props" :key="item.channel" @click="item.onClick">
       <img class="image" :src="item.imageUrl" :alt="item.channel">
