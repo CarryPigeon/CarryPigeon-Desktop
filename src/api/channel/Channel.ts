@@ -1,4 +1,5 @@
 import {BaseAPI} from "../BaseAPI";
+import {invoke} from "@tauri-apps/api/core";
 
 // 频道基本操作服务类
 export class ChannelBasicService extends BaseAPI {
@@ -7,7 +8,7 @@ export class ChannelBasicService extends BaseAPI {
      * @returns 创建的频道信息
      */
     createChannel() {
-        return this.send(this.getChannelId(),"core/channel/create", undefined, (data:string) => {
+        return this.send(this.getChannelSocket(),"core/channel/create", undefined, (data:unknown) => {
             const value = JSON.parse(<string>data);
             if (value["cid"] != null) {
                 return value["cid"];
@@ -23,7 +24,7 @@ export class ChannelBasicService extends BaseAPI {
      * @param cid 频道ID
      */
     deleteChannel(cid: number) {
-        return this.send(this.getChannelId(),"core/channel/delete", { cid });
+        return this.send(this.getChannelSocket(),"core/channel/delete", { cid });
     }
 
     /**
@@ -32,7 +33,7 @@ export class ChannelBasicService extends BaseAPI {
      * @returns 频道信息
      */
     getChannelMessage(cid: number) {
-        return this.send(this.getChannelId(),"core/channel/data/get", { cid });
+        return this.send(this.getChannelSocket(),"core/channel/data/get", { cid });
     }
 
     /**
@@ -45,7 +46,7 @@ export class ChannelBasicService extends BaseAPI {
      * @param avatar 头像
      */
     updateChannelMessage(cid: number, name: string, owner: string, message: string, brief: string, avatar: string) {
-        this.sendRequest(this.getChannelId(),"core/channel/data/update", {
+        this.sendRequest(this.getChannelSocket(),"core/channel/data/update", {
             cid,
             name,
             owner,
@@ -59,8 +60,8 @@ export class ChannelBasicService extends BaseAPI {
      * 获取所有频道
      * @returns 所有频道列表
      */
-    getAllChannels() {
-        return this.send(this.getChannelId(),"core/channel/list",);
+    public getAllChannels(callback?: (data: unknown) => unknown) {
+        return this.send(this.getChannelSocket(),"core/channel/list", undefined,callback);
     }
 }
 
@@ -74,7 +75,7 @@ export class ChannelMessageService extends BaseAPI {
      * @returns 消息列表
      */
     getMessages(cid: number, start_time: number, count: number) {
-        return this.send(this.getChannelId(), "core/channel/message/list", {
+        return this.send(this.getChannelSocket(), "core/channel/message/list", {
             cid,
             start_time,
             count
@@ -88,7 +89,7 @@ export class ChannelMessageService extends BaseAPI {
      */
     sendMessage(type: number, content: string) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(), "core/channel/message/create", {
+        return this.send(this.getChannelSocket(), "core/channel/message/create", {
             type,
             content
         });
@@ -100,9 +101,37 @@ export class ChannelMessageService extends BaseAPI {
      */
     deleteMessage(mid: number) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(), "core/channel/message/delete", {mid});
+        return this.send(this.getChannelSocket(), "core/channel/message/delete", {mid});
+    }
+    /**
+     * 登陆后更新全部消息
+     */
+    public async getAllUnreceivedMessages() {
+        // 先获取全部频道
+        const channels: number[] = await new Promise((resolve, reject) => {
+            new ChannelBasicService(this.getChannelSocket()).getAllChannels((data: unknown) => {
+                try {
+                    const value = JSON.parse(data as string);
+                    if (value["channels"] != null) {
+                        resolve(value["channels"]);
+                    } else {
+                        // TODO: 弹窗提示获取失败
+                        reject(new Error(value["msg"]));
+                    }
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+        const localLatestMessagesDate: number = await invoke("get_local_latest_messages_date");
+        for (const cid of channels) {
+            // 获取全部消息
+            await this.getMessages(cid, localLatestMessagesDate, 10000);
+        }
     }
 }
+
+export default ChannelMessageService
 
 // 频道成员服务类
 export class ChannelMemberService extends BaseAPI {
@@ -112,7 +141,7 @@ export class ChannelMemberService extends BaseAPI {
      * @returns 成员列表
      */
     getAllMembers(cid: number) {
-        return this.send(this.getChannelId(), "core/channel/member/list", { cid });
+        return this.send(this.getChannelSocket(), "core/channel/member/list", { cid });
     }
 
     /**
@@ -122,7 +151,7 @@ export class ChannelMemberService extends BaseAPI {
      */
     deleteChannelMember(cid: number, uid: number) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(), "core/channel/member/delete", {cid, uid});
+        return this.send(this.getChannelSocket(), "core/channel/member/delete", {cid, uid});
     }
 }
 
@@ -135,7 +164,7 @@ export class ChannelAdminService extends BaseAPI {
      */
     createChannelAdmin(cid: number, uid: number) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(), "core/channel/admin/create", {cid, uid});
+        return this.send(this.getChannelSocket(), "core/channel/admin/create", {cid, uid});
     }
 
     /**
@@ -145,7 +174,7 @@ export class ChannelAdminService extends BaseAPI {
      */
     deleteChannelAdmin(cid: number, uid: number) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(), "core/channel/admin/delete", {cid, uid});
+        return this.send(this.getChannelSocket(), "core/channel/admin/delete", {cid, uid});
     }
 }
 
@@ -157,7 +186,7 @@ export class ChannelApplicationService extends BaseAPI {
      */
     applyChannel(cid: number) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(),"core/channel/application", {cid});
+        return this.send(this.getChannelSocket(),"core/channel/application", {cid});
     }
 
     /**
@@ -166,7 +195,7 @@ export class ChannelApplicationService extends BaseAPI {
      * @param result 处理结果
      */
     processChannelApplication(aid: number, result: number) {
-        this.sendRequest(this.getChannelId(),"core/channel/application/process", { aid, result });
+        this.sendRequest(this.getChannelSocket(),"core/channel/application/process", { aid, result });
     }
 
     /**
@@ -175,7 +204,7 @@ export class ChannelApplicationService extends BaseAPI {
      */
     getAllChannelsApplication(table: GetAllChannelsApplicationTable[]) {
         // 错误处理已在基类中完成
-        return this.send(this.getChannelId(),"core/channel/application/list", { table });
+        return this.send(this.getChannelSocket(),"core/channel/application/list", { table });
     }
 }
 
@@ -191,7 +220,7 @@ export class ChannelBanService extends BaseAPI {
      */
     async createMemberBan(cid: number, uid: number, duration: number, state: number, admin_id: number) {
         // 错误处理已在基类中完成
-        return await this.send(this.getChannelId(),"core/channel/ban/create", {
+        return await this.send(this.getChannelSocket(),"core/channel/ban/create", {
             cid,
             uid,
             duration,
@@ -207,7 +236,7 @@ export class ChannelBanService extends BaseAPI {
      */
     async deleteMemberBan(cid: number, uid: number) {
         // 错误处理已在基类中完成
-        return await this.send(this.getChannelId(),"core/channel/ban/delete", {cid, uid});
+        return await this.send(this.getChannelSocket(),"core/channel/ban/delete", {cid, uid});
     }
 
     /**
@@ -216,11 +245,8 @@ export class ChannelBanService extends BaseAPI {
      * @returns 封禁列表
      */
     async getAllMemberBansList(cid: number) {
-        return await this.send(this.getChannelId(),"core/channel/ban/list", { cid });    
+        return await this.send(this.getChannelSocket(),"core/channel/ban/list", { cid });
     }
-}
-export class ChannelReceiveService{
-
 }
 
 // 导出接口

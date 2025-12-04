@@ -1,7 +1,6 @@
 /*
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
  */
-pub mod api;
 pub mod config;
 pub mod dao;
 pub mod error;
@@ -44,6 +43,7 @@ pub fn run() -> anyhow::Result<()> {
             get_messages_by_keyword,
             get_messages_by_user_id,
             get_messages_by_time_range,
+            get_latest_local_message_date,
             //log commands
             log_info,
             log_error,

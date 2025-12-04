@@ -3,7 +3,7 @@ import {BaseAPI} from "../BaseAPI";
 export class User extends BaseAPI{
     protected async register(email: string, code: string){
         return await this.send(
-            0,
+            String(),
             "core/user/register",
             {email: email, code: code},
             (data) => {
@@ -15,7 +15,7 @@ export class User extends BaseAPI{
     }
     protected async loginByEmail (token: string){
         return await this.send(
-            0,
+            String(),
             "core/user/login/email",
             {token: token},
             (data) => {
@@ -27,7 +27,7 @@ export class User extends BaseAPI{
     }
     protected async loginByToken(token: string) {
         return await this.send(
-            0,
+            String(),
             "core/user/login/token",
             {token: token},
             (data) => {
@@ -39,14 +39,14 @@ export class User extends BaseAPI{
      }
     protected async logoutToken(token: string) {
         return await this.send(
-            0, 
+            String(),
             "core/user/token/logout",
             {token: token}
         );
     }
     protected async getUserProfile(uid: string) {
         return await this.send(
-            0,
+            String(),
             "core/user/profile/" + uid,
             {uid: uid},
             (data) => {
@@ -56,14 +56,14 @@ export class User extends BaseAPI{
     }
     protected async updateUserProfile(username: string, avatar: string, sex: number, brief: string, birthday: string) {
         return await this.send(
-            0,
+            String(),
             "core/user/profile/update",
             {username: username, avatar: avatar, sex: sex, brief: brief, birthday: birthday},
         );
      }
     protected async updateUserEmail(new_email: string, code: string) {
         return await this.send(
-            0,
+            String(),
             "core/user/email/update",
             {new_email: new_email, code: code},
         );

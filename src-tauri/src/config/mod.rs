@@ -32,10 +32,21 @@ pub struct Config {
 #[tauri::command]
 pub async fn get_config() -> String {
     // 读取配置文件内容
-    let config_file = Path::new("./config");
+    let config_file = Path::new("./config.json");
     let data = Box::new(tokio::fs::read_to_string(config_file).await);
     match *data {
-        Ok(data) => data,
+        Ok(data) => {
+            if data.is_empty() {
+                let mut file = std::fs::File::create(config_file).unwrap();
+                file.write_all(
+                    serde_json::to_string(&Config::default())
+                        .unwrap()
+                        .as_bytes(),
+                )
+                .unwrap();
+            }
+            data
+        },
         Err(_) => {
             let mut file = std::fs::File::create(config_file).unwrap();
             file.write_all(

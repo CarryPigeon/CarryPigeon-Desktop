@@ -19,7 +19,7 @@ export interface UIMessageCommon{
     data: string;
 }
 
-export async function praseChannelMessage(channelId: number,message: string) {
+export async function praseChannelMessage(channelSocket: string,message: string) {
     const value = JSON.parse(message);
-    await TCP_SERVICE.send(channelId, value);
+    await TCP_SERVICE.send(channelSocket, value);
 }

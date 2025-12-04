@@ -11,6 +11,8 @@ const props = defineProps<{
 
 <script lang="ts">
 // 标记ServerSocket和ChannelId
+import {invoke} from "@tauri-apps/api/core";
+
 let serverSocket = ref<string>("");
 let channelId = ref<number>(0);
 
@@ -78,7 +80,7 @@ export class MessageReceiveService{
   
   
   // 处理接收到的新消息
-  public showNewMessage(messageData: string){
+  public async showNewMessage(messageData: string){
     try {
       // 尝试解析JSON数据
       const parsedData = JSON.parse(messageData);
@@ -95,7 +97,32 @@ export class MessageReceiveService{
       
       // 将新消息添加到消息列表
       messages.value.push(newMessage);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      //存储数据到数据库
+      try{
+        const oldMessage: Message = await invoke("get_message",{ serverSocket: serverSocket.value, channel_id: channelId.value, message_id: newMessage.id,});
+        if (newMessage.timestamp != oldMessage.timestamp){
+          await invoke("update_message", {
+            serverSocket: serverSocket.value,
+            message_id: newMessage.id,
+            user_id: newMessage.from_id,
+            channel_id: channelId.value,
+            content: newMessage.content,
+            created_at: newMessage.timestamp,
+          });
+        }
+        await invoke("crate_message", {
+          serverSocket: serverSocket.value,
+          message_id: newMessage.id,
+          user_id: newMessage.from_id,
+          channel_id: channelId.value,
+          content: newMessage.content,
+          created_at: newMessage.timestamp,
+          update_at: newMessage.timestamp
+        });
+      } catch (error) {
+        // TODO:处理问题
+      }
     } catch (error) {
       // TODO:处理问题
     }

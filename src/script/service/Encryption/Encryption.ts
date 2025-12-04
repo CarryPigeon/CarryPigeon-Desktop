@@ -65,7 +65,7 @@ export class OfficialEncryptClass implements EncryptInterface {
         const bodyJson = JSON.stringify(body);
         import("../net/TcpService").then(module => {
             if (module.TCP_SERVICE) {
-                return module.TCP_SERVICE.send(0, bodyJson);
+                return module.TCP_SERVICE.send(String(), bodyJson);
             }
         });
         return Promise.resolve();

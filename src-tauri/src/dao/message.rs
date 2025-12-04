@@ -1,4 +1,4 @@
-use sea_orm::{ActiveValue::Set, entity::prelude::*};
+use sea_orm::{ActiveValue::Set, QueryOrder, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 
 use crate::dao::DATABASE_POOL;
@@ -160,4 +160,19 @@ pub async fn get_messages_by_time_range(
         .all(&DATABASE_POOL.get().unwrap().connection)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_latest_local_message_date(
+    server_socket: String,
+    channel_id: u32,
+) -> Result<Option<i64>, String> {
+    let result = Entity::find()
+        .filter(Column::ServerSocket.eq(server_socket))
+        .filter(Column::ChannelId.eq(channel_id))
+        .order_by_desc(Column::CreatedAt)
+        .one(&DATABASE_POOL.get().unwrap().connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(result.map(|m| m.created_at))
 }

@@ -3,40 +3,40 @@ import { CommandMessage, DataObject } from "./CommandMessage";
 
 export abstract class BaseAPI {
 
-    private channel_id: number;
+    private channel_socket: string;
     
-    constructor(channel_id: number) {
-        this.channel_id = channel_id;
+    constructor(channel_socket: string) {
+        this.channel_socket = channel_socket;
     }
 
-    protected changeChannelId(channel_id: number) {
-        this.channel_id = channel_id;
+    protected changeChannelSocket(channel_socket: string) {
+        this.channel_socket = channel_socket;
     }
 
-    public getChannelId(): number {
-        return this.channel_id;
+    public getChannelSocket(): string {
+        return this.channel_socket;
     }
 
-    protected async sendRequest(channel_id: number ,route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
+    protected async sendRequest(channel_socket: string ,route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
         const context: CommandMessage = {
             route,
             data
         };
-        await TCP_SERVICE.send(channel_id,JSON.stringify(context));
+        await TCP_SERVICE.send(channel_socket,JSON.stringify(context));
         if (callback){
             return callback();
         }
     }
     
-    protected async send(channel_id: number, route: string, data?: DataObject | undefined, callback?: (data: string) => void): Promise<void> {
+    protected async send(channel_socket: string, route: string, data?: DataObject | undefined, callback?: (data: unknown) => unknown): Promise<void> {
         const context: CommandMessage = {
             route,
             data
         };
         if (callback === undefined) { 
-            await TCP_SERVICE.send(channel_id, JSON.stringify(context));
+            await TCP_SERVICE.send(channel_socket, JSON.stringify(context));
         } else {
-            await TCP_SERVICE.sendWithResponse(channel_id,JSON.stringify(context),callback);
+            await TCP_SERVICE.sendWithResponse(channel_socket,JSON.stringify(context),callback);
         }
     }
     

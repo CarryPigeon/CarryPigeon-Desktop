@@ -1,0 +1,8 @@
+{
+  "auto_login": false,
+  "auto_launch": false,
+  "close_to_tray": true,
+  "check_for_updates": true,
+  "server_list": {
+  }
+}

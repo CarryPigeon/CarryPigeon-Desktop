@@ -69,10 +69,10 @@ export class TcpService {
         invoke("add_tcp_service", { socket });
     }
 
-    public async send(channel_id: number, raw_data: string, callback?:(data: string) => void){
+    public async send(channel_socket: string, raw_data: string, callback?:(data: string) => void){
         return new Promise((resolve, reject) =>{
             const data = this.encrypter.encrypt(raw_data);
-            invoke("send_tcp_service", { channel_id, data }).then((res) => {
+            invoke("send_tcp_service", { channel_id: channel_socket, data }).then((res) => {
                 if (callback) {
                     callback(<string>res);
                 }
@@ -83,13 +83,13 @@ export class TcpService {
         });
     }
     
-    public async sendWithResponse(channel_id: number, raw_data: string, callback: (data: string) => void){
+    public async sendWithResponse(channel_socket: string, raw_data: string, callback: (data: string) => void){
         const id = this.funcMap.add(callback);
         const temp = JSON.parse(raw_data);
         temp["id"] = id;
         return new Promise(() => {
             const data = this.encrypter.encrypt(JSON.stringify(temp));
-            invoke("send_tcp_service", { channel_id, data });
+            invoke("send_tcp_service", { channel_id: channel_socket, data });
         });
     }
 
@@ -107,7 +107,11 @@ export class TcpService {
 }
 
 listen<string>('tcp-message',(endata) => {
-    TCP_SERVICE.listen(TCP_SERVICE.encrypter.decrypt(endata.payload));
+    TCP_SERVICE.listen(TCP_SERVICE.encrypter.decrypt(endata.payload)).then(r => {
+        invoke("log-warning",{r});
+    });
+}).then(r => {
+    invoke("log-warning", {r});
 })
 
 export const TCP_SERVICE: TcpService = new TcpService(<string>Config["socket"]);

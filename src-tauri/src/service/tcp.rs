@@ -10,20 +10,14 @@ pub struct TcpService {
     stream: TcpStream,
 }
 
+#[derive(Default)]
 pub struct TcpMapService {
-    map: HashMap<i32, Box<TcpService>>,
+    map: HashMap<String, Box<TcpService>>,
 }
 
 type SharedTcpMapService = Arc<RwLock<TcpMapService>>;
 pub static TCP_SERVICE: OnceLock<SharedTcpMapService> = OnceLock::new();
 
-impl Default for TcpMapService {
-    fn default() -> Self {
-        TcpMapService {
-            map: HashMap::new(),
-        }
-    }
-}
 
 impl TcpService {
     pub async fn new(socket: String) -> anyhow::Result<Self> {
@@ -86,46 +80,46 @@ impl TcpMapService {
         Self::default()
     }
 
-    pub fn add(&mut self, channel_id: i32, service: Box<TcpService>) {
+    pub fn add(&mut self, channel_socket: String, service: Box<TcpService>) {
         // 如果已存在相同 channel_id 的连接，先记录日志
-        if self.map.contains_key(&channel_id) {
+        if self.map.contains_key(&channel_socket) {
             tracing::info!(
                 "Replacing existing TCP service for channel_id: {}",
-                channel_id
+                channel_socket
             );
         }
-        self.map.insert(channel_id, service);
+        self.map.insert(channel_socket, service);
     }
 
-    pub async fn send(&mut self, server_id: i32, data: String) -> anyhow::Result<()> {
-        match self.map.get_mut(&server_id) {
+    pub async fn send_with_server(&mut self, server_socket: String, data: String) -> anyhow::Result<()> {
+        match self.map.get_mut(&server_socket) {
             Some(service) => service.send(data).await,
             None => Err(anyhow::anyhow!(
                 "TCP service not found for channel_id: {}",
-                server_id
+                server_socket
             )),
         }
     }
 
-    pub async fn listen(&mut self, channel_id: i32, app: AppHandle) -> anyhow::Result<()> {
-        match self.map.get_mut(&channel_id) {
+    pub async fn listen(&mut self, channel_socket: String, app: AppHandle) -> anyhow::Result<()> {
+        match self.map.get_mut(&channel_socket) {
             Some(service) => {
                 service.start(app).await;
                 Ok(())
             }
             None => Err(anyhow::anyhow!(
                 "TCP service not found for channel_id: {}",
-                channel_id
+                channel_socket
             )),
         }
     }
 
-    pub fn remove(&mut self, channel_id: i32) -> bool {
-        self.map.remove(&channel_id).is_some()
+    pub fn remove(&mut self, channel_socket: String) -> bool {
+        self.map.remove(&channel_socket).is_some()
     }
 
-    pub fn contains(&self, channel_id: i32) -> bool {
-        self.map.contains_key(&channel_id)
+    pub fn contains(&self, channel_socket: String) -> bool {
+        self.map.contains_key(&channel_socket)
     }
 }
 
@@ -137,51 +131,51 @@ pub fn init_tcp_service() -> SharedTcpMapService {
 }
 
 #[tauri::command]
-pub fn add_tcp_service(channel_id: i32, socket: String) {
+pub fn add_tcp_service(channel_socket: String, socket: String) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
         let mut lock = service.write().await;
         let tcp_service = TcpService::new(socket).await.unwrap();
-        lock.add(channel_id, Box::new(tcp_service));
+        lock.add(channel_socket, Box::new(tcp_service));
     });
 }
 
 // 提供线程安全的全局访问方法
 #[tauri::command]
-pub fn send_tcp_service(channel_id: i32, data: String) {
+pub fn send_tcp_service(channel_socket: String, data: String) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
         let mut lock = service.write().await;
-        lock.send(channel_id, data).await.unwrap();
+        lock.send_with_server(channel_socket, data).await.unwrap();
     });
 }
 
 #[tauri::command]
-pub async fn listen_tcp_service(channel_id: i32, app: AppHandle) {
+pub async fn listen_tcp_service(channel_socket: String, app: AppHandle) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
         let mut lock = service.write().await;
-        lock.listen(channel_id, app).await.unwrap();
+        lock.listen(channel_socket, app).await.unwrap();
     });
 }
 
-pub async fn remove_tcp_service(channel_id: i32) {
+pub async fn remove_tcp_service(channel_socket: String) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let _ = runtime.block_on(async {
         let mut lock = service.write().await;
-        lock.remove(channel_id)
+        lock.remove(channel_socket)
     });
 }
 
-pub async fn contains_tcp_service(channel_id: i32) {
+pub async fn contains_tcp_service(channel_socket: String) {
     let service = TCP_SERVICE.get().cloned().unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let _ = runtime.block_on(async {
         let lock = service.write().await;
-        lock.contains(channel_id)
+        lock.contains(channel_socket)
     });
 }

@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Input } from 'tdesign-vue-next';
 
+const server_socket = ref('');
 const email = ref('');
 const code = ref('');
 const loading = ref(false);
@@ -21,6 +22,7 @@ async function login() {
     <div class="login-page">
             <h1>{{ $t('login') }}</h1>
             <image class="user-image" alt="User Image" />
+            <Input class="server-input" v-model="server_socket" type="text" :placeholder="$t('server')" />
             <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
             <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')" />
             <button class="login-button" @click="login">
@@ -42,17 +44,9 @@ async function login() {
   justify-content: center
   height: 100vh
   width: 100vw
-  background-color: #f5f5f5
   padding: 20px
   box-sizing: border-box
-  display: flex
-  align-items: center
-  justify-content: center
-  height: 100vh
-  width: 100vw
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
-  padding: 20px
-  box-sizing: border-box
   
   &::before
     content: ''
@@ -76,10 +70,18 @@ async function login() {
 //    padding: 20px;
 //    box-sizing: border-box;
 
+.server-input
+  padding: 0
+  width: 50%
+  margin-top: 10px
+  margin-bottom: 10px
+  border: 1px solid #ccc
+  border-radius: 4px
+  font-size: 16px
+  box-sizing: border-box
 .email-input
     padding: 0
     width: 50%
-    padding: 0px
     margin-top: 10px
     margin-bottom: 10px
     border: 1px solid #ccc
