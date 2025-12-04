@@ -61,7 +61,7 @@ function sendMessage() {
   position: fixed
   left: 319px
   top: calc(100vh - 200px)
-  width: 54%
+  width: calc(100% - 559px)
   height: 200px
   opacity: 1
   background: rgba(243, 244, 246, 1)
