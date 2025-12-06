@@ -16,4 +16,5 @@ export const zh_cn = {
     logout: '退出登录',
     username: '用户名',
     auto_login: '自动登录',
+    server: '服务器',
 };

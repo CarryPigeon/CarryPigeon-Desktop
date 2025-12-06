@@ -3,14 +3,13 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Input } from 'tdesign-vue-next';
 
-const server_socket = ref('');
 const email = ref('');
 const code = ref('');
 const loading = ref(false);
 
 const router = useRouter();
 
-async function login() {
+async function login(){
     loading.value = true;
     await new Promise(resolve => setTimeout(resolve, 1000));
     router.push('/chat');
@@ -19,34 +18,32 @@ async function login() {
 </script>
 
 <template>
-    <div class="login-page">
-            <h1>{{ $t('login') }}</h1>
-            <image class="user-image" alt="User Image" />
-            <Input class="server-input" v-model="server_socket" type="text" :placeholder="$t('server')" />
-            <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
-            <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')" />
-            <button class="login-button" @click="login">
-                <span v-if="loading">{{ $t('loading') }}</span>
-                <span v-else>{{ $t('login') }}</span>
-            </button>
-    </div>
+<div class="login-page">
+  <h1>{{ $t('login') }}</h1>
+  <image class="user-image" alt="User Image"/>
+  <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
+  <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
+  <button class = "login-button" @click="login">
+      <span v-if="loading">{{ $t('loading') }}</span>
+      <span v-else>{{ $t('login') }}</span>
+  </button>
+</div>
 </template>
 
 <style scoped lang="sass">
 .user-image
-    width: 100px
-    height: 100px
+    width: 100px;
+    hight: 100px;
 
 .login-page
   display: flex
-  flex-direction: column
   align-items: center
   justify-content: center
   height: 100vh
   width: 100vw
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
   padding: 20px
   box-sizing: border-box
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
   
   &::before
     content: ''
@@ -55,7 +52,10 @@ async function login() {
     left: 0
     right: 0
     bottom: 0
-    background-image: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%)
+    background-image:
+      radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%)
     pointer-events: none
 
 
@@ -70,18 +70,10 @@ async function login() {
 //    padding: 20px;
 //    box-sizing: border-box;
 
-.server-input
-  padding: 0
-  width: 50%
-  margin-top: 10px
-  margin-bottom: 10px
-  border: 1px solid #ccc
-  border-radius: 4px
-  font-size: 16px
-  box-sizing: border-box
 .email-input
     padding: 0
     width: 50%
+    padding: 0px
     margin-top: 10px
     margin-bottom: 10px
     border: 1px solid #ccc
