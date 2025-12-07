@@ -53,29 +53,31 @@ function sendMessage() {
   </div>
 </template>
 
-<style scoped lang="sass">
-.text-area
-  display: grid
-  grid-template-columns: 1fr
-  grid-template-rows: 1fr
-  position: fixed
-  left: 319px
-  top: calc(100vh - 200px)
-  width: calc(100% - 559px)
-  height: 200px
-  opacity: 1
-  background: rgba(243, 244, 246, 1)
-  border: 1px solid rgba(231, 232, 236, 1)
-  box-sizing: border-box
+<style scoped lang="scss">
+.text-area {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  position: fixed;
+  left: 319px;
+  top: calc(100vh - 200px);
+  width: calc(100% - 559px);
+  height: 200px;
+  opacity: 1;
+  background: rgba(243, 244, 246, 1);
+  border: 1px solid rgba(231, 232, 236, 1);
+  box-sizing: border-box;
+}
 
-.text-area-item
-  font-size: 16px
+.text-area-item {
+  font-size: 16px;
   //width: 53% !important
   //height: 95% !important
-  margin: 20px 10px 5px 10px
-  border: none
-  background: transparent
-  outline: none
-  resize: none
-  box-sizing: border-box
+  margin: 20px 10px 5px 10px;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  box-sizing: border-box;
+}
 </style>

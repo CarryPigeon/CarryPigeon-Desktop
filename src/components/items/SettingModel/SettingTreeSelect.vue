@@ -32,17 +32,20 @@ const value = ref(props.value);
   </div>
 </template>
 
-<style scoped lang="sass">
-.setting-item-content
-  display: flex
-  align-items: center
-  justify-content: space-between
+<style scoped lang="scss">
+.setting-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 
-.setting-item-content-item-title
-  flex: 1
-  display: flex
-  align-items: center
-.setting-item-content-item-tree-select
-  margin-left: auto
-  text-align: right
+.setting-item-content-item-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.setting-item-content-item-tree-select {
+  margin-left: auto;
+  text-align: right;
+}
 </style>

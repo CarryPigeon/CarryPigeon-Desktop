@@ -41,5 +41,5 @@ channelMessageService.getAllUnreceivedMessages();     // 登陆后更新全部�
   <ParticipantsList :length="1" :online="1" :member="[a]"/>
   <ChatBox :user_id="a.id" />
 </template>
-<style scoped lang="sass">
+<style scoped lang="scss">
 </style>

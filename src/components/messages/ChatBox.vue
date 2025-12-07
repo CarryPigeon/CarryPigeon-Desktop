@@ -138,14 +138,15 @@ export var messageReceiveService = new MessageReceiveService("");
   </div>
 </template>
 
-<style scoped lang="sass">
-.chat-box-container
-  background-color: transparent
-  position: fixed
-  top: 61px
-  left: 318px
-  height: calc(65vh - 15px)
-  width: calc(100vw - 558px)
-  overflow-y: auto
+<style scoped lang="scss">
+.chat-box-container {
+  background-color: transparent;
+  position: fixed;
+  top: 61px;
+  left: 318px;
+  height: calc(65vh - 15px);
+  width: calc(100vw - 558px);
+  overflow-y: auto;
+}
 </style>
 

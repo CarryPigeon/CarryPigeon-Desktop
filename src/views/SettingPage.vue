@@ -36,41 +36,48 @@ const config = Config;
     </div>
 </template>
 
-<style scoped lang="sass">
-.side-bar
-  position: fixed
-  left: 0
-  top: 50%
-  transform: translateY(-50%)
-  list-style-type: none
+<style scoped lang="scss">
+.side-bar {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  list-style-type: none;
+}
 
-.side-bar li 
-    padding: 15px 30px
-    font-size: 18px
-    cursor: pointer
-    &:hover
-      background-color: #f0f0f0
-.back-button
-  position: fixed
-  top: 20px
-  left: 20px
-  font-size: 16px
-  color: #007BFF
-  cursor: pointer
-.content
-    position: fixed
-    left: 20%
-    top: 10%
-    width: 60%
-    height: 80%
-    background-color: transparent
-    overflow-y: auto
-    -ms-overflow-style: none
-    &::-webkit-scrollbar
-      display: none
+.side-bar li {
+  padding: 15px 30px;
+  font-size: 18px;
+  cursor: pointer;
+  &:hover {
+    background-color: #f0f0f0;
+  }
+}
+.back-button {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  font-size: 16px;
+  color: #007BFF;
+  cursor: pointer;
+}
+.content {
+  position: fixed;
+  left: 20%;
+  top: 10%;
+  width: 60%;
+  height: 80%;
+  background-color: transparent;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
 
-.setting-item-content-item-value
-    position: fixed
-    left: 59%
-    width: 20%
+.setting-item-content-item-value {
+  position: fixed;
+  left: 59%;
+  width: 20%;
+}
 </style>

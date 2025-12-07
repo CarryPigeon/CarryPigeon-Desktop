@@ -42,16 +42,17 @@ addChannel(a);
   </div>
 </template>
 
-<style scoped lang="sass">
-.channelList
-  position: absolute
-  left: 63px
-  top: 60px
-  width: 255px
-  height: calc(100vh - 120px)
+<style scoped lang="scss">
+.channelList {
+  position: absolute;
+  left: 63px;
+  top: 60px;
+  width: 255px;
+  height: calc(100vh - 120px);
   // 60px(top) + 20px(底部边距)
-  opacity: 1
-  background: rgba(243, 244, 246, 1)
-  border: 1px solid rgba(231, 232, 236, 1)
-  overflow-y: auto
+  opacity: 1;
+  background: rgba(243, 244, 246, 1);
+  border: 1px solid rgba(231, 232, 236, 1);
+  overflow-y: auto;
+}
 </style>

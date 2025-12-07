@@ -17,33 +17,37 @@ const props = defineProps<{
 </div>
 </template>
 
-<style scoped lang="sass">
-.member-bubble
-  display: flex
-  align-items: flex-start
-  margin-top: 5px
-  margin-bottom: 20px
-  margin-left: 5px
-  background: transparent
-.member-avatar
-  width: 40px
-  height: 40px
-  margin-right: 0
-  margin-top: 5px
-  border-radius: 50%
-  object-fit: cover
-.member-bubble-content
-  background: rgba(229, 231, 235, 1)
-  border-radius: 10px
-  padding: 10px
-  margin-top: 20px
-  margin-left: -95px
+<style scoped lang="scss">
+.member-bubble {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 5px;
+  margin-bottom: 20px;
+  margin-left: 5px;
+  background: transparent;
+}
+.member-avatar {
+  width: 40px;
+  height: 40px;
+  margin-right: 0;
+  margin-top: 5px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.member-bubble-content {
+  background: rgba(229, 231, 235, 1);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 20px;
+  margin-left: -95px;
 
-  max-width: 70% // 防止消息过长挤占太多空间
-.member-name
-  font-size: 14px
-  margin-top: 0
-  margin-left: 10px
-  margin-bottom: 0
+  max-width: 70%; // 防止消息过长挤占太多空间
+}
+.member-name {
+  font-size: 14px;
+  margin-top: 0;
+  margin-left: 10px;
+  margin-bottom: 0;
+}
 
 </style>

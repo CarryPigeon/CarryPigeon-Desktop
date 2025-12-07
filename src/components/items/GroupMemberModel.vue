@@ -12,19 +12,22 @@ const props = defineProps<{
 </div>
 </template>
 
-<style scoped lang="sass">
-.group-member-model
-  //display: flex
-  align-items: center
-.member-avatar
-  width: 40px
-  height: 40px
-  margin-left: 15px
-  margin-right: 0
-  margin-top: 50px
-  border-radius: 50%
-  object-fit: cover
-.member-name
-  margin-left: 100px
-  margin-top: -40px
+<style scoped lang="scss">
+.group-member-model {
+  //display: flex;
+  align-items: center;
+}
+.member-avatar {
+  width: 40px;
+  height: 40px;
+  margin-left: 15px;
+  margin-right: 0;
+  margin-top: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.member-name {
+  margin-left: 100px;
+  margin-top: -40px;
+}
 </style>

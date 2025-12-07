@@ -24,37 +24,43 @@ const router = useRouter();
     </div>
 </template>
 
-<style scoped lang="sass">
-.user-info-page
-  position: relative
-  width: 100%
-  height: 100vh
-  padding: 60px 0 0 0
-  box-sizing: border-box
-.back-buttom
-  position: absolute
-  left: 20px
-  top: 20px
-  font-size: 16px
-  color: #3B82F6
-  cursor: pointer
-.user-info-content
-  position: absolute
-  left: 20%
-.user-avatar
-  width: 150px
-  height: 150px
-  border-radius: 75px
-  margin: 20px 0
-.user-info-content
-    position: fixed
-    left: 20%
-    top: 10%
-    width: 60%
-    height: 80%
-    background-color: transparent
-    overflow-y: auto
-    -ms-overflow-style: none
-    &::-webkit-scrollbar
-      display: none
+<style scoped lang="scss">
+.user-info-page {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  padding: 60px 0 0 0;
+  box-sizing: border-box;
+}
+.back-buttom {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  font-size: 16px;
+  color: #3B82F6;
+  cursor: pointer;
+}
+.user-info-content {
+  position: absolute;
+  left: 20%;
+}
+.user-avatar {
+  width: 150px;
+  height: 150px;
+  border-radius: 75px;
+  margin: 20px 0;
+}
+.user-info-content {
+  position: fixed;
+  left: 20%;
+  top: 10%;
+  width: 60%;
+  height: 80%;
+  background-color: transparent;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
 </style>

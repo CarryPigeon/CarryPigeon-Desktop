@@ -61,41 +61,45 @@ addChannel("111", false, Avatar, () => {});
 </div>
 </template>
 
-<style scoped lang="sass">
-.list
-  display: flex
-  flex-direction: column
-  align-items: center
-  width: 65px
-  height: 100vh
-  background: rgba(17, 24, 39, 1)
-  padding: 10px 0
-  box-sizing: border-box
+<style scoped lang="scss">
+.list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 65px;
+  height: 100vh;
+  background: rgba(17, 24, 39, 1);
+  padding: 10px 0;
+  box-sizing: border-box;
+}
 
-.avatar
-  width: 48px
-  height: 48px
-  border-radius: 8px
-  margin-bottom: 15px
-  cursor: pointer
-  flex-shrink: 0
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
-.server_item_list
-  display: flex
-  flex-direction: column
-  align-items: center
-  margin-left: 0
-  padding-left: 0
-  margin-top: 0
-  width: 100%
-  gap: 10px
-  overflow-y: auto
-  flex: 1
+.server_item_list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 0;
+  padding-left: 0;
+  margin-top: 0;
+  width: 100%;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
 
-.image
-  width: 48px
-  height: 48px
-  border-radius: 8px
-  cursor: pointer
-  flex-shrink: 0
+.image {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 </style>

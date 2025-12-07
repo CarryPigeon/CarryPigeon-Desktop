@@ -30,30 +30,32 @@ const props = defineProps<{
 </div>
 </template>
 
-<style scoped lang="sass">
-.list
-  position: fixed
-  display: grid
-  left: calc(100vw - 240px)
-  padding: 0
-  top: 0
-  width: 240px
-  //height: 700px
-  height: calc(100vh - 3px)
-  opacity: 1
-  background: rgba(243, 244, 246, 1)
-  border: 1px solid rgba(231, 232, 236, 1)
-.participants-number
-  z-index: 1
-  position: fixed
-  left: calc(100vw - 240px)
-  margin-left: 10px
-  top: 0
-  width: 240px
-  border: none
-  box-sizing: border-box
-  height: 50px
-  opacity: 1
-  background: rgba(243, 244, 246, 1)
-  border-bottom: 1px solid rgba(227, 229, 233, 1)
+<style scoped lang="scss">
+.list {
+  position: fixed;
+  display: grid;
+  left: calc(100vw - 240px);
+  padding: 0;
+  top: 0;
+  width: 240px;
+  //height: 700px;
+  height: calc(100vh - 3px);
+  opacity: 1;
+  background: rgba(243, 244, 246, 1);
+  border: 1px solid rgba(231, 232, 236, 1);
+}
+.participants-number {
+  z-index: 1;
+  position: fixed;
+  left: calc(100vw - 240px);
+  margin-left: 10px;
+  top: 0;
+  width: 240px;
+  border: none;
+  box-sizing: border-box;
+  height: 50px;
+  opacity: 1;
+  background: rgba(243, 244, 246, 1);
+  border-bottom: 1px solid rgba(227, 229, 233, 1);
+}
 </style>
