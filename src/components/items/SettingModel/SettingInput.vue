@@ -11,9 +11,8 @@ const props = defineProps<{
 
 <template>
   <div class="setting-item-content">
-    <div class="setting-item-content-item-title">{{ $t(props.text) }}
-      <Input class="setting-item-content-item-value" :placeholder="props.placeholder" @change="props.onChange" />
-    </div>
+    <div class="setting-item-content-item-title">{{ $t(props.text) }}</div>
+    <Input class="setting-item-content-item-value" :placeholder="props.placeholder" @change="props.onChange" />
   </div>
 </template>
 
@@ -21,17 +20,17 @@ const props = defineProps<{
 .setting-item-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .setting-item-content-item-title {
-  flex: 1;
+  width: 70%;
   display: flex;
   align-items: center;
 }
 .setting-item-content-item-value {
   width: 30%;
-  margin-left: auto;
-  text-align: right;
+  text-align: left;
 }
 </style>

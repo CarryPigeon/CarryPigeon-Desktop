@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { Input } from 'tdesign-vue-next';
 
 const email = ref('');
+const server_socket = ref('');
 const code = ref('');
 const loading = ref(false);
 
@@ -22,6 +23,7 @@ async function login(){
   <div class="login-container">
     <h1>{{ $t('login') }}</h1>
     <image class="user-image" alt="User Image"/>
+    <Input class="server-input" v-model="server_socket" type="text" :placeholder="$t('server_socket')" />
     <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
     <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
     <button class = "login-button" @click="login">
@@ -85,6 +87,16 @@ h1 {
   border-radius: 50%;
   margin-bottom: 20px;
   object-fit: cover;
+}
+
+.server-input{
+  width: 100%;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
 }
 
 .email-input {

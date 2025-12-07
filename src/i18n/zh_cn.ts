@@ -17,4 +17,7 @@ export const zh_cn = {
     username: '用户名',
     auto_login: '自动登录',
     server: '服务器',
+    general: '通用',
+    close_to_tray: '关闭到托盘',
+    check_for_updates: '检查更新',
 };

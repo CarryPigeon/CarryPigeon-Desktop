@@ -15,9 +15,8 @@ const value = ref(props.value);
 
 <template>
   <div class="setting-item-content">
-    <div class="setting-item-content-item-title">{{ $t(props.text) }}
-      <Switch class="setting-item-content-item-switch" v-model="value" @change="props.onChange" />
-    </div>
+    <div class="setting-item-content-item-title">{{ $t(props.text) }}</div>
+    <Switch class="setting-item-content-item-switch" v-model="value" @change="props.onChange" />
   </div>
 </template>
 
@@ -25,11 +24,12 @@ const value = ref(props.value);
 .setting-item-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .setting-item-content-item-title {
-  flex: 1;
+  width: 70%;
   display: flex;
   align-items: center;
 }
