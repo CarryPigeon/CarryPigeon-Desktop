@@ -1,56 +1,56 @@
 name: Build and release Tauri App with pnpm
 on:
-  push:
-    branches: [master, release]
-  workflow_dispatch:
+    push:
+        branches: [master, release]
+    workflow_dispatch:
 
 jobs:
-  build-tauri:
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.platform }}
+    build-tauri:
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                platform: [macos-latest, ubuntu-latest, windows-latest]
+        runs-on: ${{ matrix.platform }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  toolchain: stable
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+            - name: Install Linux dependencies
+              if: matrix.platform == 'ubuntu-latest'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
 
-      # 核心改动部分：使用pnpm官方Action进行设置[citation:7]
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+            # 修复：在Action中指定pnpm版本
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10 # 请将此版本号改为你项目实际使用的版本
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-          # 将缓存配置为pnpm[citation:5]
-          cache: 'pnpm'
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "lts/*"
+                  cache: "pnpm"
 
-      # 安装依赖的命令改为pnpm
-      - name: Install frontend dependencies with pnpm
-        run: pnpm install
+            - name: Install frontend dependencies with pnpm
+              run: pnpm install
 
-      - name: Build and Release with Tauri Action
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: v__VERSION__
-          releaseName: 'App Release v__VERSION__'
-          releaseBody: 'Automated build with pnpm.'
-          releaseDraft: true
-          prerelease: false
+            - name: Build and Release with Tauri Action
+              uses: tauri-apps/tauri-action@v0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tagName: v__VERSION__
+                  releaseName: "App Release v__VERSION__"
+                  releaseBody: "Automated build with pnpm."
+                  releaseDraft: true
+                  prerelease: false
