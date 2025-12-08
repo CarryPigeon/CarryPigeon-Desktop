@@ -1,2 +1,3 @@
-./src-tauri/icons/* binary
-./public/* binary
+# 强制 icons 目录及所有子目录下的文件被视为二进制，禁止任何转换
+src-tauri/icons/** -text binary
+public/** -text binary
