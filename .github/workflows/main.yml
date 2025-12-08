@@ -18,6 +18,11 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
+            - name: Debug - Check icon files in CI
+              run: |
+                  ls -lh src-tauri/icons/
+                  file src-tauri/icons/32x32.png
+
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@stable
               with:
