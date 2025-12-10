@@ -4,15 +4,20 @@ import { Input, InputProps } from 'tdesign-vue-next';
 const props = defineProps<{
   text: string;
   placeholder: string;
-  onChange?: InputProps['onChange'];
+  channel_socket?: string;
+  onChange?: (key:string,value:string) => void;
 }>();
+
+const onChange: InputProps['onChange'] = (value) => {
+  props.onChange?.(props.text, value.toString());
+};
 
 </script>
 
 <template>
   <div class="setting-item-content">
     <div class="setting-item-content-item-title">{{ $t(props.text) }}</div>
-    <Input class="setting-item-content-item-value" :placeholder="props.placeholder" @change="props.onChange" />
+    <Input class="setting-item-content-item-value" :placeholder="props.placeholder" @change="onChange" />
   </div>
 </template>
 
