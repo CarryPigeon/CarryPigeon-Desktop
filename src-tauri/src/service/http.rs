@@ -39,7 +39,7 @@ impl std::fmt::Debug for DownloadConfig {
 /// # 返回值
 /// - `Ok(())`: 下载成功且文件完整
 /// - `Err(anyhow::Error)`: 下载过程中发生错误
-pub async fn download_file(
+pub async fn download_avatar_impl(
     url: &str,
     output_path: impl AsRef<Path>,
     config: Option<DownloadConfig>
@@ -143,7 +143,7 @@ pub async fn download_avatar(avatar_id: &str, url: &str) -> anyhow::Result<()> {
         })),
     };
     
-    download_file(url, output_path, Some(config)).await
+    download_avatar_impl(url, output_path, Some(config)).await
 }
 
 #[cfg(test)]
@@ -158,7 +158,7 @@ mod tests {
         let output_path = "./test_download.jpg";
         
         // 测试基本下载功能
-        let result = download_file(url, output_path, None).await;
+        let result = download_avatar_impl(url, output_path, None).await;
         assert!(result.is_ok(), "下载失败: {:?}", result);
         
         // 测试带超时配置的下载
@@ -167,7 +167,7 @@ mod tests {
             expected_hash: None,
             progress_callback: None,
         });
-        let result = download_file(url, output_path, config).await;
+        let result = download_avatar_impl(url, output_path, config).await;
         assert!(result.is_ok(), "带超时配置的下载失败: {:?}", result);
         
         // 测试带进度回调的下载
@@ -180,7 +180,7 @@ mod tests {
                 })
             })),
         });
-        let result = download_file(url, output_path, config).await;
+        let result = download_avatar_impl(url, output_path, config).await;
         assert!(result.is_ok(), "带进度回调的下载失败: {:?}", result);
         
         // 清理测试文件

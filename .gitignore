@@ -26,3 +26,6 @@ dist-ssr
 /target/
 /Cargo.lock
 /database.carrypigeon
+
+/src-tauri/config
+/src-tauri/config.json
