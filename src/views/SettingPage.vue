@@ -16,7 +16,7 @@ const contentRef = ref<HTMLElement | null>(null);
 const switchTab = (tab: string) => {
     console.log(`Switching to tab: ${tab}`);
     activeTab.value = tab;
-    
+
     // 滚动到对应区域
     const section = document.getElementById(tab);
     if (section) {
@@ -30,28 +30,28 @@ const switchTab = (tab: string) => {
 // 监听内容区域滚动，更新激活的侧边栏项
 const handleScroll = () => {
     if (!contentRef.value) return;
-    
+
     // 获取所有section元素
     const sections = ['account', 'general', 'security', 'privacy', 'notifications', 'edit-file'];
     let currentActiveSection = 'account';
     let maxVisibleArea = 0;
-    
+
     // 获取content容器的可见区域
     const contentRect = contentRef.value.getBoundingClientRect();
     const contentTop = contentRect.top;
     const contentBottom = contentRect.bottom;
-    
+
     // 计算每个section的可见区域大小，找出可见区域最大的section作为当前激活项
     for (const sectionId of sections) {
         const section = document.getElementById(sectionId);
         if (section) {
             const rect = section.getBoundingClientRect();
-            
+
             // 计算section与content容器的重叠区域
             const overlapTop = Math.max(contentTop, rect.top);
             const overlapBottom = Math.min(contentBottom, rect.bottom);
             const overlapHeight = Math.max(0, overlapBottom - overlapTop);
-            
+
             // 如果该section的可见区域更大，则更新当前激活项
             if (overlapHeight > maxVisibleArea) {
                 maxVisibleArea = overlapHeight;
@@ -59,11 +59,34 @@ const handleScroll = () => {
             }
         }
     }
-    
+
     // 更新激活状态
     if (currentActiveSection !== activeTab.value) {
         activeTab.value = currentActiveSection;
     }
+};
+/*
+const handleChannelSettingInputChange = (server_socket:string, key:string ,value: string) => {
+    // 处理channel设置输入变化的逻辑
+    config[server_socket][key] = value;
+};
+*/
+
+/*
+const handleChannelSettingSwitchChange = (server_socket:string, key:string,value: boolean) => {
+    // 处理channel socket设置输入变化的逻辑
+    config[server_socket][key] = value;
+};
+*/
+
+const handleApplicationSettingInputChange = (key:string,value: string) => {
+    // 处理application设置输入变化的逻辑
+    config[key] = value;
+};
+
+const handleApplicationSettingSwitchChange = (key:string,value: boolean) => {
+    // 处理application socket设置输入变化的逻辑
+    config[key] = value;
 };
 
 // 组件挂载时添加滚动事件监听
@@ -100,63 +123,63 @@ onUnmounted(() => {
 
                 <div class="setting-section">
                     <div class="setting-item">
-                        <SettingInput text='username' :placeholder="config.username" />
+                        <SettingInput text='username' :placeholder="config.username" :onChange="handleApplicationSettingInputChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingInput text='email' :placeholder="config.email" />
+                        <SettingInput text='email' :placeholder="config.email" :onChange="handleApplicationSettingInputChange"/>
                     </div>
                 </div>
 
                 <h1 id="general" class="setting-item-title">{{ $t('general') }}</h1>
                 <div class="setting-section">
                     <div class="setting-item">
-                        <SettingSwitch text='auto_login' :value="config.auto_login" />
+                        <SettingSwitch text='auto_login' :value="config.auto_login" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingSwitch text='close_to_tray' :value="config.close_to_tray" />
+                        <SettingSwitch text='close_to_tray' :value="config.close_to_tray" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingSwitch text='check_for_updates' :value="config.check_for_updates" />
+                        <SettingSwitch text='check_for_updates' :value="config.check_for_updates" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                 </div>
-                
+
                 <h1 id="security" class="setting-item-title">{{ $t('security') }}</h1>
                 <div class="setting-section">
                     <div class="setting-item">
-                        <SettingSwitch text='two_factor_auth' :value="config.two_factor_auth" />
+                        <SettingSwitch text='two_factor_auth' :value="config.two_factor_auth" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingSwitch text='password_reset' :value="config.password_reset" />
+                        <SettingSwitch text='password_reset' :value="config.password_reset" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                 </div>
-                
+
                 <h1 id="privacy" class="setting-item-title">{{ $t('privacy') }}</h1>
                 <div class="setting-section">
                     <div class="setting-item">
-                        <SettingSwitch text='private_messages' :value="config.private_messages" />
+                        <SettingSwitch text='private_messages' :value="config.private_messages" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingSwitch text='profile_visibility' :value="config.profile_visibility" />
+                        <SettingSwitch text='profile_visibility' :value="config.profile_visibility" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                 </div>
-                
+
                 <h1 id="notifications" class="setting-item-title">{{ $t('notifications') }}</h1>
                 <div class="setting-section">
                     <div class="setting-item">
-                        <SettingSwitch text='email_notifications' :value="config.email_notifications" />
+                        <SettingSwitch text='email_notifications' :value="config.email_notifications" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingSwitch text='desktop_notifications' :value="config.desktop_notifications" />
+                        <SettingSwitch text='desktop_notifications' :value="config.desktop_notifications" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                 </div>
-                
+
                 <h1 id="edit-file" class="setting-item-title">{{ $t('edit_in_file') }}</h1>
                 <div class="setting-section">
                     <div class="setting-item">
-                        <SettingSwitch text='show_file_extensions' :value="config.show_file_extensions" />
+                        <SettingSwitch text='show_file_extensions' :value="config.show_file_extensions" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                     <div class="setting-item">
-                        <SettingSwitch text='auto_save_files' :value="config.auto_save_files" />
+                        <SettingSwitch text='auto_save_files' :value="config.auto_save_files" :onChange="handleApplicationSettingSwitchChange"/>
                     </div>
                 </div>
             </div>

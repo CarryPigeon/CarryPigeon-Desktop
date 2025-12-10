@@ -5,8 +5,13 @@ import { ref } from 'vue';
 const props = defineProps<{
   text: string;
   value: boolean;
-  onChange?: SwitchProps['onChange'];
+  channel_socket?: string;
+  onChange?: (key:string,value:boolean) => void;
 }>();
+
+const onChange:SwitchProps['onChange'] = (value) => {
+  props.onChange?.(props.text, <boolean>value.valueOf());
+};
 
 const value = ref(props.value);
 
@@ -16,7 +21,7 @@ const value = ref(props.value);
 <template>
   <div class="setting-item-content">
     <div class="setting-item-content-item-title">{{ $t(props.text) }}</div>
-    <Switch class="setting-item-content-item-switch" v-model="value" @change="props.onChange" />
+    <Switch class="setting-item-content-item-switch" v-model="value" @change="onChange" />
   </div>
 </template>
 
