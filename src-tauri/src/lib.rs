@@ -7,6 +7,7 @@ pub mod error;
 pub mod log;
 pub mod service;
 pub mod windows;
+pub mod filemanager;
 
 use config::{
     get_config_bool, get_config_string, get_config_u32, get_config_u64, get_server_config_bool,
