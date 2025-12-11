@@ -170,6 +170,7 @@ pub async fn update_config<T>(key: String, value: T)
 where
     T: ConfigValueExtractor<T> + Default,
 {
+    tracing::info!("update_config");
     let config_str = get_config().await;
     let mut config_value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
         tracing::error!("Failed to parse config file: {}", e);
@@ -177,7 +178,7 @@ where
     });
     if let Value::Object(ref mut map) = config_value {
         map.insert(key, value.into_json());
-        let config_file = Path::new("./config");
+        let config_file = Path::new("./config.json");
         let mut file = std::fs::File::create(config_file).unwrap();
         file.write_all(
             serde_json::to_string_pretty(&config_value)
