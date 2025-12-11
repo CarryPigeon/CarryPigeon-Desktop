@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Config } from '../script/config/Config';
+import { changeConfig, Config } from '../script/config/Config';
 import SettingInput from '../components/items/SettingModel/SettingInput.vue';
 import SettingSwitch from '../components/items/SettingModel/SettingSwitch.vue';
 import { ref, onMounted, onUnmounted } from 'vue';
 
 const router = useRouter();
-const config = Config;
+let config = Config;
 
 // 响应式变量跟踪当前激活的侧边栏项
 const activeTab = ref('account');
@@ -81,12 +81,12 @@ const handleChannelSettingSwitchChange = (server_socket:string, key:string,value
 
 const handleApplicationSettingInputChange = (key:string,value: string) => {
     // 处理application设置输入变化的逻辑
-    config[key] = value;
+    changeConfig(key, value);
 };
 
 const handleApplicationSettingSwitchChange = (key:string,value: boolean) => {
     // 处理application socket设置输入变化的逻辑
-    config[key] = value;
+    changeConfig(key, value);
 };
 
 // 组件挂载时添加滚动事件监听
