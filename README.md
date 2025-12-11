@@ -12,5 +12,7 @@ pnpm tauri build
 pnpm tauri build --no-bundle
 ```
 
-TODO
-部分按钮重画（登录）
+## TODO
+tauri Rust侧的i18n
+创建channel功能
+查看他人信息页的功能
