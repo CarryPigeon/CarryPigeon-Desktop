@@ -1,13 +1,36 @@
-import {createApp} from "vue";
+import { createApp } from "vue";
 import App from "./App.vue";
 import { router } from "./router/Router";
 import { i18n } from "./i18n";
-import 'tdesign-vue-next/es/style/index.css';
-import {Button, TreeSelect, Input} from "tdesign-vue-next";
+import "tdesign-vue-next/es/style/index.css";
+import { Button, TreeSelect, Input } from "tdesign-vue-next";
 
-createApp(App).use(router)
-    .use(i18n)
-    .use(Button)
-    .use(TreeSelect)
-    .use(Input)
-    .mount("#app")
+const app = createApp(App);
+
+app
+  .use(router)
+  .use(i18n)
+  .use(Button)
+  .use(TreeSelect)
+  .use(Input);
+
+const searchParams = new URLSearchParams(window.location.search);
+const windowType = searchParams.get("window");
+
+if (windowType === "user-popover") {
+  router.replace({
+    path: "/user-popover",
+    query: {
+      avatar: searchParams.get("avatar") ?? "",
+      name: searchParams.get("name") ?? "",
+      email: searchParams.get("email") ?? "",
+      bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
+    },
+  });
+} else if (windowType === "user-info") {
+  router.replace("/user_info");
+}
+
+router.isReady().then(() => {
+  app.mount("#app");
+});

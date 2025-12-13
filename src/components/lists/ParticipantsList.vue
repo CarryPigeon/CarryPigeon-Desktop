@@ -1,33 +1,42 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import GroupMemberModel from "../items/GroupMemberModel.vue";
 
 export interface Member {
-  id: number
-  name: string
-  avatar: string
-  description: string
+  id: number;
+  name: string;
+  avatar: string;
+  description: string;
+  email?: string;
 }
 
 const props = defineProps<{
-  length: number
-  online: number
-  member: Member[]
-}>()
+  length: number;
+  online: number;
+  member: Member[];
+}>();
+
+const emit = defineEmits<{
+  (e: "avatar-click", payload: { screenX: number; screenY: number; member: Member }): void;
+}>();
 </script>
 
 <template>
-<div class="participants-list">
-  <div class = "participants-number">
-    <p>{{$t('participants')}} - {{props.length}}</p>
+  <div class="participants-list">
+    <div class="participants-number">
+      <p>{{ $t("participants") }} - {{ props.length }}</p>
+    </div>
+    <div class="list">
+      <ul style="list-style-type: none; padding: 0">
+        <li v-for="item in props.member" :key="item.id">
+          <GroupMemberModel
+            :avatar="item.avatar"
+            :name="item.name"
+            @avatar-click="(pos) => emit('avatar-click', { ...pos, member: item })"
+          />
+        </li>
+      </ul>
+    </div>
   </div>
-  <div class="list">
-    <ul style="list-style-type: none; padding: 0;">
-      <li v-for="item in props.member" :key="item.id">
-        <GroupMemberModel :avatar="item.avatar" :name="item.name"/>
-      </li>
-    </ul>
-  </div>
-</div>
 </template>
 
 <style scoped lang="scss">
@@ -38,12 +47,12 @@ const props = defineProps<{
   padding: 0;
   top: 0;
   width: 240px;
-  //height: 700px;
   height: calc(100vh - 3px);
   opacity: 1;
   background: rgba(243, 244, 246, 1);
   border: 1px solid rgba(231, 232, 236, 1);
 }
+
 .participants-number {
   z-index: 1;
   position: fixed;

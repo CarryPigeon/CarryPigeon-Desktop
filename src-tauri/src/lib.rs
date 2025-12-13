@@ -9,7 +9,11 @@ pub mod service;
 pub mod windows;
 pub mod filemanager;
 
-use tauri::{Manager, tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState}, menu::{Menu, MenuItem}};
+use tauri::{
+    Manager,
+    tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
+    menu::{Menu, MenuItem},
+};
 use config::{
     get_config_bool, get_config_string, get_config_u32, get_config_u64, get_server_config_bool,
     get_server_config_string, get_server_config_u32, get_server_config_u64, update_config_bool,
@@ -18,7 +22,7 @@ use config::{
 use dao::{channel::*, message::*};
 use log::{log_error, log_info, log_warning};
 use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service};
-use windows::to_chat_window_size;
+use windows::{open_user_popover_window, to_chat_window_size};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> anyhow::Result<()> {
@@ -63,10 +67,18 @@ pub fn run() -> anyhow::Result<()> {
                 .build(app)?;
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if window.label() == "user-popover" {
+                if let tauri::WindowEvent::Focused(false) = event {
+                    let _ = window.close();
+                }
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             // window commands
             to_chat_window_size,
+            open_user_popover_window,
             //tcp service commands
             send_tcp_service,
             listen_tcp_service,
