@@ -1,49 +1,43 @@
-<script setup lang="ts">
-import setting from '/settings.svg?url';
-import add from '/add.svg?url';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+﻿<script setup lang="ts">
+import setting from "/settings.svg?url";
+import add from "/add.svg?url";
+import { computed } from "vue";
+import { useRouter } from "vue-router";
 
-const props = defineProps({
-  avatar: String,
-  name: String,
-  description: String,
-  id: Number,
-})
+const props = defineProps<{
+  avatar?: string;
+  name?: string;
+  description?: string;
+  id?: number;
+}>();
 
-const avatar = ref(props.avatar);
-const name = ref(props.name);
-const description = ref(props.description);
-const id = ref(props.id);
+const emit = defineEmits<{
+  (e: "avatar-click", payload: { screenX: number; screenY: number }): void;
+}>();
+
+const avatar = computed(() => props.avatar ?? "");
+const name = computed(() => props.name ?? "");
+const description = computed(() => props.description ?? "");
+const id = computed(() => props.id ?? 0);
 
 const router = useRouter();
 
-function click_setting(){
-    router.push("/settings");
+function click_setting() {
+  router.push("/settings");
 }
 
-/*
-function updateAvatar(newAvatar: string) {
-  avatar.value = newAvatar;
+function click_avatar(event: MouseEvent) {
+  emit("avatar-click", { screenX: event.screenX, screenY: event.screenY });
 }
-
-function updateName(newName: string) {
-  name.value = newName;
-}
-
-function updateDescription(newDescription: string) {
-  description.value = newDescription;
-}
-*/
 </script>
 
 <template>
   <div class="container">
-    <img class="image" :src="avatar" alt="avatar"/>
-    <p class="username"> {{ name }} - {{ id }} </p>
-    <p class="description"> {{ description }} </p>
-    <img class="setting-icon" :src="setting" @click="click_setting" alt=""/>
-    <img class="add-icon" :src="add" alt=""/>
+    <img class="image" :src="avatar" alt="avatar" @click="click_avatar" />
+    <p class="username">{{ name }} - {{ id }}</p>
+    <p class="description">{{ description }}</p>
+    <img class="setting-icon" :src="setting" @click="click_setting" alt="" />
+    <img class="add-icon" :src="add" alt="" />
   </div>
 </template>
 
@@ -66,6 +60,7 @@ function updateDescription(newDescription: string) {
   height: 30px;
   opacity: 1;
   background: rgba(204, 204, 204, 1);
+  cursor: pointer;
 }
 
 .username {
