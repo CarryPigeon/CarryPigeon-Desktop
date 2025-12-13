@@ -1,4 +1,8 @@
+mod user_popover_window;
+
 use tauri::{AppHandle, LogicalSize, Manager};
+
+pub use user_popover_window::open_user_popover_window;
 
 #[tauri::command]
 pub fn to_chat_window_size(app: AppHandle) {
