@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import GroupMemberModel from "../items/GroupMemberModel.vue";
 
 export interface Member {

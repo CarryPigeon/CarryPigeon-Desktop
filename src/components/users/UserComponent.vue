@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import setting from "/settings.svg?url";
 import add from "/add.svg?url";
 import { computed } from "vue";
@@ -15,9 +15,15 @@ const emit = defineEmits<{
   (e: "avatar-click", payload: { screenX: number; screenY: number }): void;
 }>();
 
+function limitToChars(input: string, maxChars: number) {
+  const chars = Array.from(input);
+  if (chars.length <= maxChars) return input;
+  return chars.slice(0, maxChars).join("");
+}
+
 const avatar = computed(() => props.avatar ?? "");
 const name = computed(() => props.name ?? "");
-const description = computed(() => props.description ?? "");
+const description = computed(() => limitToChars(props.description ?? "", 25));
 const id = computed(() => props.id ?? 0);
 
 const router = useRouter();
@@ -34,28 +40,37 @@ function click_avatar(event: MouseEvent) {
 <template>
   <div class="container">
     <img class="image" :src="avatar" alt="avatar" @click="click_avatar" />
-    <p class="username">{{ name }} - {{ id }}</p>
-    <p class="description">{{ description }}</p>
-    <img class="setting-icon" :src="setting" @click="click_setting" alt="" />
-    <img class="add-icon" :src="add" alt="" />
+
+    <div class="info">
+      <p class="username">{{ name }} - {{ id }}</p>
+      <p class="description">{{ description }}</p>
+    </div>
+
+    <div class="actions">
+      <img class="setting-icon" :src="setting" @click="click_setting" alt="" />
+      <img class="add-icon" :src="add" alt="" />
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .container {
-  position: absolute;
+  position: fixed;
   left: 63px;
-  top: calc(100vh - 60px);
+  bottom: 0;
   width: 257px;
-  height: 60px;
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   opacity: 1;
   background: rgba(229, 231, 235, 1);
 }
 
 .image {
-  background-size: 30px 30px;
-  left: 86px;
-  top: 654px;
+  flex: 0 0 auto;
   width: 30px;
   height: 30px;
   opacity: 1;
@@ -63,14 +78,17 @@ function click_avatar(event: MouseEvent) {
   cursor: pointer;
 }
 
+.info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .username {
-  position: fixed;
-  left: 128px;
-  top: calc(100vh - 60px);
-  width: 57px;
-  height: 18px;
+  margin: 0;
   opacity: 1;
-  /** 文本 */
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -78,16 +96,14 @@ function click_avatar(event: MouseEvent) {
   color: rgba(0, 0, 0, 1);
   text-align: left;
   vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .description {
-  position: fixed;
-  left: 128px;
-  top: calc(100vh - 36px);
-  width: 91px;
-  height: 18px;
+  margin: 0;
   opacity: 1;
-  /** 文本 */
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -95,12 +111,19 @@ function click_avatar(event: MouseEvent) {
   color: rgba(35, 66, 87, 1);
   text-align: left;
   vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .setting-icon {
-  position: fixed;
-  left: 239px;
-  top: calc(100vh - 39px);
   cursor: pointer;
   &:hover {
     background-color: #f0f0f0;
@@ -108,9 +131,6 @@ function click_avatar(event: MouseEvent) {
 }
 
 .add-icon {
-  position: fixed;
-  left: 275px;
-  top: calc(100vh - 39px);
   cursor: pointer;
   &:hover {
     background-color: #f0f0f0;
