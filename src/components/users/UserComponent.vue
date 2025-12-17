@@ -70,7 +70,6 @@ function click_avatar(event: MouseEvent) {
   width: 57px;
   height: 18px;
   opacity: 1;
-  background: rgba(0, 0, 0, 1);
   /** 文本 */
   font-size: 12px;
   font-weight: 400;
@@ -88,7 +87,6 @@ function click_avatar(event: MouseEvent) {
   width: 91px;
   height: 18px;
   opacity: 1;
-  background: rgba(35, 66, 87, 1);
   /** 文本 */
   font-size: 12px;
   font-weight: 400;

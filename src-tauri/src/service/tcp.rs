@@ -18,7 +18,6 @@ pub struct TcpMapService {
 type SharedTcpMapService = Arc<RwLock<TcpMapService>>;
 pub static TCP_SERVICE: OnceLock<SharedTcpMapService> = OnceLock::new();
 
-
 impl TcpService {
     pub async fn new(socket: String) -> anyhow::Result<Self> {
         let listener = TcpListener::bind(&socket)
@@ -91,7 +90,11 @@ impl TcpMapService {
         self.map.insert(channel_socket, service);
     }
 
-    pub async fn send_with_server(&mut self, server_socket: String, data: String) -> anyhow::Result<()> {
+    pub async fn send_with_server(
+        &mut self,
+        server_socket: String,
+        data: String,
+    ) -> anyhow::Result<()> {
         match self.map.get_mut(&server_socket) {
             Some(service) => service.send(data).await,
             None => Err(anyhow::anyhow!(

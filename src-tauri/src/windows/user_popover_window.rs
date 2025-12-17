@@ -1,4 +1,4 @@
-﻿use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 /// 打开用户信息 Popover 窗口。
 ///
@@ -85,8 +85,16 @@ pub async fn open_user_popover_window(
         let max_x = right - width - margin;
         let max_y = bottom - height - margin;
 
-        x = if max_x >= min_x { x.clamp(min_x, max_x) } else { work_x };
-        y = if max_y >= min_y { y.clamp(min_y, max_y) } else { work_y };
+        x = if max_x >= min_x {
+            x.clamp(min_x, max_x)
+        } else {
+            work_x
+        };
+        y = if max_y >= min_y {
+            y.clamp(min_y, max_y)
+        } else {
+            work_y
+        };
     }
 
     // 通过 query 传递给前端路由页面。
