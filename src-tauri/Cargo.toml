@@ -40,11 +40,26 @@ tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-anyhow = "1"
+
+# json解析
 serde = "1.0.228"
 serde_json = "1.0.145"
+
+# 数据库orm
 sea-orm = { version = "2.0.0-rc.14", features = [ "sqlx-sqlite", "runtime-tokio-native-tls", "macros" ] }
+
+# 时间
 chrono = "0.4.42"
+
+# 错误处理
 thiserror = "2.0.17"
+anyhow = "1"
+
+# 网络请求
 reqwest = { version = "0.12.24", features = ["json", "stream"] }
 sha2 = "0.10.8"
+
+# wasm支持
+wasmtime = { version = "26", features = ["component-model"] }
+wasmtime-wasi = "26"
+hex = "0.4.3"
