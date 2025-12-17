@@ -46,7 +46,7 @@ pub async fn get_config() -> String {
                 .unwrap();
             }
             data
-        },
+        }
         Err(_) => {
             let mut file = std::fs::File::create(config_file).unwrap();
             file.write_all(

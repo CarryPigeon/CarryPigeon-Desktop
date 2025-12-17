@@ -1,4 +1,5 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
+import { ref } from "vue";
 import ServerList from "../components/lists/ServerList.vue";
 import ServerNameModel from "../components/modals/ServerNameModel.vue";
 import ChannelList from "../components/lists/ChannelList.vue";
@@ -11,8 +12,27 @@ import ChatBox from "../components/messages/ChatBox.vue";
 import Avatar from "/test_avatar.jpg?url";
 import server_socket from "./LoginPage.vue";
 import ChannelMessageService from "../api/channel/Channel.ts";
+import PluginLoaderPanel from "../components/debug/PluginLoaderPanel.vue";
+import PluginHost from "../components/plugins/PluginHost.vue";
+import type { PluginManifest } from "../script/service/PluginLoader";
 
 invoke("to_chat_window_size");
+
+const showPluginLoaderPanel = ref(false);
+
+function togglePluginLoaderPanel(): void {
+  showPluginLoaderPanel.value = !showPluginLoaderPanel.value;
+}
+
+const activePlugin = ref<PluginManifest | null>(null);
+
+function onSelectPlugin(plugin: PluginManifest) {
+  activePlugin.value = plugin;
+}
+
+function closePlugin() {
+  activePlugin.value = null;
+}
 
 const channelMessageService = new ChannelMessageService(server_socket.value);
 const a: Member = {
@@ -59,7 +79,12 @@ function openUserPopover(pos: { screenX: number; screenY: number }) {
 </script>
 
 <template>
-  <ServerList />
+  <ServerList
+    :active-plugin-name="activePlugin?.name ?? null"
+    @select-plugin="onSelectPlugin"
+    @close-plugin="closePlugin"
+    @toggle-plugin-loader-panel="togglePluginLoaderPanel"
+  />
   <ServerNameModel />
   <ChannelList />
   <UserComponent
@@ -70,8 +95,16 @@ function openUserPopover(pos: { screenX: number; screenY: number }) {
     @avatar-click="openUserPopover"
   />
   <SearchBar />
-  <TextArea />
-  <ParticipantsList :length="1" :online="1" :member="[a]" @avatar-click="openMemberPopover" />
-  <ChatBox :user_id="a.id" />
+
+  <PluginHost v-if="activePlugin" :manifest="activePlugin" @close="closePlugin" />
+
+  <template v-else>
+    <TextArea />
+    <ParticipantsList :length="1" :online="1" :member="[a]" @avatar-click="openMemberPopover" />
+    <ChatBox :user_id="a.id" />
+  </template>
+
+  <PluginLoaderPanel v-if="showPluginLoaderPanel" />
 </template>
+
 <style scoped lang="scss"></style>
