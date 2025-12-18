@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import Avatar from "/test_avatar.jpg?url";
 import { useRouter } from "vue-router";
 import PluginList from "./PluginList.vue";
 import type { PluginManifest } from "../../script/service/PluginLoader";
+import ChannelContextMenu, { type ChannelMenuAction } from "../items/ChannelContextMenu.vue";
 
 const props = defineProps<{
   activePluginName?: string | null;
@@ -38,6 +39,39 @@ const avatar_props = reactive<AvatarProps>({
   imageUrl: "",
 });
 const channel_props = reactive<ChannelProps[]>([] as ChannelProps[]);
+
+const menuOpen = ref(false);
+const menuPosition = ref({ x: 0, y: 0 });
+const selectedChannel = ref<ChannelProps | null>(null);
+
+function handleContextMenu(event: MouseEvent, item: ChannelProps) {
+  event.preventDefault();
+  menuPosition.value = { x: event.clientX, y: event.clientY };
+  selectedChannel.value = item;
+  menuOpen.value = true;
+}
+
+async function handleMenuAction(action: ChannelMenuAction) {
+  if (!selectedChannel.value) return;
+
+  switch (action) {
+    case 'copyId':
+      await navigator.clipboard.writeText(selectedChannel.value.channel);
+      break;
+    case 'copyName':
+      await navigator.clipboard.writeText(selectedChannel.value.channel);
+      break;
+    case 'pin':
+      console.log('Pin channel:', selectedChannel.value.channel);
+      break;
+    case 'settings':
+      console.log('Settings for channel:', selectedChannel.value.channel);
+      break;
+    case 'deleteHistory':
+      console.log('Delete history for channel:', selectedChannel.value.channel);
+      break;
+  }
+}
 
 function addChannel(channel: string, active: boolean, imageUrl: string, onClick: () => void) {
   channel_props.push({ channel, active, imageUrl, onClick });
@@ -81,10 +115,19 @@ addChannel("111", false, Avatar, () => {});
     <img class="avatar" :src="avatar_props.imageUrl" alt="avatar" @click="click_avatar" />
 
     <ul class="server_item_list">
-      <li v-for="item in channel_props" :key="item.channel" @click="item.onClick">
+      <li v-for="item in channel_props" :key="item.channel" @click="item.onClick" @contextmenu="(e) => handleContextMenu(e, item)">
         <img class="image" :src="item.imageUrl" :alt="item.channel" />
       </li>
     </ul>
+
+    <ChannelContextMenu
+      v-model:open="menuOpen"
+      :x="menuPosition.x"
+      :y="menuPosition.y"
+      :cid="Number(selectedChannel?.channel) || undefined"
+      :channel-name="selectedChannel?.channel ?? ''"
+      @action="handleMenuAction"
+    />
 
     <PluginList
       :active-plugin-name="props.activePluginName ?? null"

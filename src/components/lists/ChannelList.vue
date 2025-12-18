@@ -1,17 +1,69 @@
 <script setup lang="ts">
-import ChannelModel from "../items/ChannelModel.vue";
+import { ref } from 'vue';
+import ChannelModel, { type ChannelModelProps } from "../items/ChannelModel.vue";
+import ChannelContextMenu, { type ChannelMenuAction } from "../items/ChannelContextMenu.vue";
 import { useChannelStore } from "../../script/store/channelStore";
 
 const { channels } = useChannelStore();
+
+const menuOpen = ref(false);
+const menuPosition = ref({ x: 0, y: 0 });
+const selectedChannel = ref<ChannelModelProps | null>(null);
+
+function handleContextMenu(event: MouseEvent, channel: ChannelModelProps) {
+  event.preventDefault();
+  menuPosition.value = { x: event.clientX, y: event.clientY };
+  selectedChannel.value = channel;
+  menuOpen.value = true;
+}
+
+async function handleMenuAction(action: ChannelMenuAction) {
+  if (!selectedChannel.value) return;
+
+  switch (action) {
+    case 'copyId':
+      if (selectedChannel.value.cid) {
+        await navigator.clipboard.writeText(selectedChannel.value.cid.toString());
+      }
+      break;
+    case 'copyName':
+      await navigator.clipboard.writeText(selectedChannel.value.channelName);
+      break;
+    case 'pin':
+      // TODO: Implement pin logic
+      console.log('Pin channel:', selectedChannel.value.channelName);
+      break;
+    case 'settings':
+      // TODO: Implement settings logic
+      console.log('Settings for channel:', selectedChannel.value.channelName);
+      break;
+    case 'deleteHistory':
+      // TODO: Implement delete history logic
+      console.log('Delete history for channel:', selectedChannel.value.channelName);
+      break;
+  }
+}
 </script>
 
 <template>
   <div class="channelList">
     <ul class="list">
       <li v-for="item in channels" :key="item.channelName">
-        <ChannelModel v-bind="item" />
+        <ChannelModel
+          v-bind="item"
+          @contextmenu="(e: MouseEvent) => handleContextMenu(e, item)"
+        />
       </li>
     </ul>
+
+    <ChannelContextMenu
+      v-model:open="menuOpen"
+      :x="menuPosition.x"
+      :y="menuPosition.y"
+      :cid="selectedChannel?.cid"
+      :channel-name="selectedChannel?.channelName ?? ''"
+      @action="handleMenuAction"
+    />
   </div>
 </template>
 
