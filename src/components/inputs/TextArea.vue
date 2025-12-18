@@ -1,15 +1,33 @@
 <script setup lang="ts">
-import {h, onMounted, ref, render} from "vue";
+import {h, onMounted, onUnmounted, ref, render} from "vue";
 import UserMessageBubble from '../messages/UserMessageBubble.vue';
 import ChannelMessageService from "../../api/channel/Channel.ts";
 import { userData } from "../../script/struct/UserData.ts";
-import { getServerSocket } from "../messages/ChatBox.vue";
+import { getServerSocket } from "../messages/messageContext";
+import { FORWARD_MESSAGE_EVENT, type ForwardMessageEventDetail } from "../../script/utils/messageEvents";
 
 let container:HTMLElement | null = null;
 const text = ref('');
 
+const onForwardMessage = (event: Event) => {
+  const custom = event as CustomEvent<ForwardMessageEventDetail>;
+  const content = custom.detail?.content;
+  if (!content) return;
+
+  text.value = content;
+  requestAnimationFrame(() => {
+    document.getElementById('text-area-item')?.focus();
+  });
+};
+
+
 onMounted(() => {
   container = document.querySelector('.chat-box-container');
+  window.addEventListener(FORWARD_MESSAGE_EVENT, onForwardMessage);
+});
+
+onUnmounted(() => {
+  window.removeEventListener(FORWARD_MESSAGE_EVENT, onForwardMessage);
 });
 
 function sendMessage() {
