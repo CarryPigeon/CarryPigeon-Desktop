@@ -1,5 +1,6 @@
 <script setup lang="ts">
 export interface ChannelModelProps {
+  cid?: number
   imgUrl: string
   channelName: string
   latestMsg: string
