@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Config } from "../../config/Config.ts";
 import { Encryption } from "../Encryption/Encryption.ts";
 import { invoke } from "@tauri-apps/api/core";
-import { messageReceiveService } from "../../../components/messages/ChatBox.vue";
+import { messageReceiveService } from "../../../components/messages/messageReceiveService";
 
 class FuncMap{
     private map: Map<number, (data:string) => void>;

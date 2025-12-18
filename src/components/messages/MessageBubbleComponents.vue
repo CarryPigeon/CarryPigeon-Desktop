@@ -2,7 +2,7 @@
 import { defineComponent, computed, ref } from 'vue';
 import MemberMessageBubble from './MemberMessageBubble.vue';
 import UserMessageBubble from './UserMessageBubble.vue';
-import type { Message } from './ChatBox.vue';
+import type { Message } from './messageTypes';
 import name from '../users/UserComponent.vue';
 import id from '../users/UserComponent.vue';
 
@@ -73,8 +73,8 @@ export default defineComponent({
             v-for="(message, index) in orderedMessages"
             :key="message.id ?? message.from_id ?? message.timestamp ?? index"
         >
-            <MemberMessageBubble v-if="isMemberMessage(message, getIdValue ?? 0)" :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" />
-            <UserMessageBubble v-else :name="getNameValue ?? 'error'" :message="message.content" :avatar="message.avatar" :date="message.timestamp" />
+            <MemberMessageBubble v-if="isMemberMessage(message, getIdValue ?? 0)" :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" :message-id="message.id" />
+            <UserMessageBubble v-else :name="getNameValue ?? 'error'" :message="message.content" :avatar="message.avatar" :date="message.timestamp" :message-id="message.id" />
         </template>
     </div>
 </template>
