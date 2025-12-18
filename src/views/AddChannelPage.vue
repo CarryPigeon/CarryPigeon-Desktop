@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { Input } from "tdesign-vue-next";
 import ChannelModel from "../components/items/ChannelModel.vue";
 import DefaultAvatar from "/test_avatar.jpg?url";
@@ -14,15 +15,16 @@ type SearchChannel = {
 };
 
 const router = useRouter();
+const { t } = useI18n();
 
 const { channels } = useChannelStore();
 
-const suggestedChannels: SearchChannel[] = [
-  { id: 1, channelName: "公告", imgUrl: DefaultAvatar, latestMsg: "最新通知与公告" },
-  { id: 2, channelName: "产品讨论", imgUrl: DefaultAvatar, latestMsg: "需求与反馈" },
-  { id: 3, channelName: "技术支持", imgUrl: DefaultAvatar, latestMsg: "问题排查与帮助" },
-  { id: 4, channelName: "闲聊", imgUrl: DefaultAvatar, latestMsg: "随便聊聊" },
-];
+const suggestedChannels = computed<SearchChannel[]>(() => [
+  { id: 1, channelName: t('channel_announcements'), imgUrl: DefaultAvatar, latestMsg: t('channel_announcements_desc') },
+  { id: 2, channelName: t('channel_product'), imgUrl: DefaultAvatar, latestMsg: t('channel_product_desc') },
+  { id: 3, channelName: t('channel_tech_support'), imgUrl: DefaultAvatar, latestMsg: t('channel_tech_support_desc') },
+  { id: 4, channelName: t('channel_general'), imgUrl: DefaultAvatar, latestMsg: t('channel_general_desc') },
+]);
 
 const searchQuery = ref("");
 const selected = ref<SearchChannel | null>(null);
@@ -42,6 +44,7 @@ const queryName = computed(() => (queryIsId.value ? "" : normalizedQuery.value))
 
 const searchPool = computed<SearchChannel[]>(() => {
   const fromStore: SearchChannel[] = channels.map((item) => ({
+    id: item.cid,
     channelName: item.channelName,
     imgUrl: item.imgUrl,
     latestMsg: item.latestMsg,
@@ -50,7 +53,7 @@ const searchPool = computed<SearchChannel[]>(() => {
   const nameSet = new Set<string>();
   const merged: SearchChannel[] = [];
 
-  for (const item of [...fromStore, ...suggestedChannels]) {
+  for (const item of [...fromStore, ...suggestedChannels.value]) {
     const name = item.channelName.trim();
     if (!name) continue;
     if (nameSet.has(name)) continue;
@@ -68,7 +71,7 @@ function normalizeForSearch(value: string): string {
 const matchedChannels = computed<SearchChannel[]>(() => {
   const query = normalizedQuery.value;
   if (!query) {
-    return suggestedChannels;
+    return suggestedChannels.value;
   }
 
   if (queryIsId.value) {
@@ -129,12 +132,12 @@ async function onSubmit(): Promise<void> {
 
   const name = targetName.value.trim();
   if (!name) {
-    errorMessage.value = "请输入频道名称或频道ID";
+    errorMessage.value = t('enter_channel_name_or_id');
     return;
   }
 
   if (hasChannel(name)) {
-    errorMessage.value = "该频道已存在";
+    errorMessage.value = t('channel_already_exists');
     return;
   }
 
@@ -143,6 +146,7 @@ async function onSubmit(): Promise<void> {
     const idHint = queryIsId.value && queryId.value != null ? `ID: ${queryId.value}` : "";
 
     addChannel({
+      cid: selected.value?.id ?? (queryIsId.value && queryId.value != null ? queryId.value : undefined),
       channelName: name,
       imgUrl: selected.value?.imgUrl ?? DefaultAvatar,
       latestMsg: selected.value?.latestMsg ?? idHint ?? "",
@@ -161,23 +165,23 @@ async function onSubmit(): Promise<void> {
     <button class="back-button" type="button" @click="goBack">{{ $t('back') }}</button>
 
     <div class="card">
-      <h1 class="title">添加频道</h1>
-      <p class="subtitle">支持通过频道 ID 或频道名称搜索。</p>
+      <h1 class="title">{{ $t('add_channel') }}</h1>
+      <p class="subtitle">{{ $t('search_channel_hint') }}</p>
 
       <div class="form">
         <div class="field">
-          <div class="label">搜索（频道 ID / 名称）</div>
-          <Input v-model="searchQuery" placeholder="例如：123 或 产品讨论" />
+          <div class="label">{{ $t('search_label') }}</div>
+          <Input v-model="searchQuery" :placeholder="$t('search_placeholder')" />
           <div v-if="targetName" class="selected">
-            <span class="selected-label">将添加：</span>
+            <span class="selected-label">{{ $t('adding_label') }}</span>
             <span class="selected-value">{{ targetName }}</span>
-            <span v-if="isDuplicate" class="selected-dup">（已存在）</span>
+            <span v-if="isDuplicate" class="selected-dup">{{ $t('already_exists') }}</span>
           </div>
         </div>
 
         <div class="results">
-          <div class="results-head">搜索结果</div>
-          <div v-if="matchedChannels.length === 0" class="results-empty">没有匹配结果</div>
+          <div class="results-head">{{ $t('search_results') }}</div>
+          <div v-if="matchedChannels.length === 0" class="results-empty">{{ $t('no_results') }}</div>
           <div v-else class="results-list">
             <button
               v-for="item in matchedChannels"
@@ -201,7 +205,7 @@ async function onSubmit(): Promise<void> {
         <div class="actions">
           <button class="secondary" type="button" @click="goBack">{{ $t('cancel') }}</button>
           <button class="primary" type="button" :disabled="!canSubmit" @click="onSubmit">
-            {{ submitting ? $t('loading') : '添加' }}
+            {{ submitting ? $t('loading') : $t('add') }}
           </button>
         </div>
       </div>

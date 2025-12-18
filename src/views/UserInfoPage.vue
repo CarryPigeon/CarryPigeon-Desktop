@@ -10,7 +10,7 @@ const router = useRouter();
         <div class="back-button" @click="router.back()">{{ $t('back') }}</div>
         <div class="main-container">
             <div class="content">
-                <h1 class="setting-item-title">{{ $t('user-info') }}</h1>
+                <h1 class="setting-item-title">{{ $t('user_info') }}</h1>
                 <div class="avatar-container">
                     <img class="user_avatar" src="" alt="User Info Image" />
                 </div>
