@@ -4,6 +4,7 @@ import ServerList from "../components/lists/ServerList.vue";
 import ServerNameModel from "../components/modals/ServerNameModel.vue";
 import ChannelList from "../components/lists/ChannelList.vue";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import UserComponent from "../components/users/UserComponent.vue";
 import SearchBar from "../components/inputs/SearchBar.vue";
 import TextArea from "../components/inputs/TextArea.vue";
@@ -16,7 +17,9 @@ import PluginLoaderPanel from "../components/debug/PluginLoaderPanel.vue";
 import PluginHost from "../components/plugins/PluginHost.vue";
 import type { PluginManifest } from "../script/service/PluginLoader";
 
-invoke("to_chat_window_size");
+void invoke("to_chat_window_size")
+  .then(() => getCurrentWindow().center())
+  .catch(() => {});
 
 const showPluginLoaderPanel = ref(false);
 

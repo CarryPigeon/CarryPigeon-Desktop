@@ -32,6 +32,10 @@ function click_setting() {
   router.push("/settings");
 }
 
+function click_add(): void {
+  router.push("/channels/new");
+}
+
 function click_avatar(event: MouseEvent) {
   emit("avatar-click", { screenX: event.screenX, screenY: event.screenY });
 }
@@ -48,7 +52,7 @@ function click_avatar(event: MouseEvent) {
 
     <div class="actions">
       <img class="setting-icon" :src="setting" @click="click_setting" alt="" />
-      <img class="add-icon" :src="add" alt="" />
+      <img class="add-icon" :src="add" alt="" @click="click_add" />
     </div>
   </div>
 </template>
