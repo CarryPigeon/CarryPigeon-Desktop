@@ -4,7 +4,7 @@ export const zh_cn = {
     send_code: '发送验证码',
     email_invalid: '邮箱地址不合法',
     member_send_message: '发送信息',
-    member_mention: '@TA',
+    member_mention: "{'@'}TA",
     member_view_profile: '查看资料',
     member_report_user: '举报该用户',
     member_mute: '不看TA发言',

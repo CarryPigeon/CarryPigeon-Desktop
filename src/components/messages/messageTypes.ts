@@ -1,5 +1,6 @@
 export interface Message {
   from_id: number;
+  user_id?: number;
   id: string;
   name: string;
   avatar: string;
