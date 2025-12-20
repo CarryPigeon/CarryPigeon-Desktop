@@ -12,6 +12,11 @@ const props = defineProps<{
   message: string;
   date: string;
   messageId?: string | number;
+  userId?: number;
+}>();
+
+const emit = defineEmits<{
+  (e: "avatar-contextmenu", payload: { screenX: number; screenY: number; clientX: number; clientY: number; userId: number; name: string; avatar: string }): void;
 }>();
 
 const menuOpen = ref(false);
@@ -23,6 +28,19 @@ function onContextMenu(event: MouseEvent) {
   menuX.value = event.clientX;
   menuY.value = event.clientY;
   menuOpen.value = true;
+}
+
+function onAvatarContextMenu(event: MouseEvent) {
+  if (!props.userId) return;
+  emit("avatar-contextmenu", {
+    screenX: event.screenX,
+    screenY: event.screenY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    userId: props.userId,
+    name: props.name,
+    avatar: props.avatar,
+  });
 }
 
 async function handleCopy() {
@@ -60,7 +78,7 @@ function onMenuAction(action: 'copy' | 'recall' | 'forward') {
     <div class="member-bubble-content" @contextmenu.prevent="onContextMenu">{{ props.message }}</div>
     <div class="member-name">{{ props.date }} - {{ props.name }}</div>
     <div class="member-bubble-avatar">
-      <img class="member-avatar" :src="props.avatar" alt="" />
+      <img class="member-avatar" :src="props.avatar" alt="" @contextmenu.prevent="onAvatarContextMenu" />
     </div>
 
     <MessageContextMenu
