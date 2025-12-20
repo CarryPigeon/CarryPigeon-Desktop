@@ -34,12 +34,13 @@ const resolveTimestamp = (message: Message): number => {
 
 const isMemberMessage = (message: Message,user_id: number): boolean => {
     const payload = message as unknown as Record<string, unknown>;
-    const role = payload.from_id as number;
+    const role = (payload.from_id ?? payload.user_id) as number;
     return role == user_id;
 };
 
 export default defineComponent({
     name: 'MessageBubbleComponents',
+    emits: ['avatar-contextmenu'],
     components: {
         MemberMessageBubble,
         UserMessageBubble,
@@ -77,8 +78,8 @@ export default defineComponent({
             v-for="(message, index) in orderedMessages"
             :key="message.id ?? message.from_id ?? message.timestamp ?? index"
         >
-            <MemberMessageBubble v-if="isMemberMessage(message, getIdValue ?? 0)" :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" :message-id="message.id" />
-            <UserMessageBubble v-else :name="getNameValue ?? 'error'" :message="message.content" :avatar="message.avatar" :date="message.timestamp" :message-id="message.id" />
+            <MemberMessageBubble v-if="isMemberMessage(message, getIdValue ?? 0)" :name="message.name" :message="message.content" :avatar="message.avatar" :date="message.timestamp" :message-id="message.id" :user-id="message.from_id ?? (message as any).user_id" @avatar-contextmenu="(payload) => $emit('avatar-contextmenu', payload)" />
+            <UserMessageBubble v-else :name="getNameValue ?? 'error'" :message="message.content" :avatar="message.avatar" :date="message.timestamp" :message-id="message.id" :user-id="message.from_id ?? (message as any).user_id" @avatar-contextmenu="(payload) => $emit('avatar-contextmenu', payload)" />
         </template>
     </div>
 </template>

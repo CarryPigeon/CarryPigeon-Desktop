@@ -40,13 +40,13 @@ export class MessageReceiveService {
     return this.channelServer;
   }
 
-  public async showNewMessage(messageData: string) {
+  public async showNewMessage(messageData: string | Record<string, any>) {
     try {
-      const parsedData = JSON.parse(messageData);
+      const parsedData = typeof messageData === 'string' ? JSON.parse(messageData) : messageData;
 
       const newMessage: Message = {
         id: parsedData['id'],
-        from_id: parsedData['user_id'],
+        from_id: parsedData['user_id'] ?? parsedData['from_id'],
         name: parsedData.name,
         avatar: Avatar,
         content: parsedData.message,

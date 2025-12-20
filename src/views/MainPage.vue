@@ -97,6 +97,31 @@ const selectedMemberMuted = computed(() => {
   return member ? isIgnoredUser(member.id) : false;
 });
 
+function openMemberContextMenuFromChat(payload: {
+  screenX: number;
+  screenY: number;
+  clientX: number;
+  clientY: number;
+  userId: number;
+  name: string;
+  avatar: string;
+}) {
+  const member: Member = {
+    id: payload.userId,
+    name: payload.name,
+    avatar: payload.avatar,
+    description: "",
+    email: "",
+  };
+  openMemberContextMenu({
+    screenX: payload.screenX,
+    screenY: payload.screenY,
+    clientX: payload.clientX,
+    clientY: payload.clientY,
+    member,
+  });
+}
+
 function openMemberContextMenu(payload: {
   screenX: number;
   screenY: number;
@@ -174,7 +199,7 @@ async function handleMemberMenuAction(action: MemberMenuAction) {
       @avatar-click="openMemberPopover"
       @avatar-contextmenu="openMemberContextMenu"
     />
-    <ChatBox :user_id="a.id" />
+    <ChatBox :user_id="a.id" @avatar-contextmenu="openMemberContextMenuFromChat" />
   </template>
 
   <MemberContextMenu
