@@ -5,6 +5,7 @@ import UserMessageBubble from './UserMessageBubble.vue';
 import type { Message } from './messageTypes';
 import name from '../users/UserComponent.vue';
 import id from '../users/UserComponent.vue';
+import { useIgnoreStore } from '../../script/store/ignoreStore';
 
 const messageList = ref<Message[]>([]);
 
@@ -44,8 +45,11 @@ export default defineComponent({
         UserMessageBubble,
     },
     setup() {
+        const { ignoredUserIds } = useIgnoreStore();
         const orderedMessages = computed(() =>
-            [...messageList.value].sort((a, b) => resolveTimestamp(a) - resolveTimestamp(b))
+            [...messageList.value]
+                .filter((message) => !ignoredUserIds.includes(message.from_id))
+                .sort((a, b) => resolveTimestamp(a) - resolveTimestamp(b))
         );
         
         const getIdValue = computed(() => {

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Input } from 'tdesign-vue-next';
+import { Alert, Button, Input } from 'tdesign-vue-next';
 
 const email = ref('');
 const server_socket = ref('');
 const code = ref('');
 const loading = ref(false);
+const sendCodeCountdown = ref(0);
+const emailAlertVisible = ref(false);
 
 const router = useRouter();
 
@@ -16,16 +18,93 @@ async function login(){
     router.push('/chat');
 }
 
+let sendCodeTimer: ReturnType<typeof setInterval> | null = null;
+let emailAlertTimer: ReturnType<typeof setTimeout> | null = null;
+
+function isValidEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function showInvalidEmailAlert() {
+  emailAlertVisible.value = true;
+  if (emailAlertTimer) clearTimeout(emailAlertTimer);
+  emailAlertTimer = setTimeout(() => {
+    emailAlertVisible.value = false;
+    emailAlertTimer = null;
+  }, 3000);
+}
+
+function hideEmailAlert() {
+  emailAlertVisible.value = false;
+  if (emailAlertTimer) clearTimeout(emailAlertTimer);
+  emailAlertTimer = null;
+}
+
+function startSendCodeCountdown(seconds = 60) {
+  if (sendCodeTimer) clearInterval(sendCodeTimer);
+  sendCodeCountdown.value = seconds;
+  sendCodeTimer = setInterval(() => {
+    sendCodeCountdown.value -= 1;
+    if (sendCodeCountdown.value <= 0) {
+      sendCodeCountdown.value = 0;
+      if (sendCodeTimer) clearInterval(sendCodeTimer);
+      sendCodeTimer = null;
+    }
+  }, 1000);
+}
+
+async function sendCode() {
+  if (sendCodeCountdown.value > 0) return;
+  if (!isValidEmailAddress(email.value)) {
+    showInvalidEmailAlert();
+    return;
+  }
+  // TODO: Call backend to send verification code (email/server_socket).
+  startSendCodeCountdown(60);
+}
+
+watch(email, (nextEmail) => {
+  if (emailAlertVisible.value && isValidEmailAddress(nextEmail)) hideEmailAlert();
+});
+
+onBeforeUnmount(() => {
+  if (sendCodeTimer) clearInterval(sendCodeTimer);
+  sendCodeTimer = null;
+  if (emailAlertTimer) clearTimeout(emailAlertTimer);
+  emailAlertTimer = null;
+});
+
 </script>
 
 <template>
 <div class="login-page">
   <div class="login-container">
     <h1>{{ $t('login') }}</h1>
+    <Alert
+      v-if="emailAlertVisible"
+      class="email-alert"
+      theme="warning"
+      :message="$t('email_invalid')"
+      :closeBtn="true"
+      :onClose="hideEmailAlert"
+    />
     <image class="user-image" alt="User Image"/>
     <Input class="server-input" v-model="server_socket" type="text" :placeholder="$t('server_socket')" />
     <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
-    <Input class="code-input" v-model="code" type="password" :placeholder="$t('login_code')"/>
+    <Input class="code-input" v-model="code" type="text" autocomplete="one-time-code" :placeholder="$t('login_code')">
+      <template #suffix>
+        <Button
+          class="send-code-button"
+          size="small"
+          variant="text"
+          theme="primary"
+          :disabled="sendCodeCountdown > 0"
+          @click.stop="sendCode"
+        >
+          {{ sendCodeCountdown > 0 ? `${$t('send_code')} (${sendCodeCountdown}s)` : $t('send_code') }}
+        </Button>
+      </template>
+    </Input>
     <button class = "login-button" @click="login">
         <span v-if="loading">{{ $t('loading') }}</span>
         <span v-else>{{ $t('login') }}</span>
@@ -117,6 +196,15 @@ h1 {
   border-radius: 8px;
   font-size: 16px;
   box-sizing: border-box;
+}
+
+.email-alert {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.send-code-button {
+  padding: 0 8px;
 }
 
 .login-button {

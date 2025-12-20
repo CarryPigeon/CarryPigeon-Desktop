@@ -4,7 +4,12 @@ import UserMessageBubble from '../messages/UserMessageBubble.vue';
 import ChannelMessageService from "../../api/channel/Channel.ts";
 import { userData } from "../../script/struct/UserData.ts";
 import { getServerSocket } from "../messages/messageContext";
-import { FORWARD_MESSAGE_EVENT, type ForwardMessageEventDetail } from "../../script/utils/messageEvents";
+import {
+  FORWARD_MESSAGE_EVENT,
+  INSERT_TEXT_EVENT,
+  type ForwardMessageEventDetail,
+  type InsertTextEventDetail,
+} from "../../script/utils/messageEvents";
 
 let container:HTMLElement | null = null;
 const text = ref('');
@@ -20,14 +25,56 @@ const onForwardMessage = (event: Event) => {
   });
 };
 
+const onInsertText = (event: Event) => {
+  const custom = event as CustomEvent<InsertTextEventDetail>;
+  const content = custom.detail?.content;
+  if (!content) return;
+  const mode = custom.detail?.mode ?? 'append';
+
+  const textarea = document.getElementById('text-area-item') as HTMLTextAreaElement | null;
+  if (!textarea) {
+    text.value = mode === 'prepend' ? `${content}${text.value}` : mode === 'replace' ? content : `${text.value}${content}`;
+    return;
+  }
+
+  if (mode === 'replace') {
+    text.value = content;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(text.value.length, text.value.length);
+    });
+    return;
+  }
+
+  if (mode === 'prepend') {
+    text.value = `${content}${text.value}`;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(content.length, content.length);
+    });
+    return;
+  }
+
+  const start = textarea.selectionStart ?? text.value.length;
+  const end = textarea.selectionEnd ?? start;
+  text.value = `${text.value.slice(0, start)}${content}${text.value.slice(end)}`;
+  const nextPos = start + content.length;
+  requestAnimationFrame(() => {
+    textarea.focus();
+    textarea.setSelectionRange(nextPos, nextPos);
+  });
+};
+
 
 onMounted(() => {
   container = document.querySelector('.chat-box-container');
   window.addEventListener(FORWARD_MESSAGE_EVENT, onForwardMessage);
+  window.addEventListener(INSERT_TEXT_EVENT, onInsertText);
 });
 
 onUnmounted(() => {
   window.removeEventListener(FORWARD_MESSAGE_EVENT, onForwardMessage);
+  window.removeEventListener(INSERT_TEXT_EVENT, onInsertText);
 });
 
 function sendMessage() {
