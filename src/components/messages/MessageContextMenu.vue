@@ -107,7 +107,7 @@ onBeforeUnmount(() => {
       @contextmenu.prevent
     >
       <button class="message-context-menu-item" type="button" @click="emitAction('copy')">
-        复制信息
+        {{ $t('copy_message') }}
       </button>
       <button
         v-if="props.showRecall"
@@ -115,10 +115,10 @@ onBeforeUnmount(() => {
         type="button"
         @click="emitAction('recall')"
       >
-        撤回
+        {{ $t('recall_message') }}
       </button>
       <button class="message-context-menu-item" type="button" @click="emitAction('forward')">
-        转发
+        {{ $t('forward_message') }}
       </button>
     </div>
   </Teleport>

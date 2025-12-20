@@ -17,6 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "avatar-click", payload: { screenX: number; screenY: number; member: Member }): void;
+  (e: "avatar-contextmenu", payload: { screenX: number; screenY: number; clientX: number; clientY: number; member: Member }): void;
 }>();
 </script>
 
@@ -32,6 +33,7 @@ const emit = defineEmits<{
             :avatar="item.avatar"
             :name="item.name"
             @avatar-click="(pos) => emit('avatar-click', { ...pos, member: item })"
+            @avatar-contextmenu="(pos) => emit('avatar-contextmenu', { ...pos, member: item })"
           />
         </li>
       </ul>

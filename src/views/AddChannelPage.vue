@@ -117,7 +117,7 @@ function selectChannel(item: SearchChannel): void {
 const targetName = computed(() => {
   if (selected.value) return selected.value.channelName;
   if (queryName.value) return queryName.value;
-  if (queryIsId.value && queryId.value != null) return `频道 #${queryId.value}`;
+  if (queryIsId.value && queryId.value != null) return t('channel_with_id', { id: queryId.value });
   return "";
 });
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { PluginManifest } from "../../script/service/PluginLoader";
 import { PluginRuntime } from "../../script/service/plugin/PluginRuntime";
 
@@ -17,7 +18,8 @@ const loading = ref(false);
 
 let runtime: PluginRuntime | null = null;
 
-const title = computed(() => props.manifest?.name ?? "Plugin");
+const { t } = useI18n();
+const title = computed(() => props.manifest?.name ?? t('plugin_default_title'));
 
 async function stop(): Promise<void> {
   if (!runtime) return;
@@ -63,12 +65,12 @@ onBeforeUnmount(() => {
   <div class="plugin-host">
     <div class="header">
       <div class="title">{{ title }}</div>
-      <button class="close" type="button" @click="emit('close')">Back</button>
+      <button class="close" type="button" @click="emit('close')">{{ $t('back') }}</button>
     </div>
 
     <div class="body">
       <div ref="mountEl" class="mount"></div>
-      <div v-if="loading" class="overlay">Loading...</div>
+      <div v-if="loading" class="overlay">{{ $t('loading') }}</div>
       <div v-else-if="error" class="overlay error">{{ error }}</div>
     </div>
   </div>
