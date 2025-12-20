@@ -6,16 +6,32 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "avatar-click", payload: { screenX: number; screenY: number }): void;
+  (e: "avatar-contextmenu", payload: { screenX: number; screenY: number; clientX: number; clientY: number }): void;
 }>();
 
 function click_avatar(event: MouseEvent) {
   emit("avatar-click", { screenX: event.screenX, screenY: event.screenY });
 }
+
+function onAvatarContextMenu(event: MouseEvent) {
+  emit("avatar-contextmenu", {
+    screenX: event.screenX,
+    screenY: event.screenY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+  });
+}
 </script>
 
 <template>
   <div class="group-member-model">
-    <img class="member-avatar" :src="props.avatar" alt="" @click="click_avatar" />
+    <img
+      class="member-avatar"
+      :src="props.avatar"
+      alt=""
+      @click="click_avatar"
+      @contextmenu.prevent="onAvatarContextMenu"
+    />
     <p class="member-name">{{ props.name }}</p>
   </div>
 </template>

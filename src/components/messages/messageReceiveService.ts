@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import Avatar from '/test_avatar.jpg?url';
 import type { Message } from './messageTypes';
 import { getChannelId, getServerSocket } from './messageContext';
+import { isIgnoredUser } from '../../script/store/ignoreStore';
 
 const messages = ref<Message[]>([
   {
@@ -52,6 +53,7 @@ export class MessageReceiveService {
         timestamp: new Date().toLocaleTimeString(),
       };
 
+      if (isIgnoredUser(newMessage.from_id)) return;
       messages.value.push(newMessage);
 
       try {

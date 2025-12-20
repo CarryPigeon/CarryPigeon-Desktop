@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
-export type ChannelMenuAction = 'copyId' | 'copyName' | 'pin' | 'settings' | 'deleteHistory';
+export type ChannelMenuAction = 
+  | 'copyId' 
+  | 'copyName' 
+  | 'pin' 
+  | 'settings' 
+  | 'deleteHistory'
+  | 'settings_recv_notify'
+  | 'settings_recv_silent'
+  | 'settings_no_recv';
 
 const props = defineProps<{
   open: boolean;
@@ -18,6 +26,7 @@ const emit = defineEmits<{
 
 const menuRef = ref<HTMLElement | null>(null);
 const position = ref({ x: 0, y: 0 });
+const showSettingsSubmenu = ref(false);
 
 function close() {
   emit('update:open', false);
@@ -111,9 +120,22 @@ onBeforeUnmount(() => {
       <button class="channel-context-menu-item" type="button" @click="emitAction('pin')">
         {{ $t('pin_channel') }}
       </button>
-      <button class="channel-context-menu-item" type="button" @click="emitAction('settings')">
-        {{ $t('channel_settings') }}
-      </button>
+      
+      <div 
+        class="channel-context-menu-item has-submenu" 
+        @mouseenter="showSettingsSubmenu = true" 
+        @mouseleave="showSettingsSubmenu = false"
+      >
+        <span>{{ $t('channel_settings') }}</span>
+        <span class="submenu-arrow">›</span>
+        
+        <div v-if="showSettingsSubmenu" class="channel-context-submenu">
+           <button class="channel-context-menu-item" type="button" @click="emitAction('settings_recv_notify')">{{ $t('settings_recv_notify') }}</button>
+           <button class="channel-context-menu-item" type="button" @click="emitAction('settings_recv_silent')">{{ $t('settings_recv_silent') }}</button>
+           <button class="channel-context-menu-item" type="button" @click="emitAction('settings_no_recv')">{{ $t('settings_no_recv') }}</button>
+        </div>
+      </div>
+
       <button class="channel-context-menu-item delete" type="button" @click="emitAction('deleteHistory')">
         {{ $t('delete_channel_history') }}
       </button>
@@ -137,6 +159,7 @@ onBeforeUnmount(() => {
 
 .channel-context-menu-item {
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
   padding: 8px 10px;
   border: 0;
@@ -157,5 +180,35 @@ onBeforeUnmount(() => {
       background: rgba(211, 47, 47, 0.08);
     }
   }
+}
+
+.has-submenu {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.submenu-arrow {
+  font-size: 16px;
+  line-height: 1;
+  margin-left: 8px;
+  color: #666;
+}
+
+.channel-context-submenu {
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  min-width: 160px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 1);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  margin-left: -2px;
+  z-index: 10001;
 }
 </style>

@@ -37,6 +37,15 @@ async function handleMenuAction(action: ChannelMenuAction) {
       // TODO: Implement settings logic
       console.log('Settings for channel:', selectedChannel.value.channelName);
       break;
+    case 'settings_recv_notify':
+      console.log('Settings: Receive and Notify for', selectedChannel.value.channelName);
+      break;
+    case 'settings_recv_silent':
+      console.log('Settings: Receive Silent for', selectedChannel.value.channelName);
+      break;
+    case 'settings_no_recv':
+      console.log('Settings: No Receive for', selectedChannel.value.channelName);
+      break;
     case 'deleteHistory':
       // TODO: Implement delete history logic
       console.log('Delete history for channel:', selectedChannel.value.channelName);
