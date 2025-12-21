@@ -4,7 +4,7 @@ import Avatar from "/test_avatar.jpg?url";
 import { useRouter } from "vue-router";
 import PluginList from "./PluginList.vue";
 import type { PluginManifest } from "../../script/service/PluginLoader";
-import ChannelContextMenu, { type ChannelMenuAction } from "../items/ChannelContextMenu.vue";
+import ServerContextMenu, { type ChannelMenuAction } from "../items/ServerContextMenu.vue";
 
 const props = defineProps<{
   activePluginName?: string | null;
@@ -129,7 +129,7 @@ addChannel("111", false, Avatar, () => {});
       </li>
     </ul>
 
-    <ChannelContextMenu
+    <ServerContextMenu
       v-model:open="menuOpen"
       :x="menuPosition.x"
       :y="menuPosition.y"
