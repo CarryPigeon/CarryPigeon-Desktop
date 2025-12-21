@@ -2,7 +2,26 @@ import { reactive } from "vue";
 import type { ChannelModelProps } from "../../components/items/ChannelModel.vue";
 
 const channelState = reactive<{ channels: ChannelModelProps[] }>({
-  channels: [],
+  channels: [
+    {
+      cid: 1,
+      imgUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Felix",
+      channelName: "General",
+      latestMsg: "Hello everyone! Welcome to the general channel.",
+    },
+    {
+      cid: 2,
+      imgUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Aneka",
+      channelName: "Development",
+      latestMsg: "The build is failing on CI, can someone check?",
+    },
+    {
+      cid: 3,
+      imgUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Willow",
+      channelName: "Design Team",
+      latestMsg: "New mockups are ready for review.",
+    }
+  ],
 });
 
 export function useChannelStore() {

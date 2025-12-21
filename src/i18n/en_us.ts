@@ -76,4 +76,7 @@ export const en_us = {
     forward_message: 'Forward',
     channel_with_id: 'Channel #{id}',
     plugin_default_title: 'Plugin',
+    copy_server_url: 'Copy Server URL',
+    copy_server_name: 'Copy Server Name',
+    pin_server: 'Pin Server'
 };

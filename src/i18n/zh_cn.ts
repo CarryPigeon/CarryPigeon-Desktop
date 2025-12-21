@@ -76,4 +76,7 @@ export const zh_cn = {
     forward_message: '转发',
     channel_with_id: '频道 #{id}',
     plugin_default_title: '插件',
+    copy_server_url: '复制服务器地址',
+    copy_server_name: '复制服务器名称',
+    pin_server: '置顶服务器'
 };
