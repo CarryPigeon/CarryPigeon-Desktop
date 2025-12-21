@@ -9,6 +9,13 @@ const { channels } = useChannelStore();
 const menuOpen = ref(false);
 const menuPosition = ref({ x: 0, y: 0 });
 const selectedChannel = ref<ChannelModelProps | null>(null);
+const activeChannelCid = ref<number | undefined>(undefined);
+
+function handleChannelClick(channel: ChannelModelProps) {
+  if (channel.cid !== undefined) {
+    activeChannelCid.value = channel.cid;
+  }
+}
 
 function handleContextMenu(event: MouseEvent, channel: ChannelModelProps) {
   event.preventDefault();
@@ -60,6 +67,8 @@ async function handleMenuAction(action: ChannelMenuAction) {
       <li v-for="item in channels" :key="item.channelName">
         <ChannelModel
           v-bind="item"
+          :active="item.cid === activeChannelCid"
+          @click="handleChannelClick(item)"
           @contextmenu="(e: MouseEvent) => handleContextMenu(e, item)"
         />
       </li>
