@@ -1,5 +1,5 @@
 export async function generateECCKeyPair(): Promise<{privateKey: CryptoKey, publicKey: string}> {
-    let keyPair = await window.crypto.subtle.generateKey(
+    const keyPair = await window.crypto.subtle.generateKey(
         {
             name: "ECDSA",
             namedCurve: "P-256",
@@ -7,10 +7,10 @@ export async function generateECCKeyPair(): Promise<{privateKey: CryptoKey, publ
         true,
         ["sign", "verify"],
     );
-    let publicKey = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey)
-    let privateKey = keyPair.privateKey;
+    const publicKey = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey)
+    const privateKey = keyPair.privateKey;
 
-    let publicKeyBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(publicKey))));
+    const publicKeyBase64 = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(publicKey))));
 
     return { privateKey, publicKey: publicKeyBase64 };
 }

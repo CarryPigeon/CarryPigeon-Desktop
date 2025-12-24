@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import { Config } from "../../config/Config.ts";
+//import { Config } from "../../config/Config.ts";
 import { Encryption } from "../Encryption/Encryption.ts";
 import { invoke } from "@tauri-apps/api/core";
 import { messageReceiveService } from "../../../components/messages/messageReceiveService";
@@ -61,21 +61,51 @@ class FuncMap{
 export class TcpService {
     public encrypter: Encryption;
     private funcMap: FuncMap;
+    private handshakeResolver: (() => void) | undefined;
+    private handshakeRejecter: ((reason?: any) => void) | undefined;
 
     constructor(socket: string) {
         this.funcMap = new FuncMap();
         this.encrypter = new Encryption(socket);
         // 添加本频道到tcp_service中
-        invoke("add_tcp_service", { socket });
+        invoke("add_tcp_service", { channelSocket: socket, socket: socket });
+    }
+
+    public waitForKeyExchange(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.handshakeResolver = resolve;
+            this.handshakeRejecter = reject;
+            setTimeout(() => {
+                if (this.handshakeRejecter) {
+                    this.handshakeRejecter(new Error("Key exchange timeout"));
+                    this.cleanupHandshake();
+                }
+            }, 5000);
+        });
+    }
+
+    private cleanupHandshake() {
+        this.handshakeResolver = undefined;
+        this.handshakeRejecter = undefined;
     }
 
     public async send(channel_socket: string, raw_data: string, callback?:(data: string) => void){
         return new Promise((resolve, reject) =>{
             const data = this.encrypter.encrypt(raw_data);
-            invoke("send_tcp_service", { channel_id: channel_socket, data }).then((res) => {
+            invoke("send_tcp_service", { channelSocket: channel_socket, data }).then((res) => {
                 if (callback) {
                     callback(<string>res);
                 }
+                resolve(null);
+            }).catch((e) => {
+                reject(e);
+            });
+        });
+    }
+
+    public async sendRaw(channel_socket: string, raw_data: string){
+        return new Promise((resolve, reject) =>{
+            invoke("send_tcp_service", { channelSocket: channel_socket, data: raw_data }).then(() => {
                 resolve(null);
             }).catch((e) => {
                 reject(e);
@@ -89,7 +119,7 @@ export class TcpService {
         temp["id"] = id;
         return new Promise(() => {
             const data = this.encrypter.encrypt(JSON.stringify(temp));
-            invoke("send_tcp_service", { channel_id: channel_socket, data });
+            invoke("send_tcp_service", { channelSocket: channel_socket, data });
         });
     }
 
@@ -99,7 +129,18 @@ export class TcpService {
         if (value["id"] != -1) {
             this.funcMap.call(value["id"], value);
         } else if (value["key"]) {
-            await this.encrypter.decryptAESKey(value["key"]);
+            try {
+                await this.encrypter.decryptAESKey(value["key"]);
+                if (this.handshakeResolver) {
+                    this.handshakeResolver();
+                    this.cleanupHandshake();
+                }
+            } catch (e) {
+                if (this.handshakeRejecter) {
+                    this.handshakeRejecter(e);
+                    this.cleanupHandshake();
+                }
+            }
         } else {
             messageReceiveService.showNewMessage(value);
         } 
@@ -107,11 +148,27 @@ export class TcpService {
 }
 
 listen<string>('tcp-message',(endata) => {
-    TCP_SERVICE.listen(TCP_SERVICE.encrypter.decrypt(endata.payload)).then(r => {
-        invoke("log-warning",{r});
+    TCP_SERVICE.forEach((service) => {
+        let data = endata.payload;
+        try {
+            data = service.encrypter.decrypt(endata.payload);
+        } catch {
+            // 忽略解密错误，可能是密钥交换消息
+        }
+        service.listen(data).then(r => {
+            invoke("log_warning",{r});
+        });
     });
 }).then(r => {
-    invoke("log-warning", {r});
+    invoke("log_warning", {r});
 })
 
-export const TCP_SERVICE: TcpService = new TcpService(<string>Config["socket"]);
+export async function crateServerTcpService(socket: string) {
+    const service = new TcpService(socket);
+    TCP_SERVICE.set(socket, service);
+    const handshake = service.waitForKeyExchange();
+    await service.encrypter.swapKey(0);
+    return handshake;
+}
+
+export const TCP_SERVICE: Map<string,TcpService> = new Map<string,TcpService>();

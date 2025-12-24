@@ -22,7 +22,12 @@ export abstract class BaseAPI {
             route,
             data
         };
-        await TCP_SERVICE.send(channel_socket,JSON.stringify(context));
+        const service = TCP_SERVICE.get(channel_socket);
+        if (service) {
+            await service.send(channel_socket,JSON.stringify(context));
+        } else {
+            console.error(`TcpService not found for socket: ${channel_socket}`);
+        }
         if (callback){
             return callback();
         }
@@ -33,10 +38,16 @@ export abstract class BaseAPI {
             route,
             data
         };
+        const service = TCP_SERVICE.get(channel_socket);
+        if (!service) {
+            console.error(`TcpService not found for socket: ${channel_socket}`);
+            return;
+        }
+
         if (callback === undefined) { 
-            await TCP_SERVICE.send(channel_socket, JSON.stringify(context));
+            await service.send(channel_socket, JSON.stringify(context));
         } else {
-            await TCP_SERVICE.sendWithResponse(channel_socket,JSON.stringify(context),callback);
+            await service.sendWithResponse(channel_socket,JSON.stringify(context),callback);
         }
     }
     
