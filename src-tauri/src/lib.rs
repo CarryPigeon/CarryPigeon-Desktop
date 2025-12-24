@@ -16,9 +16,9 @@ use config::{
     update_config_bool, update_config_string, update_config_u32, update_config_u64,
 };
 use dao::{channel::*, message::*};
-use log::{log_error, log_info, log_warning};
+use log::{log_error, log_info, log_warning, log_debug};
 use plugin::plugin_manager::{list_plugins, load_plugin};
-use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service};
+use service::tcp::{add_tcp_service, listen_tcp_service, send_tcp_service, init_tcp_service};
 use tauri::{
     Manager,
     menu::{Menu, MenuItem},
@@ -30,6 +30,7 @@ use windows::{open_user_popover_window, to_chat_window_size};
 pub fn run() -> anyhow::Result<()> {
     tauri::Builder::default()
         .setup(|app| {
+            init_tcp_service();
             // 定义托盘菜单行为
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_i])?;
@@ -104,6 +105,7 @@ pub fn run() -> anyhow::Result<()> {
             log_info,
             log_error,
             log_warning,
+            log_debug,
             //config commands
             get_config,
             get_config_bool,

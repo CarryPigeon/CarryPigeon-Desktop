@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Alert, Button, Input } from 'tdesign-vue-next';
+import { Alert, Button, Input, MessagePlugin } from 'tdesign-vue-next';
+import { crateServerTcpService } from '../script/service/net/TcpService';
 
 const email = ref('');
 const server_socket = ref('');
@@ -12,10 +13,17 @@ const emailAlertVisible = ref(false);
 
 const router = useRouter();
 
-async function login(){
+async function login() {
     loading.value = true;
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    router.push('/chat');
+    try {
+        await crateServerTcpService(server_socket.value);
+        //await new Promise(resolve => setTimeout(resolve, 1000));
+        router.push('/chat');
+    } catch (e) {
+        console.error(e);
+        MessagePlugin.error('密钥交换失败');
+        loading.value = false;
+    }
 }
 
 let sendCodeTimer: ReturnType<typeof setInterval> | null = null;

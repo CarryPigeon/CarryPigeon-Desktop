@@ -14,3 +14,8 @@ pub fn log_error(error: String) {
 pub fn log_warning(warning: String) {
     warn!("{}", warning);
 }
+
+#[tauri::command]
+pub fn log_debug(msg: String) {
+    tracing::debug!("{}", msg);
+}
