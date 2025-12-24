@@ -59,7 +59,7 @@ const popoverSize = {
 };
 
 function connect_server(socket: string) {
-  invoke("add_tcp_service", { socket });
+  invoke("add_tcp_service", { channelSocket: socket, socket: socket });
 }
 
 connect_server(server_socket.value);

@@ -11,7 +11,12 @@ export class FileAPIService{
             size: size,
             sha256: sha256
         };
-        await TCP_SERVICE.send(channel_socket,JSON.stringify(context));
+        const service = TCP_SERVICE.get(channel_socket);
+        if (service) {
+            await service.send(channel_socket,JSON.stringify(context));
+        } else {
+            console.error(`TcpService not found for socket: ${channel_socket}`);
+        }
     }
 }
 

@@ -2,12 +2,13 @@ use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 
 pub struct TcpService {
-    listener: TcpListener,
-    stream: TcpStream,
+    write_stream: OwnedWriteHalf,
+    read_stream: Option<OwnedReadHalf>,
 }
 
 #[derive(Default)]
@@ -20,24 +21,24 @@ pub static TCP_SERVICE: OnceLock<SharedTcpMapService> = OnceLock::new();
 
 impl TcpService {
     pub async fn new(socket: String) -> anyhow::Result<Self> {
-        let listener = TcpListener::bind(&socket)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to bind TCP listener: {}", e))?;
-
         let stream = TcpStream::connect(socket)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to connect TCP stream: {}", e))?;
+        
+        let (read_stream, write_stream) = stream.into_split();
 
-        Ok(TcpService { listener, stream })
+        Ok(TcpService { 
+            write_stream, 
+            read_stream: Some(read_stream) 
+        })
     }
 
-    pub async fn start(&mut self, app: AppHandle) {
-        while let Ok((mut socket, addr)) = self.listener.accept().await {
-            let app = app.clone();
+    pub fn start(&mut self, app: AppHandle) {
+        if let Some(mut read_stream) = self.read_stream.take() {
             tokio::spawn(async move {
                 let mut buffer = vec![0; 4096];
                 loop {
-                    match socket.read(&mut buffer).await {
+                    match read_stream.read(&mut buffer).await {
                         Ok(0) => {
                             return;
                         }
@@ -49,14 +50,13 @@ impl TcpService {
                             }
                             Err(e) => {
                                 tracing::warn!("Failed to parse string from socket; err={:?}", e);
-                                break;
+                                // break; // Don't break on parse error, maybe just garbage data
                             }
                         },
                         Err(e) => {
                             tracing::warn!(
-                                "Failed to read from socket; err={:?}, addr={}",
-                                e,
-                                addr
+                                "Failed to read from socket; err={:?}",
+                                e
                             );
                             break;
                         }
@@ -67,7 +67,7 @@ impl TcpService {
     }
 
     pub async fn send(&mut self, data: String) -> anyhow::Result<()> {
-        self.stream
+        self.write_stream
             .write_all(data.as_bytes())
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send TCP data: {}", e))
@@ -104,10 +104,10 @@ impl TcpMapService {
         }
     }
 
-    pub async fn listen(&mut self, channel_socket: String, app: AppHandle) -> anyhow::Result<()> {
+    pub fn listen(&mut self, channel_socket: String, app: AppHandle) -> anyhow::Result<()> {
         match self.map.get_mut(&channel_socket) {
             Some(service) => {
-                service.start(app).await;
+                service.start(app);
                 Ok(())
             }
             None => Err(anyhow::anyhow!(
@@ -134,51 +134,43 @@ pub fn init_tcp_service() -> SharedTcpMapService {
 }
 
 #[tauri::command]
-pub fn add_tcp_service(channel_socket: String, socket: String) {
-    let service = TCP_SERVICE.get().cloned().unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let mut lock = service.write().await;
-        let tcp_service = TcpService::new(socket).await.unwrap();
-        lock.add(channel_socket, Box::new(tcp_service));
-    });
+pub async fn add_tcp_service(app: AppHandle, channel_socket: String, socket: String) -> Result<(), String> {
+    let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
+    let mut lock = service.write().await;
+    let mut tcp_service = TcpService::new(socket).await.map_err(|e| e.to_string())?;
+    tcp_service.start(app);
+    lock.add(channel_socket, Box::new(tcp_service));
+    Ok(())
 }
 
 // 提供线程安全的全局访问方法
 #[tauri::command]
-pub fn send_tcp_service(channel_socket: String, data: String) {
-    let service = TCP_SERVICE.get().cloned().unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let mut lock = service.write().await;
-        lock.send_with_server(channel_socket, data).await.unwrap();
-    });
+pub async fn send_tcp_service(channel_socket: String, data: String) -> Result<(), String> {
+    let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
+    let mut lock = service.write().await;
+    lock.send_with_server(channel_socket, data).await.map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn listen_tcp_service(channel_socket: String, app: AppHandle) {
-    let service = TCP_SERVICE.get().cloned().unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let mut lock = service.write().await;
-        lock.listen(channel_socket, app).await.unwrap();
-    });
+pub async fn listen_tcp_service(channel_socket: String, app: AppHandle) -> Result<(), String> {
+    let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
+    let mut lock = service.write().await;
+    lock.listen(channel_socket, app).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
-pub async fn remove_tcp_service(channel_socket: String) {
-    let service = TCP_SERVICE.get().cloned().unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let _ = runtime.block_on(async {
-        let mut lock = service.write().await;
-        lock.remove(channel_socket)
-    });
+#[tauri::command]
+pub async fn remove_tcp_service(channel_socket: String) -> Result<(), String> {
+    let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
+    let mut lock = service.write().await;
+    lock.remove(channel_socket);
+    Ok(())
 }
 
-pub async fn contains_tcp_service(channel_socket: String) {
-    let service = TCP_SERVICE.get().cloned().unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let _ = runtime.block_on(async {
-        let lock = service.write().await;
-        lock.contains(channel_socket)
-    });
+#[tauri::command]
+pub async fn contains_tcp_service(channel_socket: String) -> Result<bool, String> {
+    let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
+    let lock = service.read().await;
+    Ok(lock.contains(channel_socket))
 }

@@ -21,5 +21,10 @@ export interface UIMessageCommon{
 
 export async function praseChannelMessage(channelSocket: string,message: string) {
     const value = JSON.parse(message);
-    await TCP_SERVICE.send(channelSocket, value);
+    const service = TCP_SERVICE.get(channelSocket);
+    if (service) {
+        await service.send(channelSocket, value);
+    } else {
+        console.error(`TcpService not found for socket: ${channelSocket}`);
+    }
 }

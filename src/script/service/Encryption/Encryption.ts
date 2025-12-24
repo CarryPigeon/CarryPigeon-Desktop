@@ -1,10 +1,12 @@
 import * as CryptoJS from "crypto-js";
 import {generateECCKeyPair} from "./ECC";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface EncryptInterface {
     encrypt: (data: string) => string
     decrypt: (data: string) => string
     decryptAESKey(key: string): Promise<void>
+    swapKey(userId: number): Promise<void>
 }
 
 export abstract class EncryptClass implements EncryptInterface {
@@ -12,6 +14,7 @@ export abstract class EncryptClass implements EncryptInterface {
     public abstract encrypt(data: string): string;
     public abstract decrypt(data: string): string;
     public abstract decryptAESKey(key: string): Promise<void>;
+    public abstract swapKey(userId: number): Promise<void>;
 }
 
 export type EncryptClassWithConstructor<T extends EncryptClass> = new (socket: string) => T;
@@ -23,7 +26,7 @@ export class Encryption {
         if(encryptClass) {
             this.encryptClass = new encryptClass(socket);
         } else {
-            this.encryptClass = new OfficialEncryptClass();
+            this.encryptClass = new OfficialEncryptClass(socket);
         }
     }
 
@@ -48,12 +51,21 @@ export class Encryption {
     public async decryptAESKey(key: string) {
         await this.encryptClass.decryptAESKey(key);
     }
+
+    public async swapKey(userId: number) {
+        await this.encryptClass.swapKey(userId);
+    }
 }
 
 export class OfficialEncryptClass implements EncryptInterface {
     // 移除对TcpService的直接依赖
     private ECCPrivateKey: CryptoKey | undefined;
     private AESKey: string | undefined;
+    private server_socket: string;
+
+    constructor(socket: string) {
+        this.server_socket = socket;
+    }
 
     private async sendECCPrivateKey(userId: number) {
         const ECCKeyPair = await generateECCKeyPair();
@@ -65,9 +77,10 @@ export class OfficialEncryptClass implements EncryptInterface {
         const bodyJson = JSON.stringify(body);
         import("../net/TcpService").then(module => {
             if (module.TCP_SERVICE) {
-                return module.TCP_SERVICE.send(String(), bodyJson);
+                return module.TCP_SERVICE.get(this.server_socket)?.sendRaw(this.server_socket, bodyJson);
             }
         });
+        invoke("log_debug", {msg: "Sent ECC Public Key to User " + userId});
         return Promise.resolve();
     }
 
@@ -86,8 +99,7 @@ export class OfficialEncryptClass implements EncryptInterface {
             );
             const decoder = new TextDecoder('utf-8');
             this.AESKey = decoder.decode(tmp);
-        } catch (e) {
-        }
+        } catch (e) { invoke("log_error", {message: "Decrypt AES Key Failed: " + e}); }
     }
 
     public async swapKey(userId: number) {
