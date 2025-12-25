@@ -12,7 +12,7 @@ import ParticipantsList, { Member } from "../components/lists/ParticipantsList.v
 import ChatBox from "../components/messages/ChatBox.vue";
 import MemberContextMenu, { type MemberMenuAction } from "../components/items/MemberContextMenu.vue";
 import Avatar from "/test_avatar.jpg?url";
-import server_socket from "./LoginPage.vue";
+import { getServerSocket } from "../script/store/serverStore";
 import ChannelMessageService from "../api/channel/Channel.ts";
 import PluginLoaderPanel from "../components/debug/PluginLoaderPanel.vue";
 import PluginHost from "../components/plugins/PluginHost.vue";
@@ -44,7 +44,7 @@ function closePlugin() {
   activePlugin.value = null;
 }
 
-const channelMessageService = new ChannelMessageService(server_socket.value);
+const channelMessageService = new ChannelMessageService(getServerSocket());
 const a: Member = {
   id: 1,
   name: "张三",
@@ -58,11 +58,6 @@ const popoverSize = {
   height: 140,
 };
 
-function connect_server(socket: string) {
-  invoke("add_tcp_service", { channelSocket: socket, socket: socket });
-}
-
-connect_server(server_socket.value);
 channelMessageService.getAllUnreceivedMessages();
 
 function openMemberPopover(payload: { screenX: number; screenY: number; member: Member }) {

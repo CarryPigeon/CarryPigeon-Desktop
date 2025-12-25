@@ -3,51 +3,51 @@ import { CommandMessage, DataObject } from "./CommandMessage";
 
 export abstract class BaseAPI {
 
-    private channel_socket: string;
+    private server_socket: string;
     
-    constructor(channel_socket: string) {
-        this.channel_socket = channel_socket;
+    constructor(server_socket: string) {
+        this.server_socket = server_socket;
     }
 
-    protected changeChannelSocket(channel_socket: string) {
-        this.channel_socket = channel_socket;
+    protected changeChannelSocket(server_socket: string) {
+        this.server_socket = server_socket;
     }
 
     public getChannelSocket(): string {
-        return this.channel_socket;
+        return this.server_socket;
     }
 
-    protected async sendRequest(channel_socket: string ,route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
+    protected async sendRequest(server_socket: string ,route: string, data?: DataObject | undefined, callback?: (data?: unknown) => unknown) {
         const context: CommandMessage = {
             route,
             data
         };
-        const service = TCP_SERVICE.get(channel_socket);
+        const service = TCP_SERVICE.get(server_socket);
         if (service) {
-            await service.send(channel_socket,JSON.stringify(context));
+            await service.send(server_socket,JSON.stringify(context));
         } else {
-            console.error(`TcpService not found for socket: ${channel_socket}`);
+            console.error(`TcpService not found for socket: ${server_socket}`);
         }
         if (callback){
             return callback();
         }
     }
     
-    protected async send(channel_socket: string, route: string, data?: DataObject | undefined, callback?: (data: unknown) => unknown): Promise<void> {
+    protected async send(server_socket: string, route: string, data?: DataObject | undefined, callback?: (data: unknown) => unknown): Promise<void> {
         const context: CommandMessage = {
             route,
             data
         };
-        const service = TCP_SERVICE.get(channel_socket);
+        const service = TCP_SERVICE.get(server_socket);
         if (!service) {
-            console.error(`TcpService not found for socket: ${channel_socket}`);
+            console.error(`TcpService not found for socket: ${server_socket}`);
             return;
         }
 
         if (callback === undefined) { 
-            await service.send(channel_socket, JSON.stringify(context));
+            await service.send(server_socket, JSON.stringify(context));
         } else {
-            await service.sendWithResponse(channel_socket,JSON.stringify(context),callback);
+            await service.sendWithResponse(server_socket,JSON.stringify(context),callback);
         }
     }
     

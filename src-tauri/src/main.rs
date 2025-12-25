@@ -13,8 +13,8 @@ async fn main() -> anyhow::Result<()> {
     // 正式版时需要替换为warn
     let _ = Box::new(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")));
     // 输出到控制台中
-    //let formatting_layer = Box::(fmt::layer().pretty().with_writer(std::io::stderr));
-    let formatting_layer = Box::new(fmt::layer());
+    let formatting_layer = Box::new(fmt::layer().pretty().with_writer(std::io::stderr));
+    //let formatting_layer = Box::new(fmt::layer());
 
     // 输出到文件中
     //let file_appender = Box::new(rolling::never("logs", "log.txt"));
