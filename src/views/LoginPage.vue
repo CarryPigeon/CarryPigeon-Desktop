@@ -3,6 +3,7 @@ import { onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Alert, Button, Input, MessagePlugin } from 'tdesign-vue-next';
 import { crateServerTcpService } from '../script/service/net/TcpService';
+import { setServerSocket } from '../script/store/serverStore';
 
 const email = ref('');
 const server_socket = ref('');
@@ -17,6 +18,7 @@ async function login() {
     loading.value = true;
     try {
         await crateServerTcpService(server_socket.value);
+        setServerSocket(server_socket.value);
         //await new Promise(resolve => setTimeout(resolve, 1000));
         router.push('/chat');
     } catch (e) {

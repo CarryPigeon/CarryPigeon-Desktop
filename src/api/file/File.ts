@@ -6,16 +6,16 @@ interface FileUploadAPI {
 }
 
 export class FileAPIService{
-    public async requestUpload(channel_socket:string,size:number,sha256:string){
+    public async requestUpload(server_socket:string,size:number,sha256:string){
         const context: FileUploadAPI = {
             size: size,
             sha256: sha256
         };
-        const service = TCP_SERVICE.get(channel_socket);
+        const service = TCP_SERVICE.get(server_socket);
         if (service) {
-            await service.send(channel_socket,JSON.stringify(context));
+            await service.send(server_socket,JSON.stringify(context));
         } else {
-            console.error(`TcpService not found for socket: ${channel_socket}`);
+            console.error(`TcpService not found for socket: ${server_socket}`);
         }
     }
 }
