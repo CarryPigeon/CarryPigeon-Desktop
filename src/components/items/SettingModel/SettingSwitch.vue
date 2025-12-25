@@ -5,7 +5,7 @@ import { ref } from 'vue';
 const props = defineProps<{
   text: string;
   value: boolean;
-  channel_socket?: string;
+  server_socket?: string;
   onChange?: (key:string,value:boolean) => void;
 }>();
 

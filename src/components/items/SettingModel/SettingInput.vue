@@ -4,7 +4,7 @@ import { Input, InputProps } from 'tdesign-vue-next';
 const props = defineProps<{
   text: string;
   placeholder: string;
-  channel_socket?: string;
+  server_socket?: string;
   onChange?: (key:string,value:string) => void;
 }>();
 
