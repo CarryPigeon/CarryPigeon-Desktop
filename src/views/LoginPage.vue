@@ -7,6 +7,7 @@ import { setServerSocket } from '../script/store/serverStore';
 
 const email = ref('');
 const server_socket = ref('');
+const server_ecc_public_key = ref('');
 const code = ref('');
 const loading = ref(false);
 const sendCodeCountdown = ref(0);
@@ -17,13 +18,18 @@ const router = useRouter();
 async function login() {
     loading.value = true;
     try {
-        await crateServerTcpService(server_socket.value);
+        if (!server_ecc_public_key.value.trim()) {
+            MessagePlugin.error('缺少服务器 ECC 公钥');
+            loading.value = false;
+            return;
+        }
+        await crateServerTcpService(server_socket.value, { serverEccPublicKeyBase64: server_ecc_public_key.value.trim() });
         setServerSocket(server_socket.value);
         //await new Promise(resolve => setTimeout(resolve, 1000));
         router.push('/chat');
     } catch (e) {
         console.error(e);
-        MessagePlugin.error('密钥交换失败');
+        MessagePlugin.error('握手失败');
         loading.value = false;
     }
 }
@@ -100,6 +106,7 @@ onBeforeUnmount(() => {
     />
     <image class="user-image" alt="User Image"/>
     <Input class="server-input" v-model="server_socket" type="text" :placeholder="$t('server_socket')" />
+    <Input class="server-input" v-model="server_ecc_public_key" type="text" :placeholder="$t('server_ecc_public_key')" />
     <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
     <Input class="code-input" v-model="code" type="text" autocomplete="one-time-code" :placeholder="$t('login_code')">
       <template #suffix>

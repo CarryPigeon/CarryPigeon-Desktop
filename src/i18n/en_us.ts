@@ -42,6 +42,7 @@ export const en_us = {
     show_file_extensions: 'Show File Extensions',
     auto_save_files: 'Auto Save Files',
     server_socket: 'Server Address',
+    server_ecc_public_key: 'Server ECC Public Key (Base64/SPKI)',
     copy_channel_id: 'Copy Channel ID',
     copy_channel_name: 'Copy Channel Name',
     pin_channel: 'Pin Channel',

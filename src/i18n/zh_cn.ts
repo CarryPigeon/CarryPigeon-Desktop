@@ -42,6 +42,7 @@ export const zh_cn = {
     show_file_extensions: '显示文件扩展名',
     auto_save_files: '自动保存文件',
     server_socket: '服务器地址',
+    server_ecc_public_key: '服务器 ECC 公钥（Base64/SPKI）',
     copy_channel_id: '复制频道ID',
     copy_channel_name: '复制频道名称',
     pin_channel: '置顶频道',
