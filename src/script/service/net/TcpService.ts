@@ -3,15 +3,16 @@ import { listen } from "@tauri-apps/api/event";
 import { Encryption } from "../Encryption/Encryption.ts";
 import { invoke } from "@tauri-apps/api/core";
 import { messageReceiveService } from "../../../components/messages/messageReceiveService";
+import type { FrameConfig } from "../Encryption/Encryption";
 
 class FuncMap{
-    private map: Map<number, (data:string) => void>;
+    private map: Map<number, (data: unknown) => void>;
     private id_list: number[] = [];
     
     constructor(){
-        this.map = new Map<number , (data:string) => void>();
+        this.map = new Map<number , (data: unknown) => void>();
     }
-    public add(func: (data:string) => void): number {
+    public add(func: (data: unknown) => void): number {
         const id = this.id_allocate();
         this.map.set(id, func);
         return id;
@@ -20,7 +21,7 @@ class FuncMap{
         this.id_release(id);
         this.map.delete(id);
     }
-    public call(id: number, data: string){
+    public call(id: number, data: unknown){
         const func = this.map.get(id);
         if (func) {
             func(data);
@@ -65,10 +66,15 @@ export class TcpService {
     private handshakeRejecter: ((reason?: unknown) => void) | undefined;
     private initPromise: Promise<unknown>;
     public buffer: Uint8Array = new Uint8Array(0); // 使用Uint8Array作为缓冲区
+    public readonly frameConfig: FrameConfig;
 
-    constructor(socket: string) {
+    constructor(socket: string, opts?: { serverEccPublicKeyBase64?: string; frameConfig?: FrameConfig }) {
         this.funcMap = new FuncMap();
-        this.encrypter = new Encryption(socket);
+        this.frameConfig = opts?.frameConfig ?? { lengthBytes: 2, byteOrder: "be", lengthIncludesHeader: false };
+        this.encrypter = new Encryption(socket, {
+            serverEccPublicKeyBase64: opts?.serverEccPublicKeyBase64,
+            frameConfig: this.frameConfig,
+        });
         // 添加本频道到tcp_service中
         this.initPromise = invoke("add_tcp_service", { serverSocket: socket, socket: socket });
     }
@@ -77,7 +83,7 @@ export class TcpService {
         await this.initPromise;
     }
 
-    public waitForKeyExchange(): Promise<void> {
+    public waitForKeyExchange(timeoutMs: number = 15000): Promise<void> {
         return new Promise((resolve, reject) => {
             this.handshakeResolver = resolve;
             this.handshakeRejecter = reject;
@@ -86,7 +92,7 @@ export class TcpService {
                     this.handshakeRejecter(new Error("Key exchange timeout"));
                     this.cleanupHandshake();
                 }
-            }, 15000); // 增加超时时间到15秒，确保能等待服务端响应
+            }, timeoutMs);
         });
     }
 
@@ -98,7 +104,7 @@ export class TcpService {
     public async send(server_socket: string, raw_data: string, callback?:(data: string) => void): Promise<void> {
         try {
             const data = await this.encrypter.encrypt(raw_data);
-            const res = await invoke("send_tcp_service", { serverSocket: server_socket, data });
+            const res = await invoke("send_tcp_service", { serverSocket: server_socket, data: Array.from(data) });
             if (callback) {
                 callback(<string>res);
             }
@@ -110,7 +116,18 @@ export class TcpService {
 
     public async sendRaw(server_socket: string, raw_data: string){
         return new Promise((resolve, reject) =>{
-            invoke("send_tcp_service", { serverSocket: server_socket, data: raw_data }).then(() => {
+            const bytes = new TextEncoder().encode(raw_data);
+            const header = this.frameConfig.lengthBytes;
+            const totalLength = bytes.length + (this.frameConfig.lengthIncludesHeader ? header : 0);
+            const frame = new Uint8Array(header + bytes.length);
+            const view = new DataView(frame.buffer);
+            if (header === 2) {
+                view.setUint16(0, totalLength, this.frameConfig.byteOrder === "le");
+            } else {
+                view.setUint32(0, totalLength >>> 0, this.frameConfig.byteOrder === "le");
+            }
+            frame.set(bytes, header);
+            invoke("send_tcp_service", { serverSocket: server_socket, data: Array.from(frame) }).then(() => {
                 resolve(null);
             }).catch((e) => {
                 reject(e);
@@ -118,15 +135,24 @@ export class TcpService {
         });
     }
     
-    public async sendWithResponse(server_socket: string, raw_data: string, callback: (data: string) => void): Promise<void> {
+    public async sendWithResponse(server_socket: string, raw_data: string, callback: (data: unknown) => void): Promise<void> {
         const id = this.funcMap.add(callback);
         const temp = JSON.parse(raw_data);
         temp["id"] = id;
         const data = await this.encrypter.encrypt(JSON.stringify(temp));
-        await invoke("send_tcp_service", { serverSocket: server_socket, data });
+        await invoke("send_tcp_service", { serverSocket: server_socket, data: Array.from(data) });
     }
 
     public async listen(data:string) {
+        // 先用文本解析握手通知（避免 session_id 超过 JS 安全整数导致精度丢失）
+        if (this.encrypter.tryHandleHandshakeResponseText(data)) {
+            if (this.handshakeResolver) {
+                this.handshakeResolver();
+                this.cleanupHandshake();
+            }
+            return;
+        }
+
         let value;
         try {
             value = JSON.parse(data);
@@ -139,11 +165,9 @@ export class TcpService {
         // 记录接收到的所有消息，便于调试
         invoke("log_debug", {msg: `Received message: ${JSON.stringify(value)}`});
         
-        // 处理密钥交换响应 - 支持多种格式
-        if (value["key"] || value["type"] === "key_exchange" || value["action"] === "key_exchange_response") {
+        // 处理握手成功通知（/handshake）
+        if (this.encrypter.tryHandleHandshakeResponse(value)) {
             try {
-                // 直接使用value对象，因为decryptAESKey方法内部会处理JSON解析
-                await this.encrypter.decryptAESKey(JSON.stringify(value));
                 if (this.handshakeResolver) {
                     this.handshakeResolver();
                     this.cleanupHandshake();
@@ -153,12 +177,15 @@ export class TcpService {
                     this.handshakeRejecter(e);
                     this.cleanupHandshake();
                 }
-                invoke("log_error", {error: `Key exchange failed: ${e}`});
+                invoke("log_error", {error: `Handshake failed: ${e}`});
             }
         } 
         // 处理普通消息
         else if (value["id"] !== undefined) {
-            this.funcMap.call(value["id"], value);
+            const id = Number(value["id"]);
+            if (Number.isFinite(id)) {
+                this.funcMap.call(id, value);
+            }
         } 
         // 处理其他消息
         else {
@@ -167,152 +194,100 @@ export class TcpService {
     }
 }
 
-listen<number[]>('tcp-message', async (endata) => {
-    TCP_SERVICE.forEach(async (service) => {
-        const uint8arr = new Uint8Array(endata.payload);
-        
-        // 首先检查是否为密钥交换阶段（AESKey尚未设置）
-        // 如果是密钥交换阶段，需要特殊处理
-        
-        // 记录原始数据的Hex，用于调试
-        // const hex = Array.from(uint8arr).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        // invoke("log_debug", {msg: `Received raw data (hex): ${hex}`});
+type TcpMessageEvent = { server_socket: string; payload: number[] };
 
-        // 记录原始数据的Hex，用于调试
-        const hexLog = Array.from(uint8arr).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        invoke("log_debug", {msg: `Received raw data (hex): ${hexLog}`});
+listen<TcpMessageEvent>("tcp-message", async (endata) => {
+    const service = TCP_SERVICE.get(endata.payload.server_socket);
+    if (!service) return;
 
-        // 将新数据追加到缓冲区
-        const newBuffer = new Uint8Array(service.buffer.length + uint8arr.length);
-        newBuffer.set(service.buffer);
-        newBuffer.set(uint8arr, service.buffer.length);
-        service.buffer = newBuffer;
+    const uint8arr = new Uint8Array(endata.payload.payload);
+    if (uint8arr.length === 0) return;
 
-        // 处理缓冲区中的数据
-        while (service.buffer.length > 0) {
-            let processed = false;
+    // 将新数据追加到缓冲区
+    const newBuffer = new Uint8Array(service.buffer.length + uint8arr.length);
+    newBuffer.set(service.buffer);
+    newBuffer.set(uint8arr, service.buffer.length);
+    service.buffer = newBuffer;
 
-            // 1. 尝试解析二进制长度前缀包 (Length: u16, Body: bytes)
-            // 假设最小包长度为 2 (Length) + 32 (Body) = 34 bytes (根据日志观察)
-            if (service.buffer.length >= 34) {
-                const view = new DataView(service.buffer.buffer, service.buffer.byteOffset, service.buffer.byteLength);
-                const length = view.getUint16(0, false); // Big Endian
+    // 按 Netty 2B 长度前缀帧格式拆包
+    while (service.buffer.length > 0) {
+        let processed = false;
 
-                // 检查是否匹配观察到的特定二进制格式: Length=32 (0x0020)
-                if (length === 32 && service.buffer.length >= length + 2) {
-                    const packet = service.buffer.slice(2, 2 + length);
-                    
-                    // 尝试解析二进制结构: [ID: u64] [Padding: u64] [Key: u128]
-                    // ID (8 bytes)
-                    // Padding (8 bytes)
-                    // Key (16 bytes)
-                    
-                    // 提取Key (最后16字节)
-                    const keyBytes = packet.slice(16, 32);
-                    // 转换为Base64
-                    let binary = '';
-                    for (let i = 0; i < keyBytes.length; i++) {
-                        binary += String.fromCharCode(keyBytes[i]);
-                    }
-                    const keyBase64 = btoa(binary);
-                    
-                    // 构造JSON对象
-                    const json = JSON.stringify({
-                        id: 0, // 假设ID为0，或者从前8字节解析
-                        key: keyBase64,
-                        session_id: "binary_session"
-                    });
-                    
-                    invoke("log_debug", {msg: `Parsed binary packet, key: ${keyBase64}`});
-                    
-                    try {
-                        await service.listen(json);
-                    } catch (e) {
-                        invoke("log_error", {error: `Listen error (binary): ${e}`});
-                    }
-                    
-                    // 移除已处理的数据
-                    service.buffer = service.buffer.slice(2 + length);
-                    processed = true;
-                    continue;
-                }
+        const headerBytes = service.frameConfig.lengthBytes;
+        if (service.buffer.length >= headerBytes) {
+            const view = new DataView(service.buffer.buffer, service.buffer.byteOffset, service.buffer.byteLength);
+            const rawLength =
+                headerBytes === 2
+                    ? view.getUint16(0, service.frameConfig.byteOrder === "le")
+                    : view.getUint32(0, service.frameConfig.byteOrder === "le");
+            const payloadLength = service.frameConfig.lengthIncludesHeader ? rawLength - headerBytes : rawLength;
+            if (payloadLength < 0 || payloadLength > 10_000_000) {
+                invoke("log_error", { error: `Invalid frame length: raw=${rawLength}, header=${headerBytes}` });
+                break;
             }
 
-            // 2. 尝试解析换行符分隔的文本消息
-            const newlineIndex = service.buffer.indexOf(10); // 10 is '\n'
-            if (newlineIndex !== -1) {
-                const lineBytes = service.buffer.slice(0, newlineIndex);
-                const decoder = new TextDecoder('utf-8');
-                const line = decoder.decode(lineBytes).trim();
-                
-                // 移除已处理的数据 (包括换行符)
-                service.buffer = service.buffer.slice(newlineIndex + 1);
+            if (service.buffer.length >= headerBytes + payloadLength) {
+                const framePayload = service.buffer.slice(headerBytes, headerBytes + payloadLength);
+                service.buffer = service.buffer.slice(headerBytes + payloadLength);
                 processed = true;
-                
-                if (line.length === 0) continue;
 
-                // 尝试清理消息中的非JSON字符
-                let cleanMsg = line;
-                const jsonStart = line.indexOf('{');
-                const jsonEnd = line.lastIndexOf('}');
-                if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-                        cleanMsg = line.substring(jsonStart, jsonEnd + 1);
-                }
-
-                let decryptedData = cleanMsg;
+                let plaintext: string | null = null;
                 try {
-                    // 使用异步解密
-                    decryptedData = await service.encrypter.decrypt(cleanMsg);
-                } catch {
-                    // 忽略解密错误，可能是密钥交换消息或尚未加密的数据
-                    invoke("log_debug", {msg: `Decryption failed, treating as plain text: ${cleanMsg}`});
-                }
-                
-                // 确保只有有效的JSON才会被处理
-                try {
-                    await service.listen(decryptedData);
+                    plaintext = await service.encrypter.decrypt(framePayload);
                 } catch (e) {
-                    invoke("log_error", {error: `Listen error: ${e}`});
+                    if (service.encrypter.isHandshakeComplete()) {
+                        invoke("log_error", { error: `Encrypted frame decrypt failed after handshake: ${e}` });
+                        continue;
+                    }
+                    try {
+                        plaintext = new TextDecoder("utf-8").decode(framePayload);
+                    } catch {
+                        invoke("log_error", { error: `Frame decode failed: ${e}` });
+                        continue;
+                    }
+                }
+
+                if (!plaintext || plaintext.trim().length === 0) continue;
+                try {
+                    await service.listen(plaintext);
+                } catch (e) {
+                    invoke("log_error", { error: `Listen error: ${e}` });
                 }
                 continue;
             }
-
-            // 如果没有处理任何数据，跳出循环等待更多数据
-            if (!processed) {
-                break;
-            }
         }
-        
-        // 如果缓冲区过大（例如超过1MB），强制清空以防内存泄漏
-        if (service.buffer.length > 1024 * 1024) {
-             invoke("log_error", {error: "Buffer overflow, clearing buffer"});
-             service.buffer = new Uint8Array(0);
-        }
-    });
-}).then(() => {
-    // 移除不必要的日志
-})
 
-export async function crateServerTcpService(socket: string) {
-    const service = new TcpService(socket);
+        if (!processed) break;
+    }
+
+    // 如果缓冲区过大（例如超过1MB），强制清空以防内存泄漏
+    if (service.buffer.length > 1024 * 1024) {
+        invoke("log_error", {error: "Buffer overflow, clearing buffer"});
+        service.buffer = new Uint8Array(0);
+    }
+}).then(() => {});
+
+export async function crateServerTcpService(socket: string, opts?: { serverEccPublicKeyBase64?: string }) {
+    // According to client-developer-guide.md:
+    // Netty frame: 2 bytes unsigned short length prefix (Big-Endian), followed by `length` bytes payload.
+    const frameConfig: FrameConfig = { lengthBytes: 2, byteOrder: "be", lengthIncludesHeader: false };
+
+    const service = new TcpService(socket, { serverEccPublicKeyBase64: opts?.serverEccPublicKeyBase64, frameConfig });
     TCP_SERVICE.set(socket, service);
     await service.waitForInit();
-    
-    invoke("log_debug", {msg: `Starting TCP service initialization for socket: ${socket}`});
-    
+
+    invoke("log_debug", {msg: `Starting TCP service initialization for socket: ${socket} (frame=${JSON.stringify(frameConfig)})`});
+
     try {
-        // 先启动密钥交换
         await service.encrypter.swapKey(0);
-        invoke("log_debug", {msg: `Key exchange initiated for socket: ${socket}`});
-        
-        // 然后等待密钥交换完成，使用waitForKeyExchange方法中的超时机制（15秒）
-        await service.waitForKeyExchange();
-        invoke("log_debug", {msg: `Key exchange completed successfully for socket: ${socket}`});
-        
+        invoke("log_debug", {msg: `Handshake initiated for socket: ${socket} (frame=${JSON.stringify(frameConfig)})`});
+
+        await service.waitForKeyExchange(15000);
+        invoke("log_debug", {msg: `Handshake completed successfully for socket: ${socket} (frame=${JSON.stringify(frameConfig)})`});
+
         return service;
     } catch (e) {
-        invoke("log_error", {error: `TCP service initialization failed for socket ${socket}: ${e}`});
-        // 清理资源
+        invoke("log_error", {error: `TCP service initialization failed for socket ${socket} (frame=${JSON.stringify(frameConfig)}): ${e}`});
         TCP_SERVICE.delete(socket);
         throw e;
     }

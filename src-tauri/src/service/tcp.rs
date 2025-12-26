@@ -1,9 +1,16 @@
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
+use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TcpMessageEvent {
+    pub server_socket: String,
+    pub payload: Vec<u8>,
+}
 
 pub struct TcpService {
     reader: Option<tokio::net::tcp::OwnedReadHalf>,
@@ -29,7 +36,7 @@ impl TcpService {
         Ok(TcpService { reader: Some(reader), writer })
     }
 
-    pub async fn start(&mut self, app: AppHandle) {
+    pub async fn start(&mut self, app: AppHandle, server_socket: String) {
         if let Some(mut reader) = self.reader.take() {
             tokio::spawn(async move {
                 let mut buffer = vec![0; 4096];
@@ -40,7 +47,11 @@ impl TcpService {
                         }
                         Ok(n) => {
                             let res = buffer[..n].to_vec();
-                            if let Err(e) = app.emit("tcp-message", res) {
+                            let event = TcpMessageEvent {
+                                server_socket: server_socket.clone(),
+                                payload: res,
+                            };
+                            if let Err(e) = app.emit("tcp-message", event) {
                                 tracing::warn!("Failed to emit TCP message: {:?}", e);
                             }
                         },
@@ -57,9 +68,9 @@ impl TcpService {
         }
     }
 
-    pub async fn send(&mut self, data: String) -> anyhow::Result<()> {
+    pub async fn send(&mut self, data: Vec<u8>) -> anyhow::Result<()> {
         self.writer
-            .write_all(data.as_bytes())
+            .write_all(&data)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send TCP data: {}", e))
     }
@@ -84,7 +95,7 @@ impl TcpMapService {
     pub async fn send_with_server(
         &mut self,
         server_socket: String,
-        data: String,
+        data: Vec<u8>,
     ) -> anyhow::Result<()> {
         match self.map.get_mut(&server_socket) {
             Some(service) => service.send(data).await,
@@ -98,7 +109,7 @@ impl TcpMapService {
     pub async fn listen(&mut self, server_socket: String, app: AppHandle) -> anyhow::Result<()> {
         match self.map.get_mut(&server_socket) {
             Some(service) => {
-                service.start(app).await;
+                service.start(app, server_socket.clone()).await;
                 Ok(())
             }
             None => Err(anyhow::anyhow!(
@@ -129,14 +140,14 @@ pub async fn add_tcp_service(app: AppHandle, server_socket: String, socket: Stri
     let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
     let mut lock = service.write().await;
     let mut tcp_service = TcpService::new(socket).await.map_err(|e| e.to_string())?;
-    tcp_service.start(app).await;
+    tcp_service.start(app, server_socket.clone()).await;
     lock.add(server_socket, Box::new(tcp_service));
     Ok(())
 }
 
 // 提供线程安全的全局访问方法
 #[tauri::command]
-pub async fn send_tcp_service(server_socket: String, data: String) -> Result<(), String> {
+pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<(), String> {
     let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
     let mut lock = service.write().await;
     lock.send_with_server(server_socket, data).await.map_err(|e| e.to_string())?;
@@ -144,7 +155,7 @@ pub async fn send_tcp_service(server_socket: String, data: String) -> Result<(),
 }
 
 #[tauri::command]
-pub async fn send_tcp_service_no_prefix(server_socket: String, data: String) -> Result<(), String> {
+pub async fn send_tcp_service_no_prefix(server_socket: String, data: Vec<u8>) -> Result<(), String> {
     let service = TCP_SERVICE.get().cloned().ok_or("TCP Service not initialized")?;
     let mut lock = service.write().await;
     lock.send_with_server(server_socket, data).await.map_err(|e| e.to_string())?;
