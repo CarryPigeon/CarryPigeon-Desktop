@@ -24,7 +24,7 @@ const bio = computed(() => String(route.query.bio ?? route.query.description ?? 
     </div>
 
     <div v-if="bio" class="bio" :title="bio">{{ bio }}</div>
-    <div v-else class="bio muted">&nbsp;</div>
+    <div v-else class="bio-muted">&nbsp;</div>
   </div>
 </template>
 
@@ -103,7 +103,7 @@ const bio = computed(() => String(route.query.bio ?? route.query.description ?? 
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
 .muted {

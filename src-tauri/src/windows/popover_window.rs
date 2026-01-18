@@ -1,4 +1,5 @@
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use crate::windows::keep_one_popover_window;
 
 /// 打开用户信息 Popover 窗口。
 ///
@@ -11,7 +12,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 /// - `x` / `y`: 期望弹窗出现的位置（通常来自鼠标点击的 `screenX/screenY`）。
 /// - `width` / `height`: 期望弹窗大小（由前端预估传入）。
 #[tauri::command]
-pub async fn open_user_popover_window(
+pub async fn open_popover_window(
     app: AppHandle,
     query: String,
     x: f64,
@@ -19,17 +20,15 @@ pub async fn open_user_popover_window(
     width: f64,
     height: f64,
 ) -> Result<(), String> {
-    // 同一时间只允许存在一个 popover。
-    // 这里选择直接关闭旧窗口再创建新窗口，避免状态与 URL 不一致。
-    if let Some(existing) = app.get_webview_window("user-popover") {
-        let _ = existing.close();
-    }
+    // 同一时间只允许存在一个 popover
+    // 直接关闭旧窗口再创建新窗口，避免状态与 URL 不一致
+    keep_one_popover_window(&app);
 
     // 最小窗口尺寸：避免传入 0 或极小值导致不可见/难以交互。
     let min_width = 160.0;
     let min_height = 80.0;
 
-    // work area 边界留白：避免紧贴边缘产生“看起来被遮挡”的感觉。
+    // work area 边界留白：避免紧贴边缘产生“看起来被遮挡”的感觉
     let margin = 8.0;
 
     // 先进行基本的尺寸归一化：
@@ -38,11 +37,11 @@ pub async fn open_user_popover_window(
     let mut width = width.max(min_width).ceil();
     let mut height = height.max(min_height).ceil();
 
-    // 目标位置（会根据 work area 再修正）。
+    // 目标位置（会根据 work area 再修正）
     let mut x = x;
     let mut y = y;
 
-    // 尝试根据点击点找到对应显示器；找不到则 fallback 到主显示器。
+    // 尝试根据点击点找到对应显示器；找不到则 fallback 到主显示器
     let monitor = app
         .monitor_from_point(x, y)
         .map_err(|e| e.to_string())?
@@ -101,7 +100,7 @@ pub async fn open_user_popover_window(
     let url = WebviewUrl::App(format!("index.html?{}", query).into());
 
     // 关键点：position/size 在 build 之前设置，避免窗口创建后再调整导致闪烁。
-    let window = WebviewWindowBuilder::new(&app, "user-popover", url)
+    let window = WebviewWindowBuilder::new(&app, "user-info-popover", url)
         .decorations(false)
         .resizable(false)
         .skip_taskbar(true)

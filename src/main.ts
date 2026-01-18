@@ -15,9 +15,9 @@ app.use(router)
 const searchParams = new URLSearchParams(window.location.search);
 const windowType = searchParams.get("window");
 
-if (windowType === "user-popover") {
+if (windowType === "user-info-popover") {
   router.replace({
-    path: "/user-popover",
+    path: "/user-info-popover",
     query: {
       avatar: searchParams.get("avatar") ?? "",
       name: searchParams.get("name") ?? "",

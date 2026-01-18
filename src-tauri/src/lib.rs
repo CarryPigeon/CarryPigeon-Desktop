@@ -24,7 +24,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use windows::{open_user_popover_window, to_chat_window_size};
+use windows::{open_popover_window, to_chat_window_size};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> anyhow::Result<()> {
@@ -71,7 +71,7 @@ pub fn run() -> anyhow::Result<()> {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == "user-popover" {
+            if window.label() == "user-info-popover" {
                 if let tauri::WindowEvent::Focused(false) = event {
                     let _ = window.close();
                 }
@@ -81,7 +81,7 @@ pub fn run() -> anyhow::Result<()> {
         .invoke_handler(tauri::generate_handler![
             // window commands
             to_chat_window_size,
-            open_user_popover_window,
+            open_popover_window,
             //tcp service commands
             send_tcp_service,
             listen_tcp_service,

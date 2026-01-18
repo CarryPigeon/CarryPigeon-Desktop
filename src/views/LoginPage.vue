@@ -21,7 +21,8 @@ async function login() {
         if (!server_ecc_public_key.value.trim()) {
             MessagePlugin.error('缺少服务器 ECC 公钥');
             loading.value = false;
-            return;
+            router.push('/chat');
+            //return;
         }
         await crateServerTcpService(server_socket.value, { serverEccPublicKeyBase64: server_ecc_public_key.value.trim() });
         setServerSocket(server_socket.value);
@@ -235,12 +236,12 @@ h1 {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  
+
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
-  
+
   &:active {
     transform: translateY(0);
   }
