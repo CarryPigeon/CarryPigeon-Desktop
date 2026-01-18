@@ -8,7 +8,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import UserComponent from "../components/users/UserComponent.vue";
 import SearchBar from "../components/inputs/SearchBar.vue";
 import TextArea from "../components/inputs/TextArea.vue";
-import ParticipantsList, { Member } from "../components/lists/ParticipantsList.vue";
+import { Member } from "../value/memberValue.ts";
 import ChatBox from "../components/messages/ChatBox.vue";
 import MemberContextMenu, { type MemberMenuAction } from "../components/items/MemberContextMenu.vue";
 import Avatar from "/test_avatar.jpg?url";
@@ -22,6 +22,7 @@ import { MessagePlugin } from "tdesign-vue-next";
 import { copyTextToClipboard } from "../script/utils/clipboard";
 import { dispatchInsertText } from "../script/utils/messageEvents";
 import { isIgnoredUser, toggleIgnoreUser } from "../script/store/ignoreStore";
+import ParticipantsList from "../components/lists/ParticipantsList.vue";
 
 void invoke("to_chat_window_size")
   .then(() => getCurrentWindow().center())
@@ -48,7 +49,7 @@ const channelMessageService = new ChannelMessageService(getServerSocket());
 const a: Member = {
   id: 1,
   name: "张三",
-  avatar: Avatar,
+  avatarUrl: Avatar,
   description: "热爱 Rust 与前端工程化，喜欢构建好用的桌面应用。",
   email: "zhangsan@example.com",
 };
@@ -62,14 +63,14 @@ channelMessageService.getAllUnreceivedMessages();
 
 function openMemberPopover(payload: { screenX: number; screenY: number; member: Member }) {
   const query = new URLSearchParams({
-    window: "user-popover",
-    avatar: payload.member.avatar,
+    window: "user-info-popover",
+    avatar: payload.member.avatarUrl,
     name: payload.member.name,
     email: payload.member.email ?? "",
     bio: payload.member.description,
   }).toString();
 
-  invoke("open_user_popover_window", {
+  invoke("open_popover_window", {
     query,
     x: payload.screenX,
     y: payload.screenY,
@@ -104,7 +105,7 @@ function openMemberContextMenuFromChat(payload: {
   const member: Member = {
     id: payload.userId,
     name: payload.name,
-    avatar: payload.avatar,
+    avatarUrl: payload.avatar,
     description: "",
     email: "",
   };
@@ -175,7 +176,7 @@ async function handleMemberMenuAction(action: MemberMenuAction) {
   <ServerNameModel />
   <ChannelList />
   <UserComponent
-    :avatar="a.avatar"
+    :avatar="a.avatarUrl"
     :name="a.name"
     :description="a.description"
     :id="a.id"

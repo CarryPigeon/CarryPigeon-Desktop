@@ -68,7 +68,7 @@ async function handleMenuAction(action: ChannelMenuAction) {
         <ChannelModel
           v-bind="item"
           :active="item.cid === activeChannelCid"
-          @click="handleChannelClick(item)"
+          @model-click="handleChannelClick(item)"
           @contextmenu="(e: MouseEvent) => handleContextMenu(e, item)"
         />
       </li>
