@@ -13,6 +13,7 @@ export const router = createRouter({
       name: "UserInfoPage",
       component: () => import("../views/UserInfoPage.vue"),
     },
-    { path: "/user-popover", component: () => import("../views/UserPopoverPage.vue") },
+    { path: "/user-info-popover", component: () => import("../views/UserPopoverPage.vue") },
+    { path: "/channel-info-popover", component: () => import("../views/ChannelPopoverPage.vue") },
   ],
 });

@@ -1,28 +1,64 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
+import { Channel } from '../../value/channelValue'
+
 export interface ChannelModelProps {
   cid?: number
   imgUrl: string
   channelName: string
   latestMsg: string
+  bio?: string
   active?: boolean
   onClick?: () => void
 }
+
+function openChannelPopover(payload: { screenX: number; screenY: number; channel: Channel }) {
+  const query = new URLSearchParams({
+    window: "channel-info-popover",
+    avatar: payload.channel.avatarUrl,
+    name: payload.channel.channelName,
+    bio: payload.channel.description ?? "",
+  }).toString();
+
+  invoke("open_popover_window", {
+    query,
+    x: payload.screenX,
+    y: payload.screenY,
+    width: 300,
+    height: 400,
+  });
+}
+
 const props = defineProps<ChannelModelProps>()
 const emit = defineEmits<{
-  (e: 'click', payload: MouseEvent): void
+  (e: 'model-click', payload: MouseEvent): void
 }>()
 
-function handleClick(event: MouseEvent) {
+function handleModelClick(event: MouseEvent) {
   if (props.onClick) {
     props.onClick()
   }
-  emit('click', event)
+  emit('model-click', event)
+}
+
+function handleAvatarClick(event: MouseEvent) {
+  openChannelPopover({
+    screenX: event.screenX,
+    screenY: event.screenY,
+    channel: { 
+      cid: props.cid ?? 0, 
+      channelName: props.channelName, 
+      avatarUrl: props.imgUrl, 
+      description: props.bio,
+      participants: [] // Added to satisfy Channel type requirement
+    }
+  })
 }
 </script>
 
 <template>
-  <div class="channelModel" :class="[props.active ? 'active' : '']" @click="handleClick">
-    <img class="channelImg" :src="props.imgUrl" loading="lazy" alt="Channel Avatar"/>
+  <div class="channelModel" :class="[props.active ? 'active' : '']" @click="handleModelClick">
+    <img class="channelImg" :src="props.imgUrl" loading="lazy" alt="Channel Avatar" @click="handleAvatarClick"/>
     <div class="info">
       <div class="nameRow">
         <span class="channelName" :title="props.channelName">{{ props.channelName }}</span>

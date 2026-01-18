@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import SettingInput from '../components/items/SettingModel/SettingInput.vue';
+import SettingButton from '../components/items/SettingModel/SettingButton.vue';
+import SettingButtonTheme from '../components/items/SettingModel/SettingButton.vue';
+
 const router = useRouter();
+
+const logout = () => {
+    router.push('/');
+    // implement logout logic here
+};
 
 </script>
 
@@ -22,6 +30,9 @@ const router = useRouter();
                     </div>
                     <div class="setting-item">
                         <SettingInput text='email' placeholder="" />
+                    </div>
+                    <div class="setting-item">
+                        <SettingButton text='logout' placeholder='logout' :theme="SettingButtonTheme.WARNING" @click="logout"/>
                     </div>
                 </div>
             </div>
