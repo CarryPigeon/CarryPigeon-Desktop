@@ -60,9 +60,10 @@ function click_avatar(event: MouseEvent) {
 <style scoped lang="scss">
 .container {
   position: fixed;
-  left: 63px;
+  left: 65px;
   bottom: 0;
-  width: 257px;
+  width: calc(var(--channel-list-width , 255px) + 2px);
+  /* 确保宽度与频道列表同步 */
   min-height: 60px;
   box-sizing: border-box;
   padding: 10px 12px;

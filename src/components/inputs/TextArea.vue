@@ -14,6 +14,51 @@ import {
 let container:HTMLElement | null = null;
 const text = ref('');
 
+// 文本框初始高度
+const textAreaHeight = ref(200);
+// 是否正在调整大小
+const isResizing = ref(false);
+
+/**
+ * 开始调整文本框高度
+ * @param e 鼠标事件
+ */
+const startResize = (e: MouseEvent) => {
+  isResizing.value = true;
+  // 添加全局事件监听，确保鼠标移出调整条也能继续拖拽
+  document.addEventListener('mousemove', handleResize);
+  document.addEventListener('mouseup', stopResize);
+  // 阻止默认行为，防止拖拽时选中文本
+  e.preventDefault();
+};
+
+/**
+ * 处理鼠标移动，实时更新高度
+ * @param e 鼠标事件
+ */
+const handleResize = (e: MouseEvent) => {
+  if (!isResizing.value) return;
+  
+  // 计算新的高度：视口总高度减去当前鼠标的 Y 坐标
+  const newHeight = window.innerHeight - e.clientY;
+  
+  // 限制文本框的最小高度（100px）和最大高度（视口高度的 80%）
+  if (newHeight >= 100 && newHeight <= window.innerHeight * 0.8) {
+    textAreaHeight.value = newHeight;
+    // 更新全局 CSS 变量，以便 ChatBox 同步调整其高度，避免内容重叠
+    document.documentElement.style.setProperty('--chat-input-height', `${newHeight}px`);
+  }
+};
+
+/**
+ * 停止调整大小，移除事件监听
+ */
+const stopResize = () => {
+  isResizing.value = false;
+  document.removeEventListener('mousemove', handleResize);
+  document.removeEventListener('mouseup', stopResize);
+};
+
 const onForwardMessage = (event: Event) => {
   const custom = event as CustomEvent<ForwardMessageEventDetail>;
   const content = custom.detail?.content;
@@ -67,6 +112,8 @@ const onInsertText = (event: Event) => {
 
 
 onMounted(() => {
+  // 初始化全局高度变量
+  document.documentElement.style.setProperty('--chat-input-height', `${textAreaHeight.value}px`);
   container = document.querySelector('.chat-box-container');
   window.addEventListener(FORWARD_MESSAGE_EVENT, onForwardMessage);
   window.addEventListener(INSERT_TEXT_EVENT, onInsertText);
@@ -107,7 +154,15 @@ function sendMessage() {
 </script>
 
 <template>
-  <div class="text-area">
+  <div 
+    class="text-area" 
+    :style="{ 
+      height: textAreaHeight + 'px', 
+      top: `calc(100vh - ${textAreaHeight}px)` 
+    }"
+  >
+    <!-- 高度调节手柄 -->
+    <div class="resizer" @mousedown="startResize"></div>
     <textarea
         id="text-area-item"
         v-model="text"
@@ -122,23 +177,35 @@ function sendMessage() {
 .text-area {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+  grid-template-rows: auto 1fr; // 第一行给 resizer，第二行给 textarea
   position: fixed;
-  left: 319px;
-  top: calc(100vh - 200px);
-  width: calc(100% - 559px);
-  height: 200px;
+  // 动态计算左边距：ServerList(63px) + ChannelList 宽度
+  left: calc(66px + var(--channel-list-width, 255px));
+  // 动态计算宽度：总宽度 - ServerList(63px) - ChannelList 宽度 - ParticipantsList 宽度
+  width: calc(100vw - 59px - var(--channel-list-width, 255px) - var(--participants-list-width, 240px));
   opacity: 1;
   background: rgba(243, 244, 246, 1);
   border: 1px solid rgba(231, 232, 236, 1);
   box-sizing: border-box;
+  z-index: 10;
+}
+
+// 调节高度的手柄样式
+.resizer {
+  height: 4px;
+  width: 100%;
+  cursor: ns-resize; // 显示上下调节的光标
+  background: transparent;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.1); // 悬浮时显示浅色条
+  }
 }
 
 .text-area-item {
   font-size: 16px;
-  //width: 53% !important
-  //height: 95% !important
-  margin: 20px 10px 5px 10px;
+  margin: 16px 10px 5px 10px; // 稍微调整 margin，因为有了 resizer
   border: none;
   background: transparent;
   outline: none;

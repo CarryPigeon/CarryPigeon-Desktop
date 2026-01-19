@@ -22,9 +22,12 @@ const emit = defineEmits<{
   background-color: transparent;
   position: fixed;
   top: 61px;
-  left: 318px;
-  height: calc(65vh - 15px);
-  width: calc(100vw - 558px);
+  // 动态计算左边距：ServerList(63px) + ChannelList 宽度
+  left: calc(66px + var(--channel-list-width, 255px));
+  // 使用全局高度变量同步调整聊天区域高度，默认为 200px
+  height: calc(100vh - var(--chat-input-height, 200px) - 61px);
+  // 动态计算宽度：总宽度 - ServerList(63px) - ChannelList 宽度 - ParticipantsList 宽度
+  width: calc(100vw - 62px - var(--channel-list-width, 255px) - var(--participants-list-width, 240px));
   overflow-y: auto;
 }
 </style>

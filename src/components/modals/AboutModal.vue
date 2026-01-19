@@ -10,7 +10,7 @@ const emit = defineEmits<{
     (e: "update:open", value: boolean): void;
 }>();
 
-const appVersion = ref("0.1.0");
+const appVersion = ref("0.0.0");
 
 // 组件挂载时从 Tauri 后端获取应用版本
 onMounted(async () => {
