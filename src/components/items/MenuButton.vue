@@ -158,13 +158,6 @@ onBeforeUnmount(() => {
             <button
                 class="menu-item"
                 type="button"
-                @click="emitAction('about')"
-            >
-                {{ $t("menu_about") }}
-            </button>
-            <button
-                class="menu-item"
-                type="button"
                 @click="emitAction('history')"
             >
                 {{ $t("menu_manager_history") }}
@@ -175,6 +168,13 @@ onBeforeUnmount(() => {
                 @click="emitAction('plugins')"
             >
                 {{ $t("menu_manager_plugins") }}
+            </button>
+            <button
+                class="menu-item"
+                type="button"
+                @click="emitAction('about')"
+            >
+                {{ $t("menu_about") }}
             </button>
         </div>
     </Teleport>
