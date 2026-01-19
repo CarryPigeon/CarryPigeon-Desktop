@@ -19,19 +19,20 @@ const search_value = ref('')
 .search-bar {
   position: fixed;
   display: flex;
-  left: 320px;
+  // 动态计算左边距：ServerList(63px) + ChannelList 宽度
+  left: calc(67px + var(--channel-list-width, 255px));
   top: 0;
-  width: calc(100vw - 60px);
+  // 动态计算宽度：总宽度 - ServerList(63px) - ChannelList 宽度 - ParticipantsList 宽度
+  width: calc(100vw - 63px - var(--channel-list-width, 255px) - var(--participants-list-width, 240px));
   height: 61px;
   opacity: 1;
   background: rgba(245, 245, 245, 1);
 }
 
 .researcher {
-  position: fixed;
+  position: absolute; // 改为 absolute 相对于 search-bar
   display: flex;
-  //left: 641px
-  left: max(325px, calc(100vw - 590px));
+  right: 20px; // 距离搜索栏右侧 20px
   top: 10px;
   width: 292px;
   height: 36px;
@@ -53,13 +54,12 @@ const search_value = ref('')
 
 .search-icon {
   display: flex;
-  position: fixed;
-  left: max(340px, calc(100vw - 575px));
+  position: absolute; // 改为 absolute 相对于 search-bar
+  right: 280px; // 根据 researcher 的位置调整
   top: 20px;
   border: none;
   background: transparent;
   outline: none;
-  flex: 1;
   z-index: 1;
 }
 </style>

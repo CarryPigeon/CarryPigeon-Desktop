@@ -19,9 +19,10 @@ const serverName = ref(props.serverName)
 <style scoped lang="scss">
 .serverNameModel {
   position: absolute;
-  left: 63px;
+  left: 65px;
   top: 0;
-  width: 255px;
+  width: var(--channel-list-width, 255px);
+  /* 确保宽度与频道列表同步 */
   height: 60px;
   opacity: 1;
   background: rgba(243, 244, 246, 1);
