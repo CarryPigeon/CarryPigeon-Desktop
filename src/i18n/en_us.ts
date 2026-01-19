@@ -85,4 +85,7 @@ export const en_us = {
   confirm_join_content: "Are you sure you want to join {channelName}?",
   tips: "Tips",
   channel_joined: "Already joined this channel",
+  menu_about: "About",
+  menu_manager_history: "Chat History Management",
+  menu_manager_plugins: "Plugin Management",
 };
