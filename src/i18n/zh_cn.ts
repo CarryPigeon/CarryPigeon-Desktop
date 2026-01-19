@@ -85,4 +85,7 @@ export const zh_cn = {
   confirm_join_content: "您确定要加入 {channelName} 吗？",
   tips: "提示",
   channel_joined: "已加入该频道",
+  menu_about: "关于",
+  menu_manager_history: "聊天记录管理",
+  menu_manager_plugins: "插件管理",
 };
