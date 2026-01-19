@@ -3,10 +3,9 @@ import App from "./App.vue";
 import { router } from "./router/Router";
 import { i18n } from "./i18n";
 import "tdesign-vue-next/es/style/index.css";
-import { Button, TreeSelect, Input } from "tdesign-vue-next";
 
 const app = createApp(App);
-app.use(router).use(i18n).use(Button).use(TreeSelect).use(Input);
+app.use(router).use(i18n);
 
 const searchParams = new URLSearchParams(window.location.search);
 const windowType = searchParams.get("window");

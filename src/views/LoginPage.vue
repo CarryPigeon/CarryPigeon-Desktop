@@ -106,10 +106,10 @@ onBeforeUnmount(() => {
       :onClose="hideEmailAlert"
     />
     <image class="user-image" alt="User Image"/>
-    <Input class="server-input" v-model="server_socket" type="text" :placeholder="$t('server_socket')" />
-    <Input class="server-input" v-model="server_ecc_public_key" type="text" :placeholder="$t('server_ecc_public_key')" />
-    <Input class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
-    <Input class="code-input" v-model="code" type="text" autocomplete="one-time-code" :placeholder="$t('login_code')">
+    <Input id="server-input" class="server-input" v-model="server_socket" type="text" :placeholder="$t('server_socket')" />
+    <Input id="ecc-public-key-input" class="server-input" v-model="server_ecc_public_key" type="text" :placeholder="$t('server_ecc_public_key')" />
+    <Input id="email-input" class="email-input" v-model="email" type="text" :placeholder="$t('email')" />
+    <Input id="code-input" class="code-input" v-model="code" type="text" autocomplete="one-time-code" :placeholder="$t('login_code')">
       <template #suffix>
         <Button
           class="send-code-button"
