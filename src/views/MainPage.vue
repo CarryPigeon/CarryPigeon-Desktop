@@ -81,6 +81,17 @@ const selectedMemberMuted = computed(() => {
     return member ? isIgnoredUser(member.id) : false;
 });
 
+const participantsList = ref<Member[]>([]);
+
+import { getParticipants } from "../script/store/channelStore.ts";
+
+async function updateParticipantsList(cid: number) {
+    //participantsList.value = await invoke("get_participants_list", cid); stable
+    //test code
+
+    participantsList.value = await getParticipants(cid);
+}
+
 function openMemberContextMenuFromChat(payload: {
     screenX: number;
     screenY: number;
@@ -160,7 +171,7 @@ async function handleMemberMenuAction(action: MemberMenuAction) {
 <template>
     <ServerList />
     <ServerNameModel />
-    <ChannelList />
+    <ChannelList @channel-click="updateParticipantsList" />
     <UserComponent
         :avatar="a.avatarUrl"
         :name="a.name"
@@ -172,9 +183,12 @@ async function handleMemberMenuAction(action: MemberMenuAction) {
 
     <TextArea />
     <ParticipantsList
-        :length="1"
-        :online="1"
-        :member="[a]"
+        :length="participantsList.length"
+        :online="
+            participantsList.filter((member) => member.status === 'online')
+                .length
+        "
+        :member="participantsList"
         @avatar-click="openMemberPopover"
         @avatar-contextmenu="openMemberContextMenu"
     />

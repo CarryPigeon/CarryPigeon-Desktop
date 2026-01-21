@@ -11,6 +11,10 @@ import { useChannelStore } from "../../script/store/channelStore";
 // 从 store 中获取频道列表和当前激活的频道状态
 const { channels, activeChannelId, setActiveChannel } = useChannelStore();
 
+const emit = defineEmits<{
+    (e: "channel-click", cid: number): void;
+}>();
+
 // 右键菜单状态
 const menuOpen = ref(false);
 const menuPosition = ref({ x: 0, y: 0 });
@@ -26,10 +30,10 @@ const isResizingWidth = ref(false);
  * @param e 鼠标事件
  */
 const startResizeWidth = (e: MouseEvent) => {
-  isResizingWidth.value = true;
-  document.addEventListener('mousemove', handleResizeWidth);
-  document.addEventListener('mouseup', stopResizeWidth);
-  e.preventDefault();
+    isResizingWidth.value = true;
+    document.addEventListener("mousemove", handleResizeWidth);
+    document.addEventListener("mouseup", stopResizeWidth);
+    e.preventDefault();
 };
 
 /**
@@ -37,38 +41,47 @@ const startResizeWidth = (e: MouseEvent) => {
  * @param e 鼠标事件
  */
 const handleResizeWidth = (e: MouseEvent) => {
-  if (!isResizingWidth.value) return;
-  
-  // 计算新的宽度：鼠标 X 坐标减去左侧 ServerList 的固定宽度（63px）
-  const newWidth = e.clientX - 63;
-  
-  // 限制频道列表的最小宽度（160px）和最大宽度（400px）
-  if (newWidth >= 160 && newWidth <= 400) {
-    channelListWidth.value = newWidth;
-    // 更新全局 CSS 变量，以便 ChatBox 和 SearchBar 同步调整其左边距
-    document.documentElement.style.setProperty('--channel-list-width', `${newWidth}px`);
-  }
+    if (!isResizingWidth.value) return;
+
+    // 计算新的宽度：鼠标 X 坐标减去左侧 ServerList 的固定宽度（63px）
+    const newWidth = e.clientX - 63;
+
+    // 限制频道列表的最小宽度（160px）和最大宽度（400px）
+    if (newWidth >= 160 && newWidth <= 400) {
+        channelListWidth.value = newWidth;
+        // 更新全局 CSS 变量，以便 ChatBox 和 SearchBar 同步调整其左边距
+        document.documentElement.style.setProperty(
+            "--channel-list-width",
+            `${newWidth}px`,
+        );
+    }
 };
 
 /**
  * 停止调整大小，移除事件监听
  */
 const stopResizeWidth = () => {
-  isResizingWidth.value = false;
-  document.removeEventListener('mousemove', handleResizeWidth);
-  document.removeEventListener('mouseup', stopResizeWidth);
+    isResizingWidth.value = false;
+    document.removeEventListener("mousemove", handleResizeWidth);
+    document.removeEventListener("mouseup", stopResizeWidth);
 };
 
 // 处理频道点击事件：激活选中频道
 function handleChannelClick(channel: ChannelModelProps) {
     setActiveChannel(channel.cid);
+    if (channel.cid !== undefined) {
+        emit("channel-click", channel.cid);
+    }
 }
 
-import { onMounted } from 'vue';
+import { onMounted } from "vue";
 
 onMounted(() => {
-  // 初始化全局宽度变量
-  document.documentElement.style.setProperty('--channel-list-width', `${channelListWidth.value}px`);
+    // 初始化全局宽度变量
+    document.documentElement.style.setProperty(
+        "--channel-list-width",
+        `${channelListWidth.value}px`,
+    );
 });
 
 // 处理右键点击事件：显示上下文菜单
@@ -184,7 +197,7 @@ async function handleMenuAction(action: ChannelMenuAction) {
     background: transparent;
     transition: background 0.2s;
     flex-shrink: 0;
-    
+
     &:hover {
         background: rgba(0, 0, 0, 0.1);
     }
