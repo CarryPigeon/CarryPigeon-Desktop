@@ -1,5 +1,9 @@
 import { reactive, toRef } from "vue";
 import type { ChannelModelProps } from "../../components/items/ChannelModel.vue";
+import { Channel } from "../../value/channelValue";
+import { Member } from "../../value/memberValue";
+
+
 
 // 频道状态存储
 const channelState = reactive<{
@@ -30,6 +34,77 @@ const channelState = reactive<{
   // 当前激活的频道 ID
   activeChannelId: undefined,
 });
+
+export const channel: Channel[] = [
+  {
+    cid: 1,
+    channelName: "General",
+    avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=General",
+    description: "Welcome to the General channel!",
+    participants: [
+      {
+        id: 1,
+        name: "Felix",
+        avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Felix",
+        description: ""
+      },
+      {
+        id: 3,
+        name: "Willow",
+        avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Willow",
+        description: ""
+      },
+    ],
+  },
+  {
+    cid: 2,
+    channelName: "Development Team",
+    avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Development",
+    description: "Discussing development-related topics.",
+    participants: [
+      {
+        id: 1,
+        name: "Felix",
+        avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Felix",
+        description: ""
+      },
+      {
+        id: 2,
+        name: "Ella",
+        avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Ella",
+        description: ""
+      },
+    ],
+  },
+  {
+    cid: 3,
+    channelName: "Marketing Team",
+    avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Marketing",
+    description: "Discussing marketing-related topics.",
+    participants: [
+      {
+        id: 1,
+        name: "Felix",
+        avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Felix",
+        description: ""
+      },
+      {
+        id: 3,
+        name: "Willow",
+        avatarUrl: "https://api.dicebear.com/9.x/adventurer/svg?seed=Willow",
+        description: ""
+      },
+    ],
+  },
+];
+
+export function getParticipants(cid: number): Promise<Member[]> {
+  //participantsList.value = await invoke("get_participants_list", cid); stable
+  //test code
+  return new Promise((resolve) => {
+    resolve(channel[cid-1].participants);
+  });
+}
 
 // 导出频道存储钩子
 export function useChannelStore() {
