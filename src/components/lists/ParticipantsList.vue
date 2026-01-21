@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Member } from "../../value/memberValue";
 import GroupMemberModel from "../items/GroupMemberModel.vue";
-import { ref, onMounted } from 'vue';
+import { ref, onMounted } from "vue";
 
 const props = defineProps<{
     length: number;
@@ -19,10 +19,10 @@ const isResizingWidth = ref(false);
  * @param e 鼠标事件
  */
 const startResizeWidth = (e: MouseEvent) => {
-  isResizingWidth.value = true;
-  document.addEventListener('mousemove', handleResizeWidth);
-  document.addEventListener('mouseup', stopResizeWidth);
-  e.preventDefault();
+    isResizingWidth.value = true;
+    document.addEventListener("mousemove", handleResizeWidth);
+    document.addEventListener("mouseup", stopResizeWidth);
+    e.preventDefault();
 };
 
 /**
@@ -30,31 +30,37 @@ const startResizeWidth = (e: MouseEvent) => {
  * @param e 鼠标事件
  */
 const handleResizeWidth = (e: MouseEvent) => {
-  if (!isResizingWidth.value) return;
-  
-  // 计算新的宽度：视口宽度减去鼠标 X 坐标
-  const newWidth = window.innerWidth - e.clientX;
-  
-  // 限制成员列表的最小宽度（160px）和最大宽度（400px）
-  if (newWidth >= 160 && newWidth <= 400) {
-    participantsWidth.value = newWidth;
-    // 更新全局 CSS 变量，以便 ChatBox, TextArea 和 SearchBar 同步调整其右边距
-    document.documentElement.style.setProperty('--participants-list-width', `${newWidth}px`);
-  }
+    if (!isResizingWidth.value) return;
+
+    // 计算新的宽度：视口宽度减去鼠标 X 坐标
+    const newWidth = window.innerWidth - e.clientX;
+
+    // 限制成员列表的最小宽度（160px）和最大宽度（400px）
+    if (newWidth >= 160 && newWidth <= 400) {
+        participantsWidth.value = newWidth;
+        // 更新全局 CSS 变量，以便 ChatBox, TextArea 和 SearchBar 同步调整其右边距
+        document.documentElement.style.setProperty(
+            "--participants-list-width",
+            `${newWidth}px`,
+        );
+    }
 };
 
 /**
  * 停止调整大小，移除事件监听
  */
 const stopResizeWidth = () => {
-  isResizingWidth.value = false;
-  document.removeEventListener('mousemove', handleResizeWidth);
-  document.removeEventListener('mouseup', stopResizeWidth);
+    isResizingWidth.value = false;
+    document.removeEventListener("mousemove", handleResizeWidth);
+    document.removeEventListener("mouseup", stopResizeWidth);
 };
 
 onMounted(() => {
-  // 初始化全局宽度变量
-  document.documentElement.style.setProperty('--participants-list-width', `${participantsWidth.value}px`);
+    // 初始化全局宽度变量
+    document.documentElement.style.setProperty(
+        "--participants-list-width",
+        `${participantsWidth.value}px`,
+    );
 });
 
 const emit = defineEmits<{
@@ -79,8 +85,8 @@ const emit = defineEmits<{
     <div class="participants-list" :style="{ width: participantsWidth + 'px' }">
         <!-- 宽度调节手柄 -->
         <div class="resizer-h" @mousedown="startResizeWidth"></div>
-        <div class="participants-number" :style="{ width: participantsWidth + 'px' }">
-            <p>{{ $t("participants") }} - {{ props.length }}</p>
+        <div class="participants-number">
+            <p style="margin-left: 10px;">{{ $t("participants") }} - {{ props.length }}</p>
         </div>
         <div class="list" :style="{ width: participantsWidth + 'px' }">
             <ul style="list-style-type: none; padding: 0">
@@ -125,7 +131,7 @@ const emit = defineEmits<{
     background: transparent;
     transition: background 0.2s;
     flex-shrink: 0;
-    
+
     &:hover {
         background: rgba(0, 0, 0, 0.1);
     }
@@ -135,7 +141,7 @@ const emit = defineEmits<{
     position: relative; // 改为 relative 随父容器移动
     display: grid;
     padding: 0;
-    top: 0;
+    top: 60px;
     height: calc(100vh - 3px);
     opacity: 1;
     background: rgba(243, 244, 246, 1);
@@ -145,15 +151,16 @@ const emit = defineEmits<{
 
 .participants-number {
     z-index: 1;
+    margin-left: 0;
     position: absolute; // 改为 absolute
     left: 4px; // 避开 resizer
-    margin-left: 10px;
     top: 0;
     border: none;
     box-sizing: border-box;
-    height: 50px;
+    height: 60px;
     opacity: 1;
     background: rgba(243, 244, 246, 1);
     border-bottom: 1px solid rgba(227, 229, 233, 1);
+    width: var(--participants-list-width);
 }
 </style>

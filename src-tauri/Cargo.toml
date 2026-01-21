@@ -52,7 +52,6 @@ sea-orm = { version = "2.0.0-rc.22", features = [ "sqlx-sqlite", "runtime-tokio-
 chrono = "0.4.42"
 
 # 错误处理
-thiserror = "2.0.17"
 anyhow = "1"
 
 # 网络请求

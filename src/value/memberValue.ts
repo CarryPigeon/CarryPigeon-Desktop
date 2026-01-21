@@ -3,5 +3,6 @@ export interface Member {
   name: string;
   avatarUrl: string;
   description: string;
+  status?: string;
   email?: string;
 }
