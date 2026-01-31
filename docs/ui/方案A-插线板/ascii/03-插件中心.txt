@@ -1,0 +1,15 @@
++--------------------------------------------------------------------------------------------------+
+| PLUGIN CENTER (MODULE RACK)                                                                      |
+|--------------------------------------------------------------------------------------------------|
+| Filters (left)                          | Module Grid / Detail Drawer (right)                 |
+|--------------------------------------------------------------------------------------------------|
+| Search: [____________]                  | [ModuleCard]  REQUIRED  UPDATE                      |
+| (All) (Installed) (Enabled)             |  Name v1.2.3                                        |
+| (Failed) (Updates) (Required)           |  plugin_id: mc-bind                                 |
+| Source: (Server v) (Repo)               |  ports: Core:Text | MC:Bind                          |
+|                                         |  [Install] [Enable] [Detail]                         |
+|                                         |-----------------------------------------------------|
+|                                         |  Drawer: permissions diff / sha256 / lastError       |
+|                                         |  Progress: downloading -> verifying -> unpacking     |
++--------------------------------------------------------------------------------------------------+
+
