@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import path from "node:path";
 import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import { TDesignResolver } from '@tdesign-vue-next/auto-import-resolver';
@@ -16,11 +17,17 @@ export default defineConfig(async () => ({
       })],
     }),
     Components({
+      globs: ["src/features/**/presentation/components/**/*.vue"],
       resolvers: [TDesignResolver({
         library: 'vue-next'
       })],
     }),
   ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
