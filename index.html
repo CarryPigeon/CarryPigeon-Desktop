@@ -7,13 +7,15 @@
   </head>
 
   <body>
+    <!-- 应用入口：Vite 通过 #app 挂载 Vue；此文件仅保留挂载点与极少量基础样式 -->
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
   <style>
-      body{
-          margin: 0;
-          padding: 0;
-      }
+    /* 基础样式：避免浏览器默认 body margin/padding 影响布局 */
+    body {
+      margin: 0;
+      padding: 0;
+    }
   </style>
 </html>

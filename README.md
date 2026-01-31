@@ -1,18 +1,14 @@
 # CarryPigeon-Desktop
-CarryPigeon的桌面端
-## 技术栈
-框架tauri，后端rust，前端vue3
-## 运行
-```shell
-pnpm run tauri dev
-```
-## 打包
-```shell
-pnpm tauri build
-pnpm tauri build --no-bundle
-```
 
-## TODO
-tauri Rust侧的i18n
-创建channel功能
-查看他人信息页的功能
+CarryPigeon 的桌面端（Tauri + Rust + Vue 3）。
+
+## 文档
+
+- 文档索引：`docs/文档索引.md`
+- 文档规范：`docs/文档规范.md`
+- 日志与注释规范：`docs/日志与注释规范.md`
+- 项目简介：`docs/项目简介.md`
+- 架构设计：`docs/架构设计.md`
+- 客户端协议与 API：`docs/客户端开发指南.md`
+- 前端调试与 Mock：`docs/前端调试与Mock.md`
+- 环境变量示例：`.env.example`
