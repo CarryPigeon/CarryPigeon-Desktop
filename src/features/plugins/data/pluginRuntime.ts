@@ -1,177 +1,216 @@
 /**
- * @fileoverview 插件运行时（前端侧挂载/卸载）。
- * @description 负责将插件 HTML 注入宿主 DOM，并动态 import 插件 JS 执行 mount/unmount。
+ * @fileoverview 插件运行时加载器（桌面端）。
+ * @description
+ * 负责在桌面端（Tauri）环境中加载插件前端运行时，并将“受控 Host API”注入给插件使用。
+ *
+ * 职责范围：
+ * - 通过 Tauri commands 获取插件运行时入口信息（server_id/version/entry/permissions/domains）。
+ * - 从 `app://plugins/...` 动态 import 插件 ESM 入口。
+ * - 规范化插件导出（renderers/composers/contracts），供宿主使用。
+ *
+ * 安全说明：
+ * - 本运行时不是强沙箱；主要依赖“宿主只注入受控 API（如 `host.network.fetch`）”与插件契约约束。
  */
-import { invokeTauri } from "../../../shared/tauri";
-import { loadPlugin, type PluginManifest } from "./pluginLoader";
-import { createLogger } from "@/shared/utils/logger";
 
-export interface PluginContext {
-  manifest: PluginManifest;
-  root: HTMLElement;
-  html: string;
-  wasmBytes: Uint8Array;
-  compileWasm: () => Promise<WebAssembly.Module>;
-  instantiateWasm: (imports?: WebAssembly.Imports) => Promise<WebAssembly.WebAssemblyInstantiatedSource>;
-  invoke: typeof invokeTauri;
-}
+import type { Component } from "vue";
+import { invokeTauri } from "@/shared/tauri";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
+import { buildTauriTlsArgs } from "@/shared/net/tls/tauriTlsArgs";
+import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginTypes";
 
-export type PluginMountFn = (ctx: PluginContext) => void | Promise<void>;
-export type PluginUnmountFn = () => void | Promise<void>;
+export type PluginComposerPayload = {
+  domain: string;
+  domain_version: string;
+  data: unknown;
+  reply_to_mid?: string;
+};
 
-export type PluginModule = {
-  mount?: PluginMountFn;
-  unmount?: PluginUnmountFn;
-  default?: unknown;
+export type PluginContext = {
+  server_socket: string;
+  server_id: string;
+  plugin_id: string;
+  plugin_version: string;
+  cid: string;
+  uid: string;
+  lang: string;
+  host: {
+    sendMessage(payload: PluginComposerPayload): Promise<void>;
+    storage: {
+      get(key: string): Promise<unknown>;
+      set(key: string, value: unknown): Promise<void>;
+    };
+    network?: {
+      fetch(input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{
+        ok: boolean;
+        status: number;
+        headers: Record<string, string>;
+        bodyText: string;
+      }>;
+    };
+  };
+};
+
+export type LoadedPluginModule = {
+  pluginId: string;
+  version: string;
+  manifest: unknown;
+  permissions: string[];
+  providesDomains: Array<{ domain: string; domainVersion: string }>;
+  renderers: Record<string, Component>;
+  composers: Record<string, Component>;
+  contracts: Array<{ domain: string; domain_version: string; payload_schema?: unknown; constraints?: unknown }>;
+  activate?: (ctx: PluginContext) => unknown;
+  deactivate?: () => unknown;
+};
+
+type TauriFetchResponse = {
+  ok: boolean;
+  status: number;
+  bodyText: string;
+  headers: Record<string, string>;
 };
 
 /**
- * toArrayBuffer 方法说明。
- * @param bytes - 参数说明。
- * @returns 返回值说明。
+ * 获取“当前选中版本”的插件运行时入口信息。
+ *
+ * @param serverSocket - 当前 server socket。
+ * @param pluginId - 插件 id。
+ * @returns 运行时入口信息（server_id/version/entry/permissions/domains）。
  */
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const buffer = bytes.buffer as ArrayBuffer;
-  return bytes.byteOffset === 0 && bytes.byteLength === buffer.byteLength
-    ? buffer
-    : buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+export function getRuntimeEntry(serverSocket: string, pluginId: string): Promise<PluginRuntimeEntry> {
+  return invokeTauri<PluginRuntimeEntry>(TAURI_COMMANDS.pluginsGetRuntimeEntry, {
+    serverSocket,
+    pluginId,
+    ...buildTauriTlsArgs(serverSocket),
+  });
 }
 
 /**
- * createBlobUrl 方法说明。
- * @param bytes - 参数说明。
- * @param mime - 参数说明。
- * @returns 返回值说明。
+ * 获取“指定已安装版本”的插件运行时入口信息（不会切换 current 版本）。
+ *
+ * @param serverSocket - 当前 server socket。
+ * @param pluginId - 插件 id。
+ * @param version - 要加载的已安装版本。
+ * @returns 运行时入口信息。
  */
-function createBlobUrl(bytes: Uint8Array, mime: string): string {
-  const safeBytes = new Uint8Array(bytes.byteLength);
-  safeBytes.set(bytes);
-  return URL.createObjectURL(new Blob([safeBytes], { type: mime }));
+export function getRuntimeEntryForVersion(serverSocket: string, pluginId: string, version: string): Promise<PluginRuntimeEntry> {
+  return invokeTauri<PluginRuntimeEntry>(TAURI_COMMANDS.pluginsGetRuntimeEntryForVersion, {
+    serverSocket,
+    pluginId,
+    version,
+    ...buildTauriTlsArgs(serverSocket),
+  });
 }
 
 /**
- * pickMount 方法说明。
- * @param mod - 参数说明。
- * @returns 返回值说明。
+ * 构造 `app://plugins/...` 的动态 import 入口 URL。
+ *
+ * @param e - 运行时入口信息。
+ * @returns 绝对 entry URL。
  */
-function pickMount(mod: PluginModule): PluginMountFn | null {
-  if (typeof mod.mount === "function") return mod.mount;
-  if (typeof mod.default === "function") return mod.default as PluginMountFn;
-  if (mod.default && typeof (mod.default as { mount?: unknown }).mount === "function") {
-    return (mod.default as { mount: PluginMountFn }).mount;
-  }
-  return null;
+export function toAppPluginEntryUrl(e: PluginRuntimeEntry): string {
+  const rel = String(e.entry ?? "").trim().replace(/^\/+/u, "");
+  return `app://plugins/${encodeURIComponent(e.serverId)}/${encodeURIComponent(e.pluginId)}/${encodeURIComponent(e.version)}/${rel}`;
 }
 
 /**
- * pickUnmount 方法说明。
- * @param mod - 参数说明。
- * @returns 返回值说明。
+ * 创建“权限受控”的 storage API（Rust 侧按 server_id 隔离）。
+ *
+ * @param serverSocket - server socket。
+ * @param pluginId - 插件 id。
+ * @returns storage API。
  */
-function pickUnmount(mod: PluginModule): PluginUnmountFn | null {
-  if (typeof mod.unmount === "function") return mod.unmount;
-  if (mod.default && typeof (mod.default as { unmount?: unknown }).unmount === "function") {
-    return (mod.default as { unmount: PluginUnmountFn }).unmount;
-  }
-  return null;
+export function createPluginStorageApi(serverSocket: string, pluginId: string): PluginContext["host"]["storage"] {
+  return {
+    async get(key: string): Promise<unknown> {
+      const k = String(key ?? "").trim();
+      if (!k) return null;
+      return invokeTauri<unknown>(TAURI_COMMANDS.pluginsStorageGet, { serverSocket, pluginId, key: k, ...buildTauriTlsArgs(serverSocket) });
+    },
+    async set(key: string, value: unknown): Promise<void> {
+      const k = String(key ?? "").trim();
+      if (!k) return;
+      await invokeTauri<void>(TAURI_COMMANDS.pluginsStorageSet, { serverSocket, pluginId, key: k, value, ...buildTauriTlsArgs(serverSocket) });
+    },
+  };
 }
 
-export class PluginRuntime {
-  private module: PluginModule | null = null;
-  private jsUrl: string | null = null;
-  private readonly logger = createLogger("PluginRuntime");
-
-  constructor(
-    private manifest: PluginManifest,
-    private host: HTMLElement,
-  ) {}
-
-  /**
-   * 启动插件：加载资源、注入 HTML、执行 mount。
-   * @returns Promise<void>
-   */
-  public async start(): Promise<void> {
-    await this.stop();
-
-    this.logger.info("Plugin start", { name: this.manifest.name, version: this.manifest.version });
-    const { frontendWasm, frontendJs, frontendHtml } = await loadPlugin(this.manifest);
-
-    const html =
-      frontendHtml.trim().length > 0
-        ? frontendHtml
-        : `<div style="padding:16px;font-family:system-ui">No frontend.html for plugin <b>${this.manifest.name}</b></div>`;
-
-    this.host.innerHTML = html;
-    const root = this.host.querySelector<HTMLElement>("[data-plugin-root]") ?? this.host;
-
-    if (frontendJs.length === 0) {
-      this.module = null;
-      this.jsUrl = null;
-      return;
-    }
-
-    this.jsUrl = createBlobUrl(frontendJs, "text/javascript");
-
-    const mod = (await import(/* @vite-ignore */ this.jsUrl)) as PluginModule;
-    this.module = mod;
-
-    const mount = pickMount(mod);
-    if (!mount) return;
-
-    const wasmBytes = frontendWasm;
 /**
- * compileWasm 方法说明。
- * @returns 返回值说明。
+ * 创建“权限受控”的 network API（Rust 侧强制同源）。
+ *
+ * @param serverSocket - server socket。
+ * @returns network API。
  */
-    const compileWasm = async () => WebAssembly.compile(toArrayBuffer(wasmBytes));
+export function createPluginNetworkApi(serverSocket: string): NonNullable<PluginContext["host"]["network"]> {
+  return {
+    async fetch(input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<TauriFetchResponse> {
+      const url = String(input ?? "").trim();
+      const method = String(init?.method ?? "GET").trim() || "GET";
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      const body = typeof init?.body === "string" ? init.body : undefined;
+      const res = await invokeTauri<{ ok: boolean; status: number; bodyText: string; headers: Record<string, string> }>(
+        TAURI_COMMANDS.pluginsNetworkFetch,
+        { serverSocket, url, method, headers, body, ...buildTauriTlsArgs(serverSocket) },
+      );
+      return res;
+    },
+  };
+}
+
 /**
- * instantiateWasm 方法说明。
- * @param imports? - 参数说明。
- * @returns 返回值说明。
+ * 从 `app://plugins/...` 动态 import 插件模块。
+ *
+ * @param entryUrl - 绝对 entry URL。
+ * @returns 原始模块命名空间对象。
  */
-    const instantiateWasm = async (imports?: WebAssembly.Imports) =>
-      WebAssembly.instantiate(toArrayBuffer(wasmBytes), imports ?? {});
+export async function importPluginModule(entryUrl: string): Promise<Record<string, unknown>> {
+  const url = String(entryUrl ?? "").trim();
+  if (!url) throw new Error("缺少插件 entry URL");
+  // cache-bust：允许在 import 失败后重新加载同一版本。
+  const bust = `t=${Date.now().toString(16)}`;
+  const finalUrl = url.includes("?") ? `${url}&${bust}` : `${url}?${bust}`;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - Vite 对动态 URL import 会报错，这里显式忽略。
+  return import(/* @vite-ignore */ finalUrl);
+}
 
-    try {
-      await mount({
-        manifest: this.manifest,
-        root,
-        html,
-        wasmBytes,
-        compileWasm,
-        instantiateWasm,
-        invoke: invokeTauri,
-      });
-    } catch (e) {
-      this.logger.error("Plugin mount failed", { name: this.manifest.name, error: String(e) });
-      throw e;
-    }
-  }
+/**
+ * 将插件模块导出规范化为宿主可消费的结构。
+ *
+ * @param pluginId - 插件 id。
+ * @param version - 插件版本。
+ * @param runtime - 运行时入口信息（来自 Rust side）。
+ * @param mod - import 得到的模块命名空间。
+ * @returns 规范化后的插件模块对象。
+ */
+export function normalizePluginModule(
+  pluginId: string,
+  version: string,
+  runtime: PluginRuntimeEntry,
+  mod: Record<string, unknown>,
+): LoadedPluginModule {
+  const renderers = (mod.renderers ?? {}) as Record<string, Component>;
+  const composers = (mod.composers ?? {}) as Record<string, Component>;
+  const contracts = Array.isArray(mod.contracts) ? (mod.contracts as LoadedPluginModule["contracts"]) : [];
 
-  /**
-   * 停止插件：执行 unmount、回收 blob URL、清空宿主节点。
-   * @returns Promise<void>
-   */
-  public async stop(): Promise<void> {
-    const mod = this.module;
-    this.module = null;
-
-    if (mod) {
-      const unmount = pickUnmount(mod);
-      if (unmount) {
-        try {
-          await unmount();
-        } catch (e) {
-          this.logger.warn("Plugin unmount failed", { name: this.manifest.name, error: String(e) });
-        }
-      }
-    }
-
-    if (this.jsUrl) {
-      URL.revokeObjectURL(this.jsUrl);
-      this.jsUrl = null;
-    }
-
-    this.host.innerHTML = "";
-  }
+  return {
+    pluginId,
+    version,
+    manifest: mod.manifest ?? null,
+    permissions: Array.isArray(runtime.permissions) ? runtime.permissions.map((x) => String(x)) : [],
+    providesDomains: Array.isArray(runtime.providesDomains)
+      ? runtime.providesDomains.map((d) => {
+          const raw = d as unknown as Record<string, unknown>;
+          return {
+            domain: String(raw.domain ?? "").trim(),
+            domainVersion: String(raw.domainVersion ?? raw.domain_version ?? "").trim() || "1.0.0",
+          };
+        })
+      : [],
+    renderers: typeof renderers === "object" && renderers ? renderers : {},
+    composers: typeof composers === "object" && composers ? composers : {},
+    contracts,
+    activate: typeof mod.activate === "function" ? (mod.activate as LoadedPluginModule["activate"]) : undefined,
+    deactivate: typeof mod.deactivate === "function" ? (mod.deactivate as LoadedPluginModule["deactivate"]) : undefined,
+  };
 }

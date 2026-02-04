@@ -1,150 +1,88 @@
 <script setup lang="ts">
 /**
- * @fileoverview UserPopoverPage.vue 文件职责说明。
+ * @fileoverview UserPopoverPage.vue
+ * @description Lightweight popover window for user info (minimal for preview).
  */
 
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+import MonoTag from "@/shared/ui/MonoTag.vue";
 
 const route = useRoute();
 
-const avatar = computed(() => String(route.query.avatar ?? ""));
-const name = computed(() => String(route.query.name ?? ""));
-const email = computed(() => String(route.query.email ?? ""));
-const bio = computed(() => String(route.query.bio ?? route.query.description ?? ""));
+/**
+ * Read user display name from query params.
+ *
+ * @returns Name string.
+ */
+function computeName(): string {
+  return String(route.query.name ?? "");
+}
+
+/**
+ * Read user email from query params.
+ *
+ * @returns Email string.
+ */
+function computeEmail(): string {
+  return String(route.query.email ?? "");
+}
+
+/**
+ * Read user bio from query params.
+ *
+ * @returns Bio string.
+ */
+function computeBio(): string {
+  return String(route.query.bio ?? "");
+}
+
+const name = computed(computeName);
+const email = computed(computeEmail);
+const bio = computed(computeBio);
 </script>
 
 <template>
-  <!-- 页面：UserPopoverPage｜职责：用户信息弹窗（路由 query 传参） -->
-  <!-- 区块：<div> .card -->
-  <div class="card">
-    <!-- 区块：<div> .header -->
-    <div class="header">
-      <img v-if="avatar" class="avatar" :src="avatar" alt="avatar" />
-      <!-- 区块：<div> .avatar -->
-      <div v-else class="avatar placeholder" aria-hidden="true"></div>
-
-      <!-- 区块：<div> .meta -->
-      <div class="meta">
-        <!-- 区块：<div> .name -->
-        <div class="name" :title="name">{{ name }}</div>
-        <!-- 区块：<div> .email -->
-        <div v-if="email" class="email" :title="email">{{ email }}</div>
-        <!-- 区块：<div> .email -->
-        <div v-else class="email muted">&nbsp;</div>
-      </div>
-    </div>
-
-    <!-- 区块：<div> .bio -->
-    <div v-if="bio" class="bio" :title="bio">{{ bio }}</div>
-    <!-- 区块：<div> .bio-muted -->
-    <div v-else class="bio-muted">&nbsp;</div>
-  </div>
+  <!-- 页面：UserPopoverPage｜职责：用户信息 Popover -->
+  <!-- 区块：<main> .cp-pop -->
+  <main class="cp-pop">
+    <div class="cp-pop__title">{{ name || "User" }}</div>
+    <div class="cp-pop__row"><MonoTag :value="email || '—'" :copyable="true" /></div>
+    <div class="cp-pop__bio">{{ bio || "—" }}</div>
+  </main>
 </template>
 
 <style scoped lang="scss">
-/* 样式：Popover 卡片（透明背景适配 Tauri 窗口） */
-:global(html),
-/* 样式：:global(body) */
-:global(body) {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-}
-
-/* 样式：.card */
-.card {
-  width: 100vw;
-  height: 100vh;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* UserPopoverPage styles */
+/* Selector: `.cp-pop` — popover page surface. */
+.cp-pop {
+  height: 100%;
   padding: 12px;
-  background: var(--cp-panel, rgba(17, 24, 39, 0.78));
   border: 1px solid var(--cp-border);
+  background: var(--cp-panel);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  overflow: hidden;
-  animation: cp-fade-up 260ms var(--cp-ease, ease) both;
+  box-shadow: var(--cp-shadow);
 }
 
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(600px 220px at 30% 0%, rgba(56, 189, 248, 0.12), transparent 60%);
-}
-
-/* 样式：.header */
-.header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-}
-
-/* 样式：.avatar */
-.avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  object-fit: cover;
-  background: rgba(20, 32, 29, 0.08);
-  border: 1px solid var(--cp-border-light);
-  flex: 0 0 auto;
-}
-
-/* 样式：.avatar.placeholder */
-.avatar.placeholder {
-  background: rgba(15, 118, 110, 0.10);
-}
-
-/* 样式：.meta */
-.meta {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* 样式：.name */
-.name {
-  font-size: 14px;
-  font-weight: 600;
+/* Selector: `.cp-pop__title` — title line. */
+.cp-pop__title {
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  font-size: 16px;
   color: var(--cp-text);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* 样式：.email */
-.email {
+/* Selector: `.cp-pop__row` — metadata row wrapper. */
+.cp-pop__row {
+  margin-top: 10px;
+}
+
+/* Selector: `.cp-pop__bio` — bio paragraph. */
+.cp-pop__bio {
+  margin-top: 10px;
   font-size: 12px;
   color: var(--cp-text-muted);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 样式：.bio */
-.bio {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.35;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 3;
-}
-
-/* 样式：.muted */
-.muted {
-  color: transparent;
+  line-height: 1.45;
 }
 </style>

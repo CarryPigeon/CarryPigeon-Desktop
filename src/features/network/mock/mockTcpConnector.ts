@@ -1,5 +1,6 @@
 /**
- * @fileoverview mockTcpConnector.ts 文件职责说明。
+ * @fileoverview mockTcpConnector.ts
+ * @description Mock TcpConnectorPort (no-op) for UI preview mode.
  */
 import type { TcpConnectorPort } from "../domain/ports/TcpConnectorPort";
 import { createLogger } from "@/shared/utils/logger";
@@ -7,16 +8,11 @@ import { createLogger } from "@/shared/utils/logger";
 const logger = createLogger("mockTcpConnector");
 
 /**
- * Exported constant.
+ * Mock connector that logs connect attempts and immediately resolves.
+ *
  * @constant
  */
 export const mockTcpConnector: TcpConnectorPort = {
-  /**
-   * connect method.
-   * @param serverSocket - TODO.
-   * @param _opts - TODO.
-   * @returns TODO.
-   */
   async connect(serverSocket: string): Promise<void> {
     logger.info("Mock connect server", { serverSocket });
     // No-op for mock mode.

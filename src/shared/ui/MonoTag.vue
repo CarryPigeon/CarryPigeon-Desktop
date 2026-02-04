@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @fileoverview MonoTag.vue
- * @description Monospace tag for sockets/ids with optional copy.
+ * @fileoverview 单行等宽铭牌（MonoTag.vue）。
+ * @description 用于 socket/id 等显示的等宽铭牌，支持可选复制。
  */
 
 import { computed } from "vue";
@@ -18,20 +18,32 @@ const props = withDefaults(
   },
 );
 
-const display = computed(() => props.value.trim());
+/**
+ * 计算铭牌显示值。
+ *
+ * @returns 裁剪后的铭牌值。
+ */
+function computeDisplay(): string {
+  return props.value.trim();
+}
+
+const display = computed(computeDisplay);
 
 /**
- * handleCopy 方法说明。
- * @returns 返回值说明。
+ * 复制铭牌值到剪贴板（best-effort）。
+ *
+ * 设计说明：该组件不主动弹 toast，以保持通用性（由上层决定提示方式）。
+ *
+ * @returns Promise<void>
  */
-async function handleCopy() {
+async function handleCopy(): Promise<void> {
   if (!props.copyable) return;
   const text = display.value;
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // best-effort copy
+    // 尽力而为复制：忽略失败（权限/环境限制等）。
   }
 }
 </script>
@@ -52,6 +64,8 @@ async function handleCopy() {
 </template>
 
 <style scoped lang="scss">
+/* 样式：MonoTag */
+/* 选择器：`.mono-tag`｜用途：socket/id 等等宽铭牌 */
 .mono-tag {
   max-width: 100%;
   display: inline-flex;
@@ -66,6 +80,7 @@ async function handleCopy() {
   cursor: default;
 }
 
+/* 选择器：`.mono-tag.copyable`｜用途：可交互变体（启用 hover 提示） */
 .mono-tag.copyable {
   cursor: pointer;
   transition:
@@ -73,13 +88,15 @@ async function handleCopy() {
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease);
 
+  /* 选择器：`.mono-tag.copyable:hover`｜用途：轻微上浮 + info 边框高亮 */
   &:hover {
     transform: translateY(-1px);
     background: var(--cp-hover-bg);
-    border-color: rgba(56, 189, 248, 0.30);
+    border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
   }
 }
 
+/* 选择器：`.mono-tag__text`｜用途：等宽文本内容（截断） */
 .mono-tag__text {
   font-family: var(--cp-font-mono);
   font-size: 12px;
@@ -90,10 +107,10 @@ async function handleCopy() {
   min-width: 0;
 }
 
+/* 选择器：`.mono-tag__hint`｜用途：复制提示符（非关键） */
 .mono-tag__hint {
   opacity: 0.65;
   font-family: var(--cp-font-mono);
   font-size: 12px;
 }
 </style>
-
