@@ -1,744 +1,825 @@
 <script setup lang="ts">
 /**
- * @fileoverview LoginPage.vue 文件职责说明。
+ * @fileoverview LoginPage.vue
+ * @description Patchbay Login (Handshake + Auth).
  */
 
-import { onBeforeUnmount, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { Alert, Button, Input, MessagePlugin } from 'tdesign-vue-next';
-import Avatar from "/test_avatar.jpg?url";
-import { getConnectServerUsecase } from '@/features/auth/di/connectServer.di';
-import { AuthError } from '@/features/auth/domain/errors/AuthError';
-import { createLogger } from '@/shared/utils/logger';
-import { createEmailService } from '@/features/auth/data/authServiceFactory';
-import { createUserService } from '@/features/user/data/userServiceFactory';
-import { setCurrentUser } from '@/features/user/presentation/store/userData';
-import { writeAuthToken } from '@/shared/utils/localState';
-import { currentServerSocket } from '@/features/servers/presentation/store/currentServer';
-import { MOCK_SERVER_SOCKET, USE_MOCK_API } from '@/shared/config/runtime';
+import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { createAuthService, createEmailService } from "@/features/auth/data/authServiceFactory";
+import { isAuthRequiredPluginMissingError } from "@/features/auth/domain/errors/AuthErrors";
+import { setMissingRequiredPlugins } from "@/features/auth/presentation/store/requiredGate";
+import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store/currentServer";
+import { addServer, serverRacks } from "@/features/servers/presentation/store/serverList";
+import { connectWithRetry, connectionDetail, connectionPillState, connectionPhase, retryLast } from "@/features/network/presentation/store/connectionStore";
+import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
+import MonoTag from "@/shared/ui/MonoTag.vue";
+import { writeAuthSession } from "@/shared/utils/localState";
+import { setCurrentUser } from "@/features/user/presentation/store/userData";
+import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
+import { createLogger } from "@/shared/utils/logger";
 
-const logger = createLogger("LoginPage");
-
-const email = ref('');
-const server_socket = ref('');
-const transport = ref<"tls" | "tls-insecure" | "tcp">("tls");
-const code = ref('');
-const loading = ref(false);
-const sendCodeCountdown = ref(0);
-const emailAlertVisible = ref(false);
+type TransportKind = "tls_strict" | "tls_insecure" | "tcp_legacy";
 
 const router = useRouter();
+const logger = createLogger("LoginPage");
+
+const transport = ref<TransportKind>("tls_strict");
+const socketDraft = ref(currentServerSocket.value);
+
+const email = ref("");
+const code = ref("");
+const sending = ref(false);
+const loggingIn = ref(false);
+const banner = ref<string>("");
+
+const countdown = ref(0);
+let countdownTimer: number | null = null;
 
 /**
- * login 方法说明。
- * @returns 返回值说明。
+ * Compute the current login stage label shown in the UI.
+ *
+ * @returns `"Handshake"` or `"Auth"`.
  */
-async function login() {
-    loading.value = true;
-    try {
-        await ensureConnected();
-        if (!isValidEmailAddress(email.value)) {
-            showInvalidEmailAlert();
-            loading.value = false;
-            return;
-        }
-        if (!code.value.trim()) {
-            MessagePlugin.error('验证码不能为空');
-            loading.value = false;
-            return;
-        }
-        const socket = normalizeSocketWithTransport(server_socket.value.trim(), transport.value);
-        const userService = createUserService(socket);
-        const token = await userService.loginByEmail(email.value.trim(), code.value.trim());
-        const { token: boundToken, uid } = await userService.loginByToken(token);
-        const profile = (await userService
-            .getUserProfile(uid)
-            .catch(() => null)) as null | { username?: unknown; brief?: unknown };
-        if (boundToken) writeAuthToken(socket, boundToken);
-        else writeAuthToken(socket, token);
-        setCurrentUser({
-            id: uid,
-            email: email.value.trim(),
-            username: String(profile?.username ?? email.value.trim().split('@')[0] ?? ''),
-            description: String(profile?.brief ?? ''),
-        });
-        router.push('/chat');
-    } catch (e) {
-        logger.error("Handshake failed", { error: String(e) });
-        if (e instanceof AuthError) MessagePlugin.error(e.message);
-        else MessagePlugin.error('握手失败');
-    }
-    loading.value = false;
+function computeStage(): "Handshake" | "Auth" {
+  if (connectionPhase.value === "connected") return "Auth";
+  if (connectionPhase.value === "connecting") return "Handshake";
+  if (connectionPhase.value === "failed") return "Handshake";
+  return "Handshake";
 }
 
-let sendCodeTimer: ReturnType<typeof setInterval> | null = null;
-let emailAlertTimer: ReturnType<typeof setTimeout> | null = null;
+const stage = computed(computeStage);
 
 /**
- * isValidEmailAddress 方法说明。
- * @param value - 参数说明。
- * @returns 返回值说明。
+ * Resolve the server-info store for the currently selected socket.
+ *
+ * @returns Server-info store instance.
  */
-function isValidEmailAddress(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+function computeServerInfoStore() {
+  return useServerInfoStore(currentServerSocket.value.trim());
 }
 
+const serverInfoStore = computed(computeServerInfoStore);
+
 /**
- * showInvalidEmailAlert 方法说明。
- * @returns 返回值说明。
+ * Convenience ref: current server info.
+ *
+ * @returns Server info, or `null`.
  */
-function showInvalidEmailAlert() {
-  emailAlertVisible.value = true;
-  if (emailAlertTimer) clearTimeout(emailAlertTimer);
-  emailAlertTimer = setTimeout(() => {
-    emailAlertVisible.value = false;
-    emailAlertTimer = null;
-  }, 3000);
+function computeServerInfo() {
+  return serverInfoStore.value.info.value;
+}
+
+const serverInfo = computed(computeServerInfo);
+
+/**
+ * Sync the socket input draft into the global `currentServerSocket`.
+ *
+ * This keeps UI editing (draft) decoupled from the selected/active socket.
+ *
+ * @returns void
+ */
+function syncServerSocket(): void {
+  const next = socketDraft.value.trim();
+  setServerSocket(next);
 }
 
 /**
- * hideEmailAlert 方法说明。
- * @returns 返回值说明。
+ * Start a 1-second countdown used by the "resend code" button.
+ *
+ * @param seconds - Initial countdown seconds.
+ * @returns void
  */
-function hideEmailAlert() {
-  emailAlertVisible.value = false;
-  if (emailAlertTimer) clearTimeout(emailAlertTimer);
-  emailAlertTimer = null;
+function startCountdown(seconds: number): void {
+  if (countdownTimer) window.clearInterval(countdownTimer);
+  countdown.value = Math.max(0, Math.trunc(seconds));
+  countdownTimer = window.setInterval(handleCountdownTick, 1000);
 }
 
 /**
- * startSendCodeCountdown 方法说明。
- * @param seconds - 参数说明。
- * @returns 返回值说明。
+ * Interval tick: decrement countdown by 1s and stop at 0.
+ *
+ * @returns void
  */
-function startSendCodeCountdown(seconds = 60) {
-  if (sendCodeTimer) clearInterval(sendCodeTimer);
-  sendCodeCountdown.value = seconds;
-  sendCodeTimer = setInterval(() => {
-    sendCodeCountdown.value -= 1;
-    if (sendCodeCountdown.value <= 0) {
-      sendCodeCountdown.value = 0;
-      if (sendCodeTimer) clearInterval(sendCodeTimer);
-      sendCodeTimer = null;
-    }
-  }, 1000);
+function handleCountdownTick(): void {
+  countdown.value = Math.max(0, countdown.value - 1);
+  if (countdown.value <= 0 && countdownTimer) {
+    window.clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
 }
 
 /**
- * sendCode 方法说明。
- * @returns 返回值说明。
+ * Send a verification code to the given email (mock/real based on runtime).
+ *
+ * Validation is intentionally lightweight here because this is a UI preview flow.
+ *
+ * @returns Promise<void>
  */
-async function sendCode() {
-  if (sendCodeCountdown.value > 0) return;
-  if (!isValidEmailAddress(email.value)) {
-    showInvalidEmailAlert();
+async function handleSendCode(): Promise<void> {
+  banner.value = "";
+  const socket = currentServerSocket.value.trim();
+  if (!socket) {
+    banner.value = "Missing server socket.";
     return;
   }
+  if (!email.value.trim()) {
+    banner.value = "Missing email.";
+    return;
+  }
+
+  sending.value = true;
   try {
-    await ensureConnected();
-    const socket = normalizeSocketWithTransport(server_socket.value.trim(), transport.value);
     await createEmailService(socket).sendCode(email.value.trim());
-    startSendCodeCountdown(60);
+    startCountdown(60);
+    banner.value = "Code sent (mock).";
   } catch (e) {
-    logger.error("Send code failed", { error: String(e) });
-    MessagePlugin.error('发送验证码失败');
+    banner.value = String(e) || "Send failed.";
+  } finally {
+    sending.value = false;
   }
 }
 
-watch(email, (nextEmail) => {
-  if (emailAlertVisible.value && isValidEmailAddress(nextEmail)) hideEmailAlert();
-});
-
-onBeforeUnmount(() => {
-  if (sendCodeTimer) clearInterval(sendCodeTimer);
-  sendCodeTimer = null;
-  if (emailAlertTimer) clearTimeout(emailAlertTimer);
-  emailAlertTimer = null;
-});
-
 /**
- * ensureConnected 方法说明。
- * @returns 返回值说明。
+ * Perform sign-in with email + code.
+ *
+ * Behavior:
+ * - On success, stores token and populates `currentUser` (mock identity).
+ * - If the server requires plugins, redirects to `/required-setup`.
+ *
+ * @returns Promise<void>
  */
-async function ensureConnected() {
-  if (USE_MOCK_API) {
-    if (!server_socket.value.trim()) {
-      server_socket.value = MOCK_SERVER_SOCKET;
-    }
+async function handleLogin(): Promise<void> {
+  banner.value = "";
+  const socket = currentServerSocket.value.trim();
+  if (!socket) {
+    banner.value = "Missing server socket.";
+    return;
+  }
+  if (!email.value.trim() || !code.value.trim()) {
+    banner.value = "Missing email or code.";
+    return;
   }
 
-  const socket = normalizeSocketWithTransport(server_socket.value.trim(), transport.value);
-  if (!socket) throw new AuthError("Missing server socket");
-  if (currentServerSocket.value !== socket) {
-    const connectServer = getConnectServerUsecase();
-    await connectServer.execute({
-      serverSocket: socket,
+  loggingIn.value = true;
+  try {
+    const res = await createAuthService(socket).loginWithEmailCode(email.value.trim(), code.value.trim());
+    writeAuthSession(socket, {
+      accessToken: res.accessToken,
+      refreshToken: res.refreshToken,
+      uid: res.uid,
+      expiresAtMs: Date.now() + Math.max(0, Math.trunc(res.expiresInSec)) * 1000,
     });
+    setCurrentUser({
+      id: res.uid || "1",
+      username: email.value.trim().split("@")[0] || "Operator",
+      email: email.value.trim(),
+      description: "Patchbay operator (mock).",
+    });
+    void router.replace({ path: "/chat", query: res.isNewUser ? { welcome: "new" } : undefined });
+  } catch (e) {
+    if (isAuthRequiredPluginMissingError(e)) {
+      setMissingRequiredPlugins(e.payload.missing_plugins);
+      void router.replace("/required-setup");
+      return;
+    }
+    banner.value = String(e) || "Login failed.";
+  } finally {
+    loggingIn.value = false;
   }
 }
 
 /**
- * normalizeSocketWithTransport 方法说明。
- * @param raw - 参数说明。
- * @param mode - 参数说明。
- * @returns 返回值说明。
+ * Run handshake/connect for the current socket draft.
+ *
+ * On success, also refreshes server info so the UI can obtain a stable `server_id`
+ * (required by the plugin system for per-server isolation).
+ *
+ * @returns Promise<void>
  */
-function normalizeSocketWithTransport(raw: string, mode: "tls" | "tls-insecure" | "tcp"): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
-  if (mode === "tcp") return `tcp://${trimmed}`;
-  if (mode === "tls-insecure") return `tls-insecure://${trimmed}`;
-  return `tls://${trimmed}`;
+async function handleConnect(): Promise<void> {
+  syncServerSocket();
+  const socket = currentServerSocket.value.trim();
+  await connectWithRetry(socket, { maxAttempts: 6 });
+  if (connectionPhase.value === "connected") {
+    await serverInfoStore.value.refresh();
+    logger.info("Server info refreshed", { socket, serverId: serverInfo.value?.serverId ?? "" });
+  }
 }
+
+watch(
+  watchCurrentServerSocket,
+  handleCurrentServerSocketChange,
+);
+
+watch(
+  watchSocketDraft,
+  handleSocketDraftChange,
+);
+
+/**
+ * Watch-source: current server socket.
+ *
+ * @returns Current server socket string.
+ */
+function watchCurrentServerSocket(): string {
+  return currentServerSocket.value;
+}
+
+/**
+ * Keep the editable socket draft in sync with the selected socket.
+ *
+ * @param next - Next server socket.
+ * @returns void
+ */
+function handleCurrentServerSocketChange(next: string): void {
+  socketDraft.value = next;
+}
+
+/**
+ * Watch-source: socket draft.
+ *
+ * @returns Current socket draft.
+ */
+function watchSocketDraft(): string {
+  return socketDraft.value;
+}
+
+/**
+ * Clear transient banners when user edits the socket.
+ *
+ * @returns void
+ */
+function handleSocketDraftChange(): void {
+  banner.value = "";
+}
+
+/**
+ * Component mount hook: ensure a default rack exists and attempt initial connect.
+ *
+ * @returns void
+ */
+function handleMounted(): void {
+  if (serverRacks.value.length === 0 && currentServerSocket.value.trim()) {
+    addServer(currentServerSocket.value, "Default");
+  }
+  void handleConnect();
+}
+
+onMounted(handleMounted);
 </script>
 
 <template>
-  <!-- 页面：登录｜职责：与服务端握手建立连接，成功后进入聊天页 -->
-  <!-- 区块：<div> .login-page -->
-  <div class="login-page">
-    <!-- 区块：<div> .login-shell -->
-    <div class="login-shell">
-      <!-- 区块：<section> .brand-panel -->
-      <section class="brand-panel">
-        <header class="rack-head">
-          <div class="rack-kicker">RACK OVERVIEW</div>
-          <div class="rack-brand">CarryPigeon Desktop</div>
-        </header>
-
-        <div class="rack-block">
-          <div class="rack-label">{{ $t('server_socket') }}</div>
-          <Input
-            id="server-input"
-            class="login-input rack-input"
-            v-model="server_socket"
-            type="text"
-            autocomplete="off"
-            :placeholder="$t('server_socket')"
-          />
-
-          <div class="rack-row">
-            <div class="rack-label">{{ $t('transport') }}</div>
-            <select v-model="transport" class="cp-field rack-select" aria-label="transport">
-              <option value="tls">{{ $t('transport_tls_strict') }}</option>
-              <option value="tls-insecure">{{ $t('transport_tls_insecure') }}</option>
-              <option value="tcp">{{ $t('transport_tcp_legacy') }}</option>
-            </select>
-          </div>
-
-          <div class="rack-status">
-            <div class="status-row">
-              <div class="status-k">Status</div>
-              <div class="status-v">
-                <span class="status-led" :data-ready="Boolean(server_socket.trim())" aria-hidden="true"></span>
-                <span class="status-text">
-                  {{ server_socket.trim() ? "Handshake Ready" : "Waiting for socket" }}
-                </span>
-              </div>
-            </div>
-            <div class="status-hint">
-              若服务端返回 required 门禁，将自动进入 <span class="mono">/required-setup</span>。
-            </div>
+  <!-- 页面：LoginPage｜职责：连接阶段（Handshake）+ 验证码登录（Auth） -->
+  <!-- 区块：<main> .cp-login -->
+  <main class="cp-login">
+    <section class="cp-login__left">
+      <header class="cp-login__leftHead">
+        <div class="cp-login__brand">
+          <div class="cp-login__brandMark" aria-hidden="true"></div>
+          <div class="cp-login__brandText">
+            <div class="cp-login__brandName">CarryPigeon</div>
+            <div class="cp-login__brandSub">Modular Patchbay</div>
           </div>
         </div>
-      </section>
+        <div class="cp-login__stage">
+          <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">Handshake</span>
+          <span class="cp-login__stageSep">→</span>
+          <span class="cp-login__stageItem" :data-active="stage === 'Auth'">Auth</span>
+        </div>
+      </header>
 
-      <!-- 区块：<section> .login-container -->
-      <section class="login-container">
-        <div class="login-head">
-          <img class="user-image" :src="Avatar" alt="avatar" />
-          <div class="login-titles">
-            <h1 class="login-title">{{ $t('login') }}</h1>
-            <p class="login-subtitle">Handshake → Code → Chat</p>
+      <div class="cp-login__rack">
+        <div class="cp-login__label">Rack Overview</div>
+
+        <div class="cp-login__field">
+          <div class="cp-login__fieldLabel">server_socket</div>
+          <t-input v-model="socketDraft" placeholder="tls://host:port or mock://handshake" clearable />
+          <div class="cp-login__fieldHint">
+            <MonoTag :value="currentServerSocket || '—'" title="current socket" :copyable="true" />
+            <button class="cp-login__miniBtn" type="button" @click="handleConnect">Connect</button>
           </div>
         </div>
 
-        <form class="login-form" @submit.prevent="login">
-          <Alert
-            v-if="emailAlertVisible"
-            class="email-alert"
-            theme="warning"
-            :message="$t('email_invalid')"
-            :closeBtn="true"
-            :onClose="hideEmailAlert"
+        <div class="cp-login__field">
+          <div class="cp-login__fieldLabel">transport</div>
+          <div class="cp-login__seg">
+            <button class="cp-login__segBtn" :data-active="transport === 'tls_strict'" type="button" @click="transport = 'tls_strict'">
+              TLS Strict
+            </button>
+            <button class="cp-login__segBtn" :data-active="transport === 'tls_insecure'" type="button" @click="transport = 'tls_insecure'">
+              TLS Insecure
+            </button>
+            <button class="cp-login__segBtn" :data-active="transport === 'tcp_legacy'" type="button" @click="transport = 'tcp_legacy'">
+              TCP Legacy
+            </button>
+          </div>
+          <div class="cp-login__transportHint">
+            (Mock preview ignores transport; real mode should enforce TLS policies.)
+          </div>
+        </div>
+
+        <div class="cp-login__field">
+          <div class="cp-login__fieldLabel">connection</div>
+          <ConnectionPill
+            :state="connectionPillState"
+            label="Server link"
+            :detail="connectionDetail"
+            :action-label="connectionPhase === 'failed' ? 'Retry' : ''"
+            @action="retryLast"
           />
+        </div>
 
-          <div class="field">
-            <div class="field-label">{{ $t('email') }}</div>
-            <Input
-              id="email-input"
-              class="login-input"
-              v-model="email"
-              type="text"
-              autocomplete="email"
-              :placeholder="$t('email')"
-            />
+        <div class="cp-login__field">
+          <div class="cp-login__fieldLabel">server_id</div>
+          <div class="cp-login__fieldHint">
+            <MonoTag :value="serverInfo?.serverId || '—'" title="server_id" :copyable="true" />
+          </div>
+          <div class="cp-login__transportHint">
+            server_id is required for plugin isolation. If missing, Plugin Center will be disabled.
+          </div>
+        </div>
+      </div>
+
+      <div class="cp-login__leftFoot">
+        <div class="cp-login__monoBlock">
+          <div class="cp-login__monoTitle">Tip</div>
+          <div class="cp-login__monoText">
+            In mock mode, any email + code works — unless required modules are missing. Install them via the Power Latch.
+          </div>
+        </div>
+        <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">Open Server Manager</button>
+        <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
+      </div>
+    </section>
+
+    <section class="cp-login__right">
+      <div class="cp-login__panel">
+        <div class="cp-login__panelTitle">Auth Panel</div>
+        <div class="cp-login__panelSub">Email code session (login / register)</div>
+
+        <div v-if="banner" class="cp-login__banner">{{ banner }}</div>
+
+        <div class="cp-login__form">
+          <div class="cp-login__formRow">
+            <div class="cp-login__fieldLabel">email</div>
+            <t-input v-model="email" placeholder="you@domain.com" clearable />
           </div>
 
-          <div class="field">
-            <div class="field-label">{{ $t('login_code') }}</div>
-            <Input
-              id="code-input"
-              class="login-input"
-              v-model="code"
-              type="text"
-              autocomplete="one-time-code"
-              :placeholder="$t('login_code')"
-            >
-              <template #suffix>
-                <Button
-                  class="send-code-button"
-                  size="small"
-                  variant="text"
-                  theme="primary"
-                  :disabled="sendCodeCountdown > 0"
-                  @click.stop="sendCode"
-                >
-                  {{ sendCodeCountdown > 0 ? `${$t('send_code')} (${sendCodeCountdown}s)` : $t('send_code') }}
-                </Button>
-              </template>
-            </Input>
+          <div class="cp-login__formRow">
+            <div class="cp-login__fieldLabel">code</div>
+            <div class="cp-login__codeRow">
+              <t-input v-model="code" placeholder="123456" clearable />
+              <button
+                class="cp-login__sendBtn"
+                type="button"
+                :disabled="sending || countdown > 0"
+                @click="handleSendCode"
+              >
+                {{ countdown > 0 ? `Resend (${countdown})` : sending ? "Sending…" : "Send Code" }}
+              </button>
+            </div>
           </div>
 
-          <button class="login-button" :disabled="loading" type="submit">
-            <span v-if="loading">{{ $t('loading') }}</span>
-            <span v-else>{{ $t('login') }}</span>
+          <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
+            {{ loggingIn ? "Signing in…" : "Sign In / Register" }}
           </button>
-        </form>
-      </section>
-    </div>
-  </div>
+
+          <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
+        </div>
+      </div>
+    </section>
+  </main>
 </template>
 
 <style scoped lang="scss">
-/* 样式：登录页布局（暖纸 + 玻璃卡片） */
-.login-page {
-  --login-pad: clamp(14px, 2.6vw, 28px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  width: 100vw;
-  background: transparent;
-  padding: var(--login-pad);
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-/* 样式：.login-shell */
-.login-shell {
-  width: min(1120px, calc(100vw - (var(--login-pad) * 2)));
-  height: min(720px, calc(100vh - (var(--login-pad) * 2)));
+/* LoginPage styles */
+/* Layout: two-panel login (left handshake / right auth) */
+.cp-login {
+  height: 100%;
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  border-radius: clamp(22px, 2.3vw, 28px);
-  overflow: hidden;
+  grid-template-columns: 1fr minmax(360px, 460px);
+  gap: 14px;
+  padding: 14px;
+}
+
+/* Shell: shared panel container */
+.cp-login__left,
+.cp-login__right {
   border: 1px solid var(--cp-border);
-  box-shadow: var(--cp-shadow);
   background: var(--cp-surface);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  animation: cp-fade-up 520ms var(--cp-ease, ease) both;
-  position: relative;
-}
-
-.login-shell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(780px 420px at 12% 8%, var(--cp-glow-a), transparent 60%),
-    radial-gradient(700px 420px at 92% 92%, var(--cp-glow-b), transparent 55%);
-  mix-blend-mode: overlay;
-  opacity: 0.55;
-}
-
-/* 左侧品牌面板 */
-.brand-panel {
-  position: relative;
-  padding: clamp(18px, 2.2vw, 26px);
-  color: rgba(255, 253, 248, 0.94);
-  background:
-    radial-gradient(900px 520px at 20% 20%, rgba(15, 118, 110, 0.85), transparent 62%),
-    radial-gradient(800px 520px at 80% 80%, rgba(194, 65, 12, 0.62), transparent 58%),
-    linear-gradient(180deg, rgba(20, 32, 29, 0.92), rgba(20, 32, 29, 0.72));
+  border-radius: 18px;
+  box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
   min-width: 0;
 }
 
-.rack-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 253, 248, 0.14);
+/* Left column layout */
+.cp-login__left {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
 }
 
-.rack-kicker {
-  font-family: var(--cp-font-display);
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(226, 232, 240, 0.72);
-}
-
-.rack-brand {
-  font-family: var(--cp-font-display);
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  color: rgba(255, 253, 248, 0.92);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.rack-block {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid rgba(255, 253, 248, 0.14);
-  background: rgba(17, 24, 39, 0.22);
-  border-radius: 18px;
+/* Left header (brand + stage) */
+.cp-login__leftHead {
   padding: 14px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
-}
-
-.rack-label {
-  font-size: 12px;
-  color: rgba(226, 232, 240, 0.72);
-  letter-spacing: 0.02em;
-}
-
-.rack-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.rack-select {
-  width: 100%;
-}
-
-.rack-status {
-  margin-top: 2px;
-  border: 1px dashed rgba(255, 253, 248, 0.18);
-  background: rgba(17, 24, 39, 0.18);
-  border-radius: 16px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.status-row {
+  border-bottom: 1px solid var(--cp-border-light);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.status-k {
-  font-family: var(--cp-font-display);
-  font-size: 12px;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  color: rgba(226, 232, 240, 0.62);
+/* Brand cluster */
+.cp-login__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.status-v {
+/* Brand mark */
+.cp-login__brandMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid var(--cp-highlight-border);
+  background:
+    radial-gradient(10px 10px at 30% 35%, color-mix(in oklab, var(--cp-highlight) 86%, transparent), transparent 60%),
+    radial-gradient(12px 12px at 68% 60%, color-mix(in oklab, var(--cp-accent-2) 84%, transparent), transparent 60%),
+    color-mix(in oklab, var(--cp-panel-solid) 72%, var(--cp-bg));
+  box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
+}
+
+/* Brand name */
+.cp-login__brandName {
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  font-size: 16px;
+  color: var(--cp-text);
+}
+
+/* Brand subtitle */
+.cp-login__brandSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--cp-text-muted);
+}
+
+/* Stage indicator (Handshake → Auth) */
+.cp-login__stage {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-width: 0;
-}
-
-.status-led {
-  width: 10px;
-  height: 10px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.8);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+  padding: 8px 12px;
 }
 
-.status-led[data-ready="true"] {
-  background: var(--cp-accent);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+/* Stage item */
+.cp-login__stageItem {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--cp-text-muted);
 }
 
-.status-text {
+/* Stage active item */
+.cp-login__stageItem[data-active="true"] {
+  color: var(--cp-text);
+}
+
+/* Stage arrow separator */
+.cp-login__stageSep {
+  opacity: 0.55;
+}
+
+/* Rack overview panel */
+.cp-login__rack {
+  padding: 14px;
+  overflow: auto;
+}
+
+/* Section label */
+.cp-login__label {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   font-size: 12px;
-  color: rgba(255, 253, 248, 0.86);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--cp-text-muted);
 }
 
-.status-hint {
+/* Field wrapper */
+.cp-login__field {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cp-border-light);
+}
+
+/* Field label */
+.cp-login__fieldLabel {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   font-size: 12px;
-  line-height: 1.45;
-  color: rgba(226, 232, 240, 0.62);
+  color: var(--cp-text-muted);
+  margin-bottom: 8px;
 }
 
-.mono {
-  font-family: var(--cp-font-mono);
-  font-size: 12px;
-  color: rgba(226, 232, 240, 0.78);
-}
-
-.brand-panel::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(255, 253, 248, 0.16) 0 2px, transparent 3px),
-    radial-gradient(circle at 70% 60%, rgba(255, 253, 248, 0.12) 0 2px, transparent 3px),
-    radial-gradient(circle at 40% 80%, rgba(255, 253, 248, 0.1) 0 2px, transparent 3px);
-  opacity: 0.7;
-  filter: blur(0.2px);
-  pointer-events: none;
-}
-
-.brand-panel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 253, 248, 0.10), transparent),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 28%, transparent 72%, rgba(0, 0, 0, 0.22));
-  opacity: 0.28;
-  mix-blend-mode: overlay;
-}
-
-/* 右侧登录卡片 */
-.login-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: var(--cp-panel);
-  padding: clamp(18px, 2.2vw, 30px);
-  width: 100%;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  min-height: 0;
-  min-width: 0;
-}
-
-.login-container::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(620px 320px at 20% 10%, var(--cp-glow-a), transparent 60%),
-    radial-gradient(680px 360px at 90% 84%, var(--cp-glow-b), transparent 58%);
-  opacity: 0.9;
-}
-
-.login-head {
+/* Field hint row */
+.cp-login__fieldHint {
+  margin-top: 10px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  position: relative;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-/* 样式：.user-image */
-.user-image {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  object-fit: cover;
-  border: 1px solid var(--cp-border-light);
-  box-shadow: 0 14px 30px rgba(20, 32, 29, 0.12);
-}
-
-.login-titles {
-  min-width: 0;
-}
-
-.login-title {
-  margin: 0;
+/* Mini connect button */
+.cp-login__miniBtn {
+  border: 1px solid var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
   color: var(--cp-text);
-  font-size: clamp(18px, 1.8vw, 22px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.login-subtitle {
-  margin: 2px 0 0;
-  color: var(--cp-text-muted);
-  font-size: 12px;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  position: relative;
-}
-
-/* 样式：.email-alert */
-.email-alert {
-  width: 100%;
-  margin: 0;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  letter-spacing: 0.02em;
-}
-
-.login-input {
-  width: 100%;
-}
-
-.login-select {
-  appearance: none;
-}
-
-/* 样式：.send-code-button */
-.send-code-button {
-  padding: 0 10px;
-  height: 28px;
-}
-
-.login-input :deep(.t-input__suffix) {
-  padding-left: 6px;
-}
-
-.send-code-button {
   border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-.send-code-button :deep(.t-button__text) {
-  font-weight: 650;
-  letter-spacing: 0.01em;
+/* Mini connect hover */
+.cp-login__miniBtn:hover {
+  transform: translateY(-1px);
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg-strong);
 }
 
-.send-code-button:hover {
-  background: var(--cp-accent-soft) !important;
+.cp-login__miniBtn:active {
+  transform: translateY(0);
 }
 
-/* 样式：.login-button */
-.login-button {
-  width: 100%;
-  padding: 12px;
-  background: linear-gradient(180deg, var(--cp-accent), var(--cp-accent-hover));
-  color: #ffffff;
-  border: none;
+/* Transport segmented control */
+.cp-login__seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Transport segment button */
+.cp-login__segBtn {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
   border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 8px 10px;
+  font-size: 12px;
   cursor: pointer;
   transition:
-    transform var(--cp-fast, 160ms) var(--cp-ease, ease),
-    filter var(--cp-fast, 160ms) var(--cp-ease, ease),
-    opacity var(--cp-fast, 160ms) var(--cp-ease, ease);
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+/* Segment hover */
+.cp-login__segBtn:hover {
+  transform: translateY(-1px);
+  border-color: var(--cp-highlight-border);
+  background: var(--cp-hover-bg);
+}
+
+.cp-login__segBtn:active {
+  transform: translateY(0);
+}
+
+/* Segment active */
+.cp-login__segBtn[data-active="true"] {
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
+  color: var(--cp-text);
+}
+
+/* Transport hint text */
+.cp-login__transportHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--cp-text-muted);
+}
+
+/* Left footer area */
+.cp-login__leftFoot {
+  border-top: 1px solid var(--cp-border-light);
+  padding: 14px;
+}
+
+/* Tip block */
+.cp-login__monoBlock {
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+  background: var(--cp-panel-muted);
+  border-radius: 18px;
+  padding: 12px;
+}
+
+/* Tip title */
+.cp-login__monoTitle {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--cp-text-muted);
+}
+
+/* Tip text */
+.cp-login__monoText {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  line-height: 1.45;
+}
+
+/* Right column wrapper */
+.cp-login__right {
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+
+/* Auth panel card */
+.cp-login__panel {
+  width: min(440px, 100%);
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel);
+  border-radius: 18px;
+  box-shadow: var(--cp-shadow-soft);
+  padding: 16px;
+}
+
+/* Panel title */
+.cp-login__panelTitle {
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  font-size: 18px;
+  color: var(--cp-text);
+}
+
+/* Panel subtitle */
+.cp-login__panelSub {
   margin-top: 6px;
-  box-shadow: 0 18px 40px var(--cp-accent-shadow);
-
-  /* 样式：&:hover */
-  &:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.02);
-  }
-
-  /* 样式：&:active */
-  &:active {
-    transform: translateY(0px);
-    filter: brightness(0.98);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
+  font-size: 12px;
+  color: var(--cp-text-muted);
 }
 
-@media (max-width: 860px) {
-  .login-shell {
+/* Banner for inline feedback */
+.cp-login__banner {
+  margin-top: 12px;
+  border: 1px dashed var(--cp-highlight-border);
+  background: var(--cp-highlight-bg);
+  border-radius: 16px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--cp-text);
+}
+
+/* Form wrapper */
+.cp-login__form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Code row (input + send) */
+.cp-login__codeRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Send code button */
+.cp-login__sendBtn {
+  height: var(--cp-field-height);
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  border-radius: 999px;
+  padding: 0 14px;
+  min-width: 128px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+}
+
+/* Send hover (enabled only) */
+.cp-login__sendBtn:hover:enabled {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+.cp-login__sendBtn:active:enabled {
+  transform: translateY(0);
+}
+
+/* Send disabled */
+.cp-login__sendBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Primary sign-in button */
+.cp-login__primary {
+  border: 1px solid var(--cp-highlight-border-strong);
+  background:
+    radial-gradient(140px 34px at 24% 0%, color-mix(in oklab, var(--cp-highlight) 24%, transparent), transparent 60%),
+    radial-gradient(160px 38px at 78% 0%, color-mix(in oklab, var(--cp-accent) 18%, transparent), transparent 60%),
+    color-mix(in oklab, var(--cp-panel-muted) 92%, transparent);
+  color: var(--cp-text);
+  border-radius: 999px;
+  height: calc(var(--cp-field-height) + 6px);
+  padding: 0 14px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 18px 44px color-mix(in oklab, var(--cp-highlight) 16%, transparent);
+  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+}
+
+/* Primary hover (enabled only) */
+.cp-login__primary:hover:enabled {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--cp-highlight) 66%, var(--cp-border));
+  background:
+    radial-gradient(140px 34px at 24% 0%, color-mix(in oklab, var(--cp-highlight) 30%, transparent), transparent 60%),
+    radial-gradient(160px 38px at 78% 0%, color-mix(in oklab, var(--cp-accent) 22%, transparent), transparent 60%),
+    color-mix(in oklab, var(--cp-hover-bg) 86%, var(--cp-panel-muted));
+}
+
+.cp-login__primary:active:enabled {
+  transform: translateY(0);
+}
+
+/* Primary disabled */
+.cp-login__primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Ghost navigation button */
+.cp-login__ghost {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
+  border-radius: 999px;
+  padding: 10px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+}
+
+/* Ghost hover */
+.cp-login__ghost:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+.cp-login__ghost:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 980px) {
+  .cp-login {
     grid-template-columns: 1fr;
-    height: min(720px, calc(100vh - (var(--login-pad) * 2)));
   }
-  .brand-panel {
-    display: none;
+
+  .cp-login__right {
+    place-items: stretch;
+  }
+
+  .cp-login__panel {
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
   }
 }
 
-@media (max-height: 520px) {
-  .brand-panel {
-    display: none;
-  }
-  .login-shell {
-    height: calc(100vh - (var(--login-pad) * 2));
-  }
-}
-
-@media (max-height: 600px) {
-  .login-page {
-    --login-pad: 14px;
+@media (max-width: 560px) {
+  .cp-login {
+    gap: 12px;
+    padding: 12px;
   }
 
-  .login-shell {
-    height: min(720px, calc(100vh - (var(--login-pad) * 2)));
-  }
-
-  .login-container {
-    padding: 16px 16px;
-    justify-content: flex-start;
-  }
-
-  .brand-panel {
-    padding: 18px 18px;
-  }
-
-  .brand-copy {
-    margin-top: 18px;
-  }
-
-  .brand-chips {
-    display: none;
-  }
-
-  .login-form {
-    gap: 10px;
-  }
-
-  .login-head {
-    margin-bottom: 10px;
-  }
-
-  .login-button {
-    margin-top: 4px;
-  }
-}
-
-@media (max-height: 560px) {
-  .login-page {
-    --cp-field-height: 34px;
-  }
-
-  .brand-title {
-    font-size: 28px;
-  }
-
-  .brand-desc {
-    display: none;
+  .cp-login__leftHead {
+    padding: 12px;
   }
 }
 </style>

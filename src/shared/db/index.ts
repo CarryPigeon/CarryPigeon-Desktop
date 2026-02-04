@@ -1,5 +1,5 @@
 /**
- * @fileoverview index.ts 文件职责说明。
+ * @fileoverview DB module exports.
  */
 export * from "./types";
 export * from "./tauriDbClient";

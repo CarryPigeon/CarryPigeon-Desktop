@@ -1,743 +1,954 @@
 <script setup lang="ts">
 /**
- * @fileoverview PluginCenterPage.vue (Patchbay).
+ * @fileoverview PluginCenterPage.vue
+ * @description Patchbay Plugin Center (/plugins).
  */
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
-import MonoTag from "@/shared/ui/MonoTag.vue";
-import LabelBadge from "@/shared/ui/LabelBadge.vue";
+import { useI18n } from "vue-i18n";
+import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
+import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
+import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
+import { usePluginInstallStore } from "@/features/plugins/presentation/store/pluginInstallStore";
+import { addRepoSource, enabledRepoSources, removeRepoSource, repoSources, setRepoSourceEnabled } from "@/features/plugins/presentation/store/repoSourcesStore";
+import ModuleCard from "../components/ModuleCard.vue";
+import ModuleDetailDrawer from "../components/ModuleDetailDrawer.vue";
+import type { PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
 
-type PluginManifest = {
-  name: string;
-  version: string;
-  description?: string | null;
-  author?: string | null;
-  license?: string | null;
-  url: string;
-  frontend_sha256: string;
-  backend_sha256: string;
-  icon?: string | null;
-};
+type FilterKind = "all" | "installed" | "enabled" | "failed" | "updates" | "required";
+type SourceKind = "all" | "server" | "repo";
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
-const loading = ref(false);
-const error = ref<string | null>(null);
-const plugins = ref<PluginManifest[]>([]);
+const filter = ref<FilterKind>((String(route.query.filter ?? "all") as FilterKind) || "all");
+const source = ref<SourceKind>((String(route.query.source ?? "all") as SourceKind) || "all");
+const q = ref(String(route.query.q ?? ""));
 
-type PluginFilter = "all" | "installed" | "enabled" | "failed" | "updates" | "required";
-type PluginSource = "server" | "repo" | "local";
-
-const query = ref(String(route.query.q ?? "").trim());
-const normalizedQuery = computed(() => query.value.trim().toLowerCase());
-
-const filter = ref<PluginFilter>((String(route.query.filter ?? "all") as PluginFilter) || "all");
-const source = ref<PluginSource>((String(route.query.source ?? "local") as PluginSource) || "local");
-
-const selected = ref<string>("");
-
-const filtered = computed(() => {
-  const q = normalizedQuery.value;
-  const base = plugins.value;
-  const afterFilter = applyFilter(base, filter.value);
-  const afterSource = applySource(afterFilter, source.value);
-
-  if (!q) return afterSource;
-  return afterSource.filter((p) => {
-    return (
-      p.name.toLowerCase().includes(q) ||
-      p.version.toLowerCase().includes(q) ||
-      String(p.description ?? "").toLowerCase().includes(q)
-    );
-  });
-});
-
-const selectedPlugin = computed(() => {
-  const id = selected.value.trim();
-  if (!id) return null;
-  return plugins.value.find((p) => p.name === id) ?? null;
-});
+const selectedId = ref<string>("");
+const drawerOpen = ref(false);
+const repoDraft = ref<string>("");
+const repoNoteDraft = ref<string>("");
+const repoError = ref<string>("");
+const showRepoManager = ref<boolean>(false);
 
 /**
- * applyFilter 方法说明。
- * @param list - 参数说明。
- * @param f - 参数说明。
- * @returns 返回值说明。
+ * Compute the current server socket key.
+ *
+ * @returns Trimmed socket string.
  */
-function applyFilter(list: PluginManifest[], f: PluginFilter): PluginManifest[] {
-  // Current tauri API returns local manifests only; treat as installed.
-  if (f === "all") return list;
-  if (f === "installed") return list;
-  return list;
+function computeServerSocket(): string {
+  return currentServerSocket.value.trim();
 }
+
+const serverSocket = computed(computeServerSocket);
 
 /**
- * applySource 方法说明。
- * @param list - 参数说明。
- * @param s - 参数说明。
- * @returns 返回值说明。
+ * Resolve the server-info store scoped to the current socket.
+ *
+ * @returns Server-info store instance.
  */
-function applySource(list: PluginManifest[], s: PluginSource): PluginManifest[] {
-  // Placeholder: current data source is local only.
-  if (s === "local") return list;
-  return list;
+function computeServerInfoStore() {
+  return useServerInfoStore(serverSocket.value);
 }
 
-async function load() {
-  loading.value = true;
-  error.value = null;
-  try {
-    const list = await invokeTauri<PluginManifest[]>(TAURI_COMMANDS.listPlugins);
-    plugins.value = Array.isArray(list) ? list : [];
-  } catch (e) {
-    error.value = String(e);
-    plugins.value = [];
-  } finally {
-    loading.value = false;
+const serverInfoStore = computed(computeServerInfoStore);
+
+/**
+ * Expose `server_id` for UI gate behavior.
+ *
+ * @returns Current server_id (empty string when missing).
+ */
+function computeServerId(): string {
+  return serverInfoStore.value.info.value?.serverId ?? "";
+}
+
+const serverId = computed(computeServerId);
+
+/**
+ * Resolve the plugin catalog store scoped to the current socket.
+ *
+ * @returns Plugin catalog store.
+ */
+function computeCatalogStore() {
+  return usePluginCatalogStore(serverSocket.value);
+}
+
+const catalogStore = computed(computeCatalogStore);
+
+/**
+ * Add a repo source and refresh catalog (best-effort).
+ *
+ * @returns void
+ */
+function handleAddRepo(): void {
+  repoError.value = "";
+  const base = repoDraft.value.trim();
+  const note = repoNoteDraft.value.trim();
+  const created = addRepoSource(base, note || undefined);
+  if (!created) {
+    repoError.value = "Invalid repo URL (must be http/https).";
+    return;
   }
+  repoDraft.value = "";
+  repoNoteDraft.value = "";
+  if (serverSocket.value) void catalogStore.value.refresh();
 }
 
 /**
- * selectPlugin 方法说明。
- * @param pluginId - 参数说明。
- * @returns 返回值说明。
+ * Toggle a repo source and refresh catalog.
+ *
+ * @param id - Repo source id.
+ * @param enabled - Next enabled state.
+ * @returns void
  */
-function selectPlugin(pluginId: string) {
-  selected.value = pluginId;
+function handleToggleRepo(id: string, enabled: boolean): void {
+  setRepoSourceEnabled(id, enabled);
+  if (serverSocket.value) void catalogStore.value.refresh();
+}
+
+/**
+ * Remove a repo source and refresh catalog.
+ *
+ * @param id - Repo source id.
+ * @returns void
+ */
+function handleRemoveRepo(id: string): void {
+  removeRepoSource(id);
+  if (serverSocket.value) void catalogStore.value.refresh();
+}
+
+/**
+ * Resolve the plugin install store scoped to the current socket.
+ *
+ * @returns Plugin install store.
+ */
+function computeInstallStore() {
+  return usePluginInstallStore(serverSocket.value);
+}
+
+const installStore = computed(computeInstallStore);
+
+/**
+ * Compute required plugin ids for the required gate UI.
+ *
+ * @returns List of required plugin ids.
+ */
+function computeRequiredIds(): string[] {
+  const declared = serverInfoStore.value.info.value?.requiredPlugins ?? null;
+  if (Array.isArray(declared) && declared.length > 0) {
+    return declared.map((x) => String(x).trim()).filter(Boolean);
+  }
+  const out: string[] = [];
+  for (const p of catalogStore.value.catalog.value) {
+    if (p.source === "server" && p.required) out.push(p.pluginId);
+  }
+  return out;
+}
+
+const requiredIds = computed(computeRequiredIds);
+
+/**
+ * Expose catalog items by id for O(1) lookup in UI helpers.
+ *
+ * @returns Mapping of pluginId → catalog entry.
+ */
+function computeById() {
+  return catalogStore.value.byId.value;
+}
+
+const byId = computed(computeById);
+
+/**
+ * Read the `focus_plugin_id` query param (used by unknown-domain downgrade cards).
+ *
+ * @returns Focus plugin id (empty when unset).
+ */
+function computeFocusPluginId(): string {
+  return String(route.query.focus_plugin_id ?? "").trim();
+}
+
+const focusPluginId = computed(computeFocusPluginId);
+
+let queryTimer: number | null = null;
+
+/**
+ * Check whether an installed plugin has an update available.
+ *
+ * @param pluginId - Plugin id.
+ * @returns `true` when installed version differs from catalog latest version.
+ */
+function hasUpdate(pluginId: string): boolean {
+  const plugin = byId.value[pluginId];
+  const installed = installStore.value.installedById[pluginId];
+  const latest = plugin?.versions?.[0] ?? "";
+  const current = installed?.currentVersion ?? "";
+  return Boolean(latest && current && latest !== current);
+}
+
+/**
+ * Check whether a plugin passes the current source filter.
+ *
+ * @param p - Catalog entry.
+ * @returns `true` when the entry should be included.
+ */
+function matchesSource(p: PluginCatalogEntry): boolean {
+  return source.value === "all" ? true : p.source === source.value;
+}
+
+/**
+ * Check whether a plugin passes the current search query.
+ *
+ * @param p - Catalog entry.
+ * @param needle - Lowercased search needle.
+ * @returns `true` when the entry matches.
+ */
+function matchesQuery(p: PluginCatalogEntry, needle: string): boolean {
+  if (!needle) return true;
+
+  if (p.name.toLowerCase().includes(needle)) return true;
+  if (p.pluginId.toLowerCase().includes(needle)) return true;
+
+  for (const d of p.providesDomains) {
+    if (d.id.toLowerCase().includes(needle)) return true;
+    if (d.label.toLowerCase().includes(needle)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check whether a plugin passes the current status filter.
+ *
+ * @param p - Catalog entry.
+ * @returns `true` when the entry should be included.
+ */
+function matchesFilter(p: PluginCatalogEntry): boolean {
+  const installed = installStore.value.installedById[p.pluginId] ?? null;
+
+  if (filter.value === "all") return true;
+  if (filter.value === "installed") return Boolean(installed?.currentVersion);
+  if (filter.value === "enabled") return Boolean(installed?.enabled && installed.status === "ok");
+  if (filter.value === "failed") return Boolean(installed?.status === "failed");
+  if (filter.value === "updates") return hasUpdate(p.pluginId);
+  if (filter.value === "required") return Boolean(p.required);
+  return true;
+}
+
+/**
+ * Compute the plugin list shown in the grid.
+ *
+ * @returns Filtered catalog list.
+ */
+function computeFiltered(): PluginCatalogEntry[] {
+  const needle = q.value.trim().toLowerCase();
+  const items = catalogStore.value.catalog.value;
+  const out: PluginCatalogEntry[] = [];
+  for (const p of items) {
+    if (!matchesSource(p)) continue;
+    if (!matchesQuery(p, needle)) continue;
+    if (!matchesFilter(p)) continue;
+    out.push(p);
+  }
+  return out;
+}
+
+const filtered = computed(computeFiltered);
+
+/**
+ * Resolve the currently selected catalog entry (drawer content).
+ *
+ * @returns Selected plugin entry, or `null` when none.
+ */
+function computeSelectedPlugin(): PluginCatalogEntry | null {
+  return byId.value[selectedId.value] ?? null;
+}
+
+const selectedPlugin = computed(computeSelectedPlugin);
+
+/**
+ * Resolve the currently selected installed state (drawer content).
+ *
+ * @returns Selected install state, or `null` when none.
+ */
+function computeSelectedInstalled() {
+  return installStore.value.installedById[selectedId.value] ?? null;
+}
+
+const selectedInstalled = computed(computeSelectedInstalled);
+
+/**
+ * Open the plugin detail drawer for a given plugin.
+ *
+ * @param pluginId - Target plugin id.
+ */
+function openDetail(pluginId: string): void {
+  selectedId.value = pluginId;
+  drawerOpen.value = true;
+}
+
+/**
+ * Close the plugin detail drawer.
+ */
+function closeDetail(): void {
+  drawerOpen.value = false;
+}
+
+/**
+ * Drawer event: install a specific version for the selected plugin.
+ *
+ * @param version - Target version.
+ * @returns void
+ */
+function handleDrawerInstall(version: string): void {
+  const plugin = selectedPlugin.value;
+  if (!plugin) return;
+  void installStore.value.install(plugin, version);
+}
+
+/**
+ * Drawer event: update selected plugin to latest.
+ *
+ * @returns void
+ */
+function handleDrawerUpdate(): void {
+  const plugin = selectedPlugin.value;
+  if (!plugin) return;
+  void installStore.value.updateToLatest(plugin, plugin.versions[0] || "");
+}
+
+/**
+ * Drawer event: enable selected plugin.
+ *
+ * @returns void
+ */
+function handleDrawerEnable(): void {
+  const plugin = selectedPlugin.value;
+  if (!plugin) return;
+  void installStore.value.enable(plugin.pluginId);
+}
+
+/**
+ * Drawer event: disable selected plugin.
+ *
+ * @returns void
+ */
+function handleDrawerDisable(): void {
+  const plugin = selectedPlugin.value;
+  if (!plugin) return;
+  void installStore.value.disable(plugin.pluginId);
+}
+
+/**
+ * Drawer event: switch selected plugin to a specific version.
+ *
+ * @param version - Target version.
+ * @returns void
+ */
+function handleDrawerSwitchVersion(version: string): void {
+  const plugin = selectedPlugin.value;
+  if (!plugin) return;
+  void installStore.value.switchVersion(plugin.pluginId, version);
+}
+
+/**
+ * Drawer event: rollback selected plugin to the previous version.
+ *
+ * @returns void
+ */
+function handleDrawerRollback(): void {
+  const plugin = selectedPlugin.value;
+  if (!plugin) return;
+  void installStore.value.rollback(plugin.pluginId);
+}
+
+/**
+ * Ensure catalog + installed state are loaded for the current server.
+ *
+ * This is called:
+ * - On mount
+ * - When server socket changes
+ * - When user explicitly requests refresh
+ *
+ * @returns Promise<void>
+ */
+async function ensureData(): Promise<void> {
+  if (!serverSocket.value) return;
+  await Promise.all([
+    serverInfoStore.value.refresh(),
+    catalogStore.value.refresh(),
+    installStore.value.refreshInstalled(),
+  ]);
+  installStore.value.recheckRequired(requiredIds.value);
+}
+
+/**
+ * Sync current UI filters to route query for shareable/refresh-safe URLs.
+ */
+function syncQuery(): void {
   void router.replace({
-    path: "/plugins",
     query: {
       ...route.query,
-      focus_plugin_id: pluginId,
+      filter: filter.value === "all" ? undefined : filter.value,
+      source: source.value === "all" ? undefined : source.value,
+      q: q.value.trim() ? q.value.trim() : undefined,
     },
   });
 }
 
+watch([filter, source], syncQuery);
+
 /**
- * closeDrawer 方法说明。
- * @returns 返回值说明。
+ * Debounce query syncing when the search input changes.
+ *
+ * @returns void
  */
-function closeDrawer() {
-  selected.value = "";
-  const nextQuery = { ...route.query };
-  delete (nextQuery as Record<string, unknown>).focus_plugin_id;
-  void router.replace({ path: "/plugins", query: nextQuery });
+function handleQueryChange(): void {
+  if (queryTimer) window.clearTimeout(queryTimer);
+  queryTimer = window.setTimeout(syncQuery, 220);
+}
+
+watch(q, handleQueryChange);
+
+/**
+ * Watch-source: server socket.
+ *
+ * @returns Current server socket.
+ */
+function watchServerSocket(): string {
+  return serverSocket.value;
 }
 
 /**
- * setFilter 方法说明。
- * @param next - 参数说明。
- * @returns 返回值说明。
+ * Refresh page data when server socket changes.
+ *
+ * @returns void
  */
-function setFilter(next: PluginFilter) {
-  filter.value = next;
-  void router.replace({ path: "/plugins", query: { ...route.query, filter: next } });
+function handleServerSocketChange(): void {
+  void ensureData();
+}
+
+watch(watchServerSocket, handleServerSocketChange, { immediate: true });
+
+/**
+ * Watch-source: focus plugin id.
+ *
+ * @returns Current focus plugin id.
+ */
+function watchFocusPluginId(): string {
+  return focusPluginId.value;
 }
 
 /**
- * setSource 方法说明。
- * @param next - 参数说明。
- * @returns 返回值说明。
+ * Open drawer when focus plugin id is provided in route query.
+ *
+ * @param id - Target plugin id.
+ * @returns void
  */
-function setSource(next: PluginSource) {
-  source.value = next;
-  void router.replace({ path: "/plugins", query: { ...route.query, source: next } });
+function handleFocusPluginIdChange(id: string): void {
+  if (!id) return;
+  selectedId.value = id;
+  drawerOpen.value = true;
 }
+
+watch(watchFocusPluginId, handleFocusPluginIdChange, { immediate: true });
 
 /**
- * onWindowKeydown 方法说明。
- * @param event - 参数说明。
- * @returns 返回值说明。
+ * Component mount hook: prefetch data for current server.
+ *
+ * @returns void
  */
-function onWindowKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape") closeDrawer();
+function handleMounted(): void {
+  void ensureData();
 }
 
-onMounted(() => {
-  void load();
-  window.addEventListener("keydown", onWindowKeydown);
-
-  const focus = String(route.query.focus_plugin_id ?? "").trim();
-  if (focus) selected.value = focus;
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onWindowKeydown);
-});
-
-watch(
-  () => route.query,
-  (q) => {
-    query.value = String(q.q ?? "").trim();
-    filter.value = (String(q.filter ?? "all") as PluginFilter) || "all";
-    source.value = (String(q.source ?? "local") as PluginSource) || "local";
-    selected.value = String(q.focus_plugin_id ?? "").trim();
-  },
-);
+onMounted(handleMounted);
 </script>
 
 <template>
   <!-- 页面：PluginCenterPage｜职责：插件中心（模块机柜） -->
-  <!-- 区块：<div> .plugin-center -->
-  <div class="plugin-center">
-    <div class="layout">
-      <!-- 区块：<aside> .sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-top">
-          <div class="sidebar-title">{{ $t("plugin_center") }}</div>
-          <div class="sidebar-sub">Module Rack · {{ source.toUpperCase() }}</div>
-        </div>
+  <!-- 区块：<main> .cp-plugins -->
+  <main class="cp-plugins">
+    <aside class="cp-plugins__filters">
+      <div class="cp-plugins__filtersTitle">MODULE RACK</div>
+      <div class="cp-plugins__filtersSub">Search · Filter · Source</div>
 
-        <div class="sidebar-block">
-          <div class="block-title">Search</div>
-          <input v-model="query" class="cp-field" type="text" :placeholder="$t('search_bar')" />
-        </div>
+      <div class="cp-plugins__search">
+        <t-input v-model="q" :placeholder="t('plugin_search_placeholder')" clearable />
+      </div>
 
-        <div class="sidebar-block">
-          <div class="block-title">Filter</div>
-          <div class="chips">
-            <button class="chip" :class="{ active: filter === 'all' }" type="button" @click="setFilter('all')">
-              All
-            </button>
-            <button
-              class="chip"
-              :class="{ active: filter === 'installed' }"
-              type="button"
-              @click="setFilter('installed')"
-            >
-              Installed
-            </button>
-            <button
-              class="chip"
-              :class="{ active: filter === 'required' }"
-              type="button"
-              @click="setFilter('required')"
-            >
-              Required
-            </button>
-            <button class="chip" :class="{ active: filter === 'failed' }" type="button" @click="setFilter('failed')">
-              Failed
-            </button>
-            <button class="chip" :class="{ active: filter === 'updates' }" type="button" @click="setFilter('updates')">
-              Updates
-            </button>
-          </div>
+      <div class="cp-plugins__group">
+        <div class="cp-plugins__label">Filter</div>
+        <div class="cp-seg">
+          <button class="cp-seg__btn" :data-active="filter === 'all'" type="button" @click="filter = 'all'">{{ t("plugin_filter_all") }}</button>
+          <button class="cp-seg__btn" :data-active="filter === 'installed'" type="button" @click="filter = 'installed'">{{ t("plugin_filter_installed") }}</button>
+          <button class="cp-seg__btn" :data-active="filter === 'enabled'" type="button" @click="filter = 'enabled'">{{ t("plugin_filter_enabled") }}</button>
+          <button class="cp-seg__btn" :data-active="filter === 'failed'" type="button" @click="filter = 'failed'">{{ t("plugin_filter_failed") }}</button>
+          <button class="cp-seg__btn" :data-active="filter === 'updates'" type="button" @click="filter = 'updates'">{{ t("plugin_filter_updates") }}</button>
+          <button class="cp-seg__btn" :data-active="filter === 'required'" type="button" @click="filter = 'required'">{{ t("plugin_filter_required") }}</button>
         </div>
+      </div>
 
-        <div class="sidebar-block">
-          <div class="block-title">Source</div>
-          <div class="chips">
-            <button class="chip" :class="{ active: source === 'local' }" type="button" @click="setSource('local')">
-              Local
-            </button>
-            <button class="chip" :class="{ active: source === 'server' }" type="button" @click="setSource('server')">
-              Server
-            </button>
-            <button class="chip" :class="{ active: source === 'repo' }" type="button" @click="setSource('repo')">
-              Repo
-            </button>
-          </div>
-          <div class="hint">当前接口仅返回本地清单；Server/Repo 视图为占位，等待 catalog 接入。</div>
+      <div class="cp-plugins__group">
+        <div class="cp-plugins__label">Source</div>
+        <div class="cp-seg">
+          <button class="cp-seg__btn" :data-active="source === 'all'" type="button" @click="source = 'all'">All</button>
+          <button class="cp-seg__btn" :data-active="source === 'server'" type="button" @click="source = 'server'">Server</button>
+          <button class="cp-seg__btn" :data-active="source === 'repo'" type="button" @click="source = 'repo'">Repo</button>
         </div>
+      </div>
 
-        <div class="sidebar-actions">
-          <button class="btn" type="button" :disabled="loading" @click="load">
-            {{ loading ? $t("loading") : $t("recheck_required") }}
+      <div class="cp-plugins__group">
+        <div class="cp-plugins__label">Repo Sources</div>
+        <div class="cp-plugins__repoMeta">
+          <div class="cp-plugins__muted">{{ enabledRepoSources.length }} enabled · {{ repoSources.length }} total</div>
+          <button class="cp-plugins__repoBtn" type="button" @click="showRepoManager = !showRepoManager">
+            {{ showRepoManager ? "Hide" : "Manage" }}
           </button>
         </div>
-      </aside>
+        <div v-if="showRepoManager" class="cp-plugins__repoPanel">
+          <t-input v-model="repoDraft" placeholder="https://repo.example.com" clearable />
+          <t-input v-model="repoNoteDraft" placeholder="Note (optional)" clearable />
+          <button class="cp-plugins__repoAdd" type="button" @click="handleAddRepo">Add Repo</button>
+          <div v-if="repoError" class="cp-plugins__repoErr">{{ repoError }}</div>
 
-      <!-- 区块：<main> .main -->
-      <main class="main">
-        <header class="main-top">
-          <div class="main-left">
-            <LabelBadge variant="domain" label="MODULE RACK" />
-            <div class="main-count">{{ filtered.length }} modules</div>
-          </div>
-          <div class="main-right">
-            <div v-if="error" class="inline-state error">{{ error }}</div>
-          </div>
-        </header>
-
-        <section class="grid">
-          <div v-if="!filtered.length && !loading" class="state empty">No plugins</div>
-
-          <button
-            v-for="p in filtered"
-            :key="`${p.name}@${p.version}`"
-            type="button"
-            class="module"
-            :class="{ selected: selected === p.name }"
-            @click="selectPlugin(p.name)"
-          >
-            <div class="module-head">
-              <div class="module-name">{{ p.name }}</div>
-              <div class="module-ver">{{ p.version }}</div>
-            </div>
-            <div class="module-desc">{{ p.description || "—" }}</div>
-            <div class="module-ports" aria-hidden="true">
-              <span class="port" style="--port: var(--cp-domain-core)"></span>
-              <span class="port" style="--port: var(--cp-domain-math)"></span>
-              <span class="port" style="--port: var(--cp-domain-poetry)"></span>
-              <span class="port" style="--port: var(--cp-domain-mc)"></span>
-              <span class="port" style="--port: var(--cp-domain-unknown)"></span>
-            </div>
-            <div class="module-meta">
-              <span class="mono">sha256: {{ (p.frontend_sha256 || "").slice(0, 10) }}…</span>
-            </div>
-          </button>
-        </section>
-
-        <!-- 区块：<aside> .drawer -->
-        <aside v-if="selectedPlugin" class="drawer" aria-label="module detail">
-          <header class="drawer-head">
-            <div class="drawer-title">
-              <div class="drawer-name">{{ selectedPlugin.name }}</div>
-              <div class="drawer-ver mono">{{ selectedPlugin.version }}</div>
-            </div>
-            <button class="drawer-close" type="button" @click="closeDrawer">×</button>
-          </header>
-
-          <div class="drawer-body">
-            <div class="drawer-desc">{{ selectedPlugin.description || "—" }}</div>
-
-            <div class="drawer-kv">
-              <div class="k mono">plugin_id</div>
-              <div class="v">
-                <MonoTag :value="selectedPlugin.name" :copyable="true" />
+          <div v-if="repoSources.length === 0" class="cp-plugins__muted">No repos added.</div>
+          <div v-else class="cp-plugins__repoList">
+            <div v-for="r in repoSources" :key="r.id" class="cp-plugins__repoRow">
+              <label class="cp-plugins__repoToggle">
+                <input :checked="r.enabled" type="checkbox" @change="handleToggleRepo(r.id, !r.enabled)" />
+                <span>Enabled</span>
+              </label>
+              <div class="cp-plugins__repoInfo">
+                <div class="cp-plugins__repoUrl">{{ r.baseUrl }}</div>
+                <div v-if="r.note" class="cp-plugins__repoNote">{{ r.note }}</div>
               </div>
-            </div>
-
-            <div class="drawer-kv">
-              <div class="k mono">url</div>
-              <div class="v mono">{{ selectedPlugin.url || "—" }}</div>
-            </div>
-
-            <div class="drawer-kv">
-              <div class="k mono">frontend_sha256</div>
-              <div class="v mono">{{ selectedPlugin.frontend_sha256 || "—" }}</div>
-            </div>
-            <div class="drawer-kv">
-              <div class="k mono">backend_sha256</div>
-              <div class="v mono">{{ selectedPlugin.backend_sha256 || "—" }}</div>
-            </div>
-
-            <div class="drawer-actions">
-              <button class="action primary" type="button" disabled>Install</button>
-              <button class="action" type="button" disabled>Enable</button>
-              <button class="action" type="button" disabled>Update</button>
+              <button class="cp-plugins__repoRemove" type="button" @click="handleRemoveRepo(r.id)">Remove</button>
             </div>
           </div>
-        </aside>
-      </main>
-    </div>
-  </div>
+        </div>
+      </div>
+
+      <div class="cp-plugins__group">
+        <div class="cp-plugins__label">Required Gate</div>
+        <div class="cp-plugins__gate">
+          <div class="cp-plugins__gateLine">
+            <span class="cp-plugins__gateK">missing</span>
+            <span class="cp-plugins__gateV">{{ installStore.missingRequiredIds.value.length }}</span>
+          </div>
+          <button class="cp-plugins__gateBtn" type="button" @click="filter = 'required'">{{ t("open_plugin_center_required") }}</button>
+          <button class="cp-plugins__gateBtn" type="button" @click="ensureData">{{ t("recheck_required") }}</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="cp-plugins__gridWrap">
+      <header class="cp-plugins__head">
+        <div class="cp-plugins__headLeft">
+          <div class="cp-plugins__headTitle">{{ t("plugin_center") }}</div>
+          <div class="cp-plugins__headMeta">
+            <span class="cp-plugins__mono">{{ serverSocket || "no-server" }}</span>
+            <span class="cp-plugins__dot"></span>
+            <span class="cp-plugins__mono">{{ serverId || "missing-server_id" }}</span>
+            <span class="cp-plugins__dot"></span>
+            <span class="cp-plugins__muted">{{ filtered.length }} modules</span>
+          </div>
+        </div>
+        <div class="cp-plugins__headRight">
+          <button class="cp-plugins__headBtn" type="button" @click="ensureData">{{ t("refresh") }}</button>
+          <button class="cp-plugins__headBtn" type="button" @click="$router.push('/domains')">Domains</button>
+          <button class="cp-plugins__headBtn" type="button" @click="$router.push('/chat')">{{ t("back_to_patchbay") }}</button>
+        </div>
+      </header>
+
+      <div v-if="serverSocket && !serverId" class="cp-plugins__state err">
+        Plugin Center is locked: missing `server_id` from `GET /api/server`. Install/enable/update are disabled until fixed.
+      </div>
+      <div v-if="catalogStore.loading.value" class="cp-plugins__state">Loading catalog…</div>
+      <div v-else-if="catalogStore.error.value" class="cp-plugins__state err">{{ catalogStore.error.value }}</div>
+      <div v-else class="cp-plugins__grid">
+        <ModuleCard
+          v-for="p in filtered"
+          :key="p.pluginId"
+          :plugin="p"
+          :installed="installStore.installedById[p.pluginId] ?? null"
+          :progress="installStore.progressById[p.pluginId] ?? null"
+          :focused="p.pluginId === selectedId || p.pluginId === focusPluginId"
+          :has-update="hasUpdate(p.pluginId)"
+          :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+          disabled-reason="Missing server_id — plugin operations are disabled"
+          @install="installStore.install(p, p.versions[0] || '')"
+          @update="installStore.updateToLatest(p, p.versions[0] || '')"
+          @enable="installStore.enable(p.pluginId)"
+          @disable="installStore.disable(p.pluginId)"
+          @uninstall="installStore.uninstall(p.pluginId)"
+          @detail="openDetail(p.pluginId)"
+        />
+      </div>
+    </section>
+
+    <ModuleDetailDrawer
+      :open="drawerOpen"
+      :plugin="selectedPlugin"
+      :installed="selectedInstalled"
+      :has-update="selectedPlugin ? hasUpdate(selectedPlugin.pluginId) : false"
+      :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+      disabled-reason="Missing server_id — plugin operations are disabled"
+      @close="closeDetail"
+      @install="handleDrawerInstall"
+      @update="handleDrawerUpdate"
+      @enable="handleDrawerEnable"
+      @disable="handleDrawerDisable"
+      @switchVersion="handleDrawerSwitchVersion"
+      @rollback="handleDrawerRollback"
+    />
+  </main>
 </template>
 
 <style scoped lang="scss">
-/* Patchbay: module rack */
-.plugin-center {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.layout {
+/* PluginCenterPage styles */
+/* Layout: filter rail + grid area */
+.cp-plugins {
   height: 100%;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
   padding: 14px;
-  box-sizing: border-box;
 }
 
-.sidebar {
+/* Left rail: filters panel */
+.cp-plugins__filters {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
   border-radius: 18px;
+  padding: 14px;
   box-shadow: var(--cp-shadow-soft);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow: auto;
 }
 
-.sidebar-top {
-  padding: 14px 14px 12px;
-  border-bottom: 1px solid var(--cp-border-light);
-  background:
-    radial-gradient(520px 280px at 10% 0%, var(--cp-glow-a), transparent 62%),
-    radial-gradient(520px 280px at 92% 110%, var(--cp-glow-b), transparent 62%),
-    var(--cp-panel);
-}
-
-.sidebar-title {
+/* Rail title */
+.cp-plugins__filtersTitle {
   font-family: var(--cp-font-display);
-  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 12px;
   color: var(--cp-text);
-  letter-spacing: 0.01em;
 }
 
-.sidebar-sub {
-  margin-top: 4px;
+/* Rail subtitle */
+.cp-plugins__filtersSub {
+  margin-top: 6px;
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-.sidebar-block {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Search field wrapper */
+.cp-plugins__search {
+  margin-top: 12px;
 }
 
-.block-title {
+/* Filter group (segmented controls) */
+.cp-plugins__group {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cp-border-light);
+}
+
+/* Group label */
+.cp-plugins__label {
   font-family: var(--cp-font-display);
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  font-size: 12px;
   color: var(--cp-text-muted);
+  margin-bottom: 10px;
 }
 
-.chips {
+/* Segmented control container */
+.cp-seg {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.chip {
+/* Segmented control button */
+.cp-seg__btn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
-  color: var(--cp-text);
+  color: var(--cp-text-muted);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   font-size: 12px;
   cursor: pointer;
   transition:
     transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-
-  &:hover {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: rgba(56, 189, 248, 0.30);
-  }
-
-  &.active {
-    border-color: rgba(56, 189, 248, 0.30);
-    background: linear-gradient(180deg, var(--cp-accent-2-soft), transparent 75%), var(--cp-panel-muted);
-  }
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--cp-text-light);
-  line-height: 1.45;
-}
-
-.sidebar-actions {
-  margin-top: auto;
-  padding: 12px 14px;
-  border-top: 1px solid var(--cp-border-light);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn {
-  border: 1px solid rgba(56, 189, 248, 0.24);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 14px;
-  padding: 10px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: transform var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-
-  &:hover {
-    transform: translateY(-1px);
-    border-color: rgba(56, 189, 248, 0.34);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-}
-
-.main {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  background:
-    linear-gradient(180deg, rgba(148, 163, 184, 0.10), transparent 52%),
-    var(--cp-panel);
-}
-
-.main-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.main-count {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-.inline-state {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-.inline-state.error {
-  color: rgba(254, 202, 202, 0.92);
-}
-
-.grid {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.module {
-  text-align: left;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: var(--cp-shadow-soft);
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease);
-
-  &:hover {
-    transform: translateY(-2px);
-    border-color: rgba(56, 189, 248, 0.30);
-    background: var(--cp-field-bg-hover);
-  }
+    color var(--cp-fast) var(--cp-ease);
 }
 
-.module.selected {
-  border-color: rgba(56, 189, 248, 0.34);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18), var(--cp-shadow-soft);
+/* Segmented control hover */
+.cp-seg__btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--cp-highlight-border);
+  background: var(--cp-hover-bg);
 }
 
-.module-head {
+/* Segmented control active */
+.cp-seg__btn[data-active="true"] {
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
+  color: var(--cp-text);
+}
+
+/* Required-gate summary box */
+.cp-plugins__gate {
+  border: 1px dashed rgba(148, 163, 184, 0.26);
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--cp-panel-muted);
+}
+
+/* Gate key/value row */
+.cp-plugins__gateLine {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
 }
 
-.module-name {
-  font-family: var(--cp-font-display);
-  color: var(--cp-text);
-  font-size: 14px;
-  letter-spacing: 0.01em;
-}
-
-.module-ver {
-  font-family: var(--cp-font-mono);
-  color: rgba(226, 232, 240, 0.62);
+/* Gate key */
+.cp-plugins__gateK {
   font-size: 12px;
-}
-
-.module-desc {
-  margin-top: 8px;
   color: var(--cp-text-muted);
+}
+
+/* Gate value */
+.cp-plugins__gateV {
+  font-family: var(--cp-font-mono);
   font-size: 12px;
-  line-height: 1.4;
-  min-height: 34px;
+  color: var(--cp-text);
 }
 
-.module-ports {
+/* Gate action button */
+.cp-plugins__gateBtn {
   margin-top: 10px;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  opacity: 0.9;
-}
-
-.port {
-  width: 10px;
-  height: 10px;
+  width: 100%;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
   border-radius: 999px;
-  background: var(--port, var(--cp-domain-unknown));
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.10);
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+	    border-color var(--cp-fast) var(--cp-ease);
 }
 
-.module-meta {
-  margin-top: 10px;
+/* Gate button hover */
+.cp-plugins__gateBtn:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+/* Repo sources meta row */
+.cp-plugins__repoMeta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
-.mono {
+/* Repo sources manager panel */
+.cp-plugins__repoPanel {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.cp-plugins__repoBtn,
+.cp-plugins__repoAdd,
+.cp-plugins__repoRemove {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-plugins__repoBtn:hover,
+.cp-plugins__repoAdd:hover,
+.cp-plugins__repoRemove:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+.cp-plugins__repoErr {
+  font-size: 12px;
+  color: var(--cp-danger);
+}
+
+.cp-plugins__repoList {
+  display: grid;
+  gap: 10px;
+}
+
+.cp-plugins__repoRow {
+  border: 1px solid var(--cp-border-light);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 14px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.cp-plugins__repoToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--cp-text);
+}
+
+.cp-plugins__repoInfo {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.cp-plugins__repoUrl {
   font-family: var(--cp-font-mono);
   font-size: 12px;
-  color: rgba(226, 232, 240, 0.62);
+  color: var(--cp-text);
+  overflow-wrap: anywhere;
 }
 
-.state {
-  grid-column: 1 / -1;
-  padding: 14px;
-  border: 1px dashed rgba(148, 163, 184, 0.30);
-  border-radius: 18px;
-  background: var(--cp-panel-muted);
+.cp-plugins__repoNote {
+  font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-.state.error {
-  border-color: rgba(239, 68, 68, 0.34);
-  color: rgba(254, 202, 202, 0.92);
-}
-
-.drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(420px, 42vw);
-  border-left: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  box-shadow: -18px 0 60px rgba(0, 0, 0, 0.35);
+/* Right area: header + grid container */
+.cp-plugins__gridWrap {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  border-radius: 18px;
+  box-shadow: var(--cp-shadow);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
-.drawer-head {
-  padding: 14px;
+/* Grid header */
+.cp-plugins__head {
+  padding: 14px 14px 12px 14px;
   border-bottom: 1px solid var(--cp-border-light);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  background:
-    radial-gradient(520px 280px at 20% 0%, var(--cp-glow-a), transparent 65%),
-    var(--cp-panel);
 }
 
-.drawer-title {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.drawer-name {
+/* Header title */
+.cp-plugins__headTitle {
   font-family: var(--cp-font-display);
+  font-weight: 800;
+  letter-spacing: 0.04em;
   font-size: 18px;
   color: var(--cp-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.drawer-ver {
+/* Header meta row */
+.cp-plugins__headMeta {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mono meta chip */
+.cp-plugins__mono {
+  font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-.drawer-close {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 12px;
-  width: 34px;
-  height: 34px;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-
-  &:hover {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: rgba(56, 189, 248, 0.30);
-  }
+/* Dot separator */
+.cp-plugins__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.5);
 }
 
-.drawer-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 14px;
-}
-
-.drawer-desc {
-  color: var(--cp-text-muted);
-  font-size: 13px;
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-
-.drawer-kv {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.18);
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-}
-
-.drawer-kv .k {
+/* Muted meta */
+.cp-plugins__muted {
+  font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-.drawer-kv .v {
-  color: var(--cp-text);
-  min-width: 0;
-}
-
-.drawer-actions {
-  margin-top: 18px;
+/* Header right actions */
+.cp-plugins__headRight {
   display: flex;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
-.action {
+/* Header action button */
+.cp-plugins__headBtn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 10px 12px;
-  font-size: 13px;
-  cursor: not-allowed;
-  opacity: 0.75;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+	    border-color var(--cp-fast) var(--cp-ease);
 }
 
-.action.primary {
-  border-color: rgba(56, 189, 248, 0.30);
-  background: linear-gradient(180deg, var(--cp-accent-2-soft), transparent 78%), var(--cp-panel-muted);
+/* Header button hover */
+.cp-plugins__headBtn:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+/* Loading/error state */
+.cp-plugins__state {
+  padding: 18px;
+  color: var(--cp-text-muted);
+  font-size: 13px;
+}
+
+/* Error state */
+.cp-plugins__state.err {
+  color: rgba(248, 113, 113, 0.92);
+}
+
+/* Module grid */
+.cp-plugins__grid {
+  padding: 14px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  min-height: 0;
 }
 </style>

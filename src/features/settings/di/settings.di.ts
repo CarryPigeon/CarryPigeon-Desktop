@@ -1,30 +1,54 @@
 /**
- * @fileoverview settings.di.ts 文件职责说明。
+ * @fileoverview settings.di.ts
+ * @description Composition root for settings feature.
  */
-import { tauriConfigAdapter } from "../data/tauriConfigAdapter";
-import { GetConfig } from "../domain/usecases/GetConfig";
-import { UpdateConfig } from "../domain/usecases/UpdateConfig";
 
-let getConfig: GetConfig | null = null;
-let updateConfig: UpdateConfig | null = null;
+import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import type { ConfigPort } from "../domain/ports/ConfigPort";
+import { localStorageConfigPort } from "../data/localStorageConfigPort";
+import { mockConfigPort } from "../mock/mockConfigPort";
+import { GetConfig } from "../domain/usecases/GetConfig";
+import { SetTheme } from "../domain/usecases/SetTheme";
+
+let configPort: ConfigPort | null = null;
+
+// ============================================================================
+// Ports
+// ============================================================================
 
 /**
- * getGetConfigUsecase 方法说明。
- * @returns 返回值说明。
+ * Get singleton ConfigPort.
+ *
+ * Note: Even in mock mode, we typically use localStorage for theme to avoid
+ * visual flash. Override with mock if needed for testing.
+ *
+ * @returns ConfigPort.
+ */
+export function getConfigPort(): ConfigPort {
+  if (configPort) return configPort;
+  // Keep theme persistence stable in protocol mode as well (localStorage).
+  configPort = USE_MOCK_TRANSPORT ? localStorageConfigPort : USE_MOCK_API ? mockConfigPort : localStorageConfigPort;
+  return configPort;
+}
+
+// ============================================================================
+// Usecases
+// ============================================================================
+
+/**
+ * Get GetConfig usecase.
+ *
+ * @returns GetConfig usecase instance.
  */
 export function getGetConfigUsecase(): GetConfig {
-  if (getConfig) return getConfig;
-  getConfig = new GetConfig(tauriConfigAdapter);
-  return getConfig;
+  return new GetConfig(getConfigPort());
 }
 
 /**
- * getUpdateConfigUsecase 方法说明。
- * @returns 返回值说明。
+ * Get SetTheme usecase.
+ *
+ * @returns SetTheme usecase instance.
  */
-export function getUpdateConfigUsecase(): UpdateConfig {
-  if (updateConfig) return updateConfig;
-  updateConfig = new UpdateConfig(tauriConfigAdapter);
-  return updateConfig;
+export function getSetThemeUsecase(): SetTheme {
+  return new SetTheme(getConfigPort());
 }
-

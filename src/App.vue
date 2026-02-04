@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * @fileoverview App.vue root component.
+ * @fileoverview 应用根组件（路由容器）。
  */
 defineOptions({ name: "App" });
 </script>
@@ -11,10 +11,10 @@ defineOptions({ name: "App" });
 </template>
 
 <style lang="scss">
-/* Global style entry: theme tokens + baseline aesthetics */
+/* 全局样式入口：主题 token + 基础美学基线 */
 
 :root {
-  /* Typography (distinctive stacks, graceful fallbacks) */
+  /* 字体（有辨识度的字体栈与回退） */
   --cp-font-display: "Smiley Sans", "LXGW WenKai", "Alibaba PuHuiTi 3.0", "HarmonyOS Sans SC",
     "PingFang SC", "Microsoft YaHei UI", sans-serif;
   --cp-font-body: "HarmonyOS Sans SC", "Alibaba PuHuiTi 2.0", "PingFang SC", "Microsoft YaHei UI",
@@ -22,7 +22,7 @@ defineOptions({ name: "App" });
   --cp-font-mono: "Iosevka", "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", ui-monospace,
     Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  /* Palette: ink on warm paper */
+  /* 调色板：暖纸底上的墨色 */
   --cp-bg: #f6f1e7;
   --cp-bg-2: #e9f0ee;
   --cp-surface: rgba(255, 253, 248, 0.65);
@@ -47,13 +47,25 @@ defineOptions({ name: "App" });
   --cp-danger: #b42318;
   --cp-accent-shadow: rgba(15, 118, 110, 0.22);
 
-  /* Elevation */
-  --cp-shadow: 0 26px 70px rgba(20, 32, 29, 0.16);
-  --cp-shadow-soft: 0 10px 26px rgba(20, 32, 29, 0.12);
+  /* 高亮（与主题相关的选中/聚焦强调色） */
+  --cp-highlight: var(--cp-info);
+  --cp-highlight-border: color-mix(in oklab, var(--cp-highlight) 40%, var(--cp-border));
+  --cp-highlight-border-strong: color-mix(in oklab, var(--cp-highlight) 58%, var(--cp-border));
+  --cp-highlight-bg: color-mix(in oklab, var(--cp-highlight) 12%, transparent);
+  --cp-highlight-bg-strong: color-mix(in oklab, var(--cp-highlight) 18%, transparent);
+  --cp-highlight-ring: 0 0 0 3px color-mix(in oklab, var(--cp-highlight) 22%, transparent);
+  --cp-focus-border: var(--cp-highlight-border-strong);
+  --cp-focus-ring: var(--cp-highlight-ring);
+
+  /* 阴影层级（Elevation） */
+  --cp-shadow: 0 18px 52px rgba(20, 32, 29, 0.14);
+  --cp-shadow-soft: 0 8px 22px rgba(20, 32, 29, 0.10);
   --cp-ring: 0 0 0 3px rgba(15, 118, 110, 0.22);
   --cp-inset: inset 0 1px 0 rgba(255, 253, 248, 0.65);
+  --cp-elev-1: var(--cp-shadow-soft);
+  --cp-elev-2: var(--cp-shadow);
 
-  /* Inputs */
+  /* 输入控件 */
   --cp-field-height: 38px;
   --cp-field-pad-x: 12px;
   --cp-field-pad-y: 10px;
@@ -65,14 +77,14 @@ defineOptions({ name: "App" });
   --cp-field-border-hover: rgba(20, 32, 29, 0.24);
   --cp-field-placeholder: rgba(20, 32, 29, 0.42);
 
-  /* Domain cable colors */
+  /* 领域（Domain）线缆颜色（通用扩展通道） */
   --cp-domain-core: #0f766e;
-  --cp-domain-math: #2563eb;
-  --cp-domain-poetry: #db2777;
-  --cp-domain-mc: #7c3aed;
+  --cp-domain-ext-a: #2563eb;
+  --cp-domain-ext-b: #db2777;
+  --cp-domain-ext-c: #7c3aed;
   --cp-domain-unknown: rgba(20, 32, 29, 0.42);
 
-  /* Interaction */
+  /* 交互态 */
   --cp-hover-bg: rgba(20, 32, 29, 0.06);
   --cp-hover-bg-2: rgba(20, 32, 29, 0.10);
   --cp-scroll-thumb: rgba(20, 32, 29, 0.18);
@@ -81,7 +93,7 @@ defineOptions({ name: "App" });
   --cp-glow-b: rgba(194, 65, 12, 0.14);
   --cp-glow-c: rgba(2, 132, 199, 0.10);
 
-  /* Shape & motion */
+  /* 形状与动效 */
   --cp-radius-sm: 10px;
   --cp-radius: 14px;
   --cp-radius-lg: 18px;
@@ -89,12 +101,12 @@ defineOptions({ name: "App" });
   --cp-fast: 160ms;
   --cp-slow: 320ms;
 
-  /* Layout sizes */
+  /* 布局尺寸 */
   --server-rail-width: 68px;
   --channel-list-width: 280px;
   --participants-list-width: 260px;
 
-  /* TDesign token overrides (best-effort) */
+  /* 组件库（TDesign）token 覆盖（尽力而为） */
   --td-brand-color: var(--cp-accent);
   --td-brand-color-hover: var(--cp-accent-hover);
   --td-text-color-primary: var(--cp-text);
@@ -119,13 +131,13 @@ defineOptions({ name: "App" });
 }
 
 :root[data-theme="patchbay"] {
-  /* Typography */
+  /* 字体 */
   --cp-font-display: "Saira Semi Condensed", "DIN Alternate", "HarmonyOS Sans SC", "MiSans", "PingFang SC",
     "Microsoft YaHei UI", sans-serif;
   --cp-font-body: "Sarasa UI SC", "HarmonyOS Sans SC", "MiSans", "PingFang SC", "Microsoft YaHei UI",
     sans-serif;
 
-  /* Surfaces */
+  /* 表面（Surfaces） */
   --cp-bg: #0b0f14;
   --cp-bg-2: #0f1620;
   --cp-surface: rgba(17, 24, 39, 0.62);
@@ -140,7 +152,7 @@ defineOptions({ name: "App" });
   --cp-text-muted: rgba(226, 232, 240, 0.62);
   --cp-text-light: rgba(226, 232, 240, 0.42);
 
-  /* Status colors */
+  /* 状态色 */
   --cp-accent: #22c55e;
   --cp-accent-hover: #16a34a;
   --cp-accent-soft: rgba(34, 197, 94, 0.16);
@@ -151,11 +163,21 @@ defineOptions({ name: "App" });
   --cp-info: #38bdf8;
   --cp-accent-shadow: rgba(34, 197, 94, 0.22);
 
-  /* Ring */
+  /* 高亮（与主题相关的选中/聚焦强调色） */
+  --cp-highlight: var(--cp-info);
+  --cp-highlight-border: color-mix(in oklab, var(--cp-highlight) 40%, var(--cp-border));
+  --cp-highlight-border-strong: color-mix(in oklab, var(--cp-highlight) 58%, var(--cp-border));
+  --cp-highlight-bg: color-mix(in oklab, var(--cp-highlight) 12%, transparent);
+  --cp-highlight-bg-strong: color-mix(in oklab, var(--cp-highlight) 18%, transparent);
+  --cp-highlight-ring: 0 0 0 3px color-mix(in oklab, var(--cp-highlight) 22%, transparent);
+  --cp-focus-border: var(--cp-highlight-border-strong);
+  --cp-focus-ring: var(--cp-highlight-ring);
+
+  /* 聚焦环（Ring） */
   --cp-ring: 0 0 0 3px rgba(56, 189, 248, 0.28);
   --cp-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
-  /* Inputs */
+  /* 输入控件 */
   --cp-field-bg: rgba(17, 24, 39, 0.72);
   --cp-field-bg-hover: rgba(17, 24, 39, 0.82);
   --cp-field-bg-disabled: rgba(148, 163, 184, 0.06);
@@ -163,14 +185,14 @@ defineOptions({ name: "App" });
   --cp-field-border-hover: rgba(148, 163, 184, 0.30);
   --cp-field-placeholder: rgba(226, 232, 240, 0.42);
 
-  /* Domain cable colors */
+  /* 领域（Domain）线缆颜色（通用扩展通道） */
   --cp-domain-core: #2dd4bf;
-  --cp-domain-math: #60a5fa;
-  --cp-domain-poetry: #f472b6;
-  --cp-domain-mc: #a78bfa;
+  --cp-domain-ext-a: #60a5fa;
+  --cp-domain-ext-b: #f472b6;
+  --cp-domain-ext-c: #a78bfa;
   --cp-domain-unknown: #94a3b8;
 
-  /* Interaction */
+  /* 交互态 */
   --cp-hover-bg: rgba(148, 163, 184, 0.08);
   --cp-hover-bg-2: rgba(148, 163, 184, 0.14);
   --cp-scroll-thumb: rgba(148, 163, 184, 0.18);
@@ -179,11 +201,13 @@ defineOptions({ name: "App" });
   --cp-glow-b: rgba(34, 197, 94, 0.10);
   --cp-glow-c: rgba(244, 114, 182, 0.08);
 
-  /* Elevation */
-  --cp-shadow: 0 22px 70px rgba(0, 0, 0, 0.62);
-  --cp-shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.45);
+  /* 阴影层级（Elevation） */
+  --cp-shadow: 0 18px 56px rgba(0, 0, 0, 0.56);
+  --cp-shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.40);
+  --cp-elev-1: var(--cp-shadow-soft);
+  --cp-elev-2: var(--cp-shadow);
 
-  /* TDesign overrides */
+  /* 组件库（TDesign）覆盖 */
   --td-brand-color: rgba(56, 189, 248, 1);
   --td-brand-color-hover: rgba(125, 211, 252, 1);
   --td-text-color-primary: var(--cp-text);
@@ -231,7 +255,7 @@ body {
   overflow: hidden;
 }
 
-/* Patchbay background (graphite + grid) */
+/* 主题（Patchbay）背景（石墨 + 网格） */
 :root[data-theme="patchbay"] body {
   background:
     radial-gradient(900px 600px at 12% 0%, rgba(56, 189, 248, 0.10), transparent 60%),
@@ -240,7 +264,7 @@ body {
   background-attachment: fixed;
 }
 
-/* Subtle “print” texture + grid (very low opacity) */
+/* 细微“纸纹”质感 + 网格（低透明度） */
 body::before {
   content: "";
   position: fixed;
@@ -261,7 +285,7 @@ body::before {
       transparent 1px,
       transparent 10px
     );
-  opacity: 0.18;
+  opacity: 0.14;
   mix-blend-mode: multiply;
 }
 
@@ -281,7 +305,7 @@ body::before {
       transparent 1px,
       transparent 12px
     );
-  opacity: 0.35;
+  opacity: 0.26;
   mix-blend-mode: normal;
 }
 
@@ -314,16 +338,16 @@ h4 {
 
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {
   outline: none;
-  box-shadow: var(--cp-ring);
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
 }
 
-/* Prevent double focus rings inside TDesign wrappers */
+/* 防止在 TDesign 包裹层内出现双重 focus ring */
 .t-input__inner:focus-visible,
 .t-textarea__inner:focus-visible {
   box-shadow: none !important;
 }
 
-/* Native input utility (opt-in via class) */
+/* 原生输入控件工具类（按需启用） */
 .cp-field {
   width: 100%;
   height: var(--cp-field-height);
@@ -352,8 +376,8 @@ h4 {
 }
 
 .cp-field:focus {
-  border-color: var(--cp-accent);
-  box-shadow: var(--cp-ring);
+  border-color: var(--cp-focus-border);
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
 }
 
 .cp-field:disabled {
@@ -376,7 +400,7 @@ select.cp-field {
   padding-right: 34px;
 }
 
-/* TDesign: inputs/textarea baseline (avoid double shadows) */
+/* 组件库（TDesign）：输入框/文本域基线（避免双重阴影） */
 .t-input,
 .t-input__wrap,
 .t-textarea,
@@ -404,8 +428,8 @@ select.cp-field {
 .t-textarea--focused,
 .t-textarea.t-is-focused,
 .t-textarea__wrap:focus-within {
-  border-color: var(--cp-accent) !important;
-  box-shadow: var(--cp-ring), var(--cp-inset) !important;
+  border-color: var(--cp-focus-border) !important;
+  box-shadow: var(--cp-focus-ring, var(--cp-ring)), var(--cp-inset) !important;
 }
 
 .t-input {
@@ -417,7 +441,7 @@ select.cp-field {
 .t-input.t-is-focused,
 .t-input.t-input--focused:hover,
 .t-input.t-is-focused:hover {
-  box-shadow: var(--cp-ring), var(--cp-inset) !important;
+  box-shadow: var(--cp-focus-ring, var(--cp-ring)), var(--cp-inset) !important;
 }
 
 .t-input__inner::placeholder {
@@ -440,8 +464,8 @@ select.cp-field {
 }
 
 .t-textarea__inner:focus {
-  border-color: var(--cp-accent) !important;
-  box-shadow: var(--cp-ring), var(--cp-inset) !important;
+  border-color: var(--cp-focus-border) !important;
+  box-shadow: var(--cp-focus-ring, var(--cp-ring)), var(--cp-inset) !important;
 }
 
 .t-textarea__inner::placeholder {
@@ -455,7 +479,7 @@ select.cp-field {
   border-color: var(--cp-border-light) !important;
 }
 
-/* TDesign: dialogs feel like the app */
+/* 组件库（TDesign）：对话框风格与应用一致 */
 .t-dialog {
   background: var(--cp-panel) !important;
   border-color: var(--cp-border) !important;
@@ -482,7 +506,7 @@ select.cp-field {
   box-shadow: 0 18px 40px var(--cp-accent-shadow);
 }
 
-/* TDesign: toast/message */
+/* 组件库（TDesign）：Toast/Message */
 .t-message {
   background: var(--cp-panel) !important;
   border: 1px solid var(--cp-border-light);
@@ -491,7 +515,7 @@ select.cp-field {
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* Native inputs */
+/* 原生输入控件 */
 input,
 textarea,
 select {
@@ -500,7 +524,7 @@ select {
   }
 }
 
-/* Scrollbars (desktop-friendly) */
+/* 滚动条（更适配桌面端） */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--cp-hover-bg-2) transparent;

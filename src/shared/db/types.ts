@@ -1,5 +1,5 @@
 /**
- * @fileoverview types.ts 文件职责说明。
+ * @fileoverview DB types shared between frontend and Tauri DB commands.
  */
 export type DbValue = null | boolean | number | string;
 

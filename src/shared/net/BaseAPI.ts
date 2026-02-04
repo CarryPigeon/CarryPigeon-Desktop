@@ -2,17 +2,17 @@
  * @fileoverview TCP API 基类（请求封装 + 响应映射）。
  * @description 提供统一的 `send/sendRequest`，将协议细节收敛在 data 层，避免 UI 直接处理 TCP/JSON 细节。
  */
-import { TCP_SERVICE } from "../../features/network/data/tcp";
+import { TCP_SERVICE } from "@/features/network/data/tcp";
 import { CommandMessage, DataObject } from "./CommandMessage";
 import { createLogger } from "../utils/logger";
 
 /**
- * TCP request helper for feature data-layer APIs.
+ * 用于 feature data-layer 的 TCP 请求辅助基类。
  *
- * Notes:
- * - `send(route, data)` is fire-and-forget.
- * - `send(route, data, mapResponse)` returns a Promise resolved with mapped response.
- * - Prefer mapping responses here to keep parsing logic out of UI.
+ * 说明：
+ * - `send(route, data)` 为 fire-and-forget（不处理响应）。
+ * - `send(route, data, mapResponse)` 返回 Promise，并将响应映射为目标类型。
+ * - 建议在此处完成响应映射，避免 UI 层处理协议解析细节。
  */
 export abstract class BaseAPI {
 
@@ -36,8 +36,9 @@ export abstract class BaseAPI {
     }
 
     /**
-     * Fire-and-forget request (no response handling).
-     * Prefer `send()` when you need a response.
+     * 发送 fire-and-forget 请求（不处理响应）。
+     *
+     * 建议：需要响应时优先使用 `send()`（带 mapResponse）。
      */
     protected async sendRequest(route: string, data?: DataObject | undefined, callback?: () => unknown) {
         return this.sendRequestTo(this.serverSocket, route, data, callback);
@@ -133,9 +134,15 @@ export abstract class BaseAPI {
 }
 
 /**
- * normalizeRoute 方法说明。
- * @param route - 参数说明。
- * @returns 返回值说明。
+ * 将路由字符串归一化为稳定的“前导斜杠”形式。
+ *
+ * 示例：
+ * - `"chat/send"` → `"/chat/send"`
+ * - `"/chat/send"` → `"/chat/send"`
+ * - `""` → `"/"`
+ *
+ * @param route - 原始路由字符串。
+ * @returns 归一化后的路由。
  */
 function normalizeRoute(route: string): string {
     const trimmed = route.trim();
@@ -144,9 +151,14 @@ function normalizeRoute(route: string): string {
 }
 
 /**
- * unwrapResponse 方法说明。
- * @param raw - 参数说明。
- * @returns 返回值说明。
+ * 从 TCP 回调返回值中解包响应载荷。
+ *
+ * 原生侧（Rust/native）可能返回：
+ * - 包含 `{ code, data }` 的 JSON 字符串
+ * - 直接返回原始 JSON 字符串/对象（视作响应 `data`）
+ *
+ * @param raw - transport 回调返回的原始值。
+ * @returns 归一化后的 `{ code?, data? }`。
  */
 function unwrapResponse(raw: unknown): { code?: number; data?: unknown } {
     const value = parseMaybeJson(raw);
@@ -159,9 +171,10 @@ function unwrapResponse(raw: unknown): { code?: number; data?: unknown } {
 }
 
 /**
- * parseMaybeJson 方法说明。
- * @param raw - 参数说明。
- * @returns 返回值说明。
+ * 尝试将字符串解析为 JSON；失败则原样返回。
+ *
+ * @param raw - 原始值（string/object 等）。
+ * @returns 当 `raw` 为 JSON 字符串时返回解析后的值；否则返回原值。
  */
 function parseMaybeJson(raw: unknown): unknown {
     if (typeof raw !== "string") return raw;

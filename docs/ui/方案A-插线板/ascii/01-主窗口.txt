@@ -8,8 +8,7 @@
 | [!] C                | (ports)                              |  SIGNAL STREAM           | [○] Carol      |
 |                      |  o #general                          |  |▌ Core:Text            |                |
 | [menu] [plugins]     |  o #announcements                    |  |▌ Math:Formula (plugin) |                |
-|                      |  o #plugins                          |  |▌ UNPATCHED SIGNAL       |                |
+|                      |  o #plugins                          |  (o) |▌ UNPATCHED SIGNAL     |                |
 |                      |                                      |--------------------------|                |
 |                      | [User Card]                          |  COMPOSER HOST           |                |
 +----------------------------------------------------------------------------------------------------+
-
