@@ -2,7 +2,7 @@
  * @fileoverview 握手与 AES-GCM 加密（平台边界）。
  * @description 负责 ECC 握手、AES-GCM 加解密、以及 Netty length-prefix 帧封装；关联文档见 `docs/客户端开发指南.md`。
  */
-import { invokeTauri, TAURI_COMMANDS, tauriLog } from "../../../shared/tauri";
+import { invokeTauri, TAURI_COMMANDS, tauriLog } from "@/shared/tauri";
 
 type JsonObject = Record<string, unknown>;
 type FrameByteOrder = "be" | "le";
@@ -22,18 +22,23 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8");
 
 /**
- * toArrayBuffer 方法说明。
- * @param bytes - 参数说明。
- * @returns 返回值说明。
+ * Convert a `Uint8Array` view into a standalone `ArrayBuffer` slice.
+ *
+ * WebCrypto APIs accept `ArrayBuffer`/`ArrayBufferView`. We use a slice here to
+ * avoid subtle bugs when the input `Uint8Array` is a sub-view of a larger buffer.
+ *
+ * @param bytes - Byte view.
+ * @returns A sliced ArrayBuffer containing only `bytes`.
  */
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 /**
- * bytesToBase64 方法说明。
- * @param bytes - 参数说明。
- * @returns 返回值说明。
+ * Base64-encode bytes using browser built-ins (`btoa`).
+ *
+ * @param bytes - Raw bytes.
+ * @returns Base64 string.
  */
 function bytesToBase64(bytes: Uint8Array): string {
     let binary = "";
@@ -42,9 +47,10 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * base64ToBytes 方法说明。
- * @param base64 - 参数说明。
- * @returns 返回值说明。
+ * Decode a base64 string into bytes using browser built-ins (`atob`).
+ *
+ * @param base64 - Base64 string.
+ * @returns Decoded bytes.
  */
 function base64ToBytes(base64: string): Uint8Array {
     const binary = atob(base64);
@@ -54,9 +60,10 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 /**
- * concatBytes 方法说明。
- * @param parts - 参数说明。
- * @returns 返回值说明。
+ * Concatenate multiple byte arrays into a single `Uint8Array`.
+ *
+ * @param parts - Byte array parts.
+ * @returns Concatenated output.
  */
 function concatBytes(...parts: Uint8Array[]): Uint8Array {
     const total = parts.reduce((sum, p) => sum + p.length, 0);
@@ -70,10 +77,14 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
 }
 
 /**
- * frameNettyPayload 方法说明。
- * @param payload - 参数说明。
- * @param config - 参数说明。
- * @returns 返回值说明。
+ * Apply a Netty-style length-prefix header to a payload.
+ *
+ * Rust side is responsible for deframing (length-based decoder). This function
+ * only *frames* outgoing messages so Rust can parse them consistently.
+ *
+ * @param payload - Raw payload bytes.
+ * @param config - Frame config (u16/u32, endianness, header inclusion rule).
+ * @returns A new Uint8Array containing `[len][payload]`.
  */
 function frameNettyPayload(payload: Uint8Array, config: FrameConfig): Uint8Array {
     const headerBytes = config.lengthBytes;
@@ -94,9 +105,8 @@ function frameNettyPayload(payload: Uint8Array, config: FrameConfig): Uint8Array
 }
 
 /**
- * isAllZero 方法说明。
- * @param bytes - 参数说明。
- * @returns 返回值说明。
+ * @param bytes - Bytes to check.
+ * @returns `true` when all bytes are 0.
  */
 function isAllZero(bytes: Uint8Array): boolean {
     for (let i = 0; i < bytes.length; i++) if (bytes[i] !== 0) return false;
@@ -104,9 +114,10 @@ function isAllZero(bytes: Uint8Array): boolean {
 }
 
 /**
- * importServerEccPublicKeySpkiP256 方法说明。
- * @param base64Spki - 参数说明。
- * @returns 返回值说明。
+ * Import a server ECC public key (P-256) from base64 SPKI.
+ *
+ * @param base64Spki - Base64-encoded SPKI bytes.
+ * @returns Imported WebCrypto key for ECDH deriveBits.
  */
 async function importServerEccPublicKeySpkiP256(base64Spki: string): Promise<CryptoKey> {
     const spkiBytes = base64ToBytes(base64Spki);
@@ -124,10 +135,18 @@ async function importServerEccPublicKeySpkiP256(base64Spki: string): Promise<Cry
 }
 
 /**
- * eciesEncryptP256 方法说明。
- * @param serverPublicKey - 参数说明。
- * @param plaintext - 参数说明。
- * @returns 返回值说明。
+ * Encrypt a payload using ECIES-like scheme over P-256 ECDH.
+ *
+ * Notes:
+ * - This matches a common BouncyCastle ECIES configuration (KDF2(SHA1) + HMAC(SHA1)).
+ * - Output format: `V || C || T`
+ *   - `V`: ephemeral public key (uncompressed point)
+ *   - `C`: ciphertext (XOR with KDF output)
+ *   - `T`: HMAC-SHA1 tag over `C`
+ *
+ * @param serverPublicKey - Server ECDH public key (P-256).
+ * @param plaintext - Plain bytes.
+ * @returns Encrypted bytes.
  */
 async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Array): Promise<Uint8Array> {
     // Match BouncyCastle "ECIES" defaults (IESEngine + KDF2(SHA1) + HMac(SHA1), no block cipher).
@@ -152,21 +171,23 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
     const sharedSecret = new Uint8Array(sharedSecretBits);
     const ephPublicRaw = new Uint8Array(await window.crypto.subtle.exportKey("raw", eph.publicKey));
 
-/**
- * sha1 方法说明。
- * @param data - 参数说明。
- * @returns 返回值说明。
- */
+    /**
+     * Compute SHA-1 digest (used by KDF2 and HMAC key derivation).
+     *
+     * @param data - Input bytes.
+     * @returns SHA-1 digest bytes.
+     */
     async function sha1(data: Uint8Array): Promise<Uint8Array> {
         const digest = await window.crypto.subtle.digest("SHA-1", toArrayBuffer(data));
         return new Uint8Array(digest);
     }
 
-/**
- * u32be 方法说明。
- * @param value - 参数说明。
- * @returns 返回值说明。
- */
+    /**
+     * Encode an unsigned 32-bit integer in big-endian.
+     *
+     * @param value - Unsigned 32-bit integer.
+     * @returns 4-byte big-endian encoding.
+     */
     function u32be(value: number): Uint8Array {
         const out = new Uint8Array(4);
         const view = new DataView(out.buffer);
@@ -174,12 +195,13 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
         return out;
     }
 
-/**
- * kdf2Sha1 方法说明。
- * @param z - 参数说明。
- * @param length - 参数说明。
- * @returns 返回值说明。
- */
+    /**
+     * KDF2 with SHA-1 as the digest.
+     *
+     * @param z - Shared secret bytes.
+     * @param length - Output length in bytes.
+     * @returns Derived key bytes.
+     */
     async function kdf2Sha1(z: Uint8Array, length: number): Promise<Uint8Array> {
         const out = new Uint8Array(length);
         let written = 0;
@@ -214,11 +236,17 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
 }
 
 /**
- * buildAad 方法说明。
- * @param sequence - 参数说明。
- * @param sessionId - 参数说明。
- * @param timestampMs - 参数说明。
- * @returns 返回值说明。
+ * Build AAD (additional authenticated data) for AES-GCM.
+ *
+ * Layout (20 bytes):
+ * - u32 sequence
+ * - u64 sessionId
+ * - u64 timestampMs
+ *
+ * @param sequence - Message sequence number.
+ * @param sessionId - Session id.
+ * @param timestampMs - Timestamp in ms.
+ * @returns AAD bytes.
  */
 function buildAad(sequence: number, sessionId: bigint, timestampMs: bigint): Uint8Array {
     const aad = new Uint8Array(20);
@@ -230,9 +258,10 @@ function buildAad(sequence: number, sessionId: bigint, timestampMs: bigint): Uin
 }
 
 /**
- * parseAad 方法说明。
- * @param aad - 参数说明。
- * @returns 返回值说明。
+ * Parse AAD bytes back into structured fields.
+ *
+ * @param aad - AAD bytes.
+ * @returns Parsed fields.
  */
 function parseAad(aad: Uint8Array): { sequence: number; sessionId: bigint; timestampMs: bigint } {
     if (aad.length !== 20) throw new Error(`Invalid AAD length: ${aad.length}`);
@@ -245,6 +274,7 @@ function parseAad(aad: Uint8Array): { sequence: number; sessionId: bigint; times
 
 export class Encryption {
     private readonly serverSocket: string;
+    private readonly transportSocket: string;
     private serverEccPublicKeyBase64: string | undefined;
     private frameConfig: FrameConfig = { lengthBytes: 2, byteOrder: "be", lengthIncludesHeader: false };
 
@@ -253,8 +283,9 @@ export class Encryption {
     private sendSequence: number = 0;
     private handshakeComplete: boolean = false;
 
-    constructor(serverSocket: string, opts?: { serverEccPublicKeyBase64?: string; frameConfig?: FrameConfig }) {
+    constructor(serverSocket: string, opts?: { transportSocket?: string; serverEccPublicKeyBase64?: string; frameConfig?: FrameConfig }) {
         this.serverSocket = serverSocket;
+        this.transportSocket = String(opts?.transportSocket ?? serverSocket).trim() || serverSocket;
         this.serverEccPublicKeyBase64 = opts?.serverEccPublicKeyBase64;
         this.frameConfig = opts?.frameConfig ?? this.frameConfig;
     }
@@ -370,10 +401,12 @@ export class Encryption {
      * @returns Promise<void>
      */
     public async swapKey(requestId: number): Promise<void> {
-        const isMockSocket = this.serverSocket.startsWith("mock://");
+        const isMockSocket = this.transportSocket.startsWith("mock://");
         const isMockKey = this.serverEccPublicKeyBase64 === "mock";
         const isTlsSocket =
-            this.serverSocket.startsWith("tls://") || this.serverSocket.startsWith("tls-insecure://");
+            this.transportSocket.startsWith("tls://") ||
+            this.transportSocket.startsWith("tls-insecure://") ||
+            this.transportSocket.startsWith("tls-fp://");
 
         if (isMockSocket || isMockKey) {
             const rawAesKey = window.crypto.getRandomValues(new Uint8Array(16));
@@ -387,7 +420,7 @@ export class Encryption {
             this.sessionId = 1n;
             this.sendSequence = 0;
             this.handshakeComplete = true;
-            tauriLog.debug("Mock handshake bypassed", { socket: this.serverSocket });
+            tauriLog.debug("Mock handshake bypassed", { socket: this.transportSocket });
             return;
         }
 
@@ -443,7 +476,8 @@ export class Encryption {
                 .join(" ");
             tauriLog.debug("Handshake request sent", {
                 id: requestId,
-                socket: this.serverSocket,
+                serviceKey: this.serverSocket,
+                socket: this.transportSocket,
                 payloadLen: payload.length,
                 frameLen: framed.length,
                 prefix: prefixHex,

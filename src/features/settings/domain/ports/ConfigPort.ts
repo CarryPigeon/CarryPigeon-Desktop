@@ -1,12 +1,29 @@
 /**
- * @fileoverview ConfigPort.ts 文件职责说明。
+ * @fileoverview ConfigPort.ts
+ * @description Domain port: user configuration storage.
+ *
+ * Implementations:
+ * - `localStorage`: browser localStorage backed
+ * - `mock`: in-memory for testing
  */
-import type { AppConfig } from "../types/Config";
 
+import type { AppTheme, UserConfig } from "../types/ConfigTypes";
+
+/**
+ * Configuration port.
+ */
 export interface ConfigPort {
-  readRaw(): Promise<string>;
-  updateBool(key: string, value: boolean): Promise<void>;
-  updateString(key: string, value: string): Promise<void>;
-  parse(raw: string): AppConfig;
-}
+  /**
+   * Get current user configuration.
+   *
+   * @returns User configuration.
+   */
+  getConfig(): Promise<UserConfig>;
 
+  /**
+   * Set application theme.
+   *
+   * @param theme - Target theme.
+   */
+  setTheme(theme: AppTheme): Promise<void>;
+}

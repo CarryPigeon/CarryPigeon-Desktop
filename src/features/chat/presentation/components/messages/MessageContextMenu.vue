@@ -1,196 +1,169 @@
 <script setup lang="ts">
 /**
- * @fileoverview MessageContextMenu.vue 文件职责说明。
+ * @fileoverview MessageContextMenu.vue
+ * @description Context menu for message actions (copy/reply/delete/forward).
  */
 
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 
-type MenuAction = 'copy' | 'recall' | 'forward';
+export type MessageMenuAction = "copy" | "reply" | "delete" | "forward";
 
-const props = withDefaults(
-  defineProps<{
-    open: boolean;
-    x: number;
-    y: number;
-    showRecall?: boolean;
-  }>(),
-  {
-    showRecall: false,
-  },
-);
-
-const emit = defineEmits<{
-  (e: 'update:open', value: boolean): void;
-  (e: 'action', action: MenuAction): void;
+const props = defineProps<{
+  open: boolean;
+  x: number;
+  y: number;
 }>();
 
-const menuRef = ref<HTMLElement | null>(null);
-const position = ref({ x: 0, y: 0 });
+const emit = defineEmits<{
+  (e: "close"): void;
+  (e: "action", action: MessageMenuAction): void;
+}>();
+
+const { t } = useI18n();
 
 /**
- * close 方法说明。
- * @returns 返回值说明。
+ * Close the menu (emits `close`).
+ *
+ * @returns void
  */
-function close() {
-  emit('update:open', false);
+function handleClose(): void {
+  emit("close");
 }
 
 /**
- * emitAction 方法说明。
- * @param action - 参数说明。
- * @returns 返回值说明。
+ * Emit an action and close the menu.
+ *
+ * @param action - Selected menu action.
+ * @returns void
  */
-function emitAction(action: MenuAction) {
-  emit('action', action);
-  close();
+function handleAction(action: MessageMenuAction): void {
+  emit("action", action);
+  emit("close");
 }
 
 /**
- * updatePosition 方法说明。
- * @returns 返回值说明。
+ * Global handler to close the menu on:
+ * - Escape key
+ * - Any mouse click
+ *
+ * @param e - Window mouse/keyboard event.
+ * @returns void
  */
-async function updatePosition() {
-  position.value = { x: props.x, y: props.y };
-  await nextTick();
-
-  const el = menuRef.value;
-  if (!el) return;
-
-  const rect = el.getBoundingClientRect();
-  const padding = 8;
-
-  let x = props.x;
-  let y = props.y;
-
-  if (x + rect.width + padding > window.innerWidth) {
-    x = Math.max(padding, window.innerWidth - rect.width - padding);
+function onGlobal(e: MouseEvent | KeyboardEvent): void {
+  if (!props.open) return;
+  if (e instanceof KeyboardEvent && e.key === "Escape") {
+    e.preventDefault();
+    handleClose();
+    return;
   }
-
-  if (y + rect.height + padding > window.innerHeight) {
-    y = Math.max(padding, window.innerHeight - rect.height - padding);
-  }
-
-  position.value = { x, y };
+  if (e instanceof MouseEvent) handleClose();
 }
 
 /**
- * onDocumentPointerDown 方法说明。
- * @param event - 参数说明。
- * @returns 返回值说明。
+ * Component mount hook: register global close handlers.
+ *
+ * @returns void
  */
-const onDocumentPointerDown = (event: PointerEvent) => {
-  const target = event.target as Node | null;
-  if (target && menuRef.value?.contains(target)) return;
-  close();
-};
+function handleMounted(): void {
+  window.addEventListener("mousedown", onGlobal);
+  window.addEventListener("keydown", onGlobal);
+}
+
+onMounted(handleMounted);
 
 /**
- * onDocumentKeyDown 方法说明。
- * @param event - 参数说明。
- * @returns 返回值说明。
+ * Component unmount hook: remove global close handlers.
+ *
+ * @returns void
  */
-const onDocumentKeyDown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') close();
-};
+function handleBeforeUnmount(): void {
+  window.removeEventListener("mousedown", onGlobal);
+  window.removeEventListener("keydown", onGlobal);
+}
 
-/**
- * onWindowResize 方法说明。
- * @returns 返回值说明。
- */
-const onWindowResize = () => {
-  close();
-};
-
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) {
-      document.removeEventListener('pointerdown', onDocumentPointerDown);
-      document.removeEventListener('keydown', onDocumentKeyDown);
-      window.removeEventListener('resize', onWindowResize);
-      return;
-    }
-
-    void updatePosition();
-
-    document.addEventListener('pointerdown', onDocumentPointerDown);
-    document.addEventListener('keydown', onDocumentKeyDown);
-    window.addEventListener('resize', onWindowResize);
-  },
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown);
-  document.removeEventListener('keydown', onDocumentKeyDown);
-  window.removeEventListener('resize', onWindowResize);
-});
+onBeforeUnmount(handleBeforeUnmount);
 </script>
 
 <template>
-  <!-- 组件：MessageContextMenu｜职责：消息右键菜单（复制/转发/撤回）；交互：点击外部/ESC 关闭 -->
-  <Teleport to="body">
-    <!-- 区块：<div> -->
-    <div
-      v-if="props.open"
-      ref="menuRef"
-      class="message-context-menu"
-      role="menu"
-      :style="{ left: `${position.x}px`, top: `${position.y}px` }"
-      @contextmenu.prevent
-    >
-      <!-- 区块：<button> -->
-      <button class="message-context-menu-item" type="button" @click="emitAction('copy')">
-        {{ $t('copy_message') }}
+  <!-- 组件：MessageContextMenu｜职责：消息右键菜单 -->
+  <!-- 区块：<div> .cp-msgmenu -->
+  <teleport to="body">
+    <div v-if="props.open" class="cp-msgmenu" :style="{ left: `${props.x}px`, top: `${props.y}px` }" role="menu">
+      <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('copy')">
+        {{ t("copy_message") || t("copy") }}
       </button>
-      <!-- 区块：<button> -->
-      <button
-        v-if="props.showRecall"
-        class="message-context-menu-item"
-        type="button"
-        @click="emitAction('recall')"
-      >
-        {{ $t('recall_message') }}
+      <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('reply')">
+        {{ t("reply_message") }}
       </button>
-      <!-- 区块：<button> -->
-      <button class="message-context-menu-item" type="button" @click="emitAction('forward')">
-        {{ $t('forward_message') }}
+      <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
+        {{ t("forward_message") }}
+      </button>
+      <div class="cp-msgmenu__sep" aria-hidden="true"></div>
+      <button class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('delete')">
+        {{ t("delete_message") }}
       </button>
     </div>
-  </Teleport>
+  </teleport>
 </template>
 
 <style scoped lang="scss">
-/* 样式：浮层菜单（fixed 定位） */
-.message-context-menu {
+/* MessageContextMenu styles */
+/* Selector: `.cp-msgmenu` — floating menu surface (positioned by x/y). */
+.cp-msgmenu {
   position: fixed;
-  z-index: 10000;
-  min-width: 120px;
-  padding: 4px;
-  background: var(--cp-panel, rgba(17, 24, 39, 0.78));
-  border: 1px solid var(--cp-border, rgba(148, 163, 184, 0.18));
-  border-radius: var(--cp-radius, 14px);
-  box-shadow: var(--cp-shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  z-index: 60;
+  min-width: 180px;
+  border: 1px solid color-mix(in oklab, var(--cp-info) 18%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-panel) 92%, rgba(0, 0, 0, 0.05));
+  border-radius: 16px;
+  box-shadow: var(--cp-shadow);
+  padding: 8px;
+  backdrop-filter: blur(10px);
 }
 
-/* 样式：.message-context-menu-item */
-.message-context-menu-item {
+/* Selector: `.cp-msgmenu__item` — clickable menu row. */
+.cp-msgmenu__item {
   width: 100%;
-  text-align: left;
-  padding: 8px 12px;
-  border: 0;
-  background: transparent;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 10px;
   border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text);
+  font-size: 12px;
   cursor: pointer;
-  font-size: 14px;
-  color: var(--cp-text, rgba(248, 250, 252, 0.92));
-  transition: background-color var(--cp-fast, 160ms) var(--cp-ease, ease);
+  text-align: left;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
+}
 
-  /* 样式：&:hover */
-  &:hover {
-    background-color: var(--cp-accent-soft);
-  }
+/* Selector: `.cp-msgmenu__item:hover` — hover highlight. */
+.cp-msgmenu__item:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
+}
+
+/* Selector: `.cp-msgmenu__sep` — separator line before destructive action. */
+.cp-msgmenu__sep {
+  margin: 6px 6px;
+  height: 1px;
+  background: var(--cp-border-light);
+}
+
+/* Selector: `.cp-msgmenu__item.danger` — destructive action coloring. */
+.cp-msgmenu__item.danger {
+  color: color-mix(in oklab, var(--cp-danger) 72%, var(--cp-text));
+}
+
+/* Selector: `.cp-msgmenu__item.danger:hover` — destructive hover background/border. */
+.cp-msgmenu__item.danger:hover {
+  border-color: color-mix(in oklab, var(--cp-danger) 26%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
 }
 </style>

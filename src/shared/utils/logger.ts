@@ -5,18 +5,19 @@
 type LogMeta = Record<string, unknown>;
 
 /**
- * Frontend logger (console-based).
+ * 前端日志工具（基于 console）。
  *
- * Conventions:
- * - Prefer `createLogger("ScopeName")` per module/component.
- * - Pass structured `meta` instead of string concatenation.
- * - `debug()` logs are dev-only; `info/warn/error` stay enabled.
- * - Do not use `console.*` directly outside this module.
+ * 约定：
+ * - 每个模块/组件优先使用 `createLogger("ScopeName")` 创建带 scope 的 logger。
+ * - 优先传入结构化 `meta`，避免字符串拼接。
+ * - `debug()` 仅在 DEV 环境启用；`info/warn/error` 始终启用。
+ * - 除本模块外，禁止在业务代码中直接使用 `console.*`。
  */
 /**
- * formatMeta 方法说明。
- * @param meta? - 参数说明。
- * @returns 返回值说明。
+ * 将结构化元信息渲染为可安全输出到 console 的字符串。
+ *
+ * @param meta - 可选结构化元信息。
+ * @returns 以空格开头的 JSON 字符串；当 meta 不存在时返回空字符串。
  */
 function formatMeta(meta?: LogMeta): string {
   if (!meta) return "";
@@ -28,18 +29,20 @@ function formatMeta(meta?: LogMeta): string {
 }
 
 /**
- * nowIso 方法说明。
- * @returns 返回值说明。
+ * @returns 用于日志前缀的 ISO 时间字符串。
  */
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 /**
- * prefix 方法说明。
- * @param level - 参数说明。
- * @param scope? - 参数说明。
- * @returns 返回值说明。
+ * 构造日志前缀字符串。
+ *
+ * 格式：`[ISO] [LEVEL] [scope]`
+ *
+ * @param level - 日志级别标签。
+ * @param scope - 可选 scope（通常为模块/组件名）。
+ * @returns 前缀字符串。
  */
 function prefix(level: string, scope?: string): string {
   return `[${nowIso()}] [${level}]${scope ? ` [${scope}]` : ""}`;
@@ -53,49 +56,30 @@ export type Logger = {
 };
 
 /**
- * 创建一个带 scope 的前端 logger。
- * @param scope - 日志作用域（建议使用模块/组件名）
- * @returns Logger 实例
- */
-/**
- * createLogger 方法说明。
- * @param scope? - 参数说明。
- * @returns 返回值说明。
+ * 创建带 scope 的前端 logger。
+ *
+ * 设计目标：
+ * - 统一 console 输出格式与元信息处理。
+ * - 鼓励结构化日志（`meta` 对象），避免字符串拼接。
+ * - `debug` 仅在 DEV 启用，减少生产环境噪音。
+ *
+ * @param scope - 可选 scope 标签（通常为模块/组件名）。
+ * @returns Logger 实例。
  */
 export function createLogger(scope?: string): Logger {
   const isDev = !!import.meta.env?.DEV;
 
   return {
-    /**
-     * debug method.
-     * @param message - TODO.
-     * @param meta - TODO.
-     */
     debug(message, meta) {
       if (!isDev) return;
       console.debug(`${prefix("DEBUG", scope)} ${message}${formatMeta(meta)}`);
     },
-    /**
-     * info method.
-     * @param message - TODO.
-     * @param meta - TODO.
-     */
     info(message, meta) {
       console.info(`${prefix("INFO", scope)} ${message}${formatMeta(meta)}`);
     },
-    /**
-     * warn method.
-     * @param message - TODO.
-     * @param meta - TODO.
-     */
     warn(message, meta) {
       console.warn(`${prefix("WARN", scope)} ${message}${formatMeta(meta)}`);
     },
-    /**
-     * error method.
-     * @param message - TODO.
-     * @param meta - TODO.
-     */
     error(message, meta) {
       console.error(`${prefix("ERROR", scope)} ${message}${formatMeta(meta)}`);
     },

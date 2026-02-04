@@ -1,15 +1,47 @@
 /**
- * @fileoverview authServiceFactory.ts 文件职责说明。
+ * @fileoverview authServiceFactory.ts
+ * @description Data-layer factory: re-exports for backward compatibility.
+ *
+ * @deprecated Use domain/ports and di/ instead.
+ *
+ * API alignment:
+ * - See `docs/api/*` for auth endpoints and error model
+ * - required gate: PRD 5.6 + `required_plugin_missing`
  */
-import { USE_MOCK_API } from "@/shared/config/runtime";
-import { EmailService } from "./emailServiceImpl";
-import { MockEmailService } from "../mock/authMockService";
+
+// Re-export types from domain layer for backward compatibility
+export type { AuthLoginResult } from "../domain/types/AuthTypes";
+
+// Re-export port types as service types for backward compatibility
+export type { AuthServicePort as AuthService } from "../domain/ports/AuthServicePort";
+export type { EmailServicePort as EmailService } from "../domain/ports/EmailServicePort";
+
+// Re-export factory functions for backward compatibility
+export { createMockEmailServicePort as createMockEmailService } from "../mock/mockEmailServicePort";
+export { createMockAuthServicePort as createMockAuthService } from "../mock/mockAuthServicePort";
+export { createHttpEmailServicePort as createHttpEmailService } from "../data/httpEmailServicePort";
+export { createHttpAuthServicePort as createHttpAuthService } from "../data/httpAuthServicePort";
+
+import type { AuthServicePort } from "../domain/ports/AuthServicePort";
+import type { EmailServicePort } from "../domain/ports/EmailServicePort";
+import { getAuthServicePort, getEmailServicePort } from "../di/auth.di";
 
 /**
- * createEmailService 方法说明。
- * @param serverSocket - 参数说明。
- * @returns 返回值说明。
+ * Legacy factory name used by presentation/bootstrap layers.
+ *
+ * @param serverSocket - Server socket.
+ * @returns AuthServicePort.
  */
-export function createEmailService(serverSocket: string) {
-  return USE_MOCK_API ? new MockEmailService(serverSocket) : new EmailService(serverSocket);
+export function createAuthService(serverSocket: string): AuthServicePort {
+  return getAuthServicePort(serverSocket);
+}
+
+/**
+ * Legacy factory name used by presentation/bootstrap layers.
+ *
+ * @param serverSocket - Server socket.
+ * @returns EmailServicePort.
+ */
+export function createEmailService(serverSocket: string): EmailServicePort {
+  return getEmailServicePort(serverSocket);
 }

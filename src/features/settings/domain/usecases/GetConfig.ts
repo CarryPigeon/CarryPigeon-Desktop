@@ -1,19 +1,23 @@
 /**
- * @fileoverview GetConfig.ts 文件职责说明。
+ * @fileoverview GetConfig.ts
+ * @description Usecase: retrieve user configuration.
  */
-import type { AppConfig } from "../types/Config";
-import type { ConfigPort } from "../ports/ConfigPort";
 
+import type { ConfigPort } from "../ports/ConfigPort";
+import type { UserConfig } from "../types/ConfigTypes";
+
+/**
+ * Get config usecase.
+ */
 export class GetConfig {
-  constructor(private readonly config: ConfigPort) {}
+  constructor(private readonly configPort: ConfigPort) {}
 
   /**
-   * execute method.
-   * @returns TODO.
+   * Execute get config.
+   *
+   * @returns User configuration.
    */
-  async execute(): Promise<AppConfig> {
-    const raw = await this.config.readRaw();
-    return this.config.parse(raw);
+  execute(): Promise<UserConfig> {
+    return this.configPort.getConfig();
   }
 }
-

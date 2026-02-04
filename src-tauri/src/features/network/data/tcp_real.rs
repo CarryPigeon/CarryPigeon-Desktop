@@ -3,12 +3,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio_native_tls::TlsStream;
+use sha2::Digest;
 
 use crate::features::network::domain::types::TcpMessageEvent;
 
 enum Transport {
     Plain,
-    Tls { insecure: bool },
+    Tls { insecure: bool, fingerprint_sha256: Option<String> },
 }
 
 enum TcpReader {
@@ -40,7 +41,7 @@ impl TcpServiceReal {
                 let (r, w) = tokio::io::split(stream);
                 (TcpReader::Plain(r), TcpWriter::Plain(w))
             }
-            Transport::Tls { insecure } => {
+            Transport::Tls { insecure, fingerprint_sha256 } => {
                 let host = extract_host(&addr)?;
                 let mut builder = native_tls::TlsConnector::builder();
                 if insecure {
@@ -52,6 +53,11 @@ impl TcpServiceReal {
                     .connect(&host, stream)
                     .await
                     .map_err(|e| anyhow::anyhow!("TLS handshake failed: {}", e))?;
+
+                if let Some(expected) = fingerprint_sha256.as_deref() {
+                    verify_tls_fingerprint_sha256(&tls, expected)?;
+                }
+
                 let (r, w) = tokio::io::split(tls);
                 (TcpReader::Tls(r), TcpWriter::Tls(w))
             }
@@ -154,16 +160,93 @@ impl TcpServiceReal {
 }
 
 fn parse_transport(raw: &str) -> (Transport, &str) {
+    if let Some(rest) = raw.strip_prefix("tls-fp://") {
+        if let Some((fp, addr)) = rest.split_once('@') {
+            let fp = normalize_fingerprint(fp);
+            return (
+                Transport::Tls {
+                    insecure: true,
+                    fingerprint_sha256: Some(fp),
+                },
+                addr,
+            );
+        }
+        // Invalid format: keep `addr` as-is so connect attempt is deterministic,
+        // but force fingerprint verification to fail with a clear error.
+        return (
+            Transport::Tls {
+                insecure: true,
+                fingerprint_sha256: Some("".to_string()),
+            },
+            rest,
+        );
+    }
     if let Some(rest) = raw.strip_prefix("tls-insecure://") {
-        return (Transport::Tls { insecure: true }, rest);
+        return (
+            Transport::Tls {
+                insecure: true,
+                fingerprint_sha256: None,
+            },
+            rest,
+        );
     }
     if let Some(rest) = raw.strip_prefix("tls://") {
-        return (Transport::Tls { insecure: false }, rest);
+        return (
+            Transport::Tls {
+                insecure: false,
+                fingerprint_sha256: None,
+            },
+            rest,
+        );
     }
     if let Some(rest) = raw.strip_prefix("tcp://") {
         return (Transport::Plain, rest);
     }
     (Transport::Plain, raw)
+}
+
+fn normalize_fingerprint(raw: &str) -> String {
+    raw.trim()
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect()
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
+fn verify_tls_fingerprint_sha256(tls: &tokio_native_tls::TlsStream<TcpStream>, expected_sha256: &str) -> anyhow::Result<()> {
+    let expected = normalize_fingerprint(expected_sha256);
+    if expected.len() != 64 {
+        return Err(anyhow::anyhow!(
+            "Invalid TLS fingerprint: expected SHA-256 (64 hex chars), got len={}",
+            expected.len()
+        ));
+    }
+
+    let peer = tls
+        .get_ref()
+        .peer_certificate()
+        .map_err(|e| anyhow::anyhow!("Failed to read peer certificate: {}", e))?;
+    let Some(cert) = peer else {
+        return Err(anyhow::anyhow!("TLS fingerprint check failed: missing peer certificate"));
+    };
+    let der = cert
+        .to_der()
+        .map_err(|e| anyhow::anyhow!("Failed to export peer certificate DER: {}", e))?;
+    let actual = sha256_hex(&der);
+    if actual != expected {
+        return Err(anyhow::anyhow!(
+            "TLS fingerprint mismatch: expected={} actual={}",
+            expected,
+            actual
+        ));
+    }
+    Ok(())
 }
 
 fn extract_host(addr: &str) -> anyhow::Result<String> {

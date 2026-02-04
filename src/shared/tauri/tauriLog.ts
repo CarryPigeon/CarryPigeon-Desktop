@@ -8,9 +8,10 @@ import { invokeTauri } from "./invokeClient";
 type LogMeta = Record<string, unknown>;
 
 /**
- * formatMeta 方法说明。
- * @param meta? - 参数说明。
- * @returns 返回值说明。
+ * 将结构化元信息序列化为日志字符串片段。
+ *
+ * @param meta - 可选结构化元信息。
+ * @returns 以空格开头的 JSON 字符串；当 meta 不存在时返回空字符串。
  */
 function formatMeta(meta?: LogMeta): string {
   if (!meta) return "";
@@ -22,54 +23,34 @@ function formatMeta(meta?: LogMeta): string {
 }
 
 /**
- * safeInvoke 方法说明。
- * @param command - 参数说明。
- * @param args - 参数说明。
- * @param unknown> - 参数说明。
- * @returns 返回值说明。
+ * 尽力而为（best-effort）地调用 Rust 侧命令。
+ *
+ * 约束：日志链路不应导致 UI 崩溃，因此调用失败会被吞掉。
+ *
+ * @param command - Tauri command 名。
+ * @param args - command 参数。
  */
-function safeInvoke(command: string, args: Record<string, unknown>) {
+function safeInvoke(command: string, args: Record<string, unknown>): void {
   void invokeTauri(command, args).catch(() => {});
 }
 
 /**
- * Sends logs to the Rust side via Tauri commands.
- * Use this at the platform boundary (e.g. crypto/TCP) when logs must be persisted with backend logs.
- */
-/**
+ * 通过 Tauri commands 将日志转发到 Rust 侧的 logger。
+ *
+ * 适用场景：平台边界（例如 crypto/TCP 等）需要与后端日志合并持久化时，用于排障定位。
+ *
  * @constant
- * @description 将日志发送到 Rust 侧（通过 Tauri commands）。
  */
 export const tauriLog = {
-  /**
-   * debug method.
-   * @param message - TODO.
-   * @param meta - TODO.
-   */
   debug(message: string, meta?: LogMeta) {
     safeInvoke(TAURI_COMMANDS.logDebug, { msg: `${message}${formatMeta(meta)}` });
   },
-  /**
-   * info method.
-   * @param message - TODO.
-   * @param meta - TODO.
-   */
   info(message: string, meta?: LogMeta) {
     safeInvoke(TAURI_COMMANDS.logInfo, { msg: `${message}${formatMeta(meta)}` });
   },
-  /**
-   * warn method.
-   * @param message - TODO.
-   * @param meta - TODO.
-   */
   warn(message: string, meta?: LogMeta) {
     safeInvoke(TAURI_COMMANDS.logWarning, { msg: `${message}${formatMeta(meta)}` });
   },
-  /**
-   * error method.
-   * @param message - TODO.
-   * @param meta - TODO.
-   */
   error(message: string, meta?: LogMeta) {
     safeInvoke(TAURI_COMMANDS.logError, { error: `${message}${formatMeta(meta)}` });
   },

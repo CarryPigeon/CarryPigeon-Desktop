@@ -1,15 +1,19 @@
 /**
- * @fileoverview userServiceFactory.ts 文件职责说明。
+ * @fileoverview userServiceFactory.ts
+ * @description Data-layer factory: re-exports for backward compatibility.
+ *
+ * @deprecated Use domain/ports and di/ instead.
+ *
+ * API alignment:
+ * - User read endpoints live under `docs/api/*` → Users
+ * - Profile mutation endpoints are not part of the current HTTP API (kept as future/legacy hooks)
  */
-import { USE_MOCK_API } from "@/shared/config/runtime";
-import { UserService } from "./userApiImpl";
-import { MockUserService } from "../mock/userMockService";
 
-/**
- * createUserService 方法说明。
- * @param serverSocket - 参数说明。
- * @returns 返回值说明。
- */
-export function createUserService(serverSocket: string) {
-  return USE_MOCK_API ? new MockUserService(serverSocket) : new UserService(serverSocket);
-}
+// Re-export types from domain layer for backward compatibility
+export type { UserMe, UserPublic } from "../domain/types/UserTypes";
+
+// Re-export port type as service type for backward compatibility
+export type { UserServicePort as UserService } from "../domain/ports/UserServicePort";
+
+// Re-export factory function for backward compatibility
+export { createUserService } from "../di/user.di";

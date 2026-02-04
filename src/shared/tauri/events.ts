@@ -59,18 +59,20 @@ export function listenTcpFrame(
 }
 
 /**
- * emitUserProfileRequest 方法说明。
- * @param payload - 参数说明。
- * @returns 返回值说明。
+ * 发出 user-profile 请求事件（frontend → frontend，通过 Tauri event bus）。
+ *
+ * @param payload - 请求载荷。
+ * @returns Promise<void>
  */
 export function emitUserProfileRequest(payload: UserProfileRequest): Promise<void> {
   return emit(TAURI_EVENTS.userProfileRequest, payload);
 }
 
 /**
- * listenUserProfileRequest function.
- * @param handler - TODO.
- * @returns TODO.
+ * 监听 user-profile 请求事件。
+ *
+ * @param handler - 事件处理函数。
+ * @returns 取消监听函数（UnlistenFn）的 Promise。
  */
 export function listenUserProfileRequest(
   handler: (event: Event<UserProfileRequest>) => void,
@@ -79,18 +81,20 @@ export function listenUserProfileRequest(
 }
 
 /**
- * emitUserProfileResponse 方法说明。
- * @param payload - 参数说明。
- * @returns 返回值说明。
+ * 发出 user-profile 响应事件。
+ *
+ * @param payload - 响应载荷。
+ * @returns Promise<void>
  */
 export function emitUserProfileResponse(payload: UserProfileResponse): Promise<void> {
   return emit(TAURI_EVENTS.userProfileResponse, payload);
 }
 
 /**
- * listenUserProfileResponse function.
- * @param handler - TODO.
- * @returns TODO.
+ * 监听 user-profile 响应事件。
+ *
+ * @param handler - 事件处理函数。
+ * @returns 取消监听函数（UnlistenFn）的 Promise。
  */
 export function listenUserProfileResponse(
   handler: (event: Event<UserProfileResponse>) => void,
