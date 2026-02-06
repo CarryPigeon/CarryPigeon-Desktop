@@ -1,21 +1,21 @@
 /**
  * @fileoverview GetConfig.ts
- * @description Usecase: retrieve user configuration.
+ * @description settings｜用例：GetConfig。
  */
 
 import type { ConfigPort } from "../ports/ConfigPort";
 import type { UserConfig } from "../types/ConfigTypes";
 
 /**
- * Get config usecase.
+ * 用例：获取用户配置。
  */
 export class GetConfig {
   constructor(private readonly configPort: ConfigPort) {}
 
   /**
-   * Execute get config.
+   * 执行：读取配置存储中的用户配置。
    *
-   * @returns User configuration.
+   * @returns 用户配置。
    */
   execute(): Promise<UserConfig> {
     return this.configPort.getConfig();

@@ -1,29 +1,29 @@
 /**
  * @fileoverview ConfigPort.ts
- * @description Domain port: user configuration storage.
+ * @description settings｜领域端口：ConfigPort。
  *
- * Implementations:
- * - `localStorage`: browser localStorage backed
- * - `mock`: in-memory for testing
+ * 实现说明：
+ * - `localStorage`：基于浏览器 localStorage 的实现
+ * - `mock`：用于测试的内存实现
  */
 
 import type { AppTheme, UserConfig } from "../types/ConfigTypes";
 
 /**
- * Configuration port.
+ * 配置端口（领域层）。
  */
 export interface ConfigPort {
   /**
-   * Get current user configuration.
+   * 获取当前用户配置。
    *
-   * @returns User configuration.
+   * @returns 用户配置。
    */
   getConfig(): Promise<UserConfig>;
 
   /**
-   * Set application theme.
+   * 设置应用主题。
    *
-   * @param theme - Target theme.
+   * @param theme - 目标主题。
    */
   setTheme(theme: AppTheme): Promise<void>;
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview MessageContextMenu.vue
- * @description Context menu for message actions (copy/reply/delete/forward).
+ * @description chat｜组件：MessageContextMenu。
  */
 
 import { onBeforeUnmount, onMounted } from "vue";
@@ -23,19 +23,19 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 /**
- * Close the menu (emits `close`).
+ * 关闭菜单（触发 `close` 事件）。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleClose(): void {
   emit("close");
 }
 
 /**
- * Emit an action and close the menu.
+ * 派发菜单动作并关闭菜单。
  *
- * @param action - Selected menu action.
- * @returns void
+ * @param action - 选中的菜单动作。
+ * @returns 无返回值。
  */
 function handleAction(action: MessageMenuAction): void {
   emit("action", action);
@@ -43,12 +43,12 @@ function handleAction(action: MessageMenuAction): void {
 }
 
 /**
- * Global handler to close the menu on:
- * - Escape key
- * - Any mouse click
+ * 全局关闭处理器：
+ * - Escape：关闭
+ * - 任意鼠标点击：关闭
  *
- * @param e - Window mouse/keyboard event.
- * @returns void
+ * @param e - Window 鼠标/键盘事件。
+ * @returns 无返回值。
  */
 function onGlobal(e: MouseEvent | KeyboardEvent): void {
   if (!props.open) return;
@@ -61,9 +61,9 @@ function onGlobal(e: MouseEvent | KeyboardEvent): void {
 }
 
 /**
- * Component mount hook: register global close handlers.
+ * 组件挂载：注册全局关闭监听。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   window.addEventListener("mousedown", onGlobal);
@@ -73,9 +73,9 @@ function handleMounted(): void {
 onMounted(handleMounted);
 
 /**
- * Component unmount hook: remove global close handlers.
+ * 组件卸载：移除全局监听。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleBeforeUnmount(): void {
   window.removeEventListener("mousedown", onGlobal);
@@ -108,8 +108,7 @@ onBeforeUnmount(handleBeforeUnmount);
 </template>
 
 <style scoped lang="scss">
-/* MessageContextMenu styles */
-/* Selector: `.cp-msgmenu` — floating menu surface (positioned by x/y). */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；菜单为固定定位浮层，通过 x/y 定位，含分隔线与危险动作样式。 */
 .cp-msgmenu {
   position: fixed;
   z-index: 60;
@@ -122,7 +121,6 @@ onBeforeUnmount(handleBeforeUnmount);
   backdrop-filter: blur(10px);
 }
 
-/* Selector: `.cp-msgmenu__item` — clickable menu row. */
 .cp-msgmenu__item {
   width: 100%;
   display: flex;
@@ -142,26 +140,22 @@ onBeforeUnmount(handleBeforeUnmount);
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-msgmenu__item:hover` — hover highlight. */
 .cp-msgmenu__item:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-border);
 }
 
-/* Selector: `.cp-msgmenu__sep` — separator line before destructive action. */
 .cp-msgmenu__sep {
   margin: 6px 6px;
   height: 1px;
   background: var(--cp-border-light);
 }
 
-/* Selector: `.cp-msgmenu__item.danger` — destructive action coloring. */
 .cp-msgmenu__item.danger {
   color: color-mix(in oklab, var(--cp-danger) 72%, var(--cp-text));
 }
 
-/* Selector: `.cp-msgmenu__item.danger:hover` — destructive hover background/border. */
 .cp-msgmenu__item.danger:hover {
   border-color: color-mix(in oklab, var(--cp-danger) 26%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));

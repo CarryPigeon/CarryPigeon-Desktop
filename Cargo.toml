@@ -1,3 +1,19 @@
 [workspace]
 members = ["src-tauri"]
 resolver = "2"
+
+[profile.dev]
+# 以较小的步骤编译您的二进制文件（提高开发期增量编译体验）。
+incremental = true
+
+[profile.release]
+# 允许 LLVM 执行更好的优化。
+codegen-units = 1
+# 启用链接时优化。
+lto = true
+# 优先考虑小的二进制文件大小；如更偏好速度可使用 `3`。
+opt-level = "s"
+# 通过禁用 panic 处理程序来提高性能（按需启用）。
+# panic = "abort"
+# 确保移除调试符号。
+strip = true

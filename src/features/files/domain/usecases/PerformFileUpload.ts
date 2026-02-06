@@ -1,23 +1,23 @@
 /**
  * @fileoverview PerformFileUpload.ts
- * @description Usecase: perform file upload using descriptor.
+ * @description files｜用例：PerformFileUpload。
  */
 
 import type { FileServicePort } from "../ports/FileServicePort";
 import type { UploadDescriptor } from "../types/FileTypes";
 
 /**
- * Perform file upload usecase.
+ * 执行文件上传用例。
  */
 export class PerformFileUpload {
   constructor(private readonly fileService: FileServicePort) {}
 
   /**
-   * Execute perform file upload.
+   * 执行实际上传（两段式上传的第二段）。
    *
-   * @param upload - Upload descriptor.
-   * @param body - Binary payload.
-   * @returns Promise<void>.
+   * @param upload - upload descriptor。
+   * @param body - 二进制载荷（Blob/ArrayBuffer/Uint8Array）。
+   * @returns Promise<void>。
    */
   execute(upload: UploadDescriptor, body: Blob | ArrayBuffer | Uint8Array): Promise<void> {
     return this.fileService.performUpload(upload, body);

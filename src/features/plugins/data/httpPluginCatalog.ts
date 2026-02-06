@@ -1,13 +1,13 @@
 /**
  * @fileoverview httpPluginCatalog.ts
- * @description HTTP adapter for fetching the server plugin catalog.
+ * @description plugins｜数据层实现：httpPluginCatalog。
  *
- * API doc reference:
- * - See `docs/api/*` → `GET /api/plugins/catalog`
+ * API 文档：
+ * - 见 `docs/api/*` → `GET /api/plugins/catalog`
  *
- * Notes:
- * - This adapter only fetches catalog metadata; it does not install/enable plugins.
- * - Plugin install/enable/update is a client-local lifecycle handled by the plugin runtime.
+ * 说明：
+ * - 该适配器只拉取目录元数据，不负责安装/启用插件。
+ * - 插件安装/启用/更新属于客户端本地生命周期，由插件运行时负责。
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
@@ -27,20 +27,20 @@ type ApiCatalogResponse = {
 };
 
 /**
- * Map a domain string into a UI color token.
+ * 将 domain 字符串映射为 UI 颜色 token。
  *
- * This keeps the plugin center readable even when the server doesn't provide
- * UI metadata for domain colors.
+ * 用途：
+ * 即使服务端不提供“domain 颜色”相关 UI 元数据，也能保持插件中心的可读性与稳定视觉区分。
  *
- * @param domain - Domain name (e.g. `Core:Text`).
- * @returns One of the Patchbay CSS color variables.
+ * @param domain - Domain 名称（例如 `Core:Text`）。
+ * @returns Patchbay CSS 颜色变量之一。
  */
 function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] {
   const d = domain.trim();
   if (d.startsWith("Core:")) return "--cp-domain-core";
   if (!d) return "--cp-domain-unknown";
 
-  // Generic mapping for extension domains: stable but not tied to any specific vertical scenario.
+  // 扩展 domain 的通用映射：稳定但不绑定具体业务场景。
   let hash = 0;
   for (let i = 0; i < d.length; i += 1) hash = (hash * 31 + d.charCodeAt(i)) >>> 0;
   const lane = hash % 3;
@@ -50,10 +50,10 @@ function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] {
 }
 
 /**
- * Map a permission key into a UI permission descriptor.
+ * 将 permission key 映射为 UI 权限描述。
  *
- * @param key - Permission key string.
- * @returns Permission descriptor.
+ * @param key - Permission key 字符串。
+ * @returns 权限描述对象。
  */
 function mapPermission(key: string): PluginPermission {
   const k = key.trim();
@@ -62,10 +62,10 @@ function mapPermission(key: string): PluginPermission {
 }
 
 /**
- * Fetch the server plugin catalog and map into `PluginCatalogEntry[]`.
+ * 拉取服务端插件目录并映射为 `PluginCatalogEntry[]`。
  *
- * @param serverSocket - Server socket (used to derive HTTP origin).
- * @returns Catalog entries for UI rendering.
+ * @param serverSocket - 服务端 socket（用于推导 HTTP origin）。
+ * @returns 用于 UI 渲染的目录条目列表。
  */
 export async function fetchServerPluginCatalog(serverSocket: string): Promise<PluginCatalogEntry[]> {
   const socket = serverSocket.trim();

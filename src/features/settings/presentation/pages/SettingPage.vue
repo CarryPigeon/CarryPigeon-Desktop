@@ -9,12 +9,11 @@ import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { getStoredTheme, setTheme, type AppTheme } from "@/shared/utils/theme";
 import { USE_MOCK_API } from "@/shared/config/runtime";
-import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
+import { currentServerSocket, setServerSocket, useServerInfoStore } from "@/features/servers/api";
 import { getServerScopeKey, getKnownServerId, forgetServerIdentity } from "@/shared/serverIdentity";
 import { removeServerDb } from "@/shared/db";
-import { writeAuthSession } from "@/shared/utils/localState";
-import { setCurrentUser } from "@/features/user/presentation/store/userData";
+import { clearAuthAndResumeState } from "@/shared/utils/localState";
+import { setCurrentUser } from "@/features/user/api";
 import { MOCK_KEYS } from "@/shared/mock/mockKeys";
 
 const router = useRouter();
@@ -42,7 +41,7 @@ watch(theme, handleThemeChange);
 /**
  * 组件挂载：从本地持久化初始化主题。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   theme.value = getStoredTheme() ?? "patchbay";
@@ -122,17 +121,11 @@ async function clearCurrentServerData(): Promise<void> {
       // 忽略 server-info 刷新失败。
     }
 
-    const scope = getServerScopeKey(s);
-    if (!scope) throw new Error("Missing scope key");
-
-    // 清理按 server_id/socket scope 存储的 localStorage 条目。
-    localStorage.removeItem(`carrypigeon:authToken:${scope}`);
-    localStorage.removeItem(`carrypigeon:authSession:${scope}`);
-    localStorage.removeItem(`carrypigeon:lastEventId:${scope}`);
+    // 清理按 scope 隔离的本地会话与断点续传状态。
+    clearAuthAndResumeState(s);
     localStorage.removeItem(`${MOCK_KEYS.pluginsStatePrefix}${s.trim()}`);
 
     // 清理内存登录态，并返回登录页。
-    writeAuthSession(s, null);
     setCurrentUser({ id: "", username: "", email: "", description: "" });
     setServerSocket("");
 
@@ -436,14 +429,6 @@ async function clearCurrentServerData(): Promise<void> {
   border-color: var(--cp-highlight-border-strong);
   background: var(--cp-highlight-bg);
   color: var(--cp-text);
-}
-
-/* 选择器：`.cp-settings__row`｜用途：key/value 行布局 */
-.cp-settings__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 /* 选择器：`.cp-settings__muted`｜用途：弱化标签文本 */

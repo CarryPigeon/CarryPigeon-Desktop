@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ModuleDetailDrawer.vue
- * @description Plugin detail drawer (permissions/source/sha256/domains/errors).
+ * @description plugins｜组件：ModuleDetailDrawer。
  */
 
 import { computed } from "vue";
@@ -39,9 +39,9 @@ const emit = defineEmits<{
 }>();
 
 /**
- * Whether the plugin can be installed (not installed yet).
+ * 判断插件是否可安装（尚未安装任何版本）。
  *
- * @returns `true` when install action should be shown.
+ * @returns 需要显示安装按钮则为 `true`。
  */
 function computeCanInstall(): boolean {
   return Boolean(props.plugin && !props.installed?.currentVersion);
@@ -50,9 +50,9 @@ function computeCanInstall(): boolean {
 const canInstall = computed(computeCanInstall);
 
 /**
- * Whether the installed plugin can be enabled.
+ * 判断插件是否可启用（已安装但未启用）。
  *
- * @returns `true` when enable action should be shown.
+ * @returns 需要显示启用按钮则为 `true`。
  */
 function computeCanEnable(): boolean {
   return Boolean(props.plugin && props.installed?.currentVersion && !props.installed.enabled);
@@ -61,9 +61,9 @@ function computeCanEnable(): boolean {
 const canEnable = computed(computeCanEnable);
 
 /**
- * Whether the installed plugin can be disabled.
+ * 判断插件是否可禁用（当前为启用态）。
  *
- * @returns `true` when disable action should be shown.
+ * @returns 需要显示禁用按钮则为 `true`。
  */
 function computeCanDisable(): boolean {
   return Boolean(props.plugin && props.installed?.enabled);
@@ -72,9 +72,9 @@ function computeCanDisable(): boolean {
 const canDisable = computed(computeCanDisable);
 
 /**
- * Whether rollback is possible (at least one previous version exists).
+ * 判断是否可回滚（存在至少一个不同于 currentVersion 的已安装版本）。
  *
- * @returns `true` when rollback action should be shown.
+ * @returns 需要显示回滚按钮则为 `true`。
  */
 function computeCanRollback(): boolean {
   const versions = props.installed?.installedVersions ?? [];
@@ -88,9 +88,9 @@ function computeCanRollback(): boolean {
 const canRollback = computed(computeCanRollback);
 
 /**
- * Whether the drawer is locked (server_id missing or other gate).
+ * 判断抽屉是否处于锁定态（缺少 server_id 或其他 gate）。
  *
- * @returns `true` when actions should be disabled.
+ * @returns 需要禁用所有动作则为 `true`。
  */
 function computeLocked(): boolean {
   return Boolean(props.disabled);
@@ -99,9 +99,9 @@ function computeLocked(): boolean {
 const locked = computed(computeLocked);
 
 /**
- * Format provides-domains labels for the drawer.
+ * 格式化插件提供的 domains 标签，供抽屉展示使用。
  *
- * @returns Joined domain labels, or "—" when empty.
+ * @returns 拼接后的标签文本；为空时返回 `"—"`。
  */
 function computeDomainLabelsText(): string {
   const plugin = props.plugin;
@@ -116,9 +116,9 @@ const domainLabelsText = computed(computeDomainLabelsText);
 const { t } = useI18n();
 
 /**
- * Close the drawer.
+ * 关闭抽屉。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleClose(): void {
   emit("close");
@@ -259,20 +259,17 @@ function handleClose(): void {
 </template>
 
 <style scoped lang="scss">
-/* ModuleDetailDrawer styles */
-/* Drawer content wrapper */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；抽屉内为纵向分区（lock/sub/section/actions）。 */
 .cp-drawer {
   padding: 14px 14px 18px 14px;
   color: var(--cp-text);
   position: relative;
 }
 
-/* Drawer empty state */
 .cp-drawer--empty {
   color: var(--cp-text-muted);
 }
 
-/* Lock banner (server_id missing) */
 .cp-drawer__lock {
   border: 1px dashed color-mix(in oklab, var(--cp-warn) 32%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel-muted));
@@ -281,7 +278,6 @@ function handleClose(): void {
   margin-bottom: 12px;
 }
 
-/* Lock banner title */
 .cp-drawer__lockTitle {
   font-family: var(--cp-font-display);
   letter-spacing: 0.12em;
@@ -290,7 +286,6 @@ function handleClose(): void {
   color: var(--cp-text);
 }
 
-/* Lock banner subtitle */
 .cp-drawer__lockSub {
   margin-top: 8px;
   font-size: 12px;
@@ -298,7 +293,6 @@ function handleClose(): void {
   line-height: 1.4;
 }
 
-/* Subheader: tagline + badges */
 .cp-drawer__sub {
   display: flex;
   align-items: flex-start;
@@ -307,14 +301,12 @@ function handleClose(): void {
   margin-bottom: 12px;
 }
 
-/* Tagline text */
 .cp-drawer__tagline {
   color: var(--cp-text-muted);
   font-size: 12px;
   line-height: 1.35;
 }
 
-/* Badges row */
 .cp-drawer__badges {
   display: flex;
   flex-wrap: wrap;
@@ -322,14 +314,12 @@ function handleClose(): void {
   justify-content: flex-end;
 }
 
-/* Section wrapper */
 .cp-drawer__section {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--cp-border-light);
 }
 
-/* Section label */
 .cp-drawer__label {
   font-family: var(--cp-font-display);
   letter-spacing: 0.08em;
@@ -339,7 +329,6 @@ function handleClose(): void {
   margin-bottom: 8px;
 }
 
-/* Section row layout */
 .cp-drawer__row {
   display: flex;
   align-items: center;
@@ -347,7 +336,6 @@ function handleClose(): void {
   flex-wrap: wrap;
 }
 
-/* Mono pill */
 .cp-drawer__pill {
   padding: 6px 10px;
   border-radius: 999px;
@@ -359,7 +347,6 @@ function handleClose(): void {
   letter-spacing: 0.06em;
 }
 
-/* Domains row */
 .cp-drawer__ports {
   display: flex;
   align-items: center;
@@ -367,7 +354,6 @@ function handleClose(): void {
   flex-wrap: wrap;
 }
 
-/* Single domain dot */
 .cp-drawer__port {
   width: 10px;
   height: 10px;
@@ -375,20 +361,17 @@ function handleClose(): void {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-border) 70%, transparent);
 }
 
-/* Domains list text */
 .cp-drawer__portsText {
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Permissions wrapper */
 .cp-perms {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* Permission row */
 .cp-perm {
   display: grid;
   grid-template-columns: 96px 1fr auto;
@@ -400,20 +383,17 @@ function handleClose(): void {
   background: var(--cp-panel-muted);
 }
 
-/* Permission key */
 .cp-perm__key {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Permission label */
 .cp-perm__label {
   font-size: 12px;
   color: var(--cp-text);
 }
 
-/* Permission risk */
 .cp-perm__risk {
   font-family: var(--cp-font-display);
   letter-spacing: 0.08em;
@@ -422,19 +402,16 @@ function handleClose(): void {
   color: var(--cp-text-muted);
 }
 
-/* Permission variant: high risk */
 .cp-perm[data-risk="high"] {
   border-color: color-mix(in oklab, var(--cp-danger) 28%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
 }
 
-/* Permission variant: medium risk */
 .cp-perm[data-risk="medium"] {
   border-color: color-mix(in oklab, var(--cp-warn) 28%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel-muted));
 }
 
-/* Last error box */
 .cp-drawer__error {
   border: 1px dashed rgba(239, 68, 68, 0.4);
   background: rgba(239, 68, 68, 0.10);
@@ -444,14 +421,12 @@ function handleClose(): void {
   color: var(--cp-text);
 }
 
-/* Installed kv grid */
 .cp-drawer__kv {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-/* KV item */
 .cp-kv {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -459,13 +434,11 @@ function handleClose(): void {
   padding: 10px;
 }
 
-/* KV key */
 .cp-kv__k {
   font-size: 11px;
   color: var(--cp-text-muted);
 }
 
-/* KV value */
 .cp-kv__v {
   margin-top: 6px;
   font-family: var(--cp-font-mono);
@@ -473,7 +446,6 @@ function handleClose(): void {
   color: var(--cp-text);
 }
 
-/* Actions row */
 .cp-drawer__actions {
   margin-top: 16px;
   display: flex;
@@ -481,14 +453,12 @@ function handleClose(): void {
   gap: 10px;
 }
 
-/* Versions row */
 .cp-versions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-/* Single version button */
 .cp-version {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -504,26 +474,22 @@ function handleClose(): void {
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Disabled version */
 .cp-version:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Version hover */
 .cp-version:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
 }
 
-/* Active version */
 .cp-version[data-active="true"] {
   border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel-muted));
 }
 
-/* Drawer action button */
 .cp-drawer__btn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -537,7 +503,6 @@ function handleClose(): void {
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease);
 
-  /* Button hover */
   &:hover {
     transform: translateY(-1px);
     background: var(--cp-hover-bg);
@@ -545,18 +510,15 @@ function handleClose(): void {
   }
 }
 
-/* Drawer action disabled */
 .cp-drawer__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Drawer primary action */
 .cp-drawer__btn.primary {
   border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
 
-  /* Primary hover */
   &:hover {
     border-color: rgba(34, 197, 94, 0.42);
     background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));

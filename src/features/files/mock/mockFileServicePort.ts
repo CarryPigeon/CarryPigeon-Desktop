@@ -1,6 +1,6 @@
 /**
  * @fileoverview mockFileServicePort.ts
- * @description Mock FileServicePort implementation for UI preview.
+ * @description files｜Mock 实现：mockFileServicePort（用于本地预览/测试）。
  */
 
 import { MOCK_LATENCY_MS } from "@/shared/config/runtime";

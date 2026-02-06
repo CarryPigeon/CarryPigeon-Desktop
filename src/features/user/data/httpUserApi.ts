@@ -1,13 +1,16 @@
 /**
  * @fileoverview httpUserApi.ts
- * @description HTTP data adapter for user resources.
+ * @description user｜数据层实现：httpUserApi。
  *
- * API doc reference:
- * - See `docs/api/*` → Users section and error model
+ * API 文档：
+ * - 见 `docs/api/*` → Users 相关接口与错误模型
  */
 
-import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
+import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
 
+/**
+ * `/users/me` 响应：当前用户资料。
+ */
 export type ApiUserMe = {
   uid: string;
   email?: string;
@@ -15,6 +18,9 @@ export type ApiUserMe = {
   avatar?: string;
 };
 
+/**
+ * 用户公开资料（对外展示）。
+ */
 export type ApiUserPublic = {
   uid: string;
   nickname: string;
@@ -26,61 +32,46 @@ type ApiUsersBatchResponse = {
 };
 
 /**
- * Create an authenticated HTTP client bound to a server socket and access token.
+ * 获取当前用户资料（/users/me）。
  *
- * @param serverSocket - Server socket string.
- * @param accessToken - Bearer access token.
- * @returns HttpJsonClient.
- */
-function createAuthedClient(serverSocket: string, accessToken: string): HttpJsonClient {
-  const socket = serverSocket.trim();
-  const token = accessToken.trim();
-  if (!socket) throw new Error("Missing server socket");
-  if (!token) throw new Error("Missing access token");
-  return new HttpJsonClient({ serverSocket: socket, apiVersion: 1, accessToken: token });
-}
-
-/**
- * Fetch current user profile.
- *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @returns User profile.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @returns 当前用户资料。
  */
 export async function httpGetCurrentUser(serverSocket: string, accessToken: string): Promise<ApiUserMe> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   return client.requestJson<ApiUserMe>("GET", "/users/me");
 }
 
 /**
- * Fetch a user's public profile by uid.
+ * 按 uid 获取用户公开资料。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param uid - User id.
- * @returns User public profile.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param uid - 用户 id。
+ * @returns 用户公开资料。
  */
 export async function httpGetUser(serverSocket: string, accessToken: string, uid: string): Promise<ApiUserPublic> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const userId = String(uid).trim();
   if (!userId) throw new Error("Missing uid");
   return client.requestJson<ApiUserPublic>("GET", `/users/${encodeURIComponent(userId)}`);
 }
 
 /**
- * Batch fetch user public profiles.
+ * 批量获取用户公开资料。
  *
- * Notes:
- * - The API takes a CSV `ids` query param.
- * - The client uses a stable de-duplication strategy before sending.
+ * 说明：
+ * - API 接收 CSV 形式的 `ids` query 参数。
+ * - 客户端在发送前做去重，确保请求稳定且避免冗余。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param ids - User id list.
- * @returns User public profiles list.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param ids - 用户 id 列表。
+ * @returns 用户公开资料列表。
  */
 export async function httpListUsers(serverSocket: string, accessToken: string, ids: string[]): Promise<ApiUserPublic[]> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const unique = new Set<string>();
   for (const id of ids ?? []) {
     const v = String(id ?? "").trim();

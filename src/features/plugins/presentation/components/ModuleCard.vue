@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ModuleCard.vue
- * @description Patchbay module card for plugin center grid.
+ * @description plugins｜组件：ModuleCard。
  */
 
 import { computed } from "vue";
@@ -31,9 +31,9 @@ const emit = defineEmits<{
 }>();
 
 /**
- * Whether the module is installed (current version exists).
+ * 判断模块是否已安装（存在 currentVersion）。
  *
- * @returns `true` when installed.
+ * @returns 已安装则为 `true`。
  */
 function computeIsInstalled(): boolean {
   return Boolean(props.installed?.currentVersion);
@@ -42,9 +42,9 @@ function computeIsInstalled(): boolean {
 const isInstalled = computed(computeIsInstalled);
 
 /**
- * Whether the module is enabled and healthy.
+ * 判断模块是否处于启用且健康状态。
  *
- * @returns `true` when enabled and status is ok.
+ * @returns 启用且 status=ok 则为 `true`。
  */
 function computeIsEnabled(): boolean {
   return Boolean(props.installed?.enabled && props.installed?.status === "ok");
@@ -53,9 +53,9 @@ function computeIsEnabled(): boolean {
 const isEnabled = computed(computeIsEnabled);
 
 /**
- * Whether the module is in failed state.
+ * 判断模块是否处于失败态。
  *
- * @returns `true` when status is failed.
+ * @returns status=failed 则为 `true`。
  */
 function computeIsFailed(): boolean {
   return Boolean(props.installed?.status === "failed");
@@ -66,10 +66,10 @@ const isFailed = computed(computeIsFailed);
 const { t } = useI18n();
 
 /**
- * Resolve a CSS variable name into an inline style usable value.
+ * 将 CSS 变量名转换为可直接用于 inline style 的 `var(...)` 字符串。
  *
- * @param colorVar - CSS variable name (e.g. `--cp-domain-core`).
- * @returns Style string like `var(--cp-domain-core)`.
+ * @param colorVar - CSS 变量名（例如 `--cp-domain-core`）。
+ * @returns 例如 `var(--cp-domain-core)`。
  */
 function domainColor(colorVar: string): string {
   return `var(${colorVar})`;
@@ -165,8 +165,7 @@ function domainColor(colorVar: string): string {
 </template>
 
 <style scoped lang="scss">
-/* ModuleCard styles */
-/* Card shell */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；卡片包含标题区、domain 端口点阵、进度条与动作区。 */
 .cp-module-card {
   position: relative;
   border: 1px solid var(--cp-border);
@@ -180,7 +179,6 @@ function domainColor(colorVar: string): string {
     background-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Disabled overlay (used when server_id is missing) */
 .cp-module-card__disabled {
   position: absolute;
   inset: 0;
@@ -196,7 +194,6 @@ function domainColor(colorVar: string): string {
   border: 1px dashed color-mix(in oklab, var(--cp-warn) 32%, var(--cp-border));
 }
 
-/* Disabled overlay title */
 .cp-module-card__disabledTitle {
   font-family: var(--cp-font-display);
   letter-spacing: 0.14em;
@@ -205,7 +202,6 @@ function domainColor(colorVar: string): string {
   color: var(--cp-text);
 }
 
-/* Disabled overlay subtitle */
 .cp-module-card__disabledSub {
   font-size: 12px;
   color: var(--cp-text-muted);
@@ -213,7 +209,6 @@ function domainColor(colorVar: string): string {
   line-height: 1.4;
 }
 
-/* Focus ring for deep-link/focus */
 .cp-module-card[data-focused="true"] {
   border-color: var(--cp-highlight-border-strong);
   box-shadow:
@@ -221,14 +216,12 @@ function domainColor(colorVar: string): string {
     var(--cp-highlight-ring);
 }
 
-/* Hover lift */
 .cp-module-card:hover {
   transform: translateY(-2px);
   border-color: var(--cp-highlight-border);
   background: color-mix(in oklab, var(--cp-panel) 86%, var(--cp-hover-bg));
 }
 
-/* Header row (name + badges) */
 .cp-module-card__head {
   display: flex;
   align-items: flex-start;
@@ -236,7 +229,6 @@ function domainColor(colorVar: string): string {
   gap: 12px;
 }
 
-/* Title block */
 .cp-module-card__title {
   display: flex;
   flex-direction: column;
@@ -244,7 +236,6 @@ function domainColor(colorVar: string): string {
   min-width: 0;
 }
 
-/* Module name (ellipsis) */
 .cp-module-card__name {
   font-family: var(--cp-font-display);
   font-weight: 700;
@@ -257,7 +248,6 @@ function domainColor(colorVar: string): string {
   text-overflow: ellipsis;
 }
 
-/* Version line */
 .cp-module-card__version {
   display: inline-flex;
   align-items: baseline;
@@ -267,12 +257,10 @@ function domainColor(colorVar: string): string {
   color: var(--cp-text-muted);
 }
 
-/* Version prefix label */
 .cp-module-card__versionLabel {
   opacity: 0.7;
 }
 
-/* Status badges (required/update/failed) */
 .cp-module-card__badges {
   display: flex;
   flex-wrap: wrap;
@@ -280,7 +268,6 @@ function domainColor(colorVar: string): string {
   justify-content: flex-end;
 }
 
-/* Tagline text */
 .cp-module-card__tagline {
   margin-top: 10px;
   font-size: 12px;
@@ -289,12 +276,10 @@ function domainColor(colorVar: string): string {
   min-height: 32px;
 }
 
-/* plugin_id tag wrapper */
 .cp-module-card__mono {
   margin-top: 10px;
 }
 
-/* Domain ports container */
 .cp-ports {
   display: flex;
   flex-wrap: wrap;
@@ -302,7 +287,6 @@ function domainColor(colorVar: string): string {
   margin-top: 12px;
 }
 
-/* Single domain port dot */
 .cp-port {
   width: 10px;
   height: 10px;
@@ -310,12 +294,10 @@ function domainColor(colorVar: string): string {
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.10);
 }
 
-/* Progress section wrapper */
 .cp-module-card__progress {
   margin-top: 12px;
 }
 
-/* Action buttons row */
 .cp-module-card__actions {
   margin-top: 12px;
   display: flex;
@@ -323,7 +305,6 @@ function domainColor(colorVar: string): string {
   gap: 8px;
 }
 
-/* Action button base */
 .cp-module-action {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -337,7 +318,6 @@ function domainColor(colorVar: string): string {
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease);
 
-  /* Hover state */
   &:hover {
     transform: translateY(-1px);
     background: var(--cp-hover-bg);
@@ -345,31 +325,26 @@ function domainColor(colorVar: string): string {
   }
 }
 
-/* Disabled action button */
 .cp-module-action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-/* Primary action (install/enable/update) */
 .cp-module-action.primary {
   border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
 
-  /* Primary hover */
   &:hover {
     border-color: rgba(34, 197, 94, 0.42);
     background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
   }
 }
 
-/* Danger action (uninstall) */
 .cp-module-action.danger {
   border-color: color-mix(in oklab, var(--cp-danger) 34%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 12%, var(--cp-panel-muted));
 
-  /* Danger hover */
   &:hover {
     border-color: rgba(239, 68, 68, 0.46);
     background: color-mix(in oklab, var(--cp-danger) 16%, var(--cp-hover-bg));

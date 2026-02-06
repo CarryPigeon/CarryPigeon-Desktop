@@ -1,10 +1,10 @@
 /**
  * @fileoverview mockAuthServicePort.ts
- * @description Mock AuthServicePort implementation for UI preview.
+ * @description auth｜Mock 实现：mockAuthServicePort（用于本地预览/测试）。
  *
- * Required plugins gate:
- * - If any required plugin is missing or not enabled/healthy, throws
- *   `AuthRequiredPluginMissingError` with `missing_plugins`.
+ * required 插件闸门：
+ * - 若任何 required 插件缺失或未启用/不健康，则抛出 `AuthRequiredPluginMissingError`，
+ *   并携带 `missing_plugins`。
  */
 
 import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
@@ -16,10 +16,10 @@ import type { AuthLoginResult, TokenLoginResult } from "../domain/types/AuthType
 import { AuthRequiredPluginMissingError } from "../domain/errors/AuthErrors";
 
 /**
- * Create a mock AuthServicePort.
+ * 创建 `AuthServicePort` 的 mock 实现。
  *
- * @param serverSocket - Server socket (used as namespace for mock plugin state).
- * @returns AuthServicePort implementation.
+ * @param serverSocket - 服务器 Socket 地址（用于 mock 插件状态的命名空间隔离）。
+ * @returns `AuthServicePort` 实现。
  */
 export function createMockAuthServicePort(serverSocket: string): AuthServicePort {
   return {

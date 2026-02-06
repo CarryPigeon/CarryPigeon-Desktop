@@ -50,4 +50,7 @@ export const TAURI_COMMANDS = {
   pluginsNetworkFetch: "plugins_network_fetch",
 } as const;
 
+/**
+ * Tauri 命令名联合类型（由 `TAURI_COMMANDS` 推导）。
+ */
 export type TauriCommandName = (typeof TAURI_COMMANDS)[keyof typeof TAURI_COMMANDS];

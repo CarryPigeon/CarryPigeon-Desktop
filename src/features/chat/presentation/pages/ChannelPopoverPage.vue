@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ChannelPopoverPage.vue
- * @description Lightweight popover window for channel info (minimal for preview).
+ * @description chat｜页面：ChannelPopoverPage。
  */
 
 import { computed } from "vue";
@@ -11,27 +11,27 @@ import MonoTag from "@/shared/ui/MonoTag.vue";
 const route = useRoute();
 
 /**
- * Read the channel display name from query params.
+ * 从 query 参数中读取频道显示名。
  *
- * @returns Channel name string.
+ * @returns 频道名称字符串。
  */
 function computeName(): string {
   return String(route.query.name ?? "Channel");
 }
 
 /**
- * Read the channel bio/description from query params.
+ * 从 query 参数中读取频道简介/描述。
  *
- * @returns Channel bio string (may be empty).
+ * @returns 频道简介字符串（可能为空）。
  */
 function computeBio(): string {
   return String(route.query.bio ?? route.query.description ?? "");
 }
 
 /**
- * Read the channel owner label from query params.
+ * 从 query 参数中读取频道 owner 标识。
  *
- * @returns Owner display string.
+ * @returns owner 显示字符串。
  */
 function computeOwner(): string {
   return String(route.query.owner ?? "—");

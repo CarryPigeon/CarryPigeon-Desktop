@@ -1,6 +1,6 @@
 /**
  * @fileoverview ConfigTypes.ts
- * @description Domain types for settings/config feature.
+ * @description settings｜领域类型：ConfigTypes。
  */
 
 /**

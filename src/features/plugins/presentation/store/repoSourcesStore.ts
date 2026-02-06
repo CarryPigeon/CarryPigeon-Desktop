@@ -1,11 +1,15 @@
 /**
  * @fileoverview repoSourcesStore.ts
- * @description Presentation store: user-managed plugin repo sources (localStorage).
+ * @description plugins｜展示层状态（store）：repoSourcesStore。
  */
 
 import { computed, ref, type Ref } from "vue";
 import { readJson, writeJson } from "@/shared/utils/localStore";
+import { KEY_REPO_SOURCES } from "@/shared/utils/storageKeys";
 
+/**
+ * Repo 源定义（用于拉取 repo 插件目录）。
+ */
 export type RepoSource = {
   id: string;
   baseUrl: string;
@@ -14,8 +18,6 @@ export type RepoSource = {
   addedAtMs: number;
 };
 
-const KEY_REPO_SOURCES = "carrypigeon:repoSources:v1";
-
 type StoredRepoSources = {
   repos: RepoSource[];
 };
@@ -23,19 +25,19 @@ type StoredRepoSources = {
 const state = ref<StoredRepoSources>(readJson<StoredRepoSources>(KEY_REPO_SOURCES, { repos: [] }));
 
 /**
- * Persist the repo sources state to localStorage.
+ * 将 repo sources 状态持久化到 localStorage。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function persist(): void {
   writeJson(KEY_REPO_SOURCES, state.value);
 }
 
 /**
- * Normalize a repo base URL into a canonical https? string.
+ * 将 repo base URL 归一化为稳定的 http(s) URL（去尾随 `/`）。
  *
- * @param raw - Raw user input.
- * @returns Canonical base URL or empty string when invalid.
+ * @param raw - 用户输入的原始字符串。
+ * @returns 归一化后的 base URL；非法时返回空字符串。
  */
 function normalizeRepoBaseUrl(raw: string): string {
   const base = String(raw ?? "").trim().replace(/\/+$/u, "");
@@ -50,35 +52,35 @@ function normalizeRepoBaseUrl(raw: string): string {
 }
 
 /**
- * Create a unique id for a repo source record.
+ * 为 repo source 记录创建本地唯一 id。
  *
- * @param baseUrl - Normalized base URL.
- * @returns Unique repo source id.
+ * @param baseUrl - 已归一化的 base URL。
+ * @returns 唯一本地 id。
  */
 function createRepoId(baseUrl: string): string {
   return `repo_${Date.now().toString(16)}_${Math.random().toString(16).slice(2)}_${baseUrl.length}`;
 }
 
 /**
- * All repo sources (persisted).
+ * 所有 repo sources（已持久化）。
  *
  * @constant
  */
 export const repoSources: Readonly<Ref<RepoSource[]>> = computed(() => state.value.repos);
 
 /**
- * Enabled repo sources (for catalog fetching).
+ * 已启用的 repo sources（用于拉取目录）。
  *
  * @constant
  */
 export const enabledRepoSources: Readonly<Ref<RepoSource[]>> = computed(() => state.value.repos.filter((r) => r.enabled));
 
 /**
- * Add a repo source (idempotent by baseUrl).
+ * 添加 repo source（按 baseUrl 幂等）。
  *
- * @param baseUrl - Repo base URL like `https://repo.example.com`.
- * @param note - Optional note label.
- * @returns The created or existing RepoSource; `null` when invalid.
+ * @param baseUrl - Repo base URL，例如 `https://repo.example.com`。
+ * @param note - 可选备注。
+ * @returns 创建或已存在的 RepoSource；非法输入时返回 `null`。
  */
 export function addRepoSource(baseUrl: string, note?: string): RepoSource | null {
   const normalized = normalizeRepoBaseUrl(baseUrl);
@@ -106,9 +108,9 @@ export function addRepoSource(baseUrl: string, note?: string): RepoSource | null
 }
 
 /**
- * Remove a repo source by id.
+ * 按 id 删除 repo source。
  *
- * @param id - Repo source id.
+ * @param id - Repo source id。
  */
 export function removeRepoSource(id: string): void {
   const rid = String(id ?? "").trim();
@@ -118,10 +120,10 @@ export function removeRepoSource(id: string): void {
 }
 
 /**
- * Toggle a repo source enabled state.
+ * 切换 repo source 启用态。
  *
- * @param id - Repo source id.
- * @param enabled - Next enabled state.
+ * @param id - Repo source id。
+ * @param enabled - 目标启用态。
  */
 export function setRepoSourceEnabled(id: string, enabled: boolean): void {
   const rid = String(id ?? "").trim();

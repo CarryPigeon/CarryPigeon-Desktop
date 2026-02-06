@@ -3,42 +3,38 @@
  * @description 负责 ECC 握手、AES-GCM 加解密、以及 Netty length-prefix 帧封装；关联文档见 `docs/客户端开发指南.md`。
  */
 import { invokeTauri, TAURI_COMMANDS, tauriLog } from "@/shared/tauri";
+import { frameNettyPayload, type FrameConfig } from "./frameCodec";
 
 type JsonObject = Record<string, unknown>;
-type FrameByteOrder = "be" | "le";
-type FrameLengthBytes = 2 | 4;
-
-export type FrameConfig = {
-    lengthBytes: FrameLengthBytes;
-    byteOrder: FrameByteOrder;
-    lengthIncludesHeader: boolean;
-};
 
 /**
- * crypto/text codec shared by encryption helpers.
- * (Do not export; exported APIs live on `Encryption`.)
+ * 加密辅助函数共享的文本编解码器。
+ *
+ * 说明：
+ * - 不导出；对外 API 统一通过 `Encryption` 暴露。
  */
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8");
 
 /**
- * Convert a `Uint8Array` view into a standalone `ArrayBuffer` slice.
+ * 将 `Uint8Array` 视图转换为独立的 `ArrayBuffer` 切片。
  *
- * WebCrypto APIs accept `ArrayBuffer`/`ArrayBufferView`. We use a slice here to
- * avoid subtle bugs when the input `Uint8Array` is a sub-view of a larger buffer.
+ * 说明：
+ * WebCrypto API 接受 `ArrayBuffer`/`ArrayBufferView`。这里使用 slice，
+ * 用于避免输入 `Uint8Array` 是“大 buffer 的子视图”时带来的边界/偏移隐患。
  *
- * @param bytes - Byte view.
- * @returns A sliced ArrayBuffer containing only `bytes`.
+ * @param bytes - 字节视图。
+ * @returns 仅包含 `bytes` 的 `ArrayBuffer` 切片。
  */
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 /**
- * Base64-encode bytes using browser built-ins (`btoa`).
+ * 使用浏览器内置能力（`btoa`）对字节进行 Base64 编码。
  *
- * @param bytes - Raw bytes.
- * @returns Base64 string.
+ * @param bytes - 原始字节。
+ * @returns Base64 字符串。
  */
 function bytesToBase64(bytes: Uint8Array): string {
     let binary = "";
@@ -47,10 +43,10 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Decode a base64 string into bytes using browser built-ins (`atob`).
+ * 使用浏览器内置能力（`atob`）将 Base64 字符串解码为字节。
  *
- * @param base64 - Base64 string.
- * @returns Decoded bytes.
+ * @param base64 - Base64 字符串。
+ * @returns 解码后的字节数组。
  */
 function base64ToBytes(base64: string): Uint8Array {
     const binary = atob(base64);
@@ -60,10 +56,10 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 /**
- * Concatenate multiple byte arrays into a single `Uint8Array`.
+ * 将多个字节数组拼接为一个 `Uint8Array`。
  *
- * @param parts - Byte array parts.
- * @returns Concatenated output.
+ * @param parts - 字节数组片段。
+ * @returns 拼接后的输出。
  */
 function concatBytes(...parts: Uint8Array[]): Uint8Array {
     const total = parts.reduce((sum, p) => sum + p.length, 0);
@@ -77,36 +73,10 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
 }
 
 /**
- * Apply a Netty-style length-prefix header to a payload.
+ * 判断字节数组是否全为 0。
  *
- * Rust side is responsible for deframing (length-based decoder). This function
- * only *frames* outgoing messages so Rust can parse them consistently.
- *
- * @param payload - Raw payload bytes.
- * @param config - Frame config (u16/u32, endianness, header inclusion rule).
- * @returns A new Uint8Array containing `[len][payload]`.
- */
-function frameNettyPayload(payload: Uint8Array, config: FrameConfig): Uint8Array {
-    const headerBytes = config.lengthBytes;
-    const totalLength = payload.length + (config.lengthIncludesHeader ? headerBytes : 0);
-
-    if (headerBytes === 2) {
-        if (totalLength > 0xffff) throw new Error(`Netty payload too large for u16 length: ${totalLength}`);
-        const out = new Uint8Array(headerBytes + payload.length);
-        new DataView(out.buffer).setUint16(0, totalLength, config.byteOrder === "le");
-        out.set(payload, headerBytes);
-        return out;
-    }
-
-    const out = new Uint8Array(headerBytes + payload.length);
-    new DataView(out.buffer).setUint32(0, totalLength >>> 0, config.byteOrder === "le");
-    out.set(payload, headerBytes);
-    return out;
-}
-
-/**
- * @param bytes - Bytes to check.
- * @returns `true` when all bytes are 0.
+ * @param bytes - 待检查字节。
+ * @returns 全为 0 时返回 `true`。
  */
 function isAllZero(bytes: Uint8Array): boolean {
     for (let i = 0; i < bytes.length; i++) if (bytes[i] !== 0) return false;
@@ -114,10 +84,10 @@ function isAllZero(bytes: Uint8Array): boolean {
 }
 
 /**
- * Import a server ECC public key (P-256) from base64 SPKI.
+ * 从 Base64（SPKI）导入服务端 ECC 公钥（P-256）。
  *
- * @param base64Spki - Base64-encoded SPKI bytes.
- * @returns Imported WebCrypto key for ECDH deriveBits.
+ * @param base64Spki - Base64 编码的 SPKI 字节。
+ * @returns 可用于 ECDH deriveBits 的 WebCrypto key。
  */
 async function importServerEccPublicKeySpkiP256(base64Spki: string): Promise<CryptoKey> {
     const spkiBytes = base64ToBytes(base64Spki);
@@ -135,26 +105,27 @@ async function importServerEccPublicKeySpkiP256(base64Spki: string): Promise<Cry
 }
 
 /**
- * Encrypt a payload using ECIES-like scheme over P-256 ECDH.
+ * 基于 P-256 ECDH 的 ECIES-like 方案加密 payload。
  *
- * Notes:
- * - This matches a common BouncyCastle ECIES configuration (KDF2(SHA1) + HMAC(SHA1)).
- * - Output format: `V || C || T`
- *   - `V`: ephemeral public key (uncompressed point)
- *   - `C`: ciphertext (XOR with KDF output)
- *   - `T`: HMAC-SHA1 tag over `C`
+ * 说明：
+ * - 该实现对齐常见的 BouncyCastle ECIES 配置（KDF2(SHA1) + HMAC(SHA1)）。
+ * - 输出格式：`V || C || T`
+ *   - `V`：临时公钥（非压缩点）
+ *   - `C`：密文（与 KDF 输出 XOR）
+ *   - `T`：对 `C` 的 HMAC-SHA1 tag
  *
- * @param serverPublicKey - Server ECDH public key (P-256).
- * @param plaintext - Plain bytes.
- * @returns Encrypted bytes.
+ * @param serverPublicKey - 服务端 ECDH 公钥（P-256）。
+ * @param plaintext - 明文字节。
+ * @returns 密文字节。
  */
 async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Array): Promise<Uint8Array> {
-    // Match BouncyCastle "ECIES" defaults (IESEngine + KDF2(SHA1) + HMac(SHA1), no block cipher).
-    // Output format: V || C || T
-    // - V: ephemeral public key (uncompressed point)
-    // - C: ciphertext (XOR with KDF output)
-    // - T: HMAC-SHA1 over C (encodingV omitted)
-    const MAC_KEY_SIZE_BYTES = 16; // 128-bit macKeySize is the common BC default for ECIES
+    // 对齐 BouncyCastle 的 ECIES 默认配置（IESEngine + KDF2(SHA1) + HMac(SHA1)，无分组密码）。
+    // 输出格式：V || C || T
+    // - V：临时公钥（非压缩点）
+    // - C：密文（与 KDF 输出 XOR）
+    // - T：对 C 的 HMAC-SHA1（此处不包含 encodingV）
+    // 说明：16 字节（128-bit）是 BouncyCastle ECIES 常见的默认 MAC key size。
+    const MAC_KEY_SIZE_BYTES = 16;
 
     const eph = await window.crypto.subtle.generateKey(
         { name: "ECDH", namedCurve: "P-256" },
@@ -172,10 +143,10 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
     const ephPublicRaw = new Uint8Array(await window.crypto.subtle.exportKey("raw", eph.publicKey));
 
     /**
-     * Compute SHA-1 digest (used by KDF2 and HMAC key derivation).
+     * 计算 SHA-1 摘要（用于 KDF2 与 HMAC key 派生）。
      *
-     * @param data - Input bytes.
-     * @returns SHA-1 digest bytes.
+     * @param data - 输入字节。
+     * @returns SHA-1 摘要字节。
      */
     async function sha1(data: Uint8Array): Promise<Uint8Array> {
         const digest = await window.crypto.subtle.digest("SHA-1", toArrayBuffer(data));
@@ -183,10 +154,10 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
     }
 
     /**
-     * Encode an unsigned 32-bit integer in big-endian.
+     * 将无符号 32-bit 整数编码为大端字节序。
      *
-     * @param value - Unsigned 32-bit integer.
-     * @returns 4-byte big-endian encoding.
+     * @param value - 无符号 32-bit 整数。
+     * @returns 4 字节大端编码。
      */
     function u32be(value: number): Uint8Array {
         const out = new Uint8Array(4);
@@ -196,11 +167,11 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
     }
 
     /**
-     * KDF2 with SHA-1 as the digest.
+     * KDF2（digest 使用 SHA-1）。
      *
-     * @param z - Shared secret bytes.
-     * @param length - Output length in bytes.
-     * @returns Derived key bytes.
+     * @param z - 共享密钥字节。
+     * @param length - 输出长度（字节）。
+     * @returns 派生出的 key 字节。
      */
     async function kdf2Sha1(z: Uint8Array, length: number): Promise<Uint8Array> {
         const out = new Uint8Array(length);
@@ -236,17 +207,17 @@ async function eciesEncryptP256(serverPublicKey: CryptoKey, plaintext: Uint8Arra
 }
 
 /**
- * Build AAD (additional authenticated data) for AES-GCM.
+ * 构建 AES-GCM 的 AAD（additional authenticated data）。
  *
- * Layout (20 bytes):
+ * 布局（20 字节）：
  * - u32 sequence
  * - u64 sessionId
  * - u64 timestampMs
  *
- * @param sequence - Message sequence number.
- * @param sessionId - Session id.
- * @param timestampMs - Timestamp in ms.
- * @returns AAD bytes.
+ * @param sequence - 消息序号。
+ * @param sessionId - 会话 id。
+ * @param timestampMs - 时间戳（ms）。
+ * @returns AAD 字节。
  */
 function buildAad(sequence: number, sessionId: bigint, timestampMs: bigint): Uint8Array {
     const aad = new Uint8Array(20);
@@ -258,10 +229,10 @@ function buildAad(sequence: number, sessionId: bigint, timestampMs: bigint): Uin
 }
 
 /**
- * Parse AAD bytes back into structured fields.
+ * 将 AAD 字节反解析为结构化字段。
  *
- * @param aad - AAD bytes.
- * @returns Parsed fields.
+ * @param aad - AAD 字节。
+ * @returns 解析后的字段。
  */
 function parseAad(aad: Uint8Array): { sequence: number; sessionId: bigint; timestampMs: bigint } {
     if (aad.length !== 20) throw new Error(`Invalid AAD length: ${aad.length}`);
@@ -272,15 +243,55 @@ function parseAad(aad: Uint8Array): { sequence: number; sessionId: bigint; times
     return { sequence, sessionId, timestampMs };
 }
 
+/**
+ * 加密器（平台边界 / 状态机）。
+ *
+ * 职责：
+ * - 在连接建立后发起换钥（`swapKey`），并等待服务端 `/handshake` 返回 `session_id`；
+ * - 对业务 JSON 文本做 AES-GCM 加解密，并与 Rust 侧的 Netty 拆包协议对齐封帧；
+ * - 在握手前后对 session/sequence 等状态进行维护与校验。
+ *
+ * 说明：
+ * - 本类不负责拆包（deframe）；Rust 侧会先按 length-prefix 拆成单帧再投递到前端。
+ * - 日志统一通过 `tauriLog` 输出英文，便于跨端检索。
+ */
 export class Encryption {
+    /**
+     * 逻辑服务端 socket（用于索引、日志与 registry key）。
+     */
     private readonly serverSocket: string;
+    /**
+     * 传输层 socket（可能与 serverSocket 不同，例如 tls:// 或 mock://）。
+     */
     private readonly transportSocket: string;
+    /**
+     * 服务端 ECC 公钥（Base64 SPKI，P-256）。
+     *
+     * 用途：
+     * - 兼容旧链路：在非 TLS 传输下，用 ECIES-like 方案加密 `aes_key_base64`。
+     * - 若走 TLS，可不配置（推荐直接明文发送 AES key，因为传输层已加密）。
+     */
     private serverEccPublicKeyBase64: string | undefined;
+    /**
+     * length-prefix 帧配置（与 Rust/Netty 拆包保持一致）。
+     */
     private frameConfig: FrameConfig = { lengthBytes: 2, byteOrder: "be", lengthIncludesHeader: false };
 
+    /**
+     * 当前会话的 AES-GCM key（通过 `swapKey` 初始化）。
+     */
     private aesKey: CryptoKey | undefined;
+    /**
+     * 服务端握手返回的 session id（大整数）。
+     */
     private sessionId: bigint = 0n;
+    /**
+     * 发送序号（写入 AAD，用于服务端做重放/排序控制）。
+     */
     private sendSequence: number = 0;
+    /**
+     * 是否已完成握手（收到 `/handshake` 后置为 true）。
+     */
     private handshakeComplete: boolean = false;
 
     constructor(serverSocket: string, opts?: { transportSocket?: string; serverEccPublicKeyBase64?: string; frameConfig?: FrameConfig }) {
@@ -293,7 +304,7 @@ export class Encryption {
     /**
      * 设置服务端 ECC 公钥（Base64 SPKI，P-256）。
      * @param base64Spki - 服务端 ECC 公钥（Base64 SPKI）
-     * @returns void
+     * @returns 无返回值。
      */
     public setServerEccPublicKeyBase64(base64Spki: string) {
         this.serverEccPublicKeyBase64 = base64Spki;
@@ -302,7 +313,7 @@ export class Encryption {
     /**
      * 设置 Netty 帧配置（长度前缀）。
      * @param frameConfig - 帧配置
-     * @returns void
+     * @returns 无返回值。
      */
     public setFrameConfig(frameConfig: FrameConfig) {
         this.frameConfig = frameConfig;

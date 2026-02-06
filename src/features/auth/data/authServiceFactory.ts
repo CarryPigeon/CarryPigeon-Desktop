@@ -1,22 +1,29 @@
 /**
  * @fileoverview authServiceFactory.ts
- * @description Data-layer factory: re-exports for backward compatibility.
+ * @description auth｜数据层实现：authServiceFactory。
  *
- * @deprecated Use domain/ports and di/ instead.
+ * @deprecated 请改用 domain/ports 与 di/（依赖注入入口）。
  *
- * API alignment:
- * - See `docs/api/*` for auth endpoints and error model
- * - required gate: PRD 5.6 + `required_plugin_missing`
+ * API 对齐说明：
+ * - 认证相关端点与错误模型请参考 `docs/api/*`
+ * - required gate：PRD 5.6 + `required_plugin_missing`
  */
 
-// Re-export types from domain layer for backward compatibility
+/**
+ * 向后兼容导出：重导出领域层的认证登录结果类型。
+ */
 export type { AuthLoginResult } from "../domain/types/AuthTypes";
 
-// Re-export port types as service types for backward compatibility
+/**
+ * 向后兼容导出：将领域端口类型重命名为 service 类型别名。
+ */
 export type { AuthServicePort as AuthService } from "../domain/ports/AuthServicePort";
+/**
+ * 向后兼容导出：将领域端口类型重命名为 service 类型别名。
+ */
 export type { EmailServicePort as EmailService } from "../domain/ports/EmailServicePort";
 
-// Re-export factory functions for backward compatibility
+// 向后兼容导出：重导出旧工厂函数名
 export { createMockEmailServicePort as createMockEmailService } from "../mock/mockEmailServicePort";
 export { createMockAuthServicePort as createMockAuthService } from "../mock/mockAuthServicePort";
 export { createHttpEmailServicePort as createHttpEmailService } from "../data/httpEmailServicePort";
@@ -27,20 +34,20 @@ import type { EmailServicePort } from "../domain/ports/EmailServicePort";
 import { getAuthServicePort, getEmailServicePort } from "../di/auth.di";
 
 /**
- * Legacy factory name used by presentation/bootstrap layers.
+ * 旧版工厂函数名（用于历史调用点兼容）。
  *
- * @param serverSocket - Server socket.
- * @returns AuthServicePort.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns `AuthServicePort` 实例。
  */
 export function createAuthService(serverSocket: string): AuthServicePort {
   return getAuthServicePort(serverSocket);
 }
 
 /**
- * Legacy factory name used by presentation/bootstrap layers.
+ * 旧版工厂函数名（用于历史调用点兼容）。
  *
- * @param serverSocket - Server socket.
- * @returns EmailServicePort.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns `EmailServicePort` 实例。
  */
 export function createEmailService(serverSocket: string): EmailServicePort {
   return getEmailServicePort(serverSocket);

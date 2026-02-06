@@ -1,6 +1,6 @@
 /**
  * @fileoverview 插件运行时加载器（桌面端）。
- * @description
+ * @description plugins｜展示层实现：pluginRuntime。
  * 负责在桌面端（Tauri）环境中加载插件前端运行时，并将“受控 Host API”注入给插件使用。
  *
  * 职责范围：
@@ -17,39 +17,18 @@ import { invokeTauri } from "@/shared/tauri";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { buildTauriTlsArgs } from "@/shared/net/tls/tauriTlsArgs";
 import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginTypes";
+import type { PluginContext } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 
-export type PluginComposerPayload = {
-  domain: string;
-  domain_version: string;
-  data: unknown;
-  reply_to_mid?: string;
-};
+export type { PluginComposerPayload, PluginContext } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 
-export type PluginContext = {
-  server_socket: string;
-  server_id: string;
-  plugin_id: string;
-  plugin_version: string;
-  cid: string;
-  uid: string;
-  lang: string;
-  host: {
-    sendMessage(payload: PluginComposerPayload): Promise<void>;
-    storage: {
-      get(key: string): Promise<unknown>;
-      set(key: string, value: unknown): Promise<void>;
-    };
-    network?: {
-      fetch(input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{
-        ok: boolean;
-        status: number;
-        headers: Record<string, string>;
-        bodyText: string;
-      }>;
-    };
-  };
-};
-
+/**
+ * 宿主规范化后的插件模块结构。
+ *
+ * 说明：
+ * - 插件模块的原始导出可能不稳定，宿主会在 `normalizePluginModule` 中做容错与归一化；
+ * - `renderers/composers` 以 domain 为 key，供聊天 UI 渲染消息与挂载编辑器；
+ * - `activate/deactivate` 为可选生命周期钩子。
+ */
 export type LoadedPluginModule = {
   pluginId: string;
   version: string;
@@ -116,7 +95,7 @@ export function toAppPluginEntryUrl(e: PluginRuntimeEntry): string {
 /**
  * 创建“权限受控”的 storage API（Rust 侧按 server_id 隔离）。
  *
- * @param serverSocket - server socket。
+ * @param serverSocket - 服务器 Socket 地址。
  * @param pluginId - 插件 id。
  * @returns storage API。
  */
@@ -138,7 +117,7 @@ export function createPluginStorageApi(serverSocket: string, pluginId: string): 
 /**
  * 创建“权限受控”的 network API（Rust 侧强制同源）。
  *
- * @param serverSocket - server socket。
+ * @param serverSocket - 服务器 Socket 地址。
  * @returns network API。
  */
 export function createPluginNetworkApi(serverSocket: string): NonNullable<PluginContext["host"]["network"]> {

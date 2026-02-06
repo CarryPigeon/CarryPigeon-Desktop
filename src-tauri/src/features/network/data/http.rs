@@ -1,16 +1,26 @@
+//! HTTP 下载工具（头像下载等）。
+//!
+//! 约定：
+//! - 注释统一使用中文，便于团队维护与交接。
+//! - 日志输出统一使用英文，便于跨端检索与与上游/第三方日志对齐。
+
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::path::Path;
 use tokio::io::AsyncWriteExt;
-use tracing::info;
+use tracing::{debug, info};
 
-/// 下载进度回调函数类型定义
+/// 下载进度回调函数类型定义。
+///
+/// # 参数
+/// - `downloaded`: 当前已下载字节数。
+/// - `total`: 总字节数（未知时为 0）。
 type ProgressCallback = dyn Fn(u64, u64) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
     + Send
     + Sync
     + 'static;
 
-/// 下载配置结构体
+/// 下载配置结构体。
 #[derive(Default)]
 pub struct DownloadConfig {
     /// 超时时间（秒）
@@ -21,7 +31,7 @@ pub struct DownloadConfig {
     pub progress_callback: Option<Box<ProgressCallback>>,
 }
 
-// 手动实现Debug特性，跳过progress_callback字段
+/// 手动实现 Debug：跳过 `progress_callback` 字段，避免输出闭包地址/内容造成噪音。
 impl std::fmt::Debug for DownloadConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DownloadConfig")
@@ -68,7 +78,7 @@ pub async fn download_avatar_impl(
     };
 
     // 发送GET请求
-    info!("开始下载文件: {}", url);
+    info!("Starting download: url={}", url);
     let mut response = client.get(url).send().await?;
 
     // 创建输出文件
@@ -110,10 +120,10 @@ pub async fn download_avatar_impl(
     // 计算最终哈希
     let hash = format!("{:x}", hasher.finalize());
     info!(
-        "文件下载完成: {}, 大小: {} 字节, SHA256: {}",
+        "Download completed: path={}, bytes={}, sha256={}",
         output_path.display(),
         downloaded,
-        hash
+        hash,
     );
 
     // 验证文件完整性
@@ -122,18 +132,21 @@ pub async fn download_avatar_impl(
             // 如果哈希不匹配，删除文件并返回错误
             tokio::fs::remove_file(output_path).await?;
             return Err(anyhow::anyhow!(
-                "文件完整性验证失败: 预期SHA256: {}, 实际SHA256: {}",
+                "File integrity check failed: expected_sha256={}, actual_sha256={}",
                 expected,
                 hash
             ));
         }
-        info!("文件完整性验证成功: {}", output_path.display());
+        info!(
+            "File integrity check passed: path={}",
+            output_path.display()
+        );
     }
 
     Ok(())
 }
 
-/// 下载头像的包装函数
+/// 下载头像的包装函数。
 pub async fn download_avatar(avatar_id: &str, url: &str) -> anyhow::Result<()> {
     let output_path = format!("./avatar/{}.jpg", avatar_id);
 
@@ -145,9 +158,12 @@ pub async fn download_avatar(avatar_id: &str, url: &str) -> anyhow::Result<()> {
             Box::pin(async move {
                 if total > 0 {
                     let progress = (downloaded as f64 / total as f64) * 100.0;
-                    info!("头像下载进度: {:.2}% ({}/{})", progress, downloaded, total);
+                    debug!(
+                        "Avatar download progress: {:.2}% ({}/{})",
+                        progress, downloaded, total
+                    );
                 } else {
-                    info!("头像下载进度: {} 字节", downloaded);
+                    debug!("Avatar download progress: bytes={}", downloaded);
                 }
             })
         })),
@@ -170,7 +186,7 @@ mod tests {
 
         // 测试基本下载功能
         let result = download_avatar_impl(url, output_path, None).await;
-        assert!(result.is_ok(), "下载失败: {:?}", result);
+        assert!(result.is_ok(), "download failed: {:?}", result);
 
         // 测试带超时配置的下载
         let config = Some(DownloadConfig {
@@ -179,7 +195,11 @@ mod tests {
             progress_callback: None,
         });
         let result = download_avatar_impl(url, output_path, config).await;
-        assert!(result.is_ok(), "带超时配置的下载失败: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "download (with timeout) failed: {:?}",
+            result
+        );
 
         // 测试带进度回调的下载
         let config = Some(DownloadConfig {
@@ -187,16 +207,25 @@ mod tests {
             expected_hash: None,
             progress_callback: Some(Box::new(|downloaded, total| {
                 Box::pin(async move {
-                    println!("下载进度: {} / {}", downloaded, total);
+                    tracing::debug!(
+                        action = "download_progress",
+                        downloaded,
+                        total,
+                        "Download progress"
+                    );
                 })
             })),
         });
         let result = download_avatar_impl(url, output_path, config).await;
-        assert!(result.is_ok(), "带进度回调的下载失败: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "download (with progress callback) failed: {:?}",
+            result
+        );
 
         // 清理测试文件
         if let Err(e) = tokio::fs::remove_file(output_path).await {
-            println!("清理测试文件失败: {:?}", e);
+            tracing::warn!(action = "cleanup_test_file_failed", error = %e);
         }
     }
 
@@ -209,12 +238,12 @@ mod tests {
 
         // 测试头像下载功能
         let result = download_avatar(avatar_id, url).await;
-        assert!(result.is_ok(), "头像下载失败: {:?}", result);
+        assert!(result.is_ok(), "avatar download failed: {:?}", result);
 
         // 清理测试文件
         let output_path = format!("./avatar/{}.jpg", avatar_id);
         if let Err(e) = tokio::fs::remove_file(output_path).await {
-            println!("清理测试头像文件失败: {:?}", e);
+            tracing::warn!(action = "cleanup_test_avatar_file_failed", error = %e);
         }
     }
 }

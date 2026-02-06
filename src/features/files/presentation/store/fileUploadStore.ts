@@ -1,15 +1,18 @@
 /**
  * @fileoverview fileUploadStore.ts
- * @description File upload store for managing upload tasks.
+ * @description files｜展示层状态（store）：fileUploadStore。
  */
 
 import { reactive, ref } from "vue";
 import { getFileServicePort } from "@/features/files/di/files.di";
-import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
+import { currentServerSocket } from "@/features/servers/api";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { readAuthToken } from "@/shared/utils/localState";
 import type { FileUploadResult } from "@/features/files/domain/types/FileTypes";
 
+/**
+ * 单个上传任务的状态模型（用于 UI 展示与管理）。
+ */
 export type UploadTask = {
   id: string;
   file: File;
@@ -23,18 +26,21 @@ const uploadTasks = reactive<Map<string, UploadTask>>(new Map());
 const currentTaskId = ref<string>("");
 
 /**
- * Generate a unique task id.
+ * 生成上传任务的本地唯一 id。
  *
- * @returns Unique task id.
+ * @returns 任务 id。
  */
 function generateTaskId(): string {
   return `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**
- * Get current socket and valid token.
+ * 获取当前 socket 与可用 token。
  *
- * @returns Tuple [socket, token].
+ * 说明：
+ * - 会尽力刷新即将过期的 token，避免立刻鉴权失败。
+ *
+ * @returns 二元组 `[socket, token]`（均已 trim）。
  */
 async function getSocketAndToken(): Promise<[string, string]> {
   const socket = currentServerSocket.value.trim();
@@ -44,10 +50,10 @@ async function getSocketAndToken(): Promise<[string, string]> {
 }
 
 /**
- * Upload a file.
+ * 上传文件（两段式：请求 descriptor → 执行实际上传）。
  *
- * @param file - File to upload.
- * @returns Promise<FileUploadResult>.
+ * @param file - 要上传的文件。
+ * @returns 上传结果（包含 file_id/share_key 与 upload descriptor）。
  */
 export async function uploadFile(file: File): Promise<FileUploadResult> {
   const taskId = generateTaskId();
@@ -71,7 +77,7 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
 
     const fileService = getFileServicePort();
 
-    // Step 1: Request upload descriptor
+    // 第 1 步：请求 upload descriptor
     task.progress = 20;
     const result = await fileService.requestUpload(socket, token, {
       filename: file.name,
@@ -79,7 +85,7 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
       sizeBytes: file.size,
     });
 
-    // Step 2: Perform the actual upload
+    // 第 2 步：执行实际上传
     task.progress = 50;
     const buffer = await file.arrayBuffer();
     await fileService.performUpload(result.upload, buffer);
@@ -96,9 +102,12 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
 }
 
 /**
- * Cancel an upload task.
+ * 取消上传任务（best-effort）。
  *
- * @param taskId - Task id to cancel.
+ * 说明：
+ * - 当前实现不支持中断正在进行的 fetch/upload；这里只标记任务为 error。
+ *
+ * @param taskId - 任务 id。
  */
 export function cancelUpload(taskId: string): void {
   const task = uploadTasks.get(taskId);
@@ -109,47 +118,47 @@ export function cancelUpload(taskId: string): void {
 }
 
 /**
- * Remove a task from the list.
+ * 从任务列表移除某个任务。
  *
- * @param taskId - Task id to remove.
+ * @param taskId - 任务 id。
  */
 export function removeTask(taskId: string): void {
   uploadTasks.delete(taskId);
 }
 
 /**
- * Get all upload tasks.
+ * 获取全部上传任务。
  *
- * @returns Upload tasks map.
+ * @returns 上传任务 Map（taskId → task）。
  */
 export function getUploadTasks(): Map<string, UploadTask> {
   return uploadTasks;
 }
 
 /**
- * Get a specific task by id.
+ * 获取指定任务。
  *
- * @param taskId - Task id.
- * @returns Upload task or undefined.
+ * @param taskId - 任务 id。
+ * @returns 任务对象；不存在时返回 `undefined`。
  */
 export function getTask(taskId: string): UploadTask | undefined {
   return uploadTasks.get(taskId);
 }
 
 /**
- * Get the current active task id.
+ * 获取当前活跃任务 id（用于 UI 侧聚焦/回显）。
  *
- * @returns Current task id ref.
+ * @returns 当前任务 id 的 Ref。
  */
 export function getCurrentTaskId() {
   return currentTaskId;
 }
 
 /**
- * Build download URL for a share key.
+ * 构建 share key 对应的下载 URL。
  *
- * @param shareKey - File share key.
- * @returns Download URL.
+ * @param shareKey - 文件 share key。
+ * @returns 下载 URL（无法构建时返回空字符串）。
  */
 export function buildDownloadUrl(shareKey: string): string {
   const socket = currentServerSocket.value.trim();

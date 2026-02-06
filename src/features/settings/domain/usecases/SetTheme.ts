@@ -1,22 +1,22 @@
 /**
  * @fileoverview SetTheme.ts
- * @description Usecase: update theme preference.
+ * @description settings｜用例：SetTheme。
  */
 
 import type { ConfigPort } from "../ports/ConfigPort";
 import type { AppTheme } from "../types/ConfigTypes";
 
 /**
- * Set theme usecase.
+ * 用例：设置应用主题。
  */
 export class SetTheme {
   constructor(private readonly configPort: ConfigPort) {}
 
   /**
-   * Execute set theme.
+   * 执行：将主题写入配置存储。
    *
-   * @param theme - Target theme.
-   * @returns Promise<void>.
+   * @param theme - 目标主题。
+   * @returns 无返回值。
    */
   execute(theme: AppTheme): Promise<void> {
     return this.configPort.setTheme(theme);

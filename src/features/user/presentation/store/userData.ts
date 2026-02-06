@@ -13,6 +13,9 @@
 
 import { reactive } from "vue";
 
+/**
+ * 当前用户资料的最小快照模型（展示层使用）。
+ */
 export type CurrentUser = {
   /**
    * 用户 id（Snowflake 字符串；保持为 string 以避免 JS 精度丢失）。

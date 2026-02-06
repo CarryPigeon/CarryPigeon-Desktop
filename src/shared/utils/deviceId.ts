@@ -1,6 +1,6 @@
 /**
  * @fileoverview 稳定 device id 工具（用于认证/会话创建）。
- * @description
+ * @description 通用工具：deviceId。
  * 接口（HTTP API）包含 `client.device_id` 字段，用于 token 发放与会话追踪。
  * 本模块提供一个存储于 localStorage 的稳定 id。
  *
@@ -10,7 +10,7 @@
  * - 避免引入额外依赖。
  */
 
-const KEY_DEVICE_ID = "carrypigeon:deviceId";
+import { KEY_DEVICE_ID } from "./storageKeys";
 
 /**
  * 生成适合作为本地 device id 的伪随机标识。

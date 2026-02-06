@@ -1,18 +1,21 @@
 /**
  * @fileoverview protocolMockTransport.ts
- * @description In-memory protocol-level mock transport for `VITE_MOCK_MODE=protocol`.
+ * @description Mock 支撑：protocolMockTransport（用于本地预览/测试）。
  *
- * This module emulates a minimal subset of the CarryPigeon HTTP+WS protocol so
- * that the app can run its *live* stores without a real backend.
+ * 该模块模拟 CarryPigeon 的一小部分 HTTP + WS 协议，使应用在没有真实后端时也能运行 live stores。
  *
- * Scope:
- * - HTTP `/api/*` endpoints used by current UI flows (auth/server/chat/users/plugins/files/gates).
- * - Chat WS event stream: emits `message.created/deleted/read_state.updated` (best-effort).
+ * 覆盖范围（按当前 UI 流程最小集）：
+ * - HTTP `/api/*`：auth/server/chat/users/plugins/files/gates 等页面依赖的端点。
+ * - Chat WS 事件流：best-effort 地发出 `message.created/deleted/read_state.updated` 等事件。
  */
 
 import type { ApiErrorEnvelope } from "@/shared/net/http/apiErrors";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
+import { normalizeServerKey } from "@/shared/serverKey";
 
+/**
+ * Mock API 请求结构（供 protocol mock 路由器使用）。
+ */
 export type MockApiRequest = {
   serverSocket: string;
   method: string;
@@ -21,10 +24,16 @@ export type MockApiRequest = {
   body: unknown;
 };
 
+/**
+ * Mock API 返回结构（ok 或 error envelope）。
+ */
 export type MockApiResult =
   | { ok: true; status: number; body: unknown }
   | { ok: false; error: ApiErrorEnvelope };
 
+/**
+ * WS 事件封包（与服务端 wire contract 形态对齐的最小子集）。
+ */
 export type ProtocolWsEventEnvelope = {
   type: "event";
   data: {
@@ -35,6 +44,9 @@ export type ProtocolWsEventEnvelope = {
   };
 };
 
+/**
+ * Mock WS client 句柄（用于关闭连接与刷新 token）。
+ */
 export type ProtocolWsClient = {
   close(): void;
   reauth(nextAccessToken: string): void;
@@ -118,10 +130,10 @@ type ServerState = {
 const servers = new Map<string, ServerState>();
 
 /**
- * Create a deterministic mock server_id from a socket string.
+ * 基于 socket 字符串生成确定性的 mock `server_id`。
  *
- * @param input - Server socket.
- * @returns Deterministic id.
+ * @param input - 服务器 Socket 地址。
+ * @returns 确定性的短 id。
  */
 function hashToId(input: string): string {
   let h = 2166136261;
@@ -134,22 +146,22 @@ function hashToId(input: string): string {
 }
 
 /**
- * Get the required plugin ids from the static mock catalog.
+ * 从静态 mock catalog 中提取 required 插件 id 列表。
  *
- * @returns Required plugin id list.
+ * @returns required 插件 id 列表。
  */
 function listRequiredPluginIds(): string[] {
   return MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
 }
 
 /**
- * Build an API error envelope.
+ * 构造标准 API 错误封包（ApiErrorEnvelope）。
  *
  * @param status - HTTP status.
- * @param reason - Machine-readable reason string.
- * @param message - Human-readable error message.
- * @param details - Optional details object.
- * @returns ApiErrorEnvelope.
+ * @param reason - 机器可读的错误原因字符串。
+ * @param message - 面向用户的错误信息字符串。
+ * @param details - 额外详情对象（可选）。
+ * @returns `ApiErrorEnvelope`。
  */
 function apiError(status: number, reason: string, message: string, details?: Record<string, unknown>): ApiErrorEnvelope {
   return {
@@ -163,10 +175,10 @@ function apiError(status: number, reason: string, message: string, details?: Rec
 }
 
 /**
- * Parse the bearer token from request headers.
+ * 从请求头中解析 Bearer token。
  *
- * @param headers - Headers map.
- * @returns Token string, or empty.
+ * @param headers - 请求头映射表。
+ * @returns token 字符串；缺失时返回空字符串。
  */
 function readBearer(headers: Record<string, string>): string {
   const raw = String(headers.Authorization ?? headers.authorization ?? "").trim();
@@ -176,10 +188,10 @@ function readBearer(headers: Record<string, string>): string {
 }
 
 /**
- * Parse a path string into a pathname + query params.
+ * 将 path 字符串解析为 pathname + query 参数集合。
  *
- * @param path - Path string (may contain query).
- * @returns Parsed parts.
+ * @param path - path 字符串（可能包含 query）。
+ * @returns 解析结果。
  */
 function parsePath(path: string): { pathname: string; searchParams: URLSearchParams } {
   const p = String(path ?? "").trim() || "/";
@@ -188,13 +200,13 @@ function parsePath(path: string): { pathname: string; searchParams: URLSearchPar
 }
 
 /**
- * Get or create a server state bucket.
+ * 获取或创建 server state 容器（按 serverSocket 作用域隔离）。
  *
- * @param serverSocket - Server socket key.
- * @returns ServerState.
+ * @param serverSocket - 服务器 Socket 地址（作为 key）。
+ * @returns `ServerState`。
  */
 function getServer(serverSocket: string): ServerState {
-  const key = serverSocket.trim() || "__no_server__";
+  const key = normalizeServerKey(serverSocket);
   const existing = servers.get(key);
   if (existing) return existing;
 
@@ -269,11 +281,11 @@ function getServer(serverSocket: string): ServerState {
 }
 
 /**
- * Resolve a session from Authorization header.
+ * 从请求头中解析并验证会话（Authorization: Bearer ...）。
  *
- * @param server - Server state.
- * @param headers - Request headers.
- * @returns TokenSession or null.
+ * @param server - server state。
+ * @param headers - 请求头。
+ * @returns 会话；未登录/无效时返回 `null`。
  */
 function requireSession(server: ServerState, headers: Record<string, string>): TokenSession | null {
   const token = readBearer(headers);
@@ -282,11 +294,11 @@ function requireSession(server: ServerState, headers: Record<string, string>): T
 }
 
 /**
- * Emit a WS event to all listeners for this server.
+ * 向该 server 的所有 WS 监听者广播一条事件（mock 环境）。
  *
- * @param server - Server state.
- * @param eventType - Event type string.
- * @param payload - Event payload.
+ * @param server - server state。
+ * @param eventType - 事件类型字符串。
+ * @param payload - 事件载荷。
  */
 function emitWs(server: ServerState, eventType: string, payload: unknown): void {
   server.eventSeq += 1;
@@ -303,19 +315,19 @@ function emitWs(server: ServerState, eventType: string, payload: unknown): void 
     try {
       l.onEvent(env);
     } catch {
-      // Ignore listener errors: mock should not crash host UI.
+      // 忽略监听者异常：mock 不应导致宿主 UI 崩溃。
     }
   }
 }
 
 /**
- * Connect a protocol-mock chat WS client.
+ * 连接 protocol-mock 的聊天 WS 客户端。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param onEvent - Event handler.
- * @param options - Optional error callbacks.
- * @returns ProtocolWsClient.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @param accessToken - 访问令牌（Bearer token 的内容）。
+ * @param onEvent - 事件回调。
+ * @param options - 可选错误回调。
+ * @returns WS 客户端句柄。
  */
 export function connectProtocolMockChatWs(
   serverSocket: string,
@@ -343,10 +355,10 @@ export function connectProtocolMockChatWs(
 }
 
 /**
- * Handle a protocol-mock `/api/*` request.
+ * 处理 protocol-mock 的 `/api/*` 请求（用于 `HttpJsonClient` 的 mock transport）。
  *
- * @param req - Request payload from HttpJsonClient.
- * @returns MockApiResult.
+ * @param req - 来自 `HttpJsonClient` 的请求载荷。
+ * @returns mock API 响应。
  */
 export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise<MockApiResult> {
   const server = getServer(req.serverSocket);

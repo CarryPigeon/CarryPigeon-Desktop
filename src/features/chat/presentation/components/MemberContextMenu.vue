@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview MemberContextMenu.vue
- * @description Context menu for member actions in channel management.
+ * @description chat｜组件：MemberContextMenu。
  */
 
 import { onBeforeUnmount, onMounted } from "vue";
@@ -26,19 +26,19 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 /**
- * Close the menu.
+ * 关闭菜单。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleClose(): void {
   emit("close");
 }
 
 /**
- * Emit selected action and close menu.
+ * 触发动作事件并关闭菜单。
  *
- * @param action - Action identifier.
- * @returns void
+ * @param action - 动作标识。
+ * @returns 无返回值。
  */
 function handleAction(action: MemberMenuAction): void {
   emit("action", action);
@@ -46,10 +46,10 @@ function handleAction(action: MemberMenuAction): void {
 }
 
 /**
- * Handle global clicks / Escape to dismiss the menu.
+ * 处理全局点击/按键事件：点击任意位置或按下 Escape 时关闭菜单。
  *
- * @param e - Global event.
- * @returns void
+ * @param e - 全局事件。
+ * @returns 无返回值。
  */
 function onGlobal(e: MouseEvent | KeyboardEvent): void {
   if (!props.open) return;
@@ -62,9 +62,9 @@ function onGlobal(e: MouseEvent | KeyboardEvent): void {
 }
 
 /**
- * Register global listeners on mount.
+ * 组件挂载：注册全局事件监听。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   window.addEventListener("mousedown", onGlobal);
@@ -74,9 +74,9 @@ function handleMounted(): void {
 onMounted(handleMounted);
 
 /**
- * Cleanup global listeners on unmount.
+ * 组件卸载：移除全局事件监听。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleBeforeUnmount(): void {
   window.removeEventListener("mousedown", onGlobal);
@@ -95,7 +95,7 @@ onBeforeUnmount(handleBeforeUnmount);
       </button>
 
       <template v-if="!props.isSelf && props.memberRole !== 'owner'">
-        <!-- Owner can manage admins -->
+        <!-- Owner 可管理管理员 -->
         <template v-if="props.currentUserRole === 'owner'">
           <div class="cp-membermenu__sep" aria-hidden="true"></div>
           <button v-if="props.memberRole === 'member'" class="cp-membermenu__item" type="button" role="menuitem" @click="handleAction('set_admin')">
@@ -106,7 +106,7 @@ onBeforeUnmount(handleBeforeUnmount);
           </button>
         </template>
 
-        <!-- Admin+ can kick and ban -->
+        <!-- Admin+ 可踢人/封禁 -->
         <template v-if="props.currentUserRole === 'owner' || props.currentUserRole === 'admin'">
           <div v-if="props.currentUserRole !== 'owner'" class="cp-membermenu__sep" aria-hidden="true"></div>
           <button class="cp-membermenu__item" type="button" role="menuitem" @click="handleAction('ban')">

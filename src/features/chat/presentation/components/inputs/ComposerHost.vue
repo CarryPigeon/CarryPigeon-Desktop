@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ComposerHost.vue
- * @description Patchbay composer host (Domain selector + textarea + send).
+ * @description chat｜组件：ComposerHost。
  */
 
 import { computed, type Component } from "vue";
@@ -31,9 +31,9 @@ const emit = defineEmits<{
 }>();
 
 /**
- * Whether the active domain uses a plugin composer component.
+ * 判断当前 domain 是否使用“插件作曲器（composer）”组件。
  *
- * @returns `true` when plugin composer UI should be mounted.
+ * @returns 需要挂载插件 composer UI 则为 `true`。
  */
 function computeIsPluginComposerActive(): boolean {
   return Boolean(props.pluginComposer);
@@ -42,12 +42,12 @@ function computeIsPluginComposerActive(): boolean {
 const isPluginComposerActive = computed(computeIsPluginComposerActive);
 
 /**
- * Whether the send action is currently allowed.
+ * 判断当前是否允许发送。
  *
- * Rules:
- * - Draft must contain at least one non-whitespace character.
+ * 规则：
+ * - Draft 至少包含一个非空白字符。
  *
- * @returns `true` when sending should be enabled.
+ * @returns 允许发送则为 `true`。
  */
 function computeCanSend(): boolean {
   if (isPluginComposerActive.value) return false;
@@ -59,9 +59,9 @@ const canSend = computed(computeCanSend);
 const { t } = useI18n();
 
 /**
- * Emit send request (disabled when draft is empty or currently sending).
+ * 触发发送请求（draft 为空或 sending 时会被禁用）。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleSend(): void {
   if (!canSend.value) return;
@@ -69,39 +69,39 @@ function handleSend(): void {
 }
 
 /**
- * Receive a submit payload from a plugin composer and forward to the host.
+ * 接收插件 composer 的提交 payload，并转发给宿主。
  *
- * @param payload - Plugin payload to send.
- * @returns void
+ * @param payload - 需要发送的插件 payload。
+ * @returns 无返回值。
  */
 function handlePluginSubmit(payload: ComposerSubmitPayload): void {
   emit("send", payload);
 }
 
 /**
- * Emit cancel-reply request.
+ * 触发“取消回复”。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleCancelReply(): void {
   emit("cancelReply");
 }
 
 /**
- * v-model adapter for DomainSelector.
+ * DomainSelector 的 v-model 适配器。
  *
- * @param v - Selected domain id.
- * @returns void
+ * @param v - 选中的 domain id。
+ * @returns 无返回值。
  */
 function handleUpdateDomainId(v: string): void {
   emit("update:domainId", v);
 }
 
 /**
- * v-model adapter for textarea draft.
+ * textarea draft 的 v-model 适配器。
  *
- * @param v - New draft value.
- * @returns void
+ * @param v - 新的 draft 值。
+ * @returns 无返回值。
  */
 function handleUpdateDraft(v: string): void {
   emit("update:draft", v);
@@ -165,8 +165,7 @@ function handleUpdateDraft(v: string): void {
 </template>
 
 <style scoped lang="scss">
-/* ComposerHost styles */
-/* Selector: `.cp-composer` — composer container (domain selector + input + send). */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；包含回复条、错误条、两行输入区与底部动作区。 */
 .cp-composer {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -175,7 +174,6 @@ function handleUpdateDraft(v: string): void {
   box-shadow: var(--cp-shadow-soft);
 }
 
-/* Selector: `.cp-reply` — reply bar (shows referenced message snippet). */
 .cp-reply {
   border: 1px solid color-mix(in oklab, var(--cp-info) 20%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
@@ -188,7 +186,6 @@ function handleUpdateDraft(v: string): void {
   margin-bottom: 10px;
 }
 
-/* Selector: `.cp-reply__title` — reply label line (uppercase). */
 .cp-reply__title {
   font-family: var(--cp-font-display);
   letter-spacing: 0.10em;
@@ -197,7 +194,6 @@ function handleUpdateDraft(v: string): void {
   color: color-mix(in oklab, var(--cp-text) 72%, transparent);
 }
 
-/* Selector: `.cp-reply__snippet` — reply snippet preview (single-line ellipsis). */
 .cp-reply__snippet {
   margin-top: 6px;
   font-size: 12px;
@@ -209,7 +205,6 @@ function handleUpdateDraft(v: string): void {
   text-overflow: ellipsis;
 }
 
-/* Selector: `.cp-reply__btn` — cancel reply button. */
 .cp-reply__btn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -226,14 +221,12 @@ function handleUpdateDraft(v: string): void {
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-reply__btn:hover` — hover lift + info border. */
 .cp-reply__btn:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
 }
 
-/* Selector: `.cp-composer__error` — send error banner (keeps draft). */
 .cp-composer__error {
   border: 1px dashed color-mix(in oklab, var(--cp-danger) 34%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
@@ -244,14 +237,12 @@ function handleUpdateDraft(v: string): void {
   margin-bottom: 10px;
 }
 
-/* Selector: `.cp-composer__row + .cp-composer__row` — section divider between rows. */
 .cp-composer__row + .cp-composer__row {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--cp-border-light);
 }
 
-/* Selector: `.cp-composer__plugin` — plugin composer mount surface. */
 .cp-composer__plugin {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -260,7 +251,6 @@ function handleUpdateDraft(v: string): void {
   box-shadow: var(--cp-inset);
 }
 
-/* Selector: `.cp-composer__label` — row label (uppercase). */
 .cp-composer__label {
   font-family: var(--cp-font-display);
   letter-spacing: 0.1em;
@@ -270,7 +260,6 @@ function handleUpdateDraft(v: string): void {
   margin-bottom: 10px;
 }
 
-/* Selector: `.cp-composer__actions` — action row alignment (send button on the right). */
 .cp-composer__actions {
   margin-top: 12px;
   display: flex;
@@ -278,14 +267,12 @@ function handleUpdateDraft(v: string): void {
   justify-content: flex-end;
 }
 
-/* Selector: `.cp-composer__hint` — subtle hint for plugin composer mode. */
 .cp-composer__hint {
   font-size: 12px;
   color: var(--cp-text-muted);
   padding: 6px 8px;
 }
 
-/* Selector: `.cp-composer__send` — send button base. */
 .cp-composer__send {
   border: 1px solid color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
@@ -300,14 +287,12 @@ function handleUpdateDraft(v: string): void {
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-composer__send:hover:enabled` — hover affordance only when enabled. */
 .cp-composer__send:hover:enabled {
   transform: translateY(-1px);
   border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
 }
 
-/* Selector: `.cp-composer__send:disabled` — disabled visual state. */
 .cp-composer__send:disabled {
   opacity: 0.6;
   cursor: not-allowed;

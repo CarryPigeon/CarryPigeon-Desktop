@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview QuickSwitcher.vue
- * @description Ctrl/Cmd+K quick switcher overlay (servers/channels/modules).
+ * @description chat｜组件：QuickSwitcher。
  */
 
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -32,11 +32,12 @@ const { t } = useI18n();
 const inputEl = ref<HTMLInputElement | null>(null);
 
 /**
- * Focus the input after the panel is rendered.
+ * 在面板渲染完成后聚焦输入框。
  *
- * We wait for the next tick so the element exists in the DOM.
+ * 说明：
+ * 等待 next tick，确保输入框已进入 DOM。
  *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function focusInput(): Promise<void> {
   await nextTick();
@@ -44,20 +45,20 @@ async function focusInput(): Promise<void> {
 }
 
 /**
- * Close the quick switcher dialog.
+ * 关闭快捷切换弹窗。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function close(): void {
   emit("update:open", false);
 }
 
 /**
- * Ensure `activeIndex` stays within the current `items` bounds.
+ * 确保 `activeIndex` 始终处于当前 `items` 的有效范围内。
  *
- * When filtering changes the list size, this prevents out-of-range access.
+ * 当过滤导致列表长度变化时，避免出现越界访问。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function clampIndex(): void {
   const n = props.items.length;
@@ -70,15 +71,15 @@ function clampIndex(): void {
 }
 
 /**
- * Handle keyboard navigation within the switcher input.
+ * 处理输入框内的键盘导航逻辑。
  *
- * Supported keys:
- * - Escape: close
- * - ArrowUp/ArrowDown: change selection (wrap-around)
- * - Enter: select current item
+ * 支持按键：
+ * - Escape：关闭
+ * - ArrowUp/ArrowDown：切换选中项（循环）
+ * - Enter：选择当前项
  *
- * @param e - Keyboard event.
- * @returns void
+ * @param e - 键盘事件。
+ * @returns 无返回值。
  */
 function handleKeydown(e: KeyboardEvent): void {
   if (!props.open) return;
@@ -110,10 +111,10 @@ function handleKeydown(e: KeyboardEvent): void {
 }
 
 /**
- * Global keydown handler to ensure Escape closes even if focus leaves the input.
+ * 全局 keydown：确保即使焦点离开输入框，也能通过 Escape 关闭。
  *
- * @param e - Keyboard event.
- * @returns void
+ * @param e - 键盘事件。
+ * @returns 无返回值。
  */
 function onGlobalKeydown(e: KeyboardEvent): void {
   if (!props.open) return;
@@ -124,21 +125,21 @@ function onGlobalKeydown(e: KeyboardEvent): void {
 }
 
 /**
- * React to open-state changes.
+ * 响应 open 状态变化。
  *
- * When opening, focus the input for instant typing.
+ * 打开时自动聚焦输入框，便于直接输入。
  *
- * @param v - Whether the dialog is open.
- * @returns void
+ * @param v - 是否打开。
+ * @returns 无返回值。
  */
 function handleOpenChange(v: boolean): void {
   if (v) void focusInput();
 }
 
 /**
- * Watch-source: open state.
+ * watch 源：open 状态。
  *
- * @returns Whether the dialog is open.
+ * @returns 是否打开。
  */
 function watchOpen(): boolean {
   return props.open;
@@ -147,18 +148,18 @@ function watchOpen(): boolean {
 watch(watchOpen, handleOpenChange);
 
 /**
- * React to list-size changes by clamping the active index.
+ * items 长度变化时，重新夹紧 active index。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleItemsLengthChange(): void {
   clampIndex();
 }
 
 /**
- * Watch-source: items length (react to filtering changes).
+ * watch 源：items.length（用于响应过滤导致的列表变化）。
  *
- * @returns Current item count.
+ * @returns 当前条目数。
  */
 function watchItemsLength(): number {
   return props.items.length;
@@ -167,10 +168,10 @@ function watchItemsLength(): number {
 watch(watchItemsLength, handleItemsLengthChange);
 
 /**
- * Emit query updates from the input element.
+ * 处理输入框变更并向外同步 query。
  *
- * @param e - Input event from `<input>`.
- * @returns void
+ * @param e - `<input>` 的 input 事件。
+ * @returns 无返回值。
  */
 function handleInput(e: Event): void {
   const el = e.target as HTMLInputElement | null;
@@ -178,9 +179,9 @@ function handleInput(e: Event): void {
 }
 
 /**
- * Component mount hook: attach Escape close handler.
+ * 组件挂载：注册全局 Escape 关闭监听。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   window.addEventListener("keydown", onGlobalKeydown);
@@ -189,9 +190,9 @@ function handleMounted(): void {
 onMounted(handleMounted);
 
 /**
- * Component unmount hook: remove global handler.
+ * 组件卸载：移除全局监听。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleBeforeUnmount(): void {
   window.removeEventListener("keydown", onGlobalKeydown);
@@ -243,8 +244,7 @@ onBeforeUnmount(handleBeforeUnmount);
 </template>
 
 <style scoped lang="scss">
-/* QuickSwitcher styles */
-/* Selector: `.cp-qs` — full-screen overlay (mask + centering). */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；全屏遮罩 + 居中面板，列表区可滚动。 */
 .cp-qs {
   position: fixed;
   inset: 0;
@@ -255,7 +255,6 @@ onBeforeUnmount(handleBeforeUnmount);
   z-index: 50;
 }
 
-/* Selector: `.cp-qs__panel` — dialog panel container. */
 .cp-qs__panel {
   width: min(720px, 92vw);
   border: 1px solid var(--cp-highlight-border);
@@ -265,14 +264,12 @@ onBeforeUnmount(handleBeforeUnmount);
   padding: 14px;
 }
 
-/* Selector: `.cp-qs__title` — title stack wrapper. */
 .cp-qs__title {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-/* Selector: `.cp-qs__titleEn` — English title (display type, uppercase). */
 .cp-qs__titleEn {
   font-family: var(--cp-font-display);
   letter-spacing: 0.12em;
@@ -281,13 +278,11 @@ onBeforeUnmount(handleBeforeUnmount);
   color: var(--cp-text);
 }
 
-/* Selector: `.cp-qs__titleZh` — subtitle line. */
 .cp-qs__titleZh {
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Selector: `.cp-qs__input` — query input field. */
 .cp-qs__input {
   margin-top: 12px;
   width: 100%;
@@ -301,13 +296,11 @@ onBeforeUnmount(handleBeforeUnmount);
   box-shadow: var(--cp-inset);
 }
 
-/* Selector: `.cp-qs__input:focus` — focus ring (uses app ring token). */
 .cp-qs__input:focus {
   box-shadow: var(--cp-inset), var(--cp-ring);
   border-color: var(--cp-highlight-border);
 }
 
-/* Selector: `.cp-qs__list` — scrollable results list. */
 .cp-qs__list {
   margin-top: 12px;
   border-top: 1px solid var(--cp-border-light);
@@ -319,7 +312,6 @@ onBeforeUnmount(handleBeforeUnmount);
   overflow: auto;
 }
 
-/* Selector: `.cp-qs__item` — result row button. */
 .cp-qs__item {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -337,20 +329,17 @@ onBeforeUnmount(handleBeforeUnmount);
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-qs__item:hover` — hover lift + highlight border. */
 .cp-qs__item:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Selector: `.cp-qs__item[data-active="true"]` — keyboard-selected row. */
 .cp-qs__item[data-active="true"] {
   border-color: var(--cp-highlight-border-strong);
   background: var(--cp-highlight-bg);
 }
 
-/* Selector: `.cp-qs__kind` — kind column (mono). */
 .cp-qs__kind {
   font-family: var(--cp-font-mono);
   font-size: 12px;
@@ -359,7 +348,6 @@ onBeforeUnmount(handleBeforeUnmount);
   letter-spacing: 0.08em;
 }
 
-/* Selector: `.cp-qs__main` — title/subtitle stack. */
 .cp-qs__main {
   display: flex;
   flex-direction: column;
@@ -367,7 +355,6 @@ onBeforeUnmount(handleBeforeUnmount);
   min-width: 0;
 }
 
-/* Selector: `.cp-qs__itTitle` — primary item title (ellipsis). */
 .cp-qs__itTitle {
   font-size: 13px;
   color: var(--cp-text);
@@ -376,7 +363,6 @@ onBeforeUnmount(handleBeforeUnmount);
   text-overflow: ellipsis;
 }
 
-/* Selector: `.cp-qs__itSub` — secondary subtitle (mono + ellipsis). */
 .cp-qs__itSub {
   font-family: var(--cp-font-mono);
   font-size: 12px;
@@ -386,7 +372,6 @@ onBeforeUnmount(handleBeforeUnmount);
   text-overflow: ellipsis;
 }
 
-/* Selector: `.cp-qs__empty` — empty-state message. */
 .cp-qs__empty {
   padding: 14px 4px;
   color: var(--cp-text-muted);

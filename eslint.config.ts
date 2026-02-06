@@ -48,6 +48,7 @@ export default defineConfig([
           requireAllFunctions: true,
         },
       ],
+      "docs/no-cross-feature-internal-imports": "error",
     },
   },
   {

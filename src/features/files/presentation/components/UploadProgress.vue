@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview UploadProgress.vue
- * @description Component showing upload progress with cancel/retry.
+ * @description files｜组件：UploadProgress。
  */
 
 import { useI18n } from "vue-i18n";
@@ -20,10 +20,10 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 /**
- * Format byte size into a compact label.
+ * 将字节数格式化为紧凑的可读标签。
  *
- * @param bytes - File size in bytes.
- * @returns Human-readable size string.
+ * @param bytes - 文件大小（字节）。
+ * @returns 人类可读的大小字符串。
  */
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

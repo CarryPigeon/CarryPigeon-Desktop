@@ -1,20 +1,49 @@
+//! plugins｜DI/命令入口：commands。
+//!
+//! 约定：注释中文，日志英文（tracing）。
 use crate::features::plugins::data::plugin_manager::PluginLoadResult;
 use crate::features::plugins::data::plugin_manifest::PluginManifest;
-use crate::features::plugins::data::plugin_store::{InstalledPluginState, PluginRuntimeEntry};
 use crate::features::plugins::data::plugin_store;
+use crate::features::plugins::data::plugin_store::{InstalledPluginState, PluginRuntimeEntry};
 use crate::features::plugins::usecases::plugin_usecases;
 use std::collections::HashMap;
 
+/// 加载并实例化一个插件（由 manifest 指定）。
+///
+/// # 参数
+/// - `manifest`：插件清单（包含 id/version/url/sha256 等）。
+///
+/// # 返回值
+/// - `Ok(PluginLoadResult)`：加载结果（包含运行时入口等信息）。
+/// - `Err(String)`：加载失败原因。
+///
+/// # 说明
+/// 该命令主要用于调试/开发态：前端传入 manifest 后触发本地插件加载流程。
 #[tauri::command]
 pub async fn load_plugin(manifest: PluginManifest) -> Result<PluginLoadResult, String> {
     plugin_usecases::load_plugin(manifest).await
 }
 
+/// 列出本地已保存的插件清单列表。
+///
+/// # 返回值
+/// - `Ok(Vec<PluginManifest>)`：清单列表。
+/// - `Err(String)`：读取失败原因。
 #[tauri::command]
 pub async fn list_plugins() -> Result<Vec<PluginManifest>, String> {
     plugin_usecases::list_plugins().await
 }
 
+/// 查询服务端已安装插件列表（含当前版本/启用态/错误等状态）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `tls_policy`：TLS 策略（可选，传递给网络层）。
+/// - `tls_fingerprint`：TLS 指纹（可选，传递给网络层）。
+///
+/// # 返回值
+/// - `Ok(Vec<InstalledPluginState>)`：已安装插件状态列表。
+/// - `Err(String)`：查询失败原因。
 #[tauri::command]
 pub async fn plugins_list_installed(
     server_socket: String,
@@ -26,10 +55,21 @@ pub async fn plugins_list_installed(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 查询某个插件在服务端的安装状态。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(Some(InstalledPluginState))`：已安装则返回状态。
+/// - `Ok(None)`：未安装。
+/// - `Err(String)`：查询失败原因。
 #[tauri::command]
 pub async fn plugins_get_installed_state(
     server_socket: String,
@@ -43,10 +83,20 @@ pub async fn plugins_get_installed_state(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 获取插件运行时入口（用于前端动态 import 插件模块）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(PluginRuntimeEntry)`：运行时入口信息（URL/版本等）。
+/// - `Err(String)`：获取失败原因。
 #[tauri::command]
 pub async fn plugins_get_runtime_entry(
     server_socket: String,
@@ -60,10 +110,21 @@ pub async fn plugins_get_runtime_entry(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 获取指定版本的插件运行时入口。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `version`：目标版本。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(PluginRuntimeEntry)`：运行时入口信息。
+/// - `Err(String)`：获取失败原因。
 #[tauri::command]
 pub async fn plugins_get_runtime_entry_for_version(
     server_socket: String,
@@ -79,10 +140,21 @@ pub async fn plugins_get_runtime_entry_for_version(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 从服务端插件目录安装插件。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `version`：目标版本（可选；为空时由服务端/目录决定默认版本）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：安装后的状态。
+/// - `Err(String)`：安装失败原因。
 #[tauri::command]
 pub async fn plugins_install_from_server_catalog(
     server_socket: String,
@@ -98,10 +170,23 @@ pub async fn plugins_install_from_server_catalog(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 从指定 URL 安装插件（自定义来源）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `version`：要安装的版本。
+/// - `url`：插件包下载地址。
+/// - `sha256`：插件包 sha256（用于完整性校验）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：安装后的状态。
+/// - `Err(String)`：安装失败原因。
 #[tauri::command]
 pub async fn plugins_install_from_url(
     server_socket: String,
@@ -121,10 +206,20 @@ pub async fn plugins_install_from_url(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 启用已安装插件。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：更新后的插件状态。
+/// - `Err(String)`：启用失败原因。
 #[tauri::command]
 pub async fn plugins_enable(
     server_socket: String,
@@ -138,10 +233,20 @@ pub async fn plugins_enable(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 禁用已安装插件。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：更新后的插件状态。
+/// - `Err(String)`：禁用失败原因。
 #[tauri::command]
 pub async fn plugins_disable(
     server_socket: String,
@@ -155,10 +260,21 @@ pub async fn plugins_disable(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 切换已安装插件的当前版本。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `version`：目标版本。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：切换后的插件状态。
+/// - `Err(String)`：切换失败原因。
 #[tauri::command]
 pub async fn plugins_switch_version(
     server_socket: String,
@@ -174,10 +290,20 @@ pub async fn plugins_switch_version(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 卸载插件（移除服务端安装记录与本地缓存）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(())`：卸载成功。
+/// - `Err(String)`：卸载失败原因。
 #[tauri::command]
 pub async fn plugins_uninstall(
     server_socket: String,
@@ -191,10 +317,21 @@ pub async fn plugins_uninstall(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 将插件状态标记为失败（写入 last_error 等字段）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `message`：错误消息（用于 UI 展示与诊断）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：更新后的插件状态。
+/// - `Err(String)`：更新失败原因。
 #[tauri::command]
 pub async fn plugins_set_failed(
     server_socket: String,
@@ -210,10 +347,20 @@ pub async fn plugins_set_failed(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 清除插件的错误信息（从 failed 恢复）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：更新后的插件状态。
+/// - `Err(String)`：更新失败原因。
 #[tauri::command]
 pub async fn plugins_clear_error(
     server_socket: String,
@@ -227,10 +374,22 @@ pub async fn plugins_clear_error(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 读取插件私有存储（KV）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `key`：存储 key。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(Some(Value))`：存在该 key，返回 JSON 值。
+/// - `Ok(None)`：不存在该 key。
+/// - `Err(String)`：读取失败原因。
 #[tauri::command]
 pub async fn plugins_storage_get(
     server_socket: String,
@@ -246,10 +405,22 @@ pub async fn plugins_storage_get(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 写入插件私有存储（KV）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `key`：存储 key。
+/// - `value`：要写入的 JSON 值。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(())`：写入成功。
+/// - `Err(String)`：写入失败原因。
 #[tauri::command]
 pub async fn plugins_storage_set(
     server_socket: String,
@@ -267,10 +438,23 @@ pub async fn plugins_storage_set(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }
 
+/// 以插件权限边界发起网络请求（供插件 runtime 调用）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `url`：请求 URL。
+/// - `method`：HTTP 方法（GET/POST/...）。
+/// - `headers`：请求头。
+/// - `body`：请求体（可选，通常为字符串/JSON）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(PluginFetchResponse)`：请求响应（status/headers/body）。
+/// - `Err(String)`：请求失败原因。
 #[tauri::command]
 pub async fn plugins_network_fetch(
     server_socket: String,
@@ -290,6 +474,6 @@ pub async fn plugins_network_fetch(
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
-        .await
-        .map_err(|e| e.to_string())
+    .await
+    .map_err(|e| e.to_string())
 }

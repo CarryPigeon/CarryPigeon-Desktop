@@ -1,15 +1,22 @@
+//! network｜数据层：tcp_real。
+//!
+//! 约定：注释中文，日志英文（tracing）。
+
+use sha2::Digest;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 use tokio::io::{ReadHalf, WriteHalf};
+use tokio::net::TcpStream;
 use tokio_native_tls::TlsStream;
-use sha2::Digest;
 
 use crate::features::network::domain::types::TcpMessageEvent;
 
 enum Transport {
     Plain,
-    Tls { insecure: bool, fingerprint_sha256: Option<String> },
+    Tls {
+        insecure: bool,
+        fingerprint_sha256: Option<String>,
+    },
 }
 
 enum TcpReader {
@@ -22,12 +29,18 @@ enum TcpWriter {
     Tls(WriteHalf<TlsStream<TcpStream>>),
 }
 
+/// 基于 tokio 的真实 TCP service（支持纯 TCP 与 TLS）。
+///
+/// # 说明
+/// - 该类型负责建立连接、读取字节流并向前端广播事件；
+/// - 拆包规则由实现内部维护（Netty length-prefix），对外暴露为事件流。
 pub struct TcpServiceReal {
     reader: Option<TcpReader>,
     writer: TcpWriter,
 }
 
 impl TcpServiceReal {
+    /// 建立 TCP/TLS 连接并返回 service 实例。
     pub async fn connect(socket: String) -> anyhow::Result<Self> {
         let (transport, addr) = parse_transport(&socket);
         let addr = addr.to_string();
@@ -41,7 +54,10 @@ impl TcpServiceReal {
                 let (r, w) = tokio::io::split(stream);
                 (TcpReader::Plain(r), TcpWriter::Plain(w))
             }
-            Transport::Tls { insecure, fingerprint_sha256 } => {
+            Transport::Tls {
+                insecure,
+                fingerprint_sha256,
+            } => {
                 let host = extract_host(&addr)?;
                 let mut builder = native_tls::TlsConnector::builder();
                 if insecure {
@@ -69,17 +85,17 @@ impl TcpServiceReal {
         })
     }
 
+    /// 启动读取循环：将收到的数据通过 Tauri event 广播给前端。
     pub fn start(&mut self, app: AppHandle, server_socket: String) {
         let Some(mut reader) = self.reader.take() else {
             return;
         };
 
         tokio::spawn(async move {
-            // Netty frame: 2 bytes unsigned short length prefix (Big-Endian),
-            // followed by `length` bytes payload.
+            // Netty frame：2 字节无符号短整型长度前缀（大端），后跟 `length` 字节载荷。
             //
-            // Note: We still emit the raw `tcp-message` event for backward compatibility,
-            // but the preferred event is `tcp-frame`, which emits deframed payloads.
+            // 注意：为向后兼容仍会发出原始 `tcp-message` 事件；
+            // 推荐使用 `tcp-frame` 事件，它会发出已拆包后的 payload。
             let mut acc: Vec<u8> = Vec::new();
             let mut buffer = vec![0; 4096];
             loop {
@@ -101,7 +117,7 @@ impl TcpServiceReal {
                                 payload: chunk.clone(),
                             },
                         ) {
-                            tracing::warn!("Failed to emit TCP message: {:?}", e);
+                            tracing::warn!(action = "tcp_emit_message_failed", error = ?e);
                         }
 
                         // New: deframe and emit payload frames.
@@ -119,7 +135,7 @@ impl TcpServiceReal {
                             }
                             // Hard limit: 10MB payload.
                             if len > 10_000_000 {
-                                tracing::warn!("Invalid frame length: {}", len);
+                                tracing::warn!(action = "tcp_frame_invalid_length", len);
                                 acc.clear();
                                 break;
                             }
@@ -137,12 +153,12 @@ impl TcpServiceReal {
                                     payload,
                                 },
                             ) {
-                                tracing::warn!("Failed to emit TCP frame: {:?}", e);
+                                tracing::warn!(action = "tcp_emit_frame_failed", error = ?e);
                             }
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to read from socket; err={:?}", e);
+                        tracing::warn!(action = "tcp_read_failed", error = ?e);
                         break;
                     }
                 }
@@ -150,6 +166,17 @@ impl TcpServiceReal {
         });
     }
 
+    /// 向已建立的 TCP 连接发送一段 bytes。
+    ///
+    /// # 参数
+    /// - `data`：要发送的数据（已封帧或原始 payload 由上层决定）。
+    ///
+    /// # 返回值
+    /// - `Ok(())`：发送成功。
+    /// - `Err(anyhow::Error)`：发送失败原因。
+    ///
+    /// # 说明
+    /// 写入目标取决于连接类型：明文 TCP 或 TLS。
     pub async fn send(&mut self, data: Vec<u8>) -> anyhow::Result<()> {
         let result = match &mut self.writer {
             TcpWriter::Plain(w) => w.write_all(&data).await,
@@ -219,7 +246,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-fn verify_tls_fingerprint_sha256(tls: &tokio_native_tls::TlsStream<TcpStream>, expected_sha256: &str) -> anyhow::Result<()> {
+fn verify_tls_fingerprint_sha256(
+    tls: &tokio_native_tls::TlsStream<TcpStream>,
+    expected_sha256: &str,
+) -> anyhow::Result<()> {
     let expected = normalize_fingerprint(expected_sha256);
     if expected.len() != 64 {
         return Err(anyhow::anyhow!(
@@ -233,7 +263,9 @@ fn verify_tls_fingerprint_sha256(tls: &tokio_native_tls::TlsStream<TcpStream>, e
         .peer_certificate()
         .map_err(|e| anyhow::anyhow!("Failed to read peer certificate: {}", e))?;
     let Some(cert) = peer else {
-        return Err(anyhow::anyhow!("TLS fingerprint check failed: missing peer certificate"));
+        return Err(anyhow::anyhow!(
+            "TLS fingerprint check failed: missing peer certificate"
+        ));
     };
     let der = cert
         .to_der()

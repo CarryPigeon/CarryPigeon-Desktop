@@ -1,10 +1,10 @@
 /**
  * @fileoverview user.di.ts
- * @description Composition root for user feature.
+ * @description user｜依赖组装（DI）：user.di。
  *
- * Selection rules:
- * - `USE_MOCK_API` uses deterministic in-memory services for UI preview.
- * - Otherwise uses HTTP-backed services.
+ * 选择规则：
+ * - `USE_MOCK_API`：使用确定性的内存实现（用于 UI 预览/开发联调）。
+ * - 其它情况：使用基于 HTTP 的真实实现。
  */
 
 import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
@@ -18,78 +18,81 @@ import { UpdateUserEmail } from "../domain/usecases/UpdateUserEmail";
 import { UpdateUserProfile } from "../domain/usecases/UpdateUserProfile";
 
 /**
- * Get a UserServicePort for the given server socket.
+ * 获取指定服务器 Socket 地址对应的 `UserServicePort`。
  *
- * @param serverSocket - Server socket.
- * @returns UserServicePort.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns UserServicePort 实例。
  */
 export function getUserServicePort(serverSocket: string): UserServicePort {
-  return USE_MOCK_TRANSPORT ? createHttpUserServicePort(serverSocket) : USE_MOCK_API
-    ? createMockUserServicePort(serverSocket)
-    : createHttpUserServicePort(serverSocket);
+  if (USE_MOCK_TRANSPORT) return createHttpUserServicePort(serverSocket);
+  if (USE_MOCK_API) return createMockUserServicePort(serverSocket);
+  return createHttpUserServicePort(serverSocket);
 }
 
 /**
- * Get GetCurrentUser usecase.
+ * 获取 GetCurrentUser 用例实例。
  *
- * @param serverSocket - Server socket.
- * @returns GetCurrentUser usecase instance.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns GetCurrentUser 实例。
  */
 export function getGetCurrentUserUsecase(serverSocket: string): GetCurrentUser {
   return new GetCurrentUser(getUserServicePort(serverSocket));
 }
 
 /**
- * Get GetUser usecase.
+ * 获取 GetUser 用例实例。
  *
- * @param serverSocket - Server socket.
- * @returns GetUser usecase instance.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns GetUser 实例。
  */
 export function getGetUserUsecase(serverSocket: string): GetUser {
   return new GetUser(getUserServicePort(serverSocket));
 }
 
 /**
- * Get ListUsers usecase.
+ * 获取 ListUsers 用例实例。
  *
- * @param serverSocket - Server socket.
- * @returns ListUsers usecase instance.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns ListUsers 实例。
  */
 export function getListUsersUsecase(serverSocket: string): ListUsers {
   return new ListUsers(getUserServicePort(serverSocket));
 }
 
 /**
- * Get UpdateUserEmail usecase.
+ * 获取 UpdateUserEmail 用例实例。
  *
- * @param serverSocket - Server socket.
- * @returns UpdateUserEmail usecase instance.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns UpdateUserEmail 实例。
  */
 export function getUpdateUserEmailUsecase(serverSocket: string): UpdateUserEmail {
   return new UpdateUserEmail(getUserServicePort(serverSocket));
 }
 
 /**
- * Get UpdateUserProfile usecase.
+ * 获取 UpdateUserProfile 用例实例。
  *
- * @param serverSocket - Server socket.
- * @returns UpdateUserProfile usecase instance.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns UpdateUserProfile 实例。
  */
 export function getUpdateUserProfileUsecase(serverSocket: string): UpdateUserProfile {
   return new UpdateUserProfile(getUserServicePort(serverSocket));
 }
 
 // ============================================================================
-// Backward compatibility exports
+// 向后兼容导出
 // ============================================================================
 
+/**
+ * 向后兼容导出：将领域端口类型重命名为 service 类型别名。
+ */
 export type { UserServicePort as UserService } from "../domain/ports/UserServicePort";
 
 /**
- * @deprecated Use getUserServicePort instead.
+ * @deprecated 请使用 `getUserServicePort` 替代。
  *
- * @param serverSocket - Server socket.
- * @returns UserServicePort.
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns UserServicePort 实例。
  */
 export function createUserService(serverSocket: string): UserServicePort {
   return getUserServicePort(serverSocket);

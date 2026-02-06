@@ -2,9 +2,9 @@
 <script setup lang="ts">
 /**
  * @fileoverview ChannelInfoPage.vue
- * @description Channel info window/page for UI preview (view + edit mock metadata).
+ * @description chat｜页面：ChannelInfoPage。
  *
- * PRD mapping:
+ * PRD 对照：
  * - P0-C2 频道资料：owner 可更新频道资料（name/brief/avatar）——此页提供 name/brief 的 mock 编辑入口。
  */
 
@@ -19,9 +19,9 @@ const router = useRouter();
 const { t } = useI18n();
 
 /**
- * Read channel id from query params.
+ * 从 query 参数读取频道 id。
  *
- * @returns Channel id.
+ * @returns 频道 id。
  */
 function computeChannelId(): string {
   return String(route.query.id ?? "").trim();
@@ -30,10 +30,10 @@ function computeChannelId(): string {
 const channelId = computed(computeChannelId);
 
 /**
- * Find a channel record in the mock store by id.
+ * 从 mock store 中按 id 查找频道记录。
  *
- * @param id - Channel id.
- * @returns Channel when found, otherwise `null`.
+ * @param id - 频道 id。
+ * @returns 找到则返回频道对象，否则返回 `null`。
  */
 function findChannelById(id: string) {
   for (const c of allChannels.value) {
@@ -43,9 +43,9 @@ function findChannelById(id: string) {
 }
 
 /**
- * Resolve the current channel model.
+ * 获取当前频道模型。
  *
- * @returns Channel model, or `null` when not found.
+ * @returns 频道模型；未找到时返回 `null`。
  */
 function computeChannel() {
   return findChannelById(channelId.value);
@@ -54,18 +54,18 @@ function computeChannel() {
 const channel = computed(computeChannel);
 
 /**
- * Compute display name for this page (channel store wins over query fallback).
+ * 计算本页展示名称（优先使用 store；其次使用 query fallback）。
  *
- * @returns Channel display name.
+ * @returns 频道展示名。
  */
 function computeName(): string {
   return channel.value?.name ?? String(route.query.name ?? "Channel");
 }
 
 /**
- * Compute brief/description for this page (channel store wins over query fallback).
+ * 计算本页展示简介（优先使用 store；其次使用 query fallback）。
  *
- * @returns Channel brief string.
+ * @returns 频道简介文本。
  */
 function computeBrief(): string {
   return channel.value?.brief ?? String(route.query.bio ?? route.query.description ?? "");
@@ -79,7 +79,9 @@ const draftName = ref("");
 const draftBrief = ref("");
 
 /**
- * Enter edit mode and initialize drafts from current values.
+ * 进入编辑态，并用当前值初始化草稿字段。
+ *
+ * @returns 无返回值。
  */
 function beginEdit(): void {
   editing.value = true;
@@ -88,14 +90,18 @@ function beginEdit(): void {
 }
 
 /**
- * Exit edit mode without saving changes.
+ * 退出编辑态（不保存）。
+ *
+ * @returns 无返回值。
  */
 function cancelEdit(): void {
   editing.value = false;
 }
 
 /**
- * Save channel metadata into the mock store.
+ * 将频道资料保存到 mock store。
+ *
+ * @returns 无返回值。
  */
 function saveEdit(): void {
   if (!channelId.value) return;
@@ -104,7 +110,9 @@ function saveEdit(): void {
 }
 
 /**
- * Apply/join the current channel when it is discoverable.
+ * 申请加入当前频道（discover 列表内可加入的频道）。
+ *
+ * @returns 无返回值。
  */
 function handleJoin(): void {
   if (!channelId.value) return;
@@ -112,10 +120,12 @@ function handleJoin(): void {
 }
 
 /**
- * Open Patchbay and focus the current channel.
+ * 打开 Patchbay，并尽量聚焦到当前频道。
  *
- * If the user is not yet joined, this simply navigates to Patchbay and lets
- * the user join from the Discover tab.
+ * 若用户尚未加入频道：
+ * - 仅跳转到 Patchbay，并切换到 Discover tab 由用户完成加入操作。
+ *
+ * @returns 无返回值。
  */
 function openInPatchbay(): void {
   if (channel.value?.joined) {
@@ -128,18 +138,18 @@ function openInPatchbay(): void {
 }
 
 /**
- * Watch-source: channel id.
+ * watch 源：频道 id。
  *
- * @returns Current channel id.
+ * @returns 当前频道 id。
  */
 function watchChannelId(): string {
   return channelId.value;
 }
 
 /**
- * Reset editing state when switching channels.
+ * 切换频道时重置编辑态。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleChannelIdChange(): void {
   editing.value = false;
@@ -204,8 +214,7 @@ watch(
 </template>
 
 <style scoped lang="scss">
-/* ChannelInfoPage styles */
-/* Page wrapper */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；主区域为两列网格，部分卡片跨全宽。 */
 .cp-info {
   height: 100%;
   padding: 14px;
@@ -214,7 +223,6 @@ watch(
   gap: 12px;
 }
 
-/* Header card */
 .cp-info__head {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -227,13 +235,11 @@ watch(
   align-items: center;
 }
 
-/* Header right action area */
 .cp-info__headRight {
   display: flex;
   justify-content: flex-end;
 }
 
-/* Back button */
 .cp-info__back {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -245,14 +251,12 @@ watch(
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Back hover */
 .cp-info__back:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Channel name */
 .cp-info__name {
   font-family: var(--cp-font-display);
   font-weight: 900;
@@ -261,14 +265,12 @@ watch(
   color: var(--cp-text);
 }
 
-/* Subtitle */
 .cp-info__sub {
   margin-top: 6px;
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Body grid */
 .cp-info__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -283,7 +285,6 @@ watch(
   gap: 12px;
 }
 
-/* Info card */
 .cp-info__card {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -291,12 +292,10 @@ watch(
   padding: 12px;
 }
 
-/* Full-width card */
 .cp-info__card.wide {
   grid-column: 1 / -1;
 }
 
-/* Card label */
 .cp-info__k {
   font-family: var(--cp-font-display);
   letter-spacing: 0.1em;
@@ -305,7 +304,6 @@ watch(
   color: var(--cp-text-muted);
 }
 
-/* Card value */
 .cp-info__v {
   margin-top: 10px;
   font-size: 12px;
@@ -313,7 +311,6 @@ watch(
   line-height: 1.45;
 }
 
-/* Edit mode wrapper */
 .cp-info__edit {
   margin-top: 10px;
   display: flex;
@@ -321,19 +318,16 @@ watch(
   gap: 12px;
 }
 
-/* Edit field wrapper */
 .cp-info__editField {
   min-width: 0;
 }
 
-/* Edit label */
 .cp-info__editLabel {
   margin-bottom: 6px;
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Edit actions row */
 .cp-info__editActions {
   display: flex;
   justify-content: flex-end;
@@ -341,7 +335,6 @@ watch(
   flex-wrap: wrap;
 }
 
-/* Button */
 .cp-info__btn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -353,27 +346,23 @@ watch(
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Button hover */
 .cp-info__btn:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Primary button */
 .cp-info__btn.primary {
   border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
 }
 
-/* Disabled button */
 .cp-info__btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
 
-/* Membership pill */
 .cp-info__pill {
   display: inline-flex;
   align-items: center;
@@ -387,7 +376,6 @@ watch(
   margin-right: 10px;
 }
 
-/* Membership pill variant: joined */
 .cp-info__pill[data-ok="true"] {
   border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel-muted));

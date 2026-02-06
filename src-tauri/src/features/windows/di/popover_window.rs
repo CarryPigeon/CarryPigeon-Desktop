@@ -1,3 +1,6 @@
+//! windows｜DI/命令入口：popover_window。
+//!
+//! 约定：注释中文，日志英文（tracing）。
 use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 use crate::features::windows::usecases::window_usecases::keep_one_popover_window;

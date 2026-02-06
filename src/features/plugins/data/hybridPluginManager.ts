@@ -1,6 +1,6 @@
 /**
  * @fileoverview hybridPluginManager.ts
- * @description Hybrid PluginManagerPort implementation:
+ * @description plugins｜数据层实现：hybridPluginManager。
  * - Catalog list: fetched from the server via HTTP `/api/plugins/catalog`
  * - Lifecycle actions (install/enable/update/...): delegated to the Tauri adapter
  *

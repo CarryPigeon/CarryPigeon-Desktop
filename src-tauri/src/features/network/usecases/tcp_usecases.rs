@@ -1,3 +1,7 @@
+//! network｜用例层：tcp_usecases。
+//!
+//! 约定：注释中文，日志英文（tracing）。
+
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
@@ -37,6 +41,14 @@ type SharedTcpRegistry = Arc<RwLock<TcpRegistry>>;
 
 static TCP_REGISTRY: OnceLock<SharedTcpRegistry> = OnceLock::new();
 
+/// 初始化全局 TCP service 注册表。
+///
+/// # 返回值
+/// 无返回值。
+///
+/// # 说明
+/// - 该函数为 best-effort：重复调用不产生副作用；
+/// - 若未初始化，后续调用 `add_tcp_service/send_tcp_service/listen_tcp_service` 会返回错误。
 pub fn init_tcp_service() {
     let _ = TCP_REGISTRY
         .get_or_init(|| Arc::new(RwLock::new(TcpRegistry::default())))
@@ -50,6 +62,20 @@ fn parse_mock_mode(socket: &str) -> MockTcpMode {
     MockTcpMode::NoServer
 }
 
+/// 为指定 server_socket 创建并注册一个 TCP backend（real 或 mock）。
+///
+/// # 参数
+/// - `app`：Tauri 应用句柄（用于 emit 收包事件）。
+/// - `server_socket`：逻辑 server_socket（作为 registry key）。
+/// - `socket`：实际连接地址（可能为 `mock://...`、`tcp://...`、`tls://...` 等）。
+///
+/// # 返回值
+/// - `Ok(())`：创建成功并已写入注册表。
+/// - `Err(String)`：创建失败原因（例如未初始化/连接失败等）。
+///
+/// # 说明
+/// - 当真实连接失败时，会降级为 mock backend（ConnectFailed），以保证 UI 可继续工作；
+/// - 创建完成后会立即调用 backend.start()（用于注册监听或发送 mock 首包）。
 pub async fn add_tcp_service(
     app: AppHandle,
     server_socket: String,
@@ -68,9 +94,10 @@ pub async fn add_tcp_service(
             Ok(real) => TcpBackend::Real(real),
             Err(err) => {
                 tracing::warn!(
-                    "TCP connect failed; falling back to mock (no-server). socket={}, err={}",
-                    socket,
-                    err
+                    action = "tcp_connect_failed_fallback_mock",
+                    socket = %socket,
+                    error = %err,
+                    "TCP connect failed; falling back to mock (no-server)",
                 );
                 TcpBackend::Mock(MockTcpService::new(MockTcpMode::ConnectFailed))
             }
@@ -82,6 +109,15 @@ pub async fn add_tcp_service(
     Ok(())
 }
 
+/// 向指定 server_socket 对应的 TCP backend 发送数据。
+///
+/// # 参数
+/// - `server_socket`：逻辑 server_socket（用于查找 backend）。
+/// - `data`：要发送的 bytes。
+///
+/// # 返回值
+/// - `Ok(())`：发送成功。
+/// - `Err(String)`：发送失败原因。
 pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<(), String> {
     let registry = TCP_REGISTRY
         .get()
@@ -95,6 +131,18 @@ pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<()
     backend.send(data).await.map_err(|e| e.to_string())
 }
 
+/// 监听（或重启）指定 server_socket 的 TCP backend。
+///
+/// # 参数
+/// - `server_socket`：逻辑 server_socket（用于查找 backend）。
+/// - `app`：Tauri 应用句柄（用于 emit 收包事件）。
+///
+/// # 返回值
+/// - `Ok(())`：启动成功。
+/// - `Err(String)`：启动失败原因（例如服务未初始化/找不到 backend）。
+///
+/// # 说明
+/// 当前实现会调用 backend 的 `start`，用于注册监听或发送初始事件（mock）。
 pub async fn listen_tcp_service(server_socket: String, app: AppHandle) -> Result<(), String> {
     let registry = TCP_REGISTRY
         .get()

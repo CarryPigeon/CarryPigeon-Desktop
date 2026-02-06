@@ -1,6 +1,6 @@
 /**
  * @fileoverview network.di.ts
- * @description Composition root for network feature.
+ * @description network｜依赖组装（DI）：network.di。
  */
 
 import { USE_MOCK_API } from "@/shared/config/runtime";
@@ -11,13 +11,13 @@ import { tauriTcpConnector } from "../data/tauriTcpConnector";
 let connectToServer: ConnectToServer | null = null;
 
 /**
- * Get a singleton `ConnectToServer` usecase.
+ * 获取 `ConnectToServer` 用例（单例）。
  *
- * Implementation choice is driven by `USE_MOCK_API`:
- * - mock: no-op connector (UI preview)
- * - tauri: real TCP connector
+ * 选择规则（由 `USE_MOCK_API` 驱动）：
+ * - mock：空实现连接器（用于 UI 预览/开发联调）
+ * - tauri：真实 TCP 连接器（走 Tauri sidecar）
  *
- * @returns Usecase instance.
+ * @returns `ConnectToServer` 实例。
  */
 export function getConnectToServerUsecase(): ConnectToServer {
   if (connectToServer) return connectToServer;

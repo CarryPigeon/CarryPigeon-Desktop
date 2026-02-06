@@ -1,18 +1,17 @@
 /**
  * @fileoverview httpRepoPluginCatalog.ts
- * @description Fetch a repo-hosted plugin catalog (`{repo_base}/plugins/catalog`).
+ * @description plugins｜数据层实现：httpRepoPluginCatalog。
  *
- * API doc reference:
- * - See `docs/api/*` → Repo Catalog
+ * API 文档：
+ * - 见 `docs/api/*` → Repo Catalog
  *
- * Notes:
- * - Repo catalogs are not guaranteed to be served by the chat server; the
- *   client may talk to third-party hosts directly.
- * - The response structure is expected to be compatible with the server catalog
- *   (at least `plugins[]` items).
+ * 说明：
+ * - Repo catalog 不保证由聊天服务端托管；客户端可能直接请求第三方 host。
+ * - 响应结构期望与 server catalog 兼容（至少包含 `plugins[]`）。
  */
 
 import type { PluginCatalogEntry, PluginDomainPort, PluginPermission } from "@/features/plugins/domain/types/pluginTypes";
+import { CARRY_PIGEON_ACCEPT_V1 } from "@/shared/net/http/apiHeaders";
 
 type ApiCatalogResponse = {
   plugins: Array<{
@@ -27,10 +26,10 @@ type ApiCatalogResponse = {
 };
 
 /**
- * Normalize a repo base URL and append `/plugins/catalog`.
+ * 归一化 repo base URL，并拼接 `/plugins/catalog`。
  *
- * @param repoBase - Repo base URL (e.g. `https://repo.example.com`).
- * @returns Absolute catalog URL or empty string.
+ * @param repoBase - Repo base URL（例如 `https://repo.example.com`）。
+ * @returns 绝对 catalog URL；当输入无效时返回空字符串。
  */
 function toRepoCatalogUrl(repoBase: string): string {
   const base = String(repoBase ?? "").trim().replace(/\/+$/u, "");
@@ -39,10 +38,10 @@ function toRepoCatalogUrl(repoBase: string): string {
 }
 
 /**
- * Map a domain string into a UI color token (same strategy as server catalog).
+ * 将 domain 字符串映射为 UI 颜色 token（策略与 server catalog 一致）。
  *
- * @param domain - Domain name.
- * @returns One of the Patchbay CSS color variables.
+ * @param domain - Domain 名称。
+ * @returns Patchbay CSS 颜色变量之一。
  */
 function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] {
   const d = domain.trim();
@@ -58,10 +57,10 @@ function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] {
 }
 
 /**
- * Map a permission key into a UI permission descriptor.
+ * 将 permission key 映射为 UI 权限描述。
  *
- * @param key - Permission key.
- * @returns Permission descriptor.
+ * @param key - Permission key。
+ * @returns 权限描述对象。
  */
 function mapPermission(key: string): PluginPermission {
   const k = key.trim();
@@ -70,10 +69,10 @@ function mapPermission(key: string): PluginPermission {
 }
 
 /**
- * Fetch a repo-hosted plugin catalog.
+ * 拉取 repo 托管的插件目录。
  *
- * @param repoBase - Repo base URL.
- * @returns Catalog entries (source=`repo`).
+ * @param repoBase - Repo base URL。
+ * @returns 目录条目列表（source=`repo`）。
  */
 export async function fetchRepoPluginCatalog(repoBase: string): Promise<PluginCatalogEntry[]> {
   const url = toRepoCatalogUrl(repoBase);
@@ -81,7 +80,7 @@ export async function fetchRepoPluginCatalog(repoBase: string): Promise<PluginCa
 
   const res = await fetch(url, {
     method: "GET",
-    headers: { Accept: "application/vnd.carrypigeon+json; version=1" },
+    headers: { Accept: CARRY_PIGEON_ACCEPT_V1 },
   });
   if (!res.ok) throw new Error(`Repo catalog request failed: HTTP ${res.status}`);
   const raw = (await res.json()) as ApiCatalogResponse;

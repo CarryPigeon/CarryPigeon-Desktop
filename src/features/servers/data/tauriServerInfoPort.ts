@@ -1,10 +1,10 @@
 /**
  * @fileoverview tauriServerInfoPort.ts
- * @description Tauri/TCP-backed ServerInfoPort implementation.
+ * @description servers｜数据层实现：tauriServerInfoPort。
  *
- * Protocol reference:
- * - `design/protocol/PROTOCOL-OVERVIEW.md` (server_id source)
- * - Suggested route: `/core/server/data/get` (TCP or HTTP equivalent)
+ * 协议参考：
+ * - `design/protocol/PROTOCOL-OVERVIEW.md`（server_id 来源）
+ * - 推荐路由：`/core/server/data/get`（TCP 或 HTTP 等价）
  */
 
 import type { ServerInfoPort } from "../domain/ports/ServerInfoPort";
@@ -16,15 +16,15 @@ import { rememberServerId } from "@/shared/serverIdentity";
 const logger = createLogger("tauriServerInfoPort");
 
 /**
- * Minimal TCP API wrapper for server info.
+ * server info 的最小 TCP API 包装。
  *
- * The transport mapping is handled by `BaseAPI` (TCP request/response wrapper).
+ * 说明：传输映射由 `BaseAPI` 负责（TCP request/response 包装）。
  */
 class ServerInfoApi extends BaseAPI {
   /**
-   * Fetch server info from the backend.
+   * 从服务端拉取 server info。
    *
-   * @returns ServerInfo payload mapped to domain shape.
+   * @returns 映射到领域结构后的 `ServerInfo`。
    */
   get(): Promise<ServerInfo> {
     return this.send("/core/server/data/get", undefined, (raw) => mapServerInfo(raw));
@@ -32,13 +32,12 @@ class ServerInfoApi extends BaseAPI {
 }
 
 /**
- * Map a raw server response into the domain `ServerInfo` shape.
+ * 将服务端响应映射为领域 `ServerInfo` 结构。
  *
- * This mapper is defensive because different server versions may use slightly
- * different field names.
+ * 防御性说明：不同服务端版本可能使用不同字段名，本 mapper 会做 best-effort 兼容。
  *
- * @param raw - Response `data` payload from the transport.
- * @returns Parsed `ServerInfo`.
+ * @param raw - 传输层响应的 `data` 载荷。
+ * @returns 解析后的 `ServerInfo`。
  */
 function mapServerInfo(raw: unknown): ServerInfo {
   if (!raw || typeof raw !== "object") {
@@ -54,7 +53,7 @@ function mapServerInfo(raw: unknown): ServerInfo {
 }
 
 /**
- * Tauri server info port.
+ * Tauri 的 `ServerInfoPort` 实现。
  *
  * @constant
  */
@@ -67,7 +66,7 @@ export const tauriServerInfoPort: ServerInfoPort = {
       if (info.serverId) rememberServerId(socket, info.serverId);
       return info;
     } catch (e) {
-      logger.error("Get server info failed", { socket, error: String(e) });
+      logger.error("Action: get_server_info_failed", { socket, error: String(e) });
       throw e;
     }
   },

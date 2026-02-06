@@ -1,22 +1,19 @@
 <script setup lang="ts">
 /**
  * @fileoverview LoginPage.vue
- * @description Patchbay Login (Handshake + Auth).
+ * @description auth｜页面：LoginPage。
  */
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { createAuthService, createEmailService } from "@/features/auth/data/authServiceFactory";
-import { isAuthRequiredPluginMissingError } from "@/features/auth/domain/errors/AuthErrors";
-import { setMissingRequiredPlugins } from "@/features/auth/presentation/store/requiredGate";
-import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { addServer, serverRacks } from "@/features/servers/presentation/store/serverList";
-import { connectWithRetry, connectionDetail, connectionPillState, connectionPhase, retryLast } from "@/features/network/presentation/store/connectionStore";
+import { getLoginWithEmailCodeUsecase, getSendVerificationCodeUsecase } from "@/features/auth/di/auth.di";
+import { isAuthRequiredPluginMissingError, setMissingRequiredPlugins } from "@/features/auth/api";
+import { addServer, currentServerSocket, serverRacks, setServerSocket, useServerInfoStore } from "@/features/servers/api";
+import { connectWithRetry, connectionDetail, connectionPillState, connectionPhase, retryLast } from "@/features/network/api";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { writeAuthSession } from "@/shared/utils/localState";
-import { setCurrentUser } from "@/features/user/presentation/store/userData";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
+import { setCurrentUser } from "@/features/user/api";
 import { createLogger } from "@/shared/utils/logger";
 
 type TransportKind = "tls_strict" | "tls_insecure" | "tcp_legacy";
@@ -37,9 +34,9 @@ const countdown = ref(0);
 let countdownTimer: number | null = null;
 
 /**
- * Compute the current login stage label shown in the UI.
+ * 计算当前登录阶段（用于 UI 展示）。
  *
- * @returns `"Handshake"` or `"Auth"`.
+ * @returns `"Handshake"` 或 `"Auth"`。
  */
 function computeStage(): "Handshake" | "Auth" {
   if (connectionPhase.value === "connected") return "Auth";
@@ -51,9 +48,9 @@ function computeStage(): "Handshake" | "Auth" {
 const stage = computed(computeStage);
 
 /**
- * Resolve the server-info store for the currently selected socket.
+ * 获取当前 socket 对应的 server-info store。
  *
- * @returns Server-info store instance.
+ * @returns server-info store 实例。
  */
 function computeServerInfoStore() {
   return useServerInfoStore(currentServerSocket.value.trim());
@@ -62,9 +59,9 @@ function computeServerInfoStore() {
 const serverInfoStore = computed(computeServerInfoStore);
 
 /**
- * Convenience ref: current server info.
+ * 便捷计算：当前服务端信息。
  *
- * @returns Server info, or `null`.
+ * @returns 服务端信息（或 `null`）。
  */
 function computeServerInfo() {
   return serverInfoStore.value.info.value;
@@ -73,9 +70,10 @@ function computeServerInfo() {
 const serverInfo = computed(computeServerInfo);
 
 /**
- * Sync the socket input draft into the global `currentServerSocket`.
+ * 将输入框草稿 socket 同步到全局 `currentServerSocket`。
  *
- * This keeps UI editing (draft) decoupled from the selected/active socket.
+ * 说明：
+ * UI 编辑态（draft）与“已选中/已连接”的 socket 分离，避免边输入边触发连接副作用。
  *
  * @returns void
  */
@@ -85,9 +83,9 @@ function syncServerSocket(): void {
 }
 
 /**
- * Start a 1-second countdown used by the "resend code" button.
+ * 启动 1 秒倒计时（用于“重新发送验证码”按钮）。
  *
- * @param seconds - Initial countdown seconds.
+ * @param seconds - 初始倒计时秒数。
  * @returns void
  */
 function startCountdown(seconds: number): void {
@@ -97,7 +95,7 @@ function startCountdown(seconds: number): void {
 }
 
 /**
- * Interval tick: decrement countdown by 1s and stop at 0.
+ * 倒计时 tick：每秒递减，到 0 自动停止。
  *
  * @returns void
  */
@@ -110,11 +108,12 @@ function handleCountdownTick(): void {
 }
 
 /**
- * Send a verification code to the given email (mock/real based on runtime).
+ * 发送邮箱验证码（根据运行时决定 mock/real）。
  *
- * Validation is intentionally lightweight here because this is a UI preview flow.
+ * 校验策略：
+ * 这里仅做轻量校验，因为该页面同时承担 UI 预览/调试入口的职责。
  *
- * @returns Promise<void>
+ * @returns `Promise<void>`
  */
 async function handleSendCode(): Promise<void> {
   banner.value = "";
@@ -130,9 +129,9 @@ async function handleSendCode(): Promise<void> {
 
   sending.value = true;
   try {
-    await createEmailService(socket).sendCode(email.value.trim());
+    await getSendVerificationCodeUsecase(socket).execute(email.value.trim());
     startCountdown(60);
-    banner.value = "Code sent (mock).";
+    banner.value = "Code sent.";
   } catch (e) {
     banner.value = String(e) || "Send failed.";
   } finally {
@@ -141,13 +140,13 @@ async function handleSendCode(): Promise<void> {
 }
 
 /**
- * Perform sign-in with email + code.
+ * 使用邮箱 + 验证码登录。
  *
- * Behavior:
- * - On success, stores token and populates `currentUser` (mock identity).
- * - If the server requires plugins, redirects to `/required-setup`.
+ * 行为：
+ * - 成功：保存 token，并填充 `currentUser`（当前为 mock identity）；
+ * - 若服务端要求必装插件：跳转到 `/required-setup`。
  *
- * @returns Promise<void>
+ * @returns `Promise<void>`
  */
 async function handleLogin(): Promise<void> {
   banner.value = "";
@@ -163,7 +162,7 @@ async function handleLogin(): Promise<void> {
 
   loggingIn.value = true;
   try {
-    const res = await createAuthService(socket).loginWithEmailCode(email.value.trim(), code.value.trim());
+    const res = await getLoginWithEmailCodeUsecase(socket).execute(email.value.trim(), code.value.trim());
     writeAuthSession(socket, {
       accessToken: res.accessToken,
       refreshToken: res.refreshToken,
@@ -190,12 +189,12 @@ async function handleLogin(): Promise<void> {
 }
 
 /**
- * Run handshake/connect for the current socket draft.
+ * 对当前 socket draft 执行握手/连接流程。
  *
- * On success, also refreshes server info so the UI can obtain a stable `server_id`
- * (required by the plugin system for per-server isolation).
+ * 成功后额外刷新 server info，以获取稳定的 `server_id`：
+ * 插件系统需要 `server_id` 做“按服务端隔离”的本地存储命名空间。
  *
- * @returns Promise<void>
+ * @returns `Promise<void>`
  */
 async function handleConnect(): Promise<void> {
   syncServerSocket();
@@ -203,7 +202,7 @@ async function handleConnect(): Promise<void> {
   await connectWithRetry(socket, { maxAttempts: 6 });
   if (connectionPhase.value === "connected") {
     await serverInfoStore.value.refresh();
-    logger.info("Server info refreshed", { socket, serverId: serverInfo.value?.serverId ?? "" });
+    logger.info("Action: server_info_refreshed", { socket, serverId: serverInfo.value?.serverId ?? "" });
   }
 }
 
@@ -218,18 +217,18 @@ watch(
 );
 
 /**
- * Watch-source: current server socket.
+ * watch 源：当前 server socket。
  *
- * @returns Current server socket string.
+ * @returns 当前 server socket 字符串。
  */
 function watchCurrentServerSocket(): string {
   return currentServerSocket.value;
 }
 
 /**
- * Keep the editable socket draft in sync with the selected socket.
+ * 将可编辑的 socket draft 与“已选中 socket”保持同步。
  *
- * @param next - Next server socket.
+ * @param next - 新的 server socket。
  * @returns void
  */
 function handleCurrentServerSocketChange(next: string): void {
@@ -237,16 +236,16 @@ function handleCurrentServerSocketChange(next: string): void {
 }
 
 /**
- * Watch-source: socket draft.
+ * watch 源：socket draft。
  *
- * @returns Current socket draft.
+ * @returns 当前 socket draft。
  */
 function watchSocketDraft(): string {
   return socketDraft.value;
 }
 
 /**
- * Clear transient banners when user edits the socket.
+ * 用户编辑 socket 时清理临时 banner（错误提示等）。
  *
  * @returns void
  */
@@ -255,7 +254,7 @@ function handleSocketDraftChange(): void {
 }
 
 /**
- * Component mount hook: ensure a default rack exists and attempt initial connect.
+ * 组件挂载：确保存在默认 rack，并尝试首次连接。
  *
  * @returns void
  */
@@ -264,9 +263,47 @@ function handleMounted(): void {
     addServer(currentServerSocket.value, "Default");
   }
   void handleConnect();
+
+  window.addEventListener("keydown", onGlobalKeydown);
 }
 
 onMounted(handleMounted);
+
+/**
+ * 组件卸载：移除全局键盘监听。
+ */
+function handleBeforeUnmount(): void {
+  if (countdownTimer) window.clearInterval(countdownTimer);
+  countdownTimer = null;
+  window.removeEventListener("keydown", onGlobalKeydown);
+}
+
+onBeforeUnmount(handleBeforeUnmount);
+
+/**
+ * 登录页全局快捷键。
+ *
+ * - Ctrl/Cmd+P：打开插件中心
+ * - Ctrl/Cmd+,：打开设置页
+ *
+ * @param e - 键盘事件。
+ */
+function onGlobalKeydown(e: KeyboardEvent): void {
+  const k = e.key.toLowerCase();
+  const meta = e.metaKey || e.ctrlKey;
+  if (!meta) return;
+
+  if (k === "p") {
+    e.preventDefault();
+    void router.push("/plugins");
+    return;
+  }
+
+  if (k === ",") {
+    e.preventDefault();
+    void router.push("/settings");
+  }
+}
 </script>
 
 <template>
@@ -282,10 +319,13 @@ onMounted(handleMounted);
             <div class="cp-login__brandSub">Modular Patchbay</div>
           </div>
         </div>
-        <div class="cp-login__stage">
-          <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">Handshake</span>
-          <span class="cp-login__stageSep">→</span>
-          <span class="cp-login__stageItem" :data-active="stage === 'Auth'">Auth</span>
+        <div class="cp-login__stageWrap">
+          <div class="cp-login__stage">
+            <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">Handshake</span>
+            <span class="cp-login__stageSep">→</span>
+            <span class="cp-login__stageItem" :data-active="stage === 'Auth'">Auth</span>
+          </div>
+          <div class="cp-login__kbdHint">Ctrl/Cmd+P: Plugins · Ctrl/Cmd+,: Settings</div>
         </div>
       </header>
 
@@ -477,6 +517,18 @@ onMounted(handleMounted);
   background: var(--cp-panel-muted);
   border-radius: 999px;
   padding: 8px 12px;
+}
+
+.cp-login__stageWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.cp-login__kbdHint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--cp-text-muted);
 }
 
 /* Stage item */
@@ -796,6 +848,15 @@ onMounted(handleMounted);
   transform: translateY(0);
 }
 
+.cp-login__miniBtn:focus-visible,
+.cp-login__segBtn:focus-visible,
+.cp-login__sendBtn:focus-visible,
+.cp-login__primary:focus-visible,
+.cp-login__ghost:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline-offset: 2px;
+}
+
 @media (max-width: 980px) {
   .cp-login {
     grid-template-columns: 1fr;
@@ -820,6 +881,16 @@ onMounted(handleMounted);
 
   .cp-login__leftHead {
     padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-login__miniBtn,
+  .cp-login__segBtn,
+  .cp-login__sendBtn,
+  .cp-login__primary,
+  .cp-login__ghost {
+    transition: none !important;
   }
 }
 </style>

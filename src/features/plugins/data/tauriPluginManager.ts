@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tauri 插件管理器适配器（本地生命周期）。
- * @description
+ * @description plugins｜数据层实现：tauriPluginManager。
  * 将“插件中心”的生命周期操作映射为 Rust 侧的 Tauri commands：
  * - install：从 server catalog 下载 zip → sha256 校验 → 解压安装
  * - enable/disable/switch/uninstall：更新本地状态
@@ -127,7 +127,7 @@ export const tauriPluginManager: PluginManagerPort = {
       emitProgress(id, "installed", 100, "已安装", onProgress);
       return mapInstalledState(raw);
     } catch (e) {
-      logger.error("Install failed", { serverSocket: socket, pluginId: id, version: v, error: String(e) });
+      logger.error("Action: plugin_install_failed", { serverSocket: socket, pluginId: id, version: v, error: String(e) });
       emitProgress(id, "failed", 100, String(e) || "Failed", onProgress);
       throw e;
     }
@@ -168,7 +168,7 @@ export const tauriPluginManager: PluginManagerPort = {
       emitProgress(id, "installed", 100, "已安装", onProgress);
       return mapInstalledState(raw);
     } catch (e) {
-      logger.error("Install from url failed", { serverSocket: socket, pluginId: id, version: v, url: u, error: String(e) });
+      logger.error("Action: plugin_install_from_url_failed", { serverSocket: socket, pluginId: id, version: v, url: u, error: String(e) });
       emitProgress(id, "failed", 100, String(e) || "Failed", onProgress);
       throw e;
     }

@@ -4,13 +4,17 @@
  */
 
 import { getServerScopeKey } from "@/shared/serverIdentity";
+import {
+  KEY_APP_CONFIG_RAW,
+  KEY_AUTH_SESSION_PREFIX,
+  KEY_AUTH_TOKEN_PREFIX,
+  KEY_LAST_EVENT_ID_PREFIX,
+  KEY_LATEST_MESSAGE_TIME_MS,
+} from "@/shared/utils/storageKeys";
 
-const KEY_LATEST_MESSAGE_TIME_MS = "carrypigeon:latestMessageTimeMs";
-const KEY_APP_CONFIG_RAW = "carrypigeon:appConfigRaw";
-const KEY_TOKEN_PREFIX = "carrypigeon:authToken:";
-const KEY_SESSION_PREFIX = "carrypigeon:authSession:";
-const KEY_LAST_EVENT_ID_PREFIX = "carrypigeon:lastEventId:";
-
+/**
+ * 前端侧保存的认证会话结构（按 server scope 隔离）。
+ */
 export type AuthSession = {
   /**
    * 访问令牌（access token：bearer token，用于 HTTP Authorization 与 WS auth）。
@@ -88,11 +92,11 @@ export function writeAppConfigRaw(raw: string): void {
 /**
  * 读取指定 server 的 auth token。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @returns 存储的 token；缺失时返回空字符串。
  */
 export function readAuthToken(serverSocket: string): string {
-  const key = `${KEY_TOKEN_PREFIX}${getServerScopeKey(serverSocket)}`;
+  const key = `${KEY_AUTH_TOKEN_PREFIX}${getServerScopeKey(serverSocket)}`;
   const session = readAuthSession(serverSocket);
   if (session?.accessToken) return session.accessToken;
   return localStorage.getItem(key) ?? "";
@@ -101,14 +105,19 @@ export function readAuthToken(serverSocket: string): string {
 /**
  * 将 auth token 写入指定 server 的本地存储。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @param token - 要写入的 token（空字符串表示清空）。
  */
 export function writeAuthToken(serverSocket: string, token: string): void {
   const scope = getServerScopeKey(serverSocket);
   if (!scope) return;
-  const key = `${KEY_TOKEN_PREFIX}${scope}`;
-  localStorage.setItem(key, token);
+  const key = `${KEY_AUTH_TOKEN_PREFIX}${scope}`;
+  const v = String(token ?? "").trim();
+  if (!v) {
+    localStorage.removeItem(key);
+    return;
+  }
+  localStorage.setItem(key, v);
 }
 
 /**
@@ -116,11 +125,11 @@ export function writeAuthToken(serverSocket: string, token: string): void {
  *
  * 推荐原因：登出需要 refresh token（`POST /api/auth/revoke`）。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @returns Session 对象；缺失/非法时返回 `null`。
  */
 export function readAuthSession(serverSocket: string): AuthSession | null {
-  const key = `${KEY_SESSION_PREFIX}${getServerScopeKey(serverSocket)}`;
+  const key = `${KEY_AUTH_SESSION_PREFIX}${getServerScopeKey(serverSocket)}`;
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
@@ -145,13 +154,13 @@ export function readAuthSession(serverSocket: string): AuthSession | null {
  * - 刻意将数据存入 `localStorage`（桌面端 webview scope）。
  * - 同时镜像写入旧版 `authToken` key，以保持旧调用点可读（只读兼容）。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @param session - 会话载荷；当为 `null` 时清空已存储会话。
  */
 export function writeAuthSession(serverSocket: string, session: AuthSession | null): void {
   const socket = serverSocket.trim();
   const scope = getServerScopeKey(socket);
-  const key = `${KEY_SESSION_PREFIX}${scope}`;
+  const key = `${KEY_AUTH_SESSION_PREFIX}${scope}`;
   if (!socket || !scope) return;
 
   if (!session) {
@@ -171,7 +180,7 @@ export function writeAuthSession(serverSocket: string, session: AuthSession | nu
 /**
  * 读取指定 server 会话的 refresh token。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @returns refresh token 字符串（缺失时为空字符串）。
  */
 export function readRefreshToken(serverSocket: string): string {
@@ -181,7 +190,7 @@ export function readRefreshToken(serverSocket: string): string {
 /**
  * 读取指定 server 最后已处理的 WS `event_id`（用于 resume）。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @returns 最后 event id 字符串（缺失时为空字符串）。
  */
 export function readLastEventId(serverSocket: string): string {
@@ -192,7 +201,7 @@ export function readLastEventId(serverSocket: string): string {
 /**
  * 持久化指定 server 最后已处理的 WS `event_id`（用于 resume）。
  *
- * @param serverSocket - server socket（作为 key 后缀）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key，并作为 key 后缀）。
  * @param eventId - event id 字符串（空字符串表示清空）。
  */
 export function writeLastEventId(serverSocket: string, eventId: string): void {
@@ -205,4 +214,38 @@ export function writeLastEventId(serverSocket: string, eventId: string): void {
     return;
   }
   localStorage.setItem(key, v);
+}
+
+/**
+ * 清理指定 scope 的本地鉴权与断点续传状态。
+ *
+ * 说明：
+ * - scope 应使用 `getServerScopeKey(serverSocket)` 的结果（server_id 优先）。
+ * - 该函数仅清理 localStorage；不会触发路由跳转或内存状态变更。
+ *
+ * @param scopeKey - scope key（server_id 或 server_socket）。
+ * @returns 无返回值。
+ */
+export function clearAuthAndResumeStateForScope(scopeKey: string): void {
+  const scope = String(scopeKey ?? "").trim();
+  if (!scope) return;
+  localStorage.removeItem(`${KEY_AUTH_TOKEN_PREFIX}${scope}`);
+  localStorage.removeItem(`${KEY_AUTH_SESSION_PREFIX}${scope}`);
+  localStorage.removeItem(`${KEY_LAST_EVENT_ID_PREFIX}${scope}`);
+}
+
+/**
+ * 清理指定 server 的本地鉴权与断点续传状态。
+ *
+ * 说明：
+ * - 内部会自动将 `serverSocket` 转换为稳定的 scope key（server_id 优先）。
+ * - 该函数仅清理 localStorage；不会触发路由跳转或内存状态变更。
+ *
+ * @param serverSocket - 服务器 Socket 地址（用于推导 scope key）。
+ * @returns 无返回值。
+ */
+export function clearAuthAndResumeState(serverSocket: string): void {
+  const scope = getServerScopeKey(serverSocket);
+  if (!scope) return;
+  clearAuthAndResumeStateForScope(scope);
 }

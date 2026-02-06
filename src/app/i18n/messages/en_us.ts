@@ -1,6 +1,6 @@
 /**
  * @fileoverview en_us.ts
- * @description English (US) locale messages for vue-i18n.
+ * @description 模块：en_us。
  */
 /**
  * en-US message table.

@@ -1,6 +1,6 @@
 /**
  * @fileoverview mockServerInfoPort.ts
- * @description Mock ServerInfoPort implementation for local UI preview.
+ * @description servers｜Mock 实现：mockServerInfoPort（用于本地预览/测试）。
  */
 
 import type { ServerInfoPort } from "../domain/ports/ServerInfoPort";
@@ -10,12 +10,12 @@ import { sleep } from "@/shared/mock/sleep";
 import { rememberServerId } from "@/shared/serverIdentity";
 
 /**
- * Create a deterministic, URL-safe pseudo id from a string.
+ * 基于字符串生成确定性的、URL 安全的伪 id。
  *
- * This is used to emulate a stable server_id in mock mode.
+ * 用途：在 mock 模式下模拟稳定的 `server_id`。
  *
- * @param input - Raw string (server socket).
- * @returns A deterministic short id.
+ * @param input - 原始字符串（server socket）。
+ * @returns 短 id（确定性）。
  */
 function hashToId(input: string): string {
   let h = 2166136261;
@@ -28,7 +28,7 @@ function hashToId(input: string): string {
 }
 
 /**
- * Mock server info port.
+ * Mock 的 `ServerInfoPort` 实现。
  *
  * @constant
  */

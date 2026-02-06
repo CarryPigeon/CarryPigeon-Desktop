@@ -1,45 +1,47 @@
 /**
- * @fileoverview Server origin helpers for HTTP/WS and asset URL building.
- * @description
- * The app historically used `server_socket` values for TCP/TLS connections.
- * With the HTTP + WebSocket API (`/api`), we still accept a flexible input
- * string from users, but we must normalize it into a stable HTTP origin.
+ * @fileoverview serverSocket → HTTP origin 归一化工具。
+ * @description 网络基础设施：serverOrigin。
  *
- * Design goals:
- * - Keep parsing/normalization in one place.
- * - Make UI code work with both "host:port" and full "https://host:port".
- * - Avoid sprinkling string hacks across features.
+ * 背景：
+ * - 历史上应用使用 `server_socket` 表示 TCP/TLS 连接地址。
+ * - 引入 HTTP + WebSocket API（`/api/*`）后，仍允许用户输入多种形态的地址，
+ *   但内部必须归一化为稳定的 HTTP origin（`http(s)://host:port`）。
+ *
+ * 设计目标：
+ * - 把解析/归一化收敛到一个位置，避免各业务模块各自做字符串处理。
+ * - UI 同时兼容 `host:port` 与完整 `https://host:port` 输入。
+ * - 对 WS URL 做 best-effort 映射，并剥离 path/query/hash。
  */
 
 /**
- * Normalize a user-provided server socket string into an HTTP(S) origin.
+ * 将用户提供的 server socket 字符串归一化为 HTTP(S) origin。
  *
- * Supported inputs (examples):
+ * 支持输入（示例）：
  * - `https://127.0.0.1:8443`
  * - `http://localhost:8080`
  * - `127.0.0.1:8443` → `https://127.0.0.1:8443`
- * - `tls://127.0.0.1:9443` → `https://127.0.0.1:9443` (best-effort mapping)
- * - `wss://example.com/api/ws` → `https://example.com` (path removed)
+ * - `tls://127.0.0.1:9443` → `https://127.0.0.1:9443`（best-effort 映射）
+ * - `wss://example.com/api/ws` → `https://example.com`（剥离 path）
  *
- * Notes:
- * - This is a pragmatic normalizer for a self-hosted product. If you need
- *   strict parsing/validation, add it at the UI layer (server editor).
+ * 说明：
+ * - 这是面向自托管场景的“务实型”归一化器；若需要更严格的校验/提示，请在 UI 层（server editor）
+ *   增加校验逻辑与错误反馈。
  *
- * @param serverSocket - Raw server socket string from UI/storage.
- * @returns HTTP origin without trailing slash (e.g. `https://example.com:443`).
+ * @param serverSocket - 来自 UI/存储的原始 server socket 字符串。
+ * @returns 不带尾部 `/` 的 HTTP origin（例如 `https://example.com:443`）。
  */
 export function toHttpOrigin(serverSocket: string): string {
   const raw = serverSocket.trim();
   if (!raw) return "";
 
-  // Local protocol-mock scheme used by the UI preview environment.
+  // UI 预览环境使用的本地协议 mock scheme。
   if (raw.startsWith("mock://")) return "http://mock.local";
 
-  // If user pasted the WS URL, convert it to the equivalent HTTP origin.
+  // 若用户粘贴了 WS URL，则映射为等价的 HTTP origin。
   if (raw.startsWith("ws://")) return stripPath(`http://${raw.slice("ws://".length)}`);
   if (raw.startsWith("wss://")) return stripPath(`https://${raw.slice("wss://".length)}`);
 
-  // Common scheme mappings from legacy TCP configs into an HTTP origin.
+  // 兼容旧 TCP/TLS 配置：把 legacy scheme 映射为 HTTP origin。
   if (raw.startsWith("tcp://")) return stripPath(`http://${raw.slice("tcp://".length)}`);
   if (raw.startsWith("tls://")) return stripPath(`https://${raw.slice("tls://".length)}`);
   if (raw.startsWith("tls-insecure://")) return stripPath(`https://${raw.slice("tls-insecure://".length)}`);
@@ -50,23 +52,23 @@ export function toHttpOrigin(serverSocket: string): string {
   }
   if (raw.startsWith("socket://")) return stripPath(`https://${raw.slice("socket://".length)}`);
 
-  // Already an http(s) origin (possibly with path): strip the path.
+  // 已是 http(s) origin（可能带 path）：剥离 path。
   if (raw.startsWith("http://") || raw.startsWith("https://")) return stripPath(raw);
 
-  // Host[:port] only: default to https.
+  // 仅 host[:port]：默认 https。
   return stripPath(`https://${raw}`);
 }
 
 /**
- * Build an absolute URL for a server-relative path.
+ * 将服务端返回的相对路径拼接为绝对 URL。
  *
- * API rule:
- * - The server returns file/image paths as relative strings (no domain).
- * - The client builds `https://{server_host}/{relative_path}`.
+ * API 约定：
+ * - 服务端返回的文件/图片路径为相对字符串（不含域名）。
+ * - 客户端拼接为 `https://{server_host}/{relative_path}`。
  *
- * @param serverSocket - Raw server socket string used to derive origin.
- * @param relativePath - Relative path (no leading slash required).
- * @returns Absolute URL string, or empty string when inputs are invalid.
+ * @param serverSocket - 用于推导 origin 的 server socket。
+ * @param relativePath - 相对路径（可不带前导 `/`）。
+ * @returns 绝对 URL 字符串；当输入无效时返回空字符串。
  */
 export function resolveServerUrl(serverSocket: string, relativePath: string): string {
   const origin = toHttpOrigin(serverSocket);
@@ -76,10 +78,10 @@ export function resolveServerUrl(serverSocket: string, relativePath: string): st
 }
 
 /**
- * Strip any path/query/hash from a URL-like string and remove trailing slashes.
+ * 从类 URL 字符串中剥离 path/query/hash，并移除尾部 `/`。
  *
- * @param urlLike - URL string (may include path/query/hash).
- * @returns Origin-like string, best effort (e.g. `https://example.com:8443`).
+ * @param urlLike - URL 字符串（可能包含 path/query/hash）。
+ * @returns 类 origin 字符串（best effort，例如 `https://example.com:8443`）。
  */
 function stripPath(urlLike: string): string {
   const s = urlLike.trim();
@@ -88,7 +90,7 @@ function stripPath(urlLike: string): string {
     const u = new URL(s);
     return `${u.protocol}//${u.host}`;
   } catch {
-    // Fallback for non-URL inputs: remove after first "/" and trim trailing "/".
+    // 兜底：非 URL 输入时，粗暴去掉第一个 `/` 之后的内容，并去掉尾部 `/`。
     const head = s.split("/")[0] ? s.split("/").slice(0, 3).join("/") : s;
     return head.replace(/\/+$/, "");
   }

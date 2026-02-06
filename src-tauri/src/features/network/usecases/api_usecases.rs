@@ -1,3 +1,7 @@
+//! network｜用例层：api_usecases。
+//!
+//! 约定：注释中文，日志英文（tracing）。
+
 use std::collections::BTreeMap;
 
 use anyhow::Context;
@@ -5,6 +9,7 @@ use sha2::Digest;
 use tokio::net::TcpStream;
 
 use crate::features::network::di::commands::{ApiRequestJsonArgs, ApiRequestJsonResult};
+use crate::shared::net::origin::to_http_origin;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TlsPolicy {
@@ -33,49 +38,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(bytes);
     hex::encode(hasher.finalize())
-}
-
-fn to_http_origin(server_socket: &str) -> anyhow::Result<String> {
-    let raw = server_socket.trim();
-    if raw.is_empty() {
-        return Err(anyhow::anyhow!("Missing server socket"));
-    }
-
-    let mapped = if raw.starts_with("ws://") {
-        format!("http://{}", &raw["ws://".len()..])
-    } else if raw.starts_with("wss://") {
-        format!("https://{}", &raw["wss://".len()..])
-    } else if raw.starts_with("tcp://") {
-        format!("http://{}", &raw["tcp://".len()..])
-    } else if raw.starts_with("tls://") {
-        format!("https://{}", &raw["tls://".len()..])
-    } else if raw.starts_with("tls-insecure://") {
-        format!("https://{}", &raw["tls-insecure://".len()..])
-    } else if raw.starts_with("tls-fp://") {
-        // `tls-fp://{fp}@host:port`
-        let rest = &raw["tls-fp://".len()..];
-        let addr = rest.split_once('@').map(|x| x.1).unwrap_or(rest);
-        format!("https://{}", addr)
-    } else if raw.starts_with("http://") || raw.starts_with("https://") {
-        raw.to_string()
-    } else {
-        format!("https://{}", raw)
-    };
-
-    let u = reqwest::Url::parse(&mapped).context("Invalid server socket URL")?;
-    Ok(format!(
-        "{}://{}{}",
-        u.scheme(),
-        u.host_str().unwrap_or_default(),
-        port_suffix(&u)
-    ))
-}
-
-fn port_suffix(u: &reqwest::Url) -> String {
-    match u.port() {
-        Some(p) => format!(":{}", p),
-        None => "".to_string(),
-    }
 }
 
 fn extract_host_port_from_origin(origin: &str) -> anyhow::Result<(String, u16)> {
@@ -120,7 +82,9 @@ async fn verify_https_fingerprint(origin: &str, expected_sha256: &str) -> anyhow
         .peer_certificate()
         .map_err(|e| anyhow::anyhow!("Failed to read peer certificate: {}", e))?;
     let Some(cert) = peer else {
-        return Err(anyhow::anyhow!("TLS fingerprint check failed: missing peer certificate"));
+        return Err(anyhow::anyhow!(
+            "TLS fingerprint check failed: missing peer certificate"
+        ));
     };
     let der = cert
         .to_der()
@@ -146,6 +110,19 @@ fn build_reqwest_client(policy: TlsPolicy) -> anyhow::Result<reqwest::Client> {
     Ok(builder.build()?)
 }
 
+/// 执行 `/api/*` JSON 请求（Rust -> server），并返回结构化结果供前端使用。
+///
+/// # 参数
+/// - `args`：请求参数（server_socket/method/path/headers/body/tls_*）。
+///
+/// # 返回值
+/// - `Ok(ApiRequestJsonResult)`：请求结果（ok/status/body/error）。
+/// - `Err(anyhow::Error)`：请求失败原因（参数校验/TLS 校验/网络错误等）。
+///
+/// # 说明
+/// - 仅允许请求 `/api/*` 路径，并做基础的 `..` 防穿越校验；
+/// - 当 TLS 策略为指纹信任时，会在请求前先校验证书指纹；
+/// - 204 No Content 会返回空 body/error。
 pub async fn api_request_json(args: ApiRequestJsonArgs) -> anyhow::Result<ApiRequestJsonResult> {
     let socket = args.server_socket.trim().to_string();
     if socket.is_empty() {
@@ -212,7 +189,8 @@ pub async fn api_request_json(args: ApiRequestJsonArgs) -> anyhow::Result<ApiReq
         });
     }
 
-    let json: serde_json::Value = serde_json::from_slice(&bytes).context("Failed to parse JSON response")?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&bytes).context("Failed to parse JSON response")?;
     if ok {
         Ok(ApiRequestJsonResult {
             ok: true,

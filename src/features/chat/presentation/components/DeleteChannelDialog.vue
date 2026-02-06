@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview DeleteChannelDialog.vue
- * @description Dialog for deleting a channel with confirmation.
+ * @description chat｜组件：DeleteChannelDialog。
  */
 
 import { computed, ref, watch } from "vue";
@@ -28,9 +28,9 @@ const error = ref("");
 const canDelete = computed(() => confirmName.value.trim() === props.channelName.trim());
 
 /**
- * Close dialog and reset transient state.
+ * 关闭弹窗并清理临时状态。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleClose(): void {
   emit("update:visible", false);
@@ -39,9 +39,9 @@ function handleClose(): void {
 }
 
 /**
- * Perform delete action when confirmation matches.
+ * 当确认文本匹配时执行删除操作。
  *
- * @returns Promise<void>.
+ * @returns 无返回值。
  */
 async function handleDelete(): Promise<void> {
   if (!canDelete.value) return;

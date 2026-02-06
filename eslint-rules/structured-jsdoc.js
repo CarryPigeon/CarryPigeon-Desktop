@@ -123,6 +123,30 @@ function findLeadingJsdoc(sourceCode, node) {
   return sourceCode.getJSDocComment(node) ?? null;
 }
 
+function normalizePathLike(pathLike) {
+  return String(pathLike ?? "").replace(/\\/g, "/");
+}
+
+function extractFeatureFromFilename(filename) {
+  const normalized = normalizePathLike(filename);
+  const match = /\/src\/features\/([^/]+)\//.exec(normalized);
+  return match ? match[1] : "";
+}
+
+function parseFeatureImportPath(sourceValue) {
+  const raw = String(sourceValue ?? "").trim();
+  const prefix = "@/features/";
+  if (!raw.startsWith(prefix)) return null;
+  const rest = raw.slice(prefix.length);
+  const match = /^([^/]+)(?:\/([^/]+))?/.exec(rest);
+  if (!match) return null;
+  return {
+    targetFeature: match[1] ?? "",
+    firstSegment: match[2] ?? "",
+    raw,
+  };
+}
+
 export default {
   rules: {
     "require-structured-jsdoc": {
@@ -378,6 +402,51 @@ export default {
                 break;
               }
             }
+          },
+        };
+      },
+    },
+    "no-cross-feature-internal-imports": {
+      meta: {
+        type: "problem",
+        docs: {
+          description: "Disallow cross-feature imports from internal layers; require '@/features/<x>/api'.",
+        },
+        schema: [],
+      },
+      create(context) {
+        const currentFeature = extractFeatureFromFilename(context.getFilename());
+        if (!currentFeature) return {};
+
+        function checkSource(node, sourceLiteral) {
+          const parsed = parseFeatureImportPath(sourceLiteral?.value);
+          if (!parsed) return;
+          if (!parsed.targetFeature || parsed.targetFeature === currentFeature) return;
+          if (parsed.firstSegment === "api") return;
+
+          context.report({
+            node,
+            message:
+              `Cross-feature import '${parsed.raw}' is not allowed. ` +
+              `Use '@/features/${parsed.targetFeature}/api' as the public boundary.`,
+          });
+        }
+
+        return {
+          ImportDeclaration(node) {
+            checkSource(node, node.source);
+          },
+          ExportNamedDeclaration(node) {
+            if (!node.source) return;
+            checkSource(node, node.source);
+          },
+          ExportAllDeclaration(node) {
+            if (!node.source) return;
+            checkSource(node, node.source);
+          },
+          ImportExpression(node) {
+            if (!node.source || node.source.type !== "Literal") return;
+            checkSource(node, node.source);
           },
         };
       },

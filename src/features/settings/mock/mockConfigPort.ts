@@ -1,6 +1,6 @@
 /**
  * @fileoverview mockConfigPort.ts
- * @description Mock ConfigPort implementation for testing.
+ * @description settings｜Mock 实现：mockConfigPort（用于本地预览/测试）。
  */
 
 import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
