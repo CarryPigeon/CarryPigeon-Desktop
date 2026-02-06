@@ -1,6 +1,6 @@
 /**
  * @fileoverview FileTypes.ts
- * @description Domain types for file operations.
+ * @description files｜领域类型：FileTypes。
  */
 
 /**

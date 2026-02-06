@@ -1,6 +1,6 @@
 /**
  * @fileoverview mockTcpConnector.ts
- * @description Mock TcpConnectorPort (no-op) for UI preview mode.
+ * @description network｜Mock 实现：mockTcpConnector（用于本地预览/测试）。
  */
 import type { TcpConnectorPort } from "../domain/ports/TcpConnectorPort";
 import { createLogger } from "@/shared/utils/logger";
@@ -8,13 +8,13 @@ import { createLogger } from "@/shared/utils/logger";
 const logger = createLogger("mockTcpConnector");
 
 /**
- * Mock connector that logs connect attempts and immediately resolves.
+ * mock 连接器：记录连接尝试并立即成功返回。
  *
  * @constant
  */
 export const mockTcpConnector: TcpConnectorPort = {
   async connect(serverSocket: string): Promise<void> {
-    logger.info("Mock connect server", { serverSocket });
+    logger.info("Action: mock_connect_server", { serverSocket });
     // No-op for mock mode.
     return;
   },

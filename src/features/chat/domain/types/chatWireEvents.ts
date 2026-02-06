@@ -1,6 +1,6 @@
 /**
  * @fileoverview chatWireEvents.ts
- * @description WebSocket event envelope types aligned with the chat protocol.
+ * @description chat｜领域类型：chatWireEvents。
  *
  * This type describes the server-to-client event envelope on the WS stream.
  */

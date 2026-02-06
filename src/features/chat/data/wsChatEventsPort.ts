@@ -1,6 +1,6 @@
 /**
  * @fileoverview wsChatEventsPort.ts
- * @description Data adapter: implements `ChatEventsPort` using WebSocket-based client.
+ * @description chat｜数据层实现：wsChatEventsPort。
  */
 
 import type { ChatEventsClient, ChatEventsConnectOptions, ChatEventsPort } from "../domain/ports/chatEventsPort";

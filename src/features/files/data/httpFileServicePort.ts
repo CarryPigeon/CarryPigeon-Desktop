@@ -1,6 +1,6 @@
 /**
  * @fileoverview httpFileServicePort.ts
- * @description HTTP implementation of FileServicePort.
+ * @description files｜数据层实现：httpFileServicePort。
  */
 
 import type { FileServicePort } from "../domain/ports/FileServicePort";

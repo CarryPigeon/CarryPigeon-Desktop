@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview CreateChannelDialog.vue
- * @description Dialog for creating a new channel.
+ * @description chat｜组件：CreateChannelDialog。
  */
 
 import { ref } from "vue";
@@ -25,9 +25,9 @@ const loading = ref(false);
 const error = ref("");
 
 /**
- * Close dialog and reset transient state.
+ * 关闭弹窗并清理临时状态。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleClose(): void {
   emit("update:visible", false);
@@ -37,9 +37,9 @@ function handleClose(): void {
 }
 
 /**
- * Create the channel and emit success.
+ * 创建频道并在成功后触发事件通知上层。
  *
- * @returns Promise<void>.
+ * @returns 无返回值。
  */
 async function handleCreate(): Promise<void> {
   const name = channelName.value.trim();

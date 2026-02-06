@@ -11,11 +11,12 @@
  * 供本地持久化使用。
  */
 
-const KEY_SERVER_ID_BY_SOCKET = "carrypigeon:serverIdBySocket:v1";
-
-const KEY_TOKEN_PREFIX = "carrypigeon:authToken:";
-const KEY_SESSION_PREFIX = "carrypigeon:authSession:";
-const KEY_LAST_EVENT_ID_PREFIX = "carrypigeon:lastEventId:";
+import {
+  KEY_AUTH_SESSION_PREFIX,
+  KEY_AUTH_TOKEN_PREFIX,
+  KEY_LAST_EVENT_ID_PREFIX,
+  KEY_SERVER_ID_BY_SOCKET,
+} from "@/shared/utils/storageKeys";
 
 type ServerIdBySocket = Record<string, string>;
 
@@ -40,7 +41,7 @@ function safeReadMap(): ServerIdBySocket {
  * 将 socket → server_id 映射表写入 localStorage（best-effort）。
  *
  * @param map - 要写入的映射对象。
- * @returns void
+ * @returns 无返回值。
  */
 function safeWriteMap(map: ServerIdBySocket): void {
   try {
@@ -73,7 +74,7 @@ function normalizeServerId(serverId: string): string {
 /**
  * 获取 socket 对应的已缓存 server_id（未知时返回空字符串）。
  *
- * @param serverSocket - server socket 字符串。
+ * @param serverSocket - 服务器 Socket 地址字符串。
  * @returns 已缓存的 server_id；未知时为空字符串。
  */
 export function getKnownServerId(serverSocket: string): string {
@@ -88,7 +89,7 @@ export function getKnownServerId(serverSocket: string): string {
  *
  * 规则：优先使用已知 `server_id`；在未解析前退化为 `server_socket`。
  *
- * @param serverSocket - server socket 字符串。
+ * @param serverSocket - 服务器 Socket 地址字符串。
  * @returns scope key 字符串。
  */
 export function getServerScopeKey(serverSocket: string): string {
@@ -103,7 +104,7 @@ export function getServerScopeKey(serverSocket: string): string {
  * @param prefix - key 前缀。
  * @param oldScope - 旧 scope 后缀。
  * @param newScope - 新 scope 后缀。
- * @returns void
+ * @returns 无返回值。
  */
 function migrateKey(prefix: string, oldScope: string, newScope: string): void {
   if (!oldScope || !newScope || oldScope === newScope) return;
@@ -123,9 +124,9 @@ function migrateKey(prefix: string, oldScope: string, newScope: string): void {
 /**
  * 记住 socket 已解析出的 `server_id`，并将关键 localStorage 记录从 socket scope 迁移到 server_id scope（best-effort）。
  *
- * @param serverSocket - server socket 字符串。
+ * @param serverSocket - 服务器 Socket 地址字符串。
  * @param serverId - 稳定的 server_id。
- * @returns void
+ * @returns 无返回值。
  */
 export function rememberServerId(serverSocket: string, serverId: string): void {
   const socket = normalizeSocket(serverSocket);
@@ -139,8 +140,8 @@ export function rememberServerId(serverSocket: string, serverId: string): void {
   safeWriteMap(map);
 
   // 尽力而为（best-effort）：迁移常见的 per-server key，避免 server_id 可用后用户“丢失”会话/断点续传状态。
-  migrateKey(KEY_TOKEN_PREFIX, socket, sid);
-  migrateKey(KEY_SESSION_PREFIX, socket, sid);
+  migrateKey(KEY_AUTH_TOKEN_PREFIX, socket, sid);
+  migrateKey(KEY_AUTH_SESSION_PREFIX, socket, sid);
   migrateKey(KEY_LAST_EVENT_ID_PREFIX, socket, sid);
 }
 
@@ -149,8 +150,8 @@ export function rememberServerId(serverSocket: string, serverId: string): void {
  *
  * 注意：不会删除 DB 或其他存储，仅清除映射表。
  *
- * @param serverSocket - server socket 字符串。
- * @returns void
+ * @param serverSocket - 服务器 Socket 地址字符串。
+ * @returns 无返回值。
  */
 export function forgetServerIdentity(serverSocket: string): void {
   const socket = normalizeSocket(serverSocket);

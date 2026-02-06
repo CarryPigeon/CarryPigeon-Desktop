@@ -1,6 +1,6 @@
 /**
  * @fileoverview quickSwitcherStore.ts
- * @description Presentation store for Ctrl/Cmd+K quick switcher (UI preview).
+ * @description chat｜展示层状态（store）：quickSwitcherStore。
  */
 
 import { ref } from "vue";

@@ -1,24 +1,24 @@
 /**
  * @fileoverview RequestFileUpload.ts
- * @description Usecase: request file upload descriptor.
+ * @description files｜用例：RequestFileUpload。
  */
 
 import type { FileServicePort } from "../ports/FileServicePort";
 import type { FileUploadRequest, FileUploadResult } from "../types/FileTypes";
 
 /**
- * Request file upload usecase.
+ * 请求文件上传 descriptor 用例。
  */
 export class RequestFileUpload {
   constructor(private readonly fileService: FileServicePort) {}
 
   /**
-   * Execute request file upload.
+   * 执行请求上传 descriptor（两段式上传的第一段）。
    *
-   * @param serverSocket - Server socket.
-   * @param accessToken - Access token.
-   * @param request - Upload request details.
-   * @returns Upload descriptor with file id and share key.
+   * @param serverSocket - 服务器 Socket 地址。
+   * @param accessToken - 访问令牌（Bearer）。
+   * @param request - 上传请求参数。
+   * @returns 上传结果（包含 file_id/share_key 与 upload descriptor）。
    */
   execute(
     serverSocket: string,

@@ -1,6 +1,6 @@
 /**
  * @fileoverview HTTP JSON 客户端（面向 `/api/*`）。
- * @description
+ * @description 网络基础设施：httpJsonClient。
  * 这是一个对 `fetch` 的最小封装，目标是把“跨模块一致的协议细节”收敛到一处：
  * - 自动附加 API 版本 `Accept` 头（`application/vnd.carrypigeon+json; version=1`）
  * - 在有 token 时附加 `Authorization: Bearer ...`
@@ -19,10 +19,14 @@ import { createLogger } from "@/shared/utils/logger";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { handleProtocolMockApiRequest } from "@/shared/mock/protocol/protocolMockTransport";
 import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
-import { getTlsConfigForSocket } from "@/features/servers/presentation/store/serverList";
+import { buildCarryPigeonAcceptHeader } from "@/shared/net/http/apiHeaders";
+import { getServerTlsConfig } from "@/shared/net/tls/serverTlsConfigProvider";
 
 const logger = createLogger("httpJsonClient");
 
+/**
+ * HTTP JSON 客户端配置（每次请求的必要上下文）。
+ */
 export type HttpJsonClientConfig = {
   /**
    * 服务端 socket 原始字符串（用于推导 HTTP origin）。
@@ -37,16 +41,6 @@ export type HttpJsonClientConfig = {
    */
   apiVersion: number;
 };
-
-/**
- * 构造标准 API 版本 `Accept` 头。
- *
- * @param apiVersion - 协议主版本号。
- * @returns Header 值。
- */
-function buildAcceptHeader(apiVersion: number): string {
-  return `application/vnd.carrypigeon+json; version=${apiVersion}`;
-}
 
 /**
  * 从 server socket 构造稳定的 `/api` base URL。
@@ -74,7 +68,7 @@ type TauriApiResponse = {
  * - 自签证书（insecure）
  * - 指纹信任（trust_fingerprint）
  *
- * @param serverSocket - server socket key。
+ * @param serverSocket - 服务器 Socket 地址（用于读取 TLS 策略）。
  * @param url - 已构造完成的请求 URL。
  * @returns 当需要使用 Tauri 时返回 `true`。
  */
@@ -85,14 +79,14 @@ function shouldUseTauriHttp(serverSocket: string, url: string): boolean {
   } catch {
     return false;
   }
-  const tls = getTlsConfigForSocket(serverSocket);
+  const tls = getServerTlsConfig(serverSocket);
   return tls.tlsPolicy === "insecure" || tls.tlsPolicy === "trust_fingerprint";
 }
 
 /**
  * 通过 Tauri 执行 `/api/*` JSON 请求（遵循 TLS policy）。
  *
- * @param serverSocket - server socket key。
+ * @param serverSocket - 服务器 Socket 地址（用于读取 TLS 策略）。
  * @param method - HTTP method。
  * @param path - 以 `/` 开头的 API path（例如 `/server`）。
  * @param headers - Header map。
@@ -108,7 +102,7 @@ async function tauriRequestJson(
 ): Promise<TauriApiResponse> {
   const normalizedPath = normalizeApiPath(path);
   const apiPath = `/api${normalizedPath}`;
-  const tls = getTlsConfigForSocket(serverSocket);
+  const tls = getServerTlsConfig(serverSocket);
   try {
     const args: Record<string, unknown> = {
       serverSocket,
@@ -121,7 +115,7 @@ async function tauriRequestJson(
     if (body !== undefined) args.body = body;
     return await invokeTauri<TauriApiResponse>(TAURI_COMMANDS.apiRequestJson, args);
   } catch (e) {
-    logger.warn("Tauri api_request_json failed; falling back to fetch", { method, apiPath, error: String(e) });
+    logger.warn("Action: tauri_api_request_json_failed_fallback_fetch", { method, path: apiPath, error: String(e) });
     throw e;
   }
 }
@@ -227,7 +221,7 @@ export class HttpJsonClient {
     const url = `${this.baseUrl}${normalizedPath}`;
 
     const headers: Record<string, string> = {
-      Accept: buildAcceptHeader(this.apiVersion),
+      Accept: buildCarryPigeonAcceptHeader(this.apiVersion),
     };
     if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
     if (body !== undefined) headers["Content-Type"] = "application/json; charset=utf-8";
@@ -245,7 +239,7 @@ export class HttpJsonClient {
       });
       if (!res.ok) {
         const err = new ApiRequestError(res.error as ApiErrorEnvelope);
-        logger.warn("HTTP(mock) request failed", { method, url, status: err.status, reason: err.reason });
+        logger.warn("Action: http_request_failed", { transport: "mock", method, url, status: err.status, reason: err.reason });
         throw err;
       }
       if (res.status === 204) return undefined as T;
@@ -257,7 +251,7 @@ export class HttpJsonClient {
         const tauriRes = await tauriRequestJson(this.serverSocket, method, normalizedPath, headers, body);
         if (!tauriRes.ok) {
           const err = new ApiRequestError(tauriRes.error as ApiErrorEnvelope);
-          logger.warn("HTTP(tauri) request failed", { method, url, status: err.status, reason: err.reason });
+          logger.warn("Action: http_request_failed", { transport: "tauri", method, url, status: err.status, reason: err.reason });
           throw err;
         }
         if (tauriRes.status === 204) return undefined as T;
@@ -265,7 +259,7 @@ export class HttpJsonClient {
       } catch (e) {
         // 当 invoke 不可用（例如 Web 预览）或命令失败时，回退到 WebView fetch。
         // 对自签证书场景 fetch 仍可能失败，但可以保持行为一致性。
-        logger.warn("HTTP(tauri) failed; retrying with fetch", { method, url, error: String(e) });
+        logger.warn("Action: http_tauri_invoke_failed_fallback_fetch", { method, url, error: String(e) });
       }
     }
 
@@ -277,7 +271,7 @@ export class HttpJsonClient {
 
     if (!res.ok) {
       const err = await toApiError(res);
-      logger.warn("HTTP request failed", { method, url, status: err.status, reason: err.reason });
+      logger.warn("Action: http_request_failed", { transport: "fetch", method, url, status: err.status, reason: err.reason });
       throw err;
     }
 

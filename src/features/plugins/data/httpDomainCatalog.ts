@@ -1,41 +1,24 @@
 /**
  * @fileoverview httpDomainCatalog.ts
- * @description HTTP adapter for fetching the server domain catalog (`/api/domains/catalog`).
+ * @description plugins｜数据层实现：httpDomainCatalog。
  *
- * API doc reference:
- * - See `docs/api/*` → `GET /api/domains/catalog`
+ * API 文档：
+ * - 见 `docs/api/*` → `GET /api/domains/catalog`
  *
- * Notes:
- * - This endpoint is public and must be callable during required-gate flows.
- * - The catalog is primarily used for contract discovery and “missing provider”
- *   UX (e.g. when a message domain is unknown).
+ * 说明：
+ * - 该接口为 public，必须能在 required-gate 流程中调用（未登录也可用）。
+ * - 目录主要用于“契约发现（contract discovery）”与“缺少 provider”提示 UX
+ *   （例如消息 domain 未知时提示安装对应插件）。
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
+import type {
+  DomainCatalogItem,
+  DomainConstraints,
+  DomainProvider,
+} from "@/features/plugins/domain/types/domainCatalogTypes";
 
-export type DomainProvider =
-  | { type: "core" }
-  | { type: "plugin"; pluginId: string; minPluginVersion?: string };
-
-export type DomainContractPointer = {
-  schemaUrl: string;
-  sha256: string;
-};
-
-export type DomainConstraints = {
-  maxPayloadBytes?: number;
-  maxDepth?: number;
-  [key: string]: unknown;
-};
-
-export type DomainCatalogItem = {
-  domain: string;
-  supportedVersions: string[];
-  recommendedVersion: string;
-  constraints: DomainConstraints;
-  providers: DomainProvider[];
-  contract?: DomainContractPointer;
-};
+export type { DomainCatalogItem, DomainConstraints, DomainContractPointer, DomainProvider } from "@/features/plugins/domain/types/domainCatalogTypes";
 
 type ApiDomainCatalogResponse = {
   items: Array<{
@@ -49,10 +32,10 @@ type ApiDomainCatalogResponse = {
 };
 
 /**
- * Map API provider payload into a typed provider descriptor.
+ * 将 API 的 provider 对象映射为强类型 provider 描述。
  *
- * @param raw - Raw provider object.
- * @returns Provider descriptor.
+ * @param raw - 原始 provider 对象。
+ * @returns provider 描述。
  */
 function mapProvider(raw: { type: string; plugin_id?: string; min_plugin_version?: string }): DomainProvider {
   const t = String(raw.type ?? "").trim();
@@ -67,10 +50,10 @@ function mapProvider(raw: { type: string; plugin_id?: string; min_plugin_version
 }
 
 /**
- * Fetch the server domain catalog and map into a typed list.
+ * 拉取服务端 domain 目录并映射为强类型列表。
  *
- * @param serverSocket - Server socket (used to derive HTTP origin).
- * @returns Domain catalog items.
+ * @param serverSocket - 服务端 socket（用于推导 HTTP origin）。
+ * @returns domain 目录条目列表。
  */
 export async function fetchServerDomainCatalog(serverSocket: string): Promise<DomainCatalogItem[]> {
   const socket = serverSocket.trim();

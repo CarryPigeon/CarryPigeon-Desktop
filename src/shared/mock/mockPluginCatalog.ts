@@ -3,6 +3,9 @@
  * @description 用于本地 UI 预览的 mock 插件目录（无需后端）。
  */
 
+/**
+ * mock 插件提供的 domain 描述。
+ */
 export type MockPluginDomain = {
   id: string;
   label: string;
@@ -15,12 +18,18 @@ export type MockPluginDomain = {
     | "--cp-domain-unknown";
 };
 
+/**
+ * mock 插件权限声明条目（用于权限 UI 展示）。
+ */
 export type MockPluginPermission = {
   key: string;
   label: string;
   risk: "low" | "medium" | "high";
 };
 
+/**
+ * mock 插件目录条目（用于插件中心 UI 预览）。
+ */
 export type MockPluginEntry = {
   pluginId: string;
   name: string;

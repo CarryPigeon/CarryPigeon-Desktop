@@ -1,28 +1,29 @@
 /**
  * @fileoverview currentServer.ts
- * @description Presentation store: current selected server socket (rack).
+ * @description servers｜展示层状态（store）：currentServer。
  */
 
 import { ref } from "vue";
 import { MOCK_SERVER_SOCKET, USE_MOCK_API } from "@/shared/config/runtime";
 
 /**
- * The currently selected server socket.
+ * 当前选中的 server socket。
  *
- * In mock mode we default to a deterministic mock socket so that UI can be
- * previewed without manual setup.
+ * 说明：
+ * - mock 模式下使用确定性的 mock socket，便于 UI 在无后端环境下直接预览。
  *
  * @constant
  */
 export const currentServerSocket = ref<string>(USE_MOCK_API ? MOCK_SERVER_SOCKET : "");
 
 /**
- * Update the current server socket (trimmed).
+ * 更新当前 server socket（写入前会 trim）。
  *
- * This is a purely presentation-layer concern: it drives which per-server
- * stores are used (plugins catalog/install, chat mock data, etc.).
+ * 说明：
+ * - 这是展示层状态：决定使用哪一套“按 server 隔离”的 store
+ *   （例如插件目录/安装状态、聊天 mock 数据等）。
  *
- * @param next - New server socket string.
+ * @param next - 新的 server socket 字符串。
  */
 export function setServerSocket(next: string): void {
   currentServerSocket.value = next.trim();

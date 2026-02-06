@@ -1,13 +1,11 @@
+//! shared｜数据库：commands。
+//!
+//! 约定：注释中文，日志英文（tracing）。
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use sea_orm::{
-    ConnectionTrait,
-    DatabaseBackend,
-    Statement,
-    StatementBuilder,
-    TransactionTrait,
-    Value,
+    ConnectionTrait, DatabaseBackend, Statement, StatementBuilder, TransactionTrait, Value,
 };
 use tauri::command;
 
@@ -15,57 +13,106 @@ use super::{close_db, connect_named, get_db, get_entry, remove_db};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
+/// 数据库参数/结果值的跨端表示（Rust ⇄ 前端）。
+///
+/// # 说明
+/// - 前端通过 invoke 传入的参数需要可序列化；这里用 `serde(untagged)` 以简化 JSON 形态。
+/// - 该类型会被映射为 SeaORM/SQLx 可执行的 `Value`，用于参数化 SQL。
 pub enum DbValue {
+    /// 空值（NULL）。
     Null,
+    /// 布尔值。
     Bool(bool),
+    /// 数值（使用 `f64` 承载，便于与 JS number 对齐）。
     Number(f64),
+    /// 字符串。
     String(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 执行类 SQL 的请求参数（INSERT/UPDATE/DELETE 等）。
+///
+/// # 说明
+/// - `key`：数据库连接 key（由 `db_init` 初始化）。
+/// - `sql`：要执行的 SQL 文本。
+/// - `params`：可选参数数组（按占位符顺序传递）。
 pub struct DbExecuteRequest {
+    /// 数据库连接 key（由 `db_init` 初始化）。
     pub key: String,
+    /// SQL 文本。
     pub sql: String,
+    /// SQL 参数（可选）。
     pub params: Option<Vec<DbValue>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询类 SQL 的请求参数（SELECT）。
+///
+/// # 说明
+/// - `columns` 用于指定需要从结果中抽取的列，并决定返回 rows 的列顺序。
 pub struct DbQueryRequest {
+    /// 数据库连接 key（由 `db_init` 初始化）。
     pub key: String,
+    /// SQL 文本。
     pub sql: String,
+    /// SQL 参数（可选）。
     pub params: Option<Vec<DbValue>>,
+    /// 需要读取的列名列表（返回 rows 将严格按此顺序对齐）。
     pub columns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 事务内的单条 SQL 语句描述。
 pub struct DbStatement {
+    /// SQL 文本。
     pub sql: String,
+    /// SQL 参数（可选）。
     pub params: Option<Vec<DbValue>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 事务请求参数：在同一事务内按序执行多条语句。
 pub struct DbTransactionRequest {
+    /// 数据库连接 key（由 `db_init` 初始化）。
     pub key: String,
+    /// 待执行的语句列表（按顺序执行）。
     pub statements: Vec<DbStatement>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 初始化数据库连接的请求参数。
+///
+/// # 说明
+/// - `path` 为空时会自动落到项目根目录下的默认路径（`data/db/{key}.db`）。
+/// - `kind` 用于决定初始化迁移（system/server），详见 `run_migrations`。
 pub struct DbInitRequest {
+    /// 数据库连接 key（逻辑命名）。
     pub key: String,
+    /// 数据库文件路径（可选）。
     pub path: Option<String>,
+    /// 数据库类型/用途标记（可选）。
     pub kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 执行类 SQL 的结果。
 pub struct DbExecResult {
+    /// 受影响的行数。
     pub rows_affected: u64,
+    /// 最后插入行 id（若可用）；当前实现不保证返回。
     pub last_insert_rowid: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询类 SQL 的结果。
+///
+/// # 说明
+/// - `rows` 为二维数组，内层数组与 `columns` 一一对齐。
 pub struct DbQueryResult {
+    /// 列名（返回 rows 的对齐基准）。
     pub columns: Vec<String>,
-    pub rows: Vec<Vec<DbValue>>, // rows aligned to columns
+    /// 行数据（与 columns 对齐）。
+    pub rows: Vec<Vec<DbValue>>,
 }
 
 #[derive(Debug, Clone)]
@@ -128,7 +175,6 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-
 fn map_values(params: Option<Vec<DbValue>>) -> Vec<Value> {
     params
         .unwrap_or_default()
@@ -168,6 +214,18 @@ fn exec_result(result: &sea_orm::ExecResult) -> DbExecResult {
 }
 
 #[command]
+/// 初始化（或连接）一个命名数据库，并按需执行迁移。
+///
+/// # 参数
+/// - `req`：初始化请求（key/path/kind）。
+///
+/// # 返回值
+/// - `Ok(())`：初始化成功。
+/// - `Err(String)`：初始化失败原因。
+///
+/// # 说明
+/// - 前端应先调用该命令，再调用 `db_execute/db_query/db_transaction` 等命令。
+/// - 若 `path` 为空，将使用默认路径 `data/db/{key}.db`。
 pub async fn db_init(req: DbInitRequest) -> Result<(), String> {
     if req.key.trim().is_empty() {
         return Err("key is required".into());
@@ -178,11 +236,21 @@ pub async fn db_init(req: DbInitRequest) -> Result<(), String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| default_db_path(&req.key));
     ensure_parent_dir(&path)?;
-    connect_named(&req.key, path).await.map_err(|e| e.to_string())?;
+    connect_named(&req.key, path)
+        .await
+        .map_err(|e| e.to_string())?;
     run_migrations(&req.key, req.kind.as_deref()).await
 }
 
 #[command]
+/// 执行一条 SQL（非查询）。
+///
+/// # 参数
+/// - `req`：执行请求（key/sql/params）。
+///
+/// # 返回值
+/// - `Ok(DbExecResult)`：执行结果（行数等）。
+/// - `Err(String)`：执行失败原因。
 pub async fn db_execute(req: DbExecuteRequest) -> Result<DbExecResult, String> {
     let db = get_db(&req.key).await?;
     let conn = &db.connection;
@@ -192,6 +260,18 @@ pub async fn db_execute(req: DbExecuteRequest) -> Result<DbExecResult, String> {
 }
 
 #[command]
+/// 执行一条查询 SQL，并按指定列名抽取结果。
+///
+/// # 参数
+/// - `req`：查询请求（key/sql/params/columns）。
+///
+/// # 返回值
+/// - `Ok(DbQueryResult)`：查询结果（columns + rows）。
+/// - `Err(String)`：查询失败原因。
+///
+/// # 说明
+/// - 为减少跨端类型推断复杂度，调用方必须显式提供 `columns`。
+/// - 若 `columns` 为空，直接返回错误。
 pub async fn db_query(req: DbQueryRequest) -> Result<DbQueryResult, String> {
     if req.columns.is_empty() {
         return Err("columns is required".into());
@@ -218,6 +298,14 @@ pub async fn db_query(req: DbQueryRequest) -> Result<DbQueryResult, String> {
 }
 
 #[command]
+/// 在同一事务内按序执行多条 SQL（非查询）。
+///
+/// # 参数
+/// - `req`：事务请求（key/statements）。
+///
+/// # 返回值
+/// - `Ok(Vec<DbExecResult>)`：每条语句的执行结果列表（与输入 statements 顺序一致）。
+/// - `Err(String)`：执行失败原因。
 pub async fn db_transaction(req: DbTransactionRequest) -> Result<Vec<DbExecResult>, String> {
     let db = get_db(&req.key).await?;
     let conn = &db.connection;
@@ -235,6 +323,17 @@ pub async fn db_transaction(req: DbTransactionRequest) -> Result<Vec<DbExecResul
 }
 
 #[command]
+/// 关闭并释放一个命名数据库连接（从注册表移除）。
+///
+/// # 参数
+/// - `key`：数据库连接 key。
+///
+/// # 返回值
+/// - `Ok(())`：关闭成功。
+/// - `Err(String)`：关闭失败原因。
+///
+/// # 说明
+/// 该操作会从内存注册表移除连接；连接对象被 drop 后由底层驱动完成资源释放。
 pub async fn db_close(key: String) -> Result<(), String> {
     if key.trim().is_empty() {
         return Err("key is required".into());
@@ -243,6 +342,18 @@ pub async fn db_close(key: String) -> Result<(), String> {
 }
 
 #[command]
+/// 移除一个命名数据库连接，并尝试删除对应的数据库文件。
+///
+/// # 参数
+/// - `key`：数据库连接 key。
+///
+/// # 返回值
+/// - `Ok(())`：删除成功或文件不存在。
+/// - `Err(String)`：删除失败原因。
+///
+/// # 说明
+/// - 该命令会先从注册表移除连接，再删除文件。
+/// - 若注册表中不存在该 key，则使用默认路径作为删除目标兜底。
 pub async fn db_remove(key: String) -> Result<(), String> {
     if key.trim().is_empty() {
         return Err("key is required".into());
@@ -259,6 +370,18 @@ pub async fn db_remove(key: String) -> Result<(), String> {
 }
 
 #[command]
+/// 获取命名数据库对应的文件路径。
+///
+/// # 参数
+/// - `key`：数据库连接 key。
+///
+/// # 返回值
+/// - `Ok(String)`：数据库文件路径（字符串）。
+/// - `Err(String)`：获取失败原因。
+///
+/// # 说明
+/// - 若注册表中存在该 key，则返回初始化时的路径。
+/// - 若不存在，则返回默认路径 `data/db/{key}.db`。
 pub async fn db_path(key: String) -> Result<String, String> {
     if key.trim().is_empty() {
         return Err("key is required".into());
@@ -353,9 +476,7 @@ struct Migration {
     statements: Vec<&'static str>,
 }
 
-async fn ensure_migrations_table(
-    conn: &sea_orm::DatabaseConnection,
-) -> Result<(), String> {
+async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> Result<(), String> {
     let stmt = RawStatement::new(
         r#"
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -371,9 +492,7 @@ async fn ensure_migrations_table(
     Ok(())
 }
 
-async fn fetch_applied_versions(
-    conn: &sea_orm::DatabaseConnection,
-) -> Result<Vec<i64>, String> {
+async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> Result<Vec<i64>, String> {
     let stmt = RawStatement::new(
         "SELECT version FROM schema_migrations ORDER BY version ASC".to_string(),
         Vec::new(),
@@ -394,15 +513,13 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> Result<(), String> {
     ensure_migrations_table(conn).await?;
     let applied = fetch_applied_versions(conn).await?;
 
-    let kind = kind
-        .map(|v| v.trim().to_lowercase())
-        .unwrap_or_else(|| {
-            if key == "system" {
-                "system".to_string()
-            } else {
-                "server".to_string()
-            }
-        });
+    let kind = kind.map(|v| v.trim().to_lowercase()).unwrap_or_else(|| {
+        if key == "system" {
+            "system".to_string()
+        } else {
+            "server".to_string()
+        }
+    });
 
     let migrations = if kind == "system" {
         system_migrations()
@@ -420,7 +537,8 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> Result<(), String> {
             txn.execute(&stmt).await.map_err(|e| e.to_string())?;
         }
         let insert_stmt = RawStatement::new(
-            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)".to_string(),
+            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)"
+                .to_string(),
             vec![
                 Value::BigInt(Some(migration.version)),
                 Value::String(Some(migration.name.to_string())),

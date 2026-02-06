@@ -1,6 +1,6 @@
 /**
  * @fileoverview protocolMockPluginManager.ts
- * @description Protocol-mock PluginManagerPort:
+ * @description plugins｜数据层实现：protocolMockPluginManager。
  * - Catalog is fetched via HTTP (`/api/plugins/catalog`) so that `VITE_MOCK_MODE=protocol`
  *   exercises the protocol surface.
  * - Lifecycle actions (install/enable/switch/uninstall) delegate to the existing

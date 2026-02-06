@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ModuleProgress.vue
- * @description Unified progress UI for plugin install/enable/update state machine.
+ * @description plugins｜组件：ModuleProgress。
  */
 
 import { computed } from "vue";
@@ -15,9 +15,9 @@ const props = defineProps<{
 const { t } = useI18n();
 
 /**
- * Map the internal progress stage to an i18n label.
+ * 将内部进度阶段映射为 i18n 文案。
  *
- * @returns Human-readable stage label.
+ * @returns 可读的阶段标签。
  */
 function computeStageLabel(): string {
   const s = props.progress.stage;
@@ -50,8 +50,7 @@ const stageLabel = computed(computeStageLabel);
 </template>
 
 <style scoped lang="scss">
-/* ModuleProgress styles */
-/* Selector: `.cp-module-progress` — progress card container. */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；进度卡包含标题行、进度条与消息行。 */
 .cp-module-progress {
   border: 1px solid color-mix(in oklab, var(--cp-info) 22%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
@@ -60,7 +59,6 @@ const stageLabel = computed(computeStageLabel);
   box-shadow: var(--cp-shadow-soft);
 }
 
-/* Selector: `.cp-module-progress__row` — stage + percent header row. */
 .cp-module-progress__row {
   display: flex;
   align-items: baseline;
@@ -68,7 +66,6 @@ const stageLabel = computed(computeStageLabel);
   gap: 12px;
 }
 
-/* Selector: `.cp-module-progress__stage` — stage label (uppercase display font). */
 .cp-module-progress__stage {
   font-family: var(--cp-font-display);
   text-transform: uppercase;
@@ -77,14 +74,12 @@ const stageLabel = computed(computeStageLabel);
   color: var(--cp-text);
 }
 
-/* Selector: `.cp-module-progress__pct` — percent text (mono). */
 .cp-module-progress__pct {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Selector: `.cp-module-progress__bar` — progress bar track. */
 .cp-module-progress__bar {
   margin-top: 8px;
   height: 10px;
@@ -94,7 +89,6 @@ const stageLabel = computed(computeStageLabel);
   overflow: hidden;
 }
 
-/* Selector: `.cp-module-progress__barFill` — progress bar fill (gradient). */
 .cp-module-progress__barFill {
   height: 100%;
   border-radius: 999px;
@@ -107,7 +101,6 @@ const stageLabel = computed(computeStageLabel);
   transition: width var(--cp-slow) var(--cp-ease);
 }
 
-/* Selector: `.cp-module-progress__msg` — progress message line. */
 .cp-module-progress__msg {
   margin-top: 8px;
   font-size: 12px;

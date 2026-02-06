@@ -1,3 +1,6 @@
+//! Tauri 应用入口：main。
+//!
+//! 约定：注释中文，日志英文（tracing）。
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -15,6 +18,6 @@ async fn main() -> anyhow::Result<()> {
         .with(formatting_layer)
         .init();
 
-    tracing::info!("CarryPigeon Desktop Started");
+    tracing::info!(action = "app_started", "CarryPigeon Desktop started");
     carrypigeon_desktop_lib::run()
 }

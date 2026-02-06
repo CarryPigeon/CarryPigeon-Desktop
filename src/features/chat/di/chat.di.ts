@@ -1,11 +1,11 @@
 /**
  * @fileoverview chat.di.ts
- * @description Composition root for chat feature.
+ * @description chat｜依赖组装（DI）：chat.di。
  *
- * Responsibilities:
- * - Choose which store implementation to use (mock vs live) based on runtime config.
- * - Provide the live store with its required ports (API + events).
- * - Provide usecase factories for domain operations.
+ * 职责：
+ * - 根据运行时配置选择 store 实现（mock vs live）。
+ * - 为 live store 提供所需 ports（API + events）。
+ * - 提供领域用例（usecase）的工厂方法，供展示层调用。
  */
 
 import { MOCK_MODE } from "@/shared/config/runtime";
@@ -17,7 +17,7 @@ import { createMockChatStore } from "@/features/chat/mock/mockChatStore";
 import { createLiveChatStore } from "@/features/chat/presentation/store/liveChatStore";
 import type { ChatStore } from "@/features/chat/presentation/store/chatStoreTypes";
 
-// Usecases
+// 用例
 import { ListChannels } from "../domain/usecases/ListChannels";
 import { GetUnreads } from "../domain/usecases/GetUnreads";
 import { ListChannelMessages } from "../domain/usecases/ListChannelMessages";
@@ -37,9 +37,9 @@ let store: ChatStore | null = null;
 // ============================================================================
 
 /**
- * Get singleton chat API port.
+ * 获取 chat API port（单例）。
  *
- * @returns ChatApiPort.
+ * @returns `ChatApiPort` 实例。
  */
 export function getChatApiPort(): ChatApiPort {
   if (apiPort) return apiPort;
@@ -48,9 +48,9 @@ export function getChatApiPort(): ChatApiPort {
 }
 
 /**
- * Get singleton chat events port.
+ * 获取 chat events port（单例）。
  *
- * @returns ChatEventsPort.
+ * @returns `ChatEventsPort` 实例。
  */
 export function getChatEventsPort(): ChatEventsPort {
   if (eventsPort) return eventsPort;
@@ -63,13 +63,13 @@ export function getChatEventsPort(): ChatEventsPort {
 // ============================================================================
 
 /**
- * Get singleton chat store.
+ * 获取 chat store（展示层 store，单例）。
  *
- * Mock rules:
- * - `MOCK_MODE="store"` uses a deterministic in-memory store.
- * - Other modes use the live store backed by ports.
+ * mock 选择规则：
+ * - `MOCK_MODE="store"`：使用确定性的内存 store（用于 UI 预览/开发联调）。
+ * - 其它情况：使用由 ports 驱动的 live store。
  *
- * @returns ChatStore.
+ * @returns `ChatStore` 实例。
  */
 export function getChatStore(): ChatStore {
   if (store) return store;
@@ -82,85 +82,85 @@ export function getChatStore(): ChatStore {
 }
 
 // ============================================================================
-// Usecases
+// 用例
 // ============================================================================
 
 /**
- * Get ListChannels usecase.
+ * 获取 `ListChannels` 用例实例。
  *
- * @returns ListChannels usecase instance.
+ * @returns `ListChannels` 实例。
  */
 export function getListChannelsUsecase(): ListChannels {
   return new ListChannels(getChatApiPort());
 }
 
 /**
- * Get GetUnreads usecase.
+ * 获取 `GetUnreads` 用例实例。
  *
- * @returns GetUnreads usecase instance.
+ * @returns `GetUnreads` 实例。
  */
 export function getGetUnreadsUsecase(): GetUnreads {
   return new GetUnreads(getChatApiPort());
 }
 
 /**
- * Get ListChannelMessages usecase.
+ * 获取 `ListChannelMessages` 用例实例。
  *
- * @returns ListChannelMessages usecase instance.
+ * @returns `ListChannelMessages` 实例。
  */
 export function getListChannelMessagesUsecase(): ListChannelMessages {
   return new ListChannelMessages(getChatApiPort());
 }
 
 /**
- * Get SendMessage usecase.
+ * 获取 `SendMessage` 用例实例。
  *
- * @returns SendMessage usecase instance.
+ * @returns `SendMessage` 实例。
  */
 export function getSendMessageUsecase(): SendMessage {
   return new SendMessage(getChatApiPort());
 }
 
 /**
- * Get DeleteMessage usecase.
+ * 获取 `DeleteMessage` 用例实例。
  *
- * @returns DeleteMessage usecase instance.
+ * @returns `DeleteMessage` 实例。
  */
 export function getDeleteMessageUsecase(): DeleteMessage {
   return new DeleteMessage(getChatApiPort());
 }
 
 /**
- * Get UpdateReadState usecase.
+ * 获取 `UpdateReadState` 用例实例。
  *
- * @returns UpdateReadState usecase instance.
+ * @returns `UpdateReadState` 实例。
  */
 export function getUpdateReadStateUsecase(): UpdateReadState {
   return new UpdateReadState(getChatApiPort());
 }
 
 /**
- * Get ApplyJoinChannel usecase.
+ * 获取 `ApplyJoinChannel` 用例实例。
  *
- * @returns ApplyJoinChannel usecase instance.
+ * @returns `ApplyJoinChannel` 实例。
  */
 export function getApplyJoinChannelUsecase(): ApplyJoinChannel {
   return new ApplyJoinChannel(getChatApiPort());
 }
 
 /**
- * Get PatchChannel usecase.
+ * 获取 `PatchChannel` 用例实例。
  *
- * @returns PatchChannel usecase instance.
+ * @returns `PatchChannel` 实例。
  */
 export function getPatchChannelUsecase(): PatchChannel {
   return new PatchChannel(getChatApiPort());
 }
 
 /**
- * Get ConnectChatEvents usecase.
+ * 获取 `ConnectChatEvents` 用例实例。
  *
- * @returns ConnectChatEvents usecase instance.
+ * @returns `ConnectChatEvents` 实例。
  */
 export function getConnectChatEventsUsecase(): ConnectChatEvents {
   return new ConnectChatEvents(getChatEventsPort());

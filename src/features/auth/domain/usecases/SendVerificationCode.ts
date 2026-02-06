@@ -1,21 +1,21 @@
 /**
  * @fileoverview SendVerificationCode.ts
- * @description Usecase: request email verification code.
+ * @description auth｜用例：SendVerificationCode。
  */
 
 import type { EmailServicePort } from "../ports/EmailServicePort";
 
 /**
- * Send verification code usecase.
+ * 发送邮箱验证码用例。
  */
 export class SendVerificationCode {
   constructor(private readonly emailService: EmailServicePort) {}
 
   /**
-   * Request a verification code to be sent to the given email.
+   * 请求服务端向指定邮箱发送验证码。
    *
-   * @param email - Target email address.
-   * @returns Promise<void>.
+   * @param email - 目标邮箱地址。
+   * @returns Promise<void>。
    */
   execute(email: string): Promise<void> {
     return this.emailService.sendCode(email);

@@ -1,6 +1,6 @@
 /**
  * @fileoverview mockPluginManager.ts
- * @description Mock PluginManagerPort implementation for local UI preview.
+ * @description plugins｜Mock 实现：mockPluginManager（用于本地预览/测试）。
  */
 
 import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
@@ -11,9 +11,9 @@ import type { PluginManagerPort, PluginProgressHandler } from "@/features/plugin
 import type { InstalledPluginState, PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
 
 /**
- * Convert the static mock catalog into the domain-facing catalog entry shape.
+ * 将静态 mock catalog 转换为领域层的 catalog entry 结构。
  *
- * @returns Catalog entries.
+ * @returns 插件目录条目列表。
  */
 function toDomainCatalog(): PluginCatalogEntry[] {
   return MOCK_PLUGIN_CATALOG.map((p) => ({
@@ -33,11 +33,11 @@ function toDomainCatalog(): PluginCatalogEntry[] {
 }
 
 /**
- * Convert a persisted mock state entry into the domain installed state shape.
+ * 将持久化的 mock 状态转换为领域层的 installed state 结构。
  *
- * @param pluginId - Plugin id.
- * @param raw - Persisted mock state record for that plugin.
- * @returns InstalledPluginState.
+ * @param pluginId - 插件 id。
+ * @param raw - 该插件对应的已持久化 mock 状态记录。
+ * @returns 已安装状态。
  */
 function stateToInstalled(pluginId: string, raw: ReturnType<typeof getMockPluginsState>[string]): InstalledPluginState {
   return {
@@ -51,10 +51,10 @@ function stateToInstalled(pluginId: string, raw: ReturnType<typeof getMockPlugin
 }
 
 /**
- * Best-effort progress emitter (no-op when handler is absent).
+ * best-effort 的进度触发器（当 handler 缺失时为 no-op）。
  *
- * @param onProgress - Optional progress handler.
- * @param payload - Progress payload.
+ * @param onProgress - 进度回调（可选）。
+ * @param payload - 进度载荷。
  */
 function emitProgress(onProgress: PluginProgressHandler | undefined, payload: Parameters<PluginProgressHandler>[0]): void {
   if (!onProgress) return;

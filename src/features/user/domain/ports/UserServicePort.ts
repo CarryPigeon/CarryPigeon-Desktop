@@ -1,60 +1,60 @@
 /**
  * @fileoverview UserServicePort.ts
- * @description Domain port: user profile operations.
+ * @description user｜领域端口：UserServicePort。
  *
- * Implementations:
- * - `mock`: deterministic user data for UI preview
- * - `http`: real HTTP-backed user service
+ * 实现说明：
+ * - `mock`：用于 UI 预览/开发联调的确定性实现
+ * - `http`：基于后端 API 的真实实现
  */
 
 import type { UserMe, UserPublic } from "../types/UserTypes";
 
 /**
- * User service port.
+ * 用户服务端口（领域层）。
  */
 export interface UserServicePort {
   /**
-   * Get current user profile.
+   * 获取当前用户资料。
    *
-   * @param accessToken - Bearer access token.
-   * @returns Current user profile.
+   * @param accessToken - Bearer access token。
+   * @returns 当前用户资料。
    */
   getMe(accessToken: string): Promise<UserMe>;
 
   /**
-   * Get a user's public profile.
+   * 按 uid 获取用户公开资料。
    *
-   * @param accessToken - Bearer access token.
-   * @param uid - User id.
-   * @returns User public profile.
+   * @param accessToken - Bearer access token。
+   * @param uid - 用户 id。
+   * @returns 用户公开资料。
    */
   getUser(accessToken: string, uid: string): Promise<UserPublic>;
 
   /**
-   * Batch fetch user public profiles.
+   * 批量获取用户公开资料。
    *
-   * @param accessToken - Bearer access token.
-   * @param ids - User id list.
-   * @returns User public profiles list.
+   * @param accessToken - Bearer access token。
+   * @param ids - 用户 id 列表。
+   * @returns 用户公开资料列表。
    */
   listUsers(accessToken: string, ids: string[]): Promise<UserPublic[]>;
 
   /**
-   * Update user email (requires verification code).
+   * 更新用户邮箱（需要验证码）。
    *
-   * @param email - New email.
-   * @param code - Verification code.
+   * @param email - 新邮箱地址。
+   * @param code - 验证码。
    */
   updateUserEmail(email: string, code: string): Promise<void>;
 
   /**
-   * Update user profile.
+   * 更新用户资料。
    *
-   * @param username - New username.
-   * @param avatar - Avatar id.
-   * @param sex - Sex code.
-   * @param brief - Bio.
-   * @param birthday - Birthday timestamp.
+   * @param username - 用户名。
+   * @param avatar - avatar id。
+   * @param sex - 性别编码。
+   * @param brief - 简介。
+   * @param birthday - 生日时间戳。
    */
   updateUserProfile(
     username: string,

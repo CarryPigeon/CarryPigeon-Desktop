@@ -1,13 +1,16 @@
 /**
  * @fileoverview httpChatApi.ts
- * @description HTTP data adapter for chat resources (channels/messages/read state).
+ * @description chat｜数据层实现：httpChatApi。
  *
- * API doc reference:
- * - See `docs/api/*` for chat resource endpoints and error model.
+ * 接口文档参考：
+ * - 参见 `docs/api/*`（聊天资源端点、错误模型）。
  */
 
-import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
+import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
 
+/**
+ * 频道 API 响应模型（snake_case，与服务端对齐）。
+ */
 export type ApiChannel = {
   cid: string;
   name: string;
@@ -16,12 +19,18 @@ export type ApiChannel = {
   owner_uid?: string;
 };
 
+/**
+ * 用户轻量 API 响应模型（snake_case）。
+ */
 export type ApiUserLite = {
   uid: string;
   nickname: string;
   avatar?: string;
 };
 
+/**
+ * 频道成员 API 响应模型（snake_case）。
+ */
 export type ApiChannelMember = {
   uid: string;
   role: "owner" | "admin" | "member" | string;
@@ -30,6 +39,9 @@ export type ApiChannelMember = {
   join_time: number;
 };
 
+/**
+ * 入群申请 API 响应模型（snake_case）。
+ */
 export type ApiChannelApplication = {
   application_id: string;
   cid: string;
@@ -39,6 +51,9 @@ export type ApiChannelApplication = {
   status: "pending" | "approved" | "rejected" | string;
 };
 
+/**
+ * 封禁条目 API 响应模型（snake_case）。
+ */
 export type ApiChannelBan = {
   cid: string;
   uid: string;
@@ -47,6 +62,9 @@ export type ApiChannelBan = {
   create_time: number;
 };
 
+/**
+ * 消息 API 响应模型（snake_case）。
+ */
 export type ApiMessage = {
   mid: string;
   cid: string;
@@ -118,58 +136,43 @@ type ApiListBansResponse = {
 };
 
 /**
- * Create an authenticated HTTP client bound to a server socket and token.
+ * 获取频道列表。
  *
- * @param serverSocket - Server socket (origin input).
- * @param accessToken - Bearer token.
- * @returns HttpJsonClient instance.
- */
-function createAuthedClient(serverSocket: string, accessToken: string): HttpJsonClient {
-  const socket = serverSocket.trim();
-  const token = accessToken.trim();
-  if (!socket) throw new Error("Missing server socket");
-  if (!token) throw new Error("Missing access token");
-  return new HttpJsonClient({ serverSocket: socket, apiVersion: 1, accessToken: token });
-}
-
-/**
- * Fetch channel list.
- *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @returns Channels array.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @returns 频道数组。
  */
 export async function httpListChannels(serverSocket: string, accessToken: string): Promise<ApiChannel[]> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const res = await client.requestJson<ApiListChannelsResponse>("GET", "/channels");
   return Array.isArray(res?.channels) ? res.channels : [];
 }
 
 /**
- * Fetch per-channel unread counters for the current user.
+ * 获取当前用户在各频道的未读计数。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @returns Unread items array.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @returns 未读计数条目数组。
  */
 export async function httpGetUnreads(
   serverSocket: string,
   accessToken: string,
 ): Promise<ApiUnreadsResponse["items"]> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const res = await client.requestJson<ApiUnreadsResponse>("GET", "/unreads");
   return Array.isArray(res?.items) ? res.items : [];
 }
 
 /**
- * Fetch messages for a channel.
+ * 获取频道消息列表（支持游标分页）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param cursor - Optional pagination cursor.
- * @param limit - Page size (default 50).
- * @returns Messages + pagination hints.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param cursor - 可选分页游标。
+ * @param limit - 每页大小（默认 50）。
+ * @returns 消息列表与分页提示信息。
  */
 export async function httpListChannelMessages(
   serverSocket: string,
@@ -178,7 +181,7 @@ export async function httpListChannelMessages(
   cursor?: string,
   limit: number = 50,
 ): Promise<ApiListMessagesResponse> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const q: string[] = [];
@@ -189,14 +192,14 @@ export async function httpListChannelMessages(
 }
 
 /**
- * Send a message to a channel.
+ * 向频道发送消息。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param req - Message request body.
- * @param idempotencyKey - Optional idempotency key used to avoid duplicates on retries.
- * @returns Created message object.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param req - 消息请求体。
+ * @param idempotencyKey - 幂等 key（可选）：用于避免重试时重复写入。
+ * @returns 创建后的消息对象。
  */
 export async function httpSendChannelMessage(
   serverSocket: string,
@@ -205,7 +208,7 @@ export async function httpSendChannelMessage(
   req: ApiSendMessageRequest,
   idempotencyKey?: string,
 ): Promise<ApiMessage> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const path = `/channels/${encodeURIComponent(channelId)}/messages`;
@@ -215,28 +218,28 @@ export async function httpSendChannelMessage(
 }
 
 /**
- * Delete (hard-delete) a message by mid.
+ * 按 `mid` 删除消息（硬删除）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param mid - Message id.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param mid - 消息 id。
+ * @returns `Promise<void>`。
  */
 export async function httpDeleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const messageId = String(mid).trim();
   if (!messageId) throw new Error("Missing mid");
   await client.requestJson<void>("DELETE", `/messages/${encodeURIComponent(messageId)}`);
 }
 
 /**
- * Update read state for a channel (only forward).
+ * 更新频道已读状态（仅允许“前进”更新）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param req - Read state body.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param req - 已读状态请求体。
+ * @returns `Promise<void>`。
  */
 export async function httpUpdateReadState(
   serverSocket: string,
@@ -244,20 +247,20 @@ export async function httpUpdateReadState(
   cid: string,
   req: ApiReadStateRequest,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   await client.requestJson<void>("PUT", `/channels/${encodeURIComponent(channelId)}/read_state`, req);
 }
 
 /**
- * Patch channel metadata (name/brief).
+ * 局部更新频道元信息（name/brief/avatar）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param patch - Partial update body.
- * @returns Updated channel object.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param patch - 部分更新请求体。
+ * @returns 更新后的频道对象。
  */
 export async function httpPatchChannel(
   serverSocket: string,
@@ -265,20 +268,20 @@ export async function httpPatchChannel(
   cid: string,
   patch: Partial<Pick<ApiChannel, "name" | "brief" | "avatar">>,
 ): Promise<ApiChannel> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   return client.requestJson<ApiChannel>("PATCH", `/channels/${encodeURIComponent(channelId)}`, patch);
 }
 
 /**
- * Apply/join a channel (non-member).
+ * 申请加入频道（非成员）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param reason - Optional join reason.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param reason - 申请理由（可选）。
+ * @returns `Promise<void>`。
  */
 export async function httpApplyJoinChannel(
   serverSocket: string,
@@ -286,7 +289,7 @@ export async function httpApplyJoinChannel(
   cid: string,
   reason: string,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const body: ApiApplyJoinRequest = { reason: String(reason ?? "") };
@@ -294,19 +297,19 @@ export async function httpApplyJoinChannel(
 }
 
 /**
- * Create a channel (owner).
+ * 创建频道（owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param req - Channel create request.
- * @returns Created channel object.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param req - 创建频道请求体。
+ * @returns 创建后的频道对象。
  */
 export async function httpCreateChannel(
   serverSocket: string,
   accessToken: string,
   req: ApiCreateChannelRequest,
 ): Promise<ApiChannel> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const name = String(req?.name ?? "").trim();
   if (!name) throw new Error("Missing channel name");
   return client.requestJson<ApiChannel>("POST", "/channels", {
@@ -317,49 +320,49 @@ export async function httpCreateChannel(
 }
 
 /**
- * Delete a channel (owner).
+ * 删除频道（owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @returns `Promise<void>`。
  */
 export async function httpDeleteChannel(serverSocket: string, accessToken: string, cid: string): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   await client.requestJson<void>("DELETE", `/channels/${encodeURIComponent(channelId)}`);
 }
 
 /**
- * Get channel profile by id.
+ * 获取频道信息。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @returns Channel profile.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @returns 频道信息。
  */
 export async function httpGetChannel(serverSocket: string, accessToken: string, cid: string): Promise<ApiChannel> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   return client.requestJson<ApiChannel>("GET", `/channels/${encodeURIComponent(channelId)}`);
 }
 
 /**
- * List channel members.
+ * 获取频道成员列表。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @returns Members list.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @returns 成员列表。
  */
 export async function httpListChannelMembers(
   serverSocket: string,
   accessToken: string,
   cid: string,
 ): Promise<ApiChannelMember[]> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const res = await client.requestJson<ApiListMembersResponse>("GET", `/channels/${encodeURIComponent(channelId)}/members`);
@@ -367,13 +370,13 @@ export async function httpListChannelMembers(
 }
 
 /**
- * Kick a user from a channel (admin/owner).
+ * 将用户踢出频道（admin/owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param uid - User id to remove.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param uid - 需要移除的用户 id。
+ * @returns `Promise<void>`。
  */
 export async function httpKickChannelMember(
   serverSocket: string,
@@ -381,7 +384,7 @@ export async function httpKickChannelMember(
   cid: string,
   uid: string,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const userId = String(uid).trim();
   if (!channelId) throw new Error("Missing cid");
@@ -390,13 +393,13 @@ export async function httpKickChannelMember(
 }
 
 /**
- * Grant admin role for a user in a channel (owner).
+ * 授予频道管理员（owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param uid - User id.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param uid - 用户 id。
+ * @returns `Promise<void>`。
  */
 export async function httpAddChannelAdmin(
   serverSocket: string,
@@ -404,7 +407,7 @@ export async function httpAddChannelAdmin(
   cid: string,
   uid: string,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const userId = String(uid).trim();
   if (!channelId) throw new Error("Missing cid");
@@ -413,13 +416,13 @@ export async function httpAddChannelAdmin(
 }
 
 /**
- * Revoke admin role for a user in a channel (owner).
+ * 撤销频道管理员（owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param uid - User id.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param uid - 用户 id。
+ * @returns `Promise<void>`。
  */
 export async function httpRemoveChannelAdmin(
   serverSocket: string,
@@ -427,7 +430,7 @@ export async function httpRemoveChannelAdmin(
   cid: string,
   uid: string,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const userId = String(uid).trim();
   if (!channelId) throw new Error("Missing cid");
@@ -436,19 +439,19 @@ export async function httpRemoveChannelAdmin(
 }
 
 /**
- * List join applications for a channel (admin/owner).
+ * 获取频道入群申请列表（admin/owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @returns Application list.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @returns 申请列表。
  */
 export async function httpListChannelApplications(
   serverSocket: string,
   accessToken: string,
   cid: string,
 ): Promise<ApiChannelApplication[]> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const res = await client.requestJson<ApiListApplicationsResponse>("GET", `/channels/${encodeURIComponent(channelId)}/applications`);
@@ -456,14 +459,14 @@ export async function httpListChannelApplications(
 }
 
 /**
- * Decide a join application (admin/owner).
+ * 审批/拒绝入群申请（admin/owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param applicationId - Application id.
- * @param decision - `"approve"` or `"reject"`.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param applicationId - 申请 id。
+ * @param decision - `"approve"` 或 `"reject"`。
+ * @returns `Promise<void>`。
  */
 export async function httpDecideChannelApplication(
   serverSocket: string,
@@ -472,7 +475,7 @@ export async function httpDecideChannelApplication(
   applicationId: string,
   decision: ApiApplicationDecisionRequest["decision"],
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const aid = String(applicationId).trim();
   if (!channelId) throw new Error("Missing cid");
@@ -485,15 +488,15 @@ export async function httpDecideChannelApplication(
 }
 
 /**
- * Put (create/update) a ban for a user in a channel (admin/owner).
+ * 对频道内某用户设置禁言/封禁（创建或更新）（admin/owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param uid - User id.
- * @param untilMs - Unix epoch ms.
- * @param reason - Reason text.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param uid - 用户 id。
+ * @param untilMs - 截止时间（Unix epoch ms）。
+ * @param reason - 原因说明。
+ * @returns `Promise<void>`。
  */
 export async function httpPutChannelBan(
   serverSocket: string,
@@ -503,7 +506,7 @@ export async function httpPutChannelBan(
   untilMs: number,
   reason: string,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const userId = String(uid).trim();
   if (!channelId) throw new Error("Missing cid");
@@ -514,13 +517,13 @@ export async function httpPutChannelBan(
 }
 
 /**
- * Remove a ban for a user in a channel (admin/owner).
+ * 解除频道内某用户禁言/封禁（admin/owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @param uid - User id.
- * @returns Promise<void>.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @param uid - 用户 id。
+ * @returns `Promise<void>`。
  */
 export async function httpDeleteChannelBan(
   serverSocket: string,
@@ -528,7 +531,7 @@ export async function httpDeleteChannelBan(
   cid: string,
   uid: string,
 ): Promise<void> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const userId = String(uid).trim();
   if (!channelId) throw new Error("Missing cid");
@@ -537,19 +540,19 @@ export async function httpDeleteChannelBan(
 }
 
 /**
- * List bans for a channel (admin/owner).
+ * 获取频道封禁列表（admin/owner）。
  *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param cid - Channel id.
- * @returns Ban list.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param cid - 频道 id。
+ * @returns 封禁列表。
  */
 export async function httpListChannelBans(
   serverSocket: string,
   accessToken: string,
   cid: string,
 ): Promise<ApiChannelBan[]> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const res = await client.requestJson<ApiListBansResponse>("GET", `/channels/${encodeURIComponent(channelId)}/bans`);

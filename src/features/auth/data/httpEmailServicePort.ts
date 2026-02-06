@@ -1,16 +1,16 @@
 /**
  * @fileoverview httpEmailServicePort.ts
- * @description HTTP implementation of EmailServicePort.
+ * @description auth｜数据层实现：httpEmailServicePort。
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 import type { EmailServicePort } from "../domain/ports/EmailServicePort";
 
 /**
- * Create an HTTP-backed EmailServicePort.
+ * 创建 HTTP 版本的 EmailServicePort。
  *
- * @param serverSocket - Server socket.
- * @returns EmailServicePort implementation.
+ * @param serverSocket - 服务端 socket。
+ * @returns EmailServicePort 实现。
  */
 export function createHttpEmailServicePort(serverSocket: string): EmailServicePort {
   const client = new HttpJsonClient({ serverSocket, apiVersion: 1 });

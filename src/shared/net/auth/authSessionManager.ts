@@ -1,14 +1,14 @@
 /**
  * @fileoverview authSessionManager.ts
- * @description Session-level helper for access token refresh + WS reauth coordination.
+ * @description 网络基础设施：authSessionManager。
  *
- * API reference:
- * - See `docs/api/*` for auth refresh/revoke and WS reauth semantics.
+ * API 参考：
+ * - 见 `docs/api/*`：auth refresh/revoke 以及 WS reauth 语义。
  *
- * Design goals:
- * - Keep feature layers clean: chat/features should not import auth/data directly.
- * - Avoid duplicated refresh storms: singleflight per server socket.
- * - Provide a minimal, documentable surface for “get a valid token” and “auto refresh”.
+ * 设计目标：
+ * - 保持 feature 分层干净：chat/features 不直接依赖 auth/data。
+ * - 避免重复刷新风暴：按 server socket 做 singleflight。
+ * - 提供最小、可文档化的能力面：获取可用 token 与自动刷新。
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
@@ -35,10 +35,10 @@ const tokenListeners = new Map<string, Set<(session: AuthSession | null) => void
 const autoRefreshTimers = new Map<string, number>();
 
 /**
- * Notify session listeners for a server socket.
+ * 通知指定 server socket 的 session 监听者。
  *
- * @param serverSocket - Server socket key.
- * @param session - Updated session or null.
+ * @param serverSocket - 服务器 Socket 地址（作为监听 key）。
+ * @param session - 更新后的 session；若为 null 表示清空。
  */
 function emitSession(serverSocket: string, session: AuthSession | null): void {
   const key = serverSocket.trim();
@@ -48,17 +48,17 @@ function emitSession(serverSocket: string, session: AuthSession | null): void {
     try {
       fn(session);
     } catch {
-      // Listener failures must not break token propagation.
+      // 监听者异常不得影响 token 传播。
     }
   }
 }
 
 /**
- * Subscribe to session changes for a server socket.
+ * 订阅指定 server socket 的 session 变更。
  *
- * @param serverSocket - Server socket key.
- * @param listener - Listener callback.
- * @returns Unsubscribe function.
+ * @param serverSocket - 服务器 Socket 地址（作为监听 key）。
+ * @param listener - 监听回调。
+ * @returns 取消订阅函数。
  */
 export function onAuthSessionChanged(
   serverSocket: string,
@@ -78,11 +78,11 @@ export function onAuthSessionChanged(
 }
 
 /**
- * Compute whether a session is “close to expiry”.
+ * 判断 session 是否“临近过期”（需要尽快刷新）。
  *
- * @param session - Stored session.
- * @param nowMs - Current time in ms.
- * @returns True if should refresh soon.
+ * @param session - 已存储的 session。
+ * @param nowMs - 当前时间（ms）。
+ * @returns 需要尽快刷新时返回 true。
  */
 function shouldRefreshSoon(session: AuthSession, nowMs: number): boolean {
   const expiresAt = typeof session.expiresAtMs === "number" ? session.expiresAtMs : undefined;
@@ -92,11 +92,11 @@ function shouldRefreshSoon(session: AuthSession, nowMs: number): boolean {
 }
 
 /**
- * Perform `POST /api/auth/refresh` using the stored refresh token.
+ * 使用已存储的 refresh token 执行 `POST /api/auth/refresh`。
  *
- * @param serverSocket - Server socket.
- * @param refreshToken - Refresh token.
- * @returns Next session or null when refresh fails.
+ * @param serverSocket - 服务端 socket。
+ * @param refreshToken - refresh token。
+ * @returns 刷新成功返回新 session；失败返回 null。
  */
 async function refreshViaHttp(serverSocket: string, refreshToken: string): Promise<AuthSession | null> {
   const socket = serverSocket.trim();
@@ -119,24 +119,24 @@ async function refreshViaHttp(serverSocket: string, refreshToken: string): Promi
     return { accessToken, refreshToken: nextRefreshToken, uid: uid || undefined, expiresAtMs };
   } catch (e) {
     if (isApiRequestError(e)) {
-      logger.warn("Refresh failed", { socket, reason: e.reason, status: e.status });
+      logger.warn("Action: auth_refresh_failed", { socket, reason: e.reason, status: e.status });
     } else {
-      logger.warn("Refresh failed", { socket, error: String(e) });
+      logger.warn("Action: auth_refresh_failed", { socket, error: String(e) });
     }
     return null;
   }
 }
 
 /**
- * Ensure the stored session has a valid (non-expiring) access token.
+ * 确保本地存储的 session 持有“可用的（未临近过期）”access token。
  *
- * Behavior:
- * - If the session is missing: returns `null`.
- * - If the session is near expiry: refreshes it via HTTP and updates localStorage.
- * - Uses singleflight to avoid concurrent refresh storms.
+ * 行为：
+ * - 若 session 不存在：返回 `null`。
+ * - 若 session 临近过期：通过 HTTP 刷新，并更新 localStorage。
+ * - 使用 singleflight 避免并发刷新风暴。
  *
- * @param serverSocket - Server socket.
- * @returns Updated session or null.
+ * @param serverSocket - 服务端 socket。
+ * @returns 更新后的 session；若不存在则为 null。
  */
 export async function ensureValidAuthSession(serverSocket: string): Promise<AuthSession | null> {
   const socket = serverSocket.trim();
@@ -167,10 +167,10 @@ export async function ensureValidAuthSession(serverSocket: string): Promise<Auth
 }
 
 /**
- * Ensure a usable access token, returning the latest token string.
+ * 确保存在可用 access token，并返回最新 token 字符串。
  *
- * @param serverSocket - Server socket.
- * @returns Access token or empty string.
+ * @param serverSocket - 服务端 socket。
+ * @returns access token；若不可用则返回空字符串。
  */
 export async function ensureValidAccessToken(serverSocket: string): Promise<string> {
   const session = await ensureValidAuthSession(serverSocket);
@@ -178,20 +178,21 @@ export async function ensureValidAccessToken(serverSocket: string): Promise<stri
 }
 
 /**
- * Start an auto-refresh loop for a server socket.
+ * 为指定 server socket 启动自动刷新循环。
  *
- * This schedules refresh shortly before expiry. On refresh success it updates
- * localStorage and emits to subscribers (WS can reauth).
+ * 说明：
+ * - 会在过期前一段时间调度刷新；
+ * - 刷新成功会更新 localStorage 并广播给订阅者（WS 可据此 reauth）。
  *
- * @param serverSocket - Server socket.
- * @returns Handle that can stop the loop.
+ * @param serverSocket - 服务端 socket。
+ * @returns 可停止循环的 handle。
  */
 export function startAuthSessionAutoRefresh(serverSocket: string): AutoRefreshHandle {
   const socket = serverSocket.trim();
   if (!socket) return { stop: () => void 0 };
 
   /**
-   * Clear any existing timer for this socket.
+   * 清理该 socket 的既有 timer（若存在）。
    */
   function clearTimer(): void {
     const t = autoRefreshTimers.get(socket);
@@ -200,7 +201,7 @@ export function startAuthSessionAutoRefresh(serverSocket: string): AutoRefreshHa
   }
 
   /**
-   * Schedule the next refresh tick based on stored session.
+   * 基于本地存储 session 调度下一次刷新 tick。
    */
   function scheduleNext(): void {
     clearTimer();
@@ -220,7 +221,7 @@ export function startAuthSessionAutoRefresh(serverSocket: string): AutoRefreshHa
     }, delayMs);
 
     autoRefreshTimers.set(socket, id);
-    logger.debug("Auto refresh scheduled", { socket, delayMs });
+    logger.debug("Action: auth_auto_refresh_scheduled", { socket, delayMs });
   }
 
   scheduleNext();
@@ -233,10 +234,10 @@ export function startAuthSessionAutoRefresh(serverSocket: string): AutoRefreshHa
 }
 
 /**
- * Best-effort revoke refresh token for a stored session and clear it locally.
+ * Best-effort：吊销本地 session 对应的 refresh token，并清空本地存储。
  *
- * @param serverSocket - Server socket.
- * @returns Promise<void>
+ * @param serverSocket - 服务端 socket。
+ * @returns Promise<void>。
  */
 export async function revokeAndClearSession(serverSocket: string): Promise<void> {
   const socket = serverSocket.trim();
@@ -253,9 +254,9 @@ export async function revokeAndClearSession(serverSocket: string): Promise<void>
     await client.requestJson<void>("POST", "/auth/revoke", { refresh_token: refreshToken, client: { device_id: getDeviceId() } });
   } catch (e) {
     if (isApiRequestError(e)) {
-      logger.warn("Revoke failed (best-effort)", { socket, reason: e.reason, status: e.status });
+      logger.warn("Action: auth_revoke_failed_best_effort", { socket, reason: e.reason, status: e.status });
       return;
     }
-    logger.warn("Revoke failed (best-effort)", { socket, error: String(e) });
+    logger.warn("Action: auth_revoke_failed_best_effort", { socket, error: String(e) });
   }
 }

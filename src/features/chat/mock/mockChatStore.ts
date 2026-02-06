@@ -1,13 +1,12 @@
 /**
  * @fileoverview mockChatStore.ts
- * @description Mock (in-memory) implementation of the chat store for UI preview.
+ * @description chat｜Mock 实现：mockChatStore（用于本地预览/测试）。
  */
 
 import { computed, reactive, ref } from "vue";
-import { currentUser } from "@/features/user/presentation/store/userData";
-import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
-import { usePluginInstallStore } from "@/features/plugins/presentation/store/pluginInstallStore";
+import { usePluginCatalogStore, usePluginInstallStore } from "@/features/plugins/api";
+import { currentServerSocket } from "@/features/servers/api";
+import { currentUser } from "@/features/user/api";
 import type {
   ChatChannel,
   ChatMember,
@@ -21,9 +20,9 @@ import type {
 } from "../presentation/store/chatStoreTypes";
 
 /**
- * Create the mock store implementation (in-memory).
+ * 创建 mock store 实现（纯内存）。
  *
- * @returns ChatStore.
+ * @returns `ChatStore`。
  */
 export function createMockChatStore(): ChatStore {
   const state = reactive({
@@ -130,20 +129,21 @@ export function createMockChatStore(): ChatStore {
   const currentChannelLastReadTimeMs = computed(() => state.lastReadTimeMsByChannel[currentChannelId.value] ?? 0);
 
   /**
-   * Ensure the mock chat store is ready.
+   * 确保 mock chat store 已就绪。
    *
-   * Mock mode has no external dependencies; this is a no-op for API symmetry.
+   * 说明：
+   * mock 模式没有外部依赖，此方法仅用于保持与真实实现的 API 对称。
    *
-   * @returns Promise<void>.
+   * @returns `Promise<void>`。
    */
   async function ensureChatReady(): Promise<void> {
     return;
   }
 
   /**
-   * Domain list for composer: core + enabled plugin domains.
+   * 获取作曲器（composer）的 domain 列表：core + 已启用插件的 domains。
    *
-   * @returns Domain list.
+   * @returns domain 列表。
    */
   function availableDomains(): MessageDomain[] {
     const socket = currentServerSocket.value.trim();
@@ -166,11 +166,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Lookup a message by id within a channel.
+   * 在某频道内按 id 查找消息。
    *
-   * @param channelId - Channel id in which to search.
-   * @param messageId - Message id to find.
-   * @returns The message when found, otherwise `null`.
+   * @param channelId - 频道 id。
+   * @param messageId - 消息 id。
+   * @returns 找到则返回消息，否则返回 `null`。
    */
   function getMessageById(channelId: string, messageId: string): ChatMessage | null {
     const list = state.messagesByChannel[channelId] ?? [];
@@ -181,10 +181,10 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Select a channel and clear its unread counter.
+   * 选择频道并清空未读计数。
    *
-   * @param id - Target channel id.
-   * @returns Promise<void>.
+   * @param id - 目标频道 id。
+   * @returns `Promise<void>`。
    */
   async function selectChannel(id: string): Promise<void> {
     currentChannelId.value = id;
@@ -195,9 +195,9 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Report read state for the current channel (mock).
+   * 上报当前频道已读状态（mock）。
    *
-   * @returns Promise<void>.
+   * @returns `Promise<void>`。
    */
   async function reportCurrentReadState(): Promise<void> {
     const cid = currentChannelId.value.trim();
@@ -206,21 +206,22 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Load the next page of older messages (mock).
+   * 加载更早一页消息（mock）。
    *
-   * Mock store uses a finite in-memory list and does not paginate.
+   * 说明：
+   * mock store 使用有限的内存列表，不支持分页，因此该方法为空实现。
    *
-   * @returns Promise<void>
+   * @returns `Promise<void>`
    */
   async function loadMoreMessages(): Promise<void> {
     return;
   }
 
   /**
-   * Apply/join a discoverable channel (mock).
+   * 申请加入某个可发现频道（mock）。
    *
-   * @param channelId - Target channel id.
-   * @returns Promise<void>.
+   * @param channelId - 目标频道 id。
+   * @returns `Promise<void>`。
    */
   async function applyJoin(channelId: string): Promise<void> {
     let target: ChatChannel | null = null;
@@ -241,11 +242,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Update a channel's display metadata (mock).
+   * 更新频道展示信息（mock）。
    *
-   * @param channelId - Channel id.
-   * @param patch - Partial metadata updates.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param patch - 部分更新字段。
+   * @returns `Promise<void>`。
    */
   async function updateChannelMeta(channelId: string, patch: Partial<Pick<ChatChannel, "name" | "brief">>): Promise<void> {
     for (const c of state.channels) {
@@ -256,10 +257,10 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Enter reply mode for a message.
+   * 进入回复模式。
    *
-   * @param messageId - Message id to reply to.
-   * @returns void.
+   * @param messageId - 需要回复的消息 id。
+   * @returns void。
    */
   function startReply(messageId: string): void {
     replyToMessageId.value = messageId;
@@ -267,19 +268,19 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Exit reply mode without sending.
+   * 退出回复模式（不发送）。
    *
-   * @returns void.
+   * @returns void。
    */
   function cancelReply(): void {
     replyToMessageId.value = "";
   }
 
   /**
-   * Delete a message from the current channel (mock hard delete).
+   * 从当前频道删除消息（mock 硬删除）。
    *
-   * @param messageId - Target message id.
-   * @returns Promise<void>.
+   * @param messageId - 目标消息 id。
+   * @returns `Promise<void>`。
    */
   async function deleteMessage(messageId: string): Promise<void> {
     const list = state.messagesByChannel[currentChannelId.value] ?? [];
@@ -288,10 +289,10 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Send the current composer draft as a message (mock).
+   * 发送当前作曲器草稿消息（mock）。
    *
-   * @param payload - Optional plugin payload.
-   * @returns Promise<void>.
+   * @param payload - 可选插件 payload（domain composer 提交）。
+   * @returns `Promise<void>`。
    */
   async function sendComposerMessage(payload?: ComposerSubmitPayload): Promise<void> {
     const uiDomain = selectedDomainId.value.trim();
@@ -344,14 +345,14 @@ export function createMockChatStore(): ChatStore {
   }
 
   // ============================================================================
-  // Channel management methods (mock)
+  // 频道管理方法（mock）
   // ============================================================================
 
   /**
-   * List channel members (mock).
+   * 获取频道成员列表（mock）。
    *
-   * @param channelId - Channel id.
-   * @returns Promise<ChannelMember[]>.
+   * @param channelId - 频道 id。
+   * @returns `Promise<ChannelMember[]>`。
    */
   async function listMembers(channelId: string): Promise<ChannelMember[]> {
     void channelId;
@@ -364,11 +365,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Kick a member from a channel (mock).
+   * 将成员踢出频道（mock）。
    *
-   * @param channelId - Channel id.
-   * @param uid - User id.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param uid - 用户 id。
+   * @returns `Promise<void>`。
    */
   async function kickMember(channelId: string, uid: string): Promise<void> {
     void channelId;
@@ -376,11 +377,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Set a user as admin (mock).
+   * 将用户设为管理员（mock）。
    *
-   * @param channelId - Channel id.
-   * @param uid - User id.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param uid - 用户 id。
+   * @returns `Promise<void>`。
    */
   async function setAdmin(channelId: string, uid: string): Promise<void> {
     void channelId;
@@ -392,11 +393,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Remove a user from admin (mock).
+   * 撤销用户管理员身份（mock）。
    *
-   * @param channelId - Channel id.
-   * @param uid - User id.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param uid - 用户 id。
+   * @returns `Promise<void>`。
    */
   async function removeAdmin(channelId: string, uid: string): Promise<void> {
     void channelId;
@@ -408,10 +409,10 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * List join applications for a channel (mock).
+   * 获取入群申请列表（mock）。
    *
-   * @param channelId - Channel id.
-   * @returns Promise<ChannelApplication[]>.
+   * @param channelId - 频道 id。
+   * @returns `Promise<ChannelApplication[]>`。
    */
   async function listApplications(channelId: string): Promise<ChannelApplication[]> {
     return [
@@ -428,12 +429,12 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Decide a join application (mock).
+   * 审批入群申请（mock）。
    *
-   * @param channelId - Channel id.
-   * @param applicationId - Application id.
-   * @param approved - Whether to approve.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param applicationId - 申请 id。
+   * @param approved - 是否通过。
+   * @returns `Promise<void>`。
    */
   async function decideApplication(channelId: string, applicationId: string, approved: boolean): Promise<void> {
     void channelId;
@@ -444,10 +445,10 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * List bans for a channel (mock).
+   * 获取禁言/封禁列表（mock）。
    *
-   * @param channelId - Channel id.
-   * @returns Promise<ChannelBan[]>.
+   * @param channelId - 频道 id。
+   * @returns `Promise<ChannelBan[]>`。
    */
   async function listBans(channelId: string): Promise<ChannelBan[]> {
     void channelId;
@@ -455,13 +456,13 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Ban a user from a channel (mock).
+   * 设置禁言/封禁（mock）。
    *
-   * @param channelId - Channel id.
-   * @param uid - User id.
-   * @param until - Ban until timestamp (ms).
-   * @param reason - Ban reason.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param uid - 用户 id。
+   * @param until - 截止时间戳（ms）。
+   * @param reason - 原因。
+   * @returns `Promise<void>`。
    */
   async function setBan(channelId: string, uid: string, until: number, reason: string): Promise<void> {
     void channelId;
@@ -472,11 +473,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Remove a ban from a user (mock).
+   * 解除禁言/封禁（mock）。
    *
-   * @param channelId - Channel id.
-   * @param uid - User id.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @param uid - 用户 id。
+   * @returns `Promise<void>`。
    */
   async function removeBan(channelId: string, uid: string): Promise<void> {
     void channelId;
@@ -485,11 +486,11 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Create a channel (mock).
+   * 创建频道（mock）。
    *
-   * @param name - Channel name.
-   * @param brief - Channel brief.
-   * @returns Promise<ChatChannel>.
+   * @param name - 频道名称。
+   * @param brief - 频道简介。
+   * @returns `Promise<ChatChannel>`。
    */
   async function createChannel(name: string, brief?: string): Promise<ChatChannel> {
     const newChannel: ChatChannel = {
@@ -507,10 +508,10 @@ export function createMockChatStore(): ChatStore {
   }
 
   /**
-   * Delete a channel (mock).
+   * 删除频道（mock）。
    *
-   * @param channelId - Channel id.
-   * @returns Promise<void>.
+   * @param channelId - 频道 id。
+   * @returns `Promise<void>`。
    */
   async function deleteChannel(channelId: string): Promise<void> {
     state.channels = state.channels.filter((c) => c.id !== channelId);
@@ -548,7 +549,7 @@ export function createMockChatStore(): ChatStore {
     cancelReply,
     deleteMessage,
     sendComposerMessage,
-    // Channel management
+    // 频道管理
     listMembers,
     kickMember,
     setAdmin,

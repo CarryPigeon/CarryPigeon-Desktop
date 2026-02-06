@@ -1,22 +1,24 @@
 /**
  * @fileoverview GetServerInfo.ts
- * @description Usecase: retrieve server `server_id` and basic info through `ServerInfoPort`.
+ * @description servers｜用例：GetServerInfo。
  */
 
 import type { ServerInfoPort } from "../ports/ServerInfoPort";
 import type { ServerInfo } from "../types/serverInfo";
 
+/**
+ * 获取服务器信息用例。
+ */
 export class GetServerInfo {
   constructor(private readonly port: ServerInfoPort) {}
 
   /**
-   * Fetch server info by socket.
+   * 执行：通过 server socket 获取服务器信息。
    *
-   * @param serverSocket - Target server socket.
-   * @returns Resolved `ServerInfo`.
+   * @param serverSocket - 服务器 Socket 地址。
+   * @returns 解析后的 `ServerInfo`。
    */
   execute(serverSocket: string): Promise<ServerInfo> {
     return this.port.getServerInfo(serverSocket);
   }
 }
-

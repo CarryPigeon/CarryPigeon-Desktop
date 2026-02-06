@@ -16,10 +16,7 @@
 
 export type AppTheme = "patchbay" | "legacy";
 
-/**
- * 主题持久化使用的 `localStorage` key。
- */
-const THEME_KEY = "carrypigeon:theme";
+import { KEY_THEME } from "./storageKeys";
 
 /**
  * 从 `localStorage` 读取已持久化的主题。
@@ -27,7 +24,7 @@ const THEME_KEY = "carrypigeon:theme";
  * @returns 当存储值合法时返回 `"patchbay"` / `"legacy"`；否则返回 `null`。
  */
 export function getStoredTheme(): AppTheme | null {
-  const raw = String(localStorage.getItem(THEME_KEY) ?? "").trim().toLowerCase();
+  const raw = String(localStorage.getItem(KEY_THEME) ?? "").trim().toLowerCase();
   if (raw === "patchbay") return "patchbay";
   if (raw === "legacy") return "legacy";
   return null;
@@ -43,7 +40,7 @@ export function getStoredTheme(): AppTheme | null {
  * @param theme - 要应用的目标主题。
  */
 export function setTheme(theme: AppTheme): void {
-  localStorage.setItem(THEME_KEY, theme);
+  localStorage.setItem(KEY_THEME, theme);
   document.documentElement.dataset.theme = theme === "patchbay" ? "patchbay" : "legacy";
   if (document.body) document.body.dataset.theme = theme === "patchbay" ? "patchbay" : "legacy";
 }

@@ -1,6 +1,6 @@
 /**
  * @fileoverview zh_cn.ts
- * @description Chinese (Simplified) locale messages for vue-i18n.
+ * @description 模块：zh_cn。
  */
 /**
  * zh-CN message table.

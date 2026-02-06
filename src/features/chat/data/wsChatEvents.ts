@@ -1,6 +1,6 @@
 /**
  * @fileoverview 聊天事件流 WebSocket 客户端。
- * @description
+ * @description chat｜数据层实现：wsChatEvents。
  * 用于连接服务端 `/api/ws`，完成鉴权（`auth/reauth`）、心跳（`ping`）与事件接收（`event`）。
  *
  * 文档对齐：
@@ -168,7 +168,7 @@ function computeReconnectDelayMs(attempt: number): number {
 /**
  * 连接聊天 WS 并完成鉴权。
  *
- * @param serverSocket - 服务器 socket（用于推导 origin）。
+ * @param serverSocket - 服务器 Socket 地址（用于推导 origin）。
  * @param accessToken - `auth` 使用的 access_token。
  * @param onEvent - 事件回调（仅服务端事件 envelope）。
  * @param options - 可选扩展回调与覆盖项。
@@ -202,7 +202,7 @@ export function connectChatWs(
   /**
    * 停止心跳定时器。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function stopPing(): void {
     if (!pingTimer) return;
@@ -213,7 +213,7 @@ export function connectChatWs(
   /**
    * 停止重连定时器。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function stopReconnect(): void {
     if (!reconnectTimer) return;
@@ -224,7 +224,7 @@ export function connectChatWs(
   /**
    * 启动 WS 心跳：每 30 秒发送一次 `ping`。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function startPing(): void {
     stopPing();
@@ -242,7 +242,7 @@ export function connectChatWs(
    *
    * 重要约定：`resume.last_event_id` 必须是“最后已处理事件”的 `event_id`。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function sendAuth(): void {
     const id = createRequestId();
@@ -258,7 +258,7 @@ export function connectChatWs(
         resume,
       },
     };
-    logger.info("WS open: auth", { wsUrl, hasResume: Boolean(lastEventId) });
+    logger.info("Action: ws_open_auth", { wsUrl, hasResume: Boolean(lastEventId) });
     ws?.send(JSON.stringify(msg));
     startPing();
   }
@@ -281,7 +281,7 @@ export function connectChatWs(
     if (parsed && typeof parsed === "object" && parsed.type === "resume.failed") {
       const msg = parsed as WsResumeFailed;
       const reason = String(msg.data?.reason ?? "").trim() || "resume_failed";
-      logger.warn("WS resume failed", { wsUrl, reason });
+      logger.warn("Action: ws_resume_failed", { wsUrl, reason });
       writeLastEventId(socket, "");
       options?.onResumeFailed?.(reason);
       return;
@@ -291,13 +291,13 @@ export function connectChatWs(
       const env = parsed as WsEventEnvelope;
       const eid = String(env.data?.event_id ?? "").trim();
       if (!eid) {
-        logger.warn("WS event missing event_id; ignored", { wsUrl, eventType: String(env.data?.event_type ?? "").trim() });
+        logger.warn("Action: ws_event_missing_event_id_ignored", { wsUrl, eventType: String(env.data?.event_type ?? "").trim() });
         return;
       }
 
       const last = readLastEventId(socket).trim();
       if (last && compareEventId(eid, last) <= 0) {
-        logger.debug("WS event ignored (duplicate/out-of-order)", {
+        logger.debug("Action: ws_event_ignored_duplicate_or_out_of_order", {
           wsUrl,
           eid,
           last,
@@ -310,7 +310,7 @@ export function connectChatWs(
         onEvent(env);
       } catch (e) {
         // 重要：消费端失败时，不能前移 last_event_id，否则会丢事件。
-        logger.error("WS event handler failed; keeping last_event_id", {
+        logger.error("Action: ws_event_handler_failed_keep_last_event_id", {
           wsUrl,
           eid,
           eventType: String(env.data?.event_type ?? "").trim(),
@@ -325,7 +325,7 @@ export function connectChatWs(
 
     if (parsed && typeof parsed === "object" && typeof (parsed as WsCommandErr).error === "object") {
       const e = parsed as WsCommandErr;
-      logger.warn("WS command error", { type: e.type, id: e.id ?? "", reason: e.error?.reason ?? "" });
+      logger.warn("Action: ws_command_error", { type: e.type, id: e.id ?? "", reason: e.error?.reason ?? "" });
       if (e.type === "auth.err" || e.type === "reauth.err") {
         const reason = String(e.error?.reason ?? "").trim() || "unauthorized";
         options?.onAuthError?.(reason);
@@ -334,13 +334,13 @@ export function connectChatWs(
     }
 
     const ok = parsed as WsCommandOk;
-    logger.debug("WS message", { type: ok.type, id: ok.id ?? "" });
+    logger.debug("Action: ws_message", { type: ok.type, id: ok.id ?? "" });
   }
 
   /**
    * 当连接非预期关闭时，按退避策略计划重连。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function scheduleReconnect(): void {
     if (closedByUser) return;
@@ -351,13 +351,13 @@ export function connectChatWs(
       reconnectTimer = null;
       connect();
     }, delayMs);
-    logger.warn("WS reconnect scheduled", { wsUrl, attempt: reconnectAttempt, delayMs });
+    logger.warn("Action: ws_reconnect_scheduled", { wsUrl, attempt: reconnectAttempt, delayMs });
   }
 
   /**
    * 创建新的 WebSocket 实例并绑定事件监听。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function connect(): void {
     stopPing();
@@ -380,12 +380,12 @@ export function connectChatWs(
 
     ws.addEventListener("close", () => {
       stopPing();
-      logger.warn("WS closed", { wsUrl });
+      logger.warn("Action: ws_closed", { wsUrl });
       scheduleReconnect();
     });
 
     ws.addEventListener("error", () => {
-      logger.warn("WS error", { wsUrl });
+      logger.warn("Action: ws_error", { wsUrl });
     });
   }
 
@@ -410,7 +410,7 @@ export function connectChatWs(
   /**
    * 主动关闭连接并停止所有定时器。
    *
-   * @returns void
+   * @returns 无返回值。
    */
   function close(): void {
     closedByUser = true;

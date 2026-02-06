@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ChannelMembersPage.vue
- * @description Channel members management page.
+ * @description chat｜页面：ChannelMembersPage。
  */
 
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -10,7 +10,7 @@ import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { CHANNEL_CHANGED_EVENT, type ChannelChangedEventDetail } from "@/shared/utils/messageEvents";
 import { listMembers, kickMember, setAdmin, removeAdmin, type ChannelMember } from "@/features/chat/presentation/store/chatStore";
-import { currentUser } from "@/features/user/presentation/store/userData";
+import { currentUser } from "@/features/user/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -33,10 +33,10 @@ const isOwner = computed(() => currentUserRole.value === "owner");
 const isAdmin = computed(() => currentUserRole.value === "admin" || currentUserRole.value === "owner");
 
 /**
- * Format join timestamp.
+ * 格式化加入时间戳。
  *
- * @param ms - Join timestamp (ms).
- * @returns Date string.
+ * @param ms - 加入时间戳（ms）。
+ * @returns 日期字符串。
  */
 function formatJoinTime(ms: number): string {
   if (!ms) return "—";
@@ -44,10 +44,10 @@ function formatJoinTime(ms: number): string {
 }
 
 /**
- * Format role value into translated label.
+ * 将 role 值转换为翻译后的标签文案。
  *
- * @param role - Role value.
- * @returns Localized role label.
+ * @param role - 角色值。
+ * @returns 本地化后的角色标签。
  */
 function roleLabel(role: string): string {
   if (role === "owner") return t("role_owner");
@@ -56,9 +56,9 @@ function roleLabel(role: string): string {
 }
 
 /**
- * Load members for the selected channel.
+ * 加载当前频道成员列表。
  *
- * @returns Promise<void>.
+ * @returns 无返回值。
  */
 async function loadMembers(): Promise<void> {
   if (!channelId.value) return;
@@ -74,10 +74,10 @@ async function loadMembers(): Promise<void> {
 }
 
 /**
- * Kick a member from the channel.
+ * 将成员踢出频道。
  *
- * @param uid - Target user id.
- * @returns Promise<void>.
+ * @param uid - 目标用户 id。
+ * @returns 无返回值。
  */
 async function handleKick(uid: string): Promise<void> {
   if (!confirm(t("kick_confirm"))) return;
@@ -90,10 +90,10 @@ async function handleKick(uid: string): Promise<void> {
 }
 
 /**
- * Promote a member to admin.
+ * 将成员提升为管理员。
  *
- * @param uid - Target user id.
- * @returns Promise<void>.
+ * @param uid - 目标用户 id。
+ * @returns 无返回值。
  */
 async function handleSetAdmin(uid: string): Promise<void> {
   try {
@@ -105,10 +105,10 @@ async function handleSetAdmin(uid: string): Promise<void> {
 }
 
 /**
- * Demote an admin to member.
+ * 将管理员降级为成员。
  *
- * @param uid - Target user id.
- * @returns Promise<void>.
+ * @param uid - 目标用户 id。
+ * @returns 无返回值。
  */
 async function handleRemoveAdmin(uid: string): Promise<void> {
   try {
@@ -120,9 +120,9 @@ async function handleRemoveAdmin(uid: string): Promise<void> {
 }
 
 /**
- * Handle window-level channel changed events and refresh members when needed.
+ * 处理窗口级频道变更事件：必要时刷新成员列表。
  *
- * @param e - Window event.
+ * @param e - Window 事件。
  */
 function handleChannelChanged(e: Event): void {
   const evt = e as CustomEvent<ChannelChangedEventDetail>;
@@ -134,7 +134,7 @@ function handleChannelChanged(e: Event): void {
 }
 
 /**
- * Component mount hook: load data and register event listeners.
+ * 组件挂载：加载数据并注册事件监听。
  */
 function handleMounted(): void {
   void loadMembers();
@@ -142,7 +142,7 @@ function handleMounted(): void {
 }
 
 /**
- * Component unmount hook: remove event listeners.
+ * 组件卸载：移除事件监听。
  */
 function handleBeforeUnmount(): void {
   window.removeEventListener(CHANNEL_CHANGED_EVENT, handleChannelChanged);
@@ -193,7 +193,7 @@ onBeforeUnmount(handleBeforeUnmount);
 </template>
 
 <style scoped lang="scss">
-/* ChannelMembersPage styles */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；页面为“头部卡片 + 可滚动成员列表”。 */
 .cp-members {
   height: 100%;
   padding: 14px;

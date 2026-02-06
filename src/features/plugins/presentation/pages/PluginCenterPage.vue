@@ -1,30 +1,29 @@
 <script setup lang="ts">
 /**
  * @fileoverview PluginCenterPage.vue
- * @description Patchbay Plugin Center (/plugins).
+ * @description plugins｜页面：PluginCenterPage。
  */
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
-import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
-import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
-import { usePluginInstallStore } from "@/features/plugins/presentation/store/pluginInstallStore";
-import { addRepoSource, enabledRepoSources, removeRepoSource, repoSources, setRepoSourceEnabled } from "@/features/plugins/presentation/store/repoSourcesStore";
-import ModuleCard from "../components/ModuleCard.vue";
+import { addRepoSource, createPluginContext, enabledRepoSources, removeRepoSource, repoSources, setRepoSourceEnabled } from "@/features/plugins/api";
 import ModuleDetailDrawer from "../components/ModuleDetailDrawer.vue";
-import type { PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
-
-type FilterKind = "all" | "installed" | "enabled" | "failed" | "updates" | "required";
-type SourceKind = "all" | "server" | "repo";
+import PluginCenterFilterRail from "../components/PluginCenterFilterRail.vue";
+import PluginCenterGridHeader from "../components/PluginCenterGridHeader.vue";
+import PluginCenterCatalogGrid from "../components/PluginCenterCatalogGrid.vue";
+import type { PluginCatalogEntry } from "@/features/plugins/api";
+import { useCurrentServerContext } from "@/features/servers/api";
+import {
+  type PluginCenterFilterKind,
+  type PluginCenterSourceKind,
+  usePluginCenterCatalogView,
+} from "@/features/plugins/presentation/composables/usePluginCenterCatalogView";
 
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
 
-const filter = ref<FilterKind>((String(route.query.filter ?? "all") as FilterKind) || "all");
-const source = ref<SourceKind>((String(route.query.source ?? "all") as SourceKind) || "all");
+const filter = ref<PluginCenterFilterKind>((String(route.query.filter ?? "all") as PluginCenterFilterKind) || "all");
+const source = ref<PluginCenterSourceKind>((String(route.query.source ?? "all") as PluginCenterSourceKind) || "all");
 const q = ref(String(route.query.q ?? ""));
 
 const selectedId = ref<string>("");
@@ -34,54 +33,14 @@ const repoNoteDraft = ref<string>("");
 const repoError = ref<string>("");
 const showRepoManager = ref<boolean>(false);
 
-/**
- * Compute the current server socket key.
- *
- * @returns Trimmed socket string.
- */
-function computeServerSocket(): string {
-  return currentServerSocket.value.trim();
-}
-
-const serverSocket = computed(computeServerSocket);
+const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = useCurrentServerContext();
+const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
+const { catalogStore, installStore, requiredIds, refreshCatalog, refreshInstalled } = createPluginContext({ socket: serverSocket, requiredPluginsDeclared });
 
 /**
- * Resolve the server-info store scoped to the current socket.
+ * 新增 Repo Source，并尽力刷新目录。
  *
- * @returns Server-info store instance.
- */
-function computeServerInfoStore() {
-  return useServerInfoStore(serverSocket.value);
-}
-
-const serverInfoStore = computed(computeServerInfoStore);
-
-/**
- * Expose `server_id` for UI gate behavior.
- *
- * @returns Current server_id (empty string when missing).
- */
-function computeServerId(): string {
-  return serverInfoStore.value.info.value?.serverId ?? "";
-}
-
-const serverId = computed(computeServerId);
-
-/**
- * Resolve the plugin catalog store scoped to the current socket.
- *
- * @returns Plugin catalog store.
- */
-function computeCatalogStore() {
-  return usePluginCatalogStore(serverSocket.value);
-}
-
-const catalogStore = computed(computeCatalogStore);
-
-/**
- * Add a repo source and refresh catalog (best-effort).
- *
- * @returns void
+ * @returns 无返回值。
  */
 function handleAddRepo(): void {
   repoError.value = "";
@@ -94,77 +53,83 @@ function handleAddRepo(): void {
   }
   repoDraft.value = "";
   repoNoteDraft.value = "";
-  if (serverSocket.value) void catalogStore.value.refresh();
+  if (serverSocket.value) void refreshCatalog();
 }
 
 /**
- * Toggle a repo source and refresh catalog.
+ * 切换 Repo Source 启用态，并刷新目录。
  *
- * @param id - Repo source id.
- * @param enabled - Next enabled state.
- * @returns void
+ * @param id - Repo source id。
+ * @param enabled - 目标启用态。
+ * @returns 无返回值。
  */
 function handleToggleRepo(id: string, enabled: boolean): void {
   setRepoSourceEnabled(id, enabled);
-  if (serverSocket.value) void catalogStore.value.refresh();
+  if (serverSocket.value) void refreshCatalog();
 }
 
 /**
- * Remove a repo source and refresh catalog.
+ * 删除 Repo Source，并刷新目录。
  *
- * @param id - Repo source id.
- * @returns void
+ * @param id - Repo source id。
+ * @returns 无返回值。
  */
 function handleRemoveRepo(id: string): void {
   removeRepoSource(id);
-  if (serverSocket.value) void catalogStore.value.refresh();
+  if (serverSocket.value) void refreshCatalog();
 }
 
+const { byId, filtered, hasUpdate } = usePluginCenterCatalogView({ filter, source, q, catalogStore, installStore });
+
 /**
- * Resolve the plugin install store scoped to the current socket.
+ * 网格事件：安装插件（默认安装最新版本）。
  *
- * @returns Plugin install store.
+ * @param plugin - 目标插件。
  */
-function computeInstallStore() {
-  return usePluginInstallStore(serverSocket.value);
+function handleCardInstall(plugin: PluginCatalogEntry): void {
+  void installStore.value.install(plugin, plugin.versions[0] || "");
 }
 
-const installStore = computed(computeInstallStore);
-
 /**
- * Compute required plugin ids for the required gate UI.
+ * 网格事件：更新插件到最新版本。
  *
- * @returns List of required plugin ids.
+ * @param plugin - 目标插件。
  */
-function computeRequiredIds(): string[] {
-  const declared = serverInfoStore.value.info.value?.requiredPlugins ?? null;
-  if (Array.isArray(declared) && declared.length > 0) {
-    return declared.map((x) => String(x).trim()).filter(Boolean);
-  }
-  const out: string[] = [];
-  for (const p of catalogStore.value.catalog.value) {
-    if (p.source === "server" && p.required) out.push(p.pluginId);
-  }
-  return out;
+function handleCardUpdate(plugin: PluginCatalogEntry): void {
+  void installStore.value.updateToLatest(plugin, plugin.versions[0] || "");
 }
 
-const requiredIds = computed(computeRequiredIds);
-
 /**
- * Expose catalog items by id for O(1) lookup in UI helpers.
+ * 网格事件：启用插件。
  *
- * @returns Mapping of pluginId → catalog entry.
+ * @param pluginId - 插件 id。
  */
-function computeById() {
-  return catalogStore.value.byId.value;
+function handleCardEnable(pluginId: string): void {
+  void installStore.value.enable(pluginId);
 }
 
-const byId = computed(computeById);
+/**
+ * 网格事件：禁用插件。
+ *
+ * @param pluginId - 插件 id。
+ */
+function handleCardDisable(pluginId: string): void {
+  void installStore.value.disable(pluginId);
+}
 
 /**
- * Read the `focus_plugin_id` query param (used by unknown-domain downgrade cards).
+ * 网格事件：卸载插件。
  *
- * @returns Focus plugin id (empty when unset).
+ * @param pluginId - 插件 id。
+ */
+function handleCardUninstall(pluginId: string): void {
+  void installStore.value.uninstall(pluginId);
+}
+
+/**
+ * 读取 `focus_plugin_id` query 参数（用于 UnknownDomainCard 等引导聚焦插件）。
+ *
+ * @returns 聚焦插件 id（未设置则为空字符串）。
  */
 function computeFocusPluginId(): string {
   return String(route.query.focus_plugin_id ?? "").trim();
@@ -175,92 +140,9 @@ const focusPluginId = computed(computeFocusPluginId);
 let queryTimer: number | null = null;
 
 /**
- * Check whether an installed plugin has an update available.
+ * 获取当前选中的目录条目（抽屉内容）。
  *
- * @param pluginId - Plugin id.
- * @returns `true` when installed version differs from catalog latest version.
- */
-function hasUpdate(pluginId: string): boolean {
-  const plugin = byId.value[pluginId];
-  const installed = installStore.value.installedById[pluginId];
-  const latest = plugin?.versions?.[0] ?? "";
-  const current = installed?.currentVersion ?? "";
-  return Boolean(latest && current && latest !== current);
-}
-
-/**
- * Check whether a plugin passes the current source filter.
- *
- * @param p - Catalog entry.
- * @returns `true` when the entry should be included.
- */
-function matchesSource(p: PluginCatalogEntry): boolean {
-  return source.value === "all" ? true : p.source === source.value;
-}
-
-/**
- * Check whether a plugin passes the current search query.
- *
- * @param p - Catalog entry.
- * @param needle - Lowercased search needle.
- * @returns `true` when the entry matches.
- */
-function matchesQuery(p: PluginCatalogEntry, needle: string): boolean {
-  if (!needle) return true;
-
-  if (p.name.toLowerCase().includes(needle)) return true;
-  if (p.pluginId.toLowerCase().includes(needle)) return true;
-
-  for (const d of p.providesDomains) {
-    if (d.id.toLowerCase().includes(needle)) return true;
-    if (d.label.toLowerCase().includes(needle)) return true;
-  }
-
-  return false;
-}
-
-/**
- * Check whether a plugin passes the current status filter.
- *
- * @param p - Catalog entry.
- * @returns `true` when the entry should be included.
- */
-function matchesFilter(p: PluginCatalogEntry): boolean {
-  const installed = installStore.value.installedById[p.pluginId] ?? null;
-
-  if (filter.value === "all") return true;
-  if (filter.value === "installed") return Boolean(installed?.currentVersion);
-  if (filter.value === "enabled") return Boolean(installed?.enabled && installed.status === "ok");
-  if (filter.value === "failed") return Boolean(installed?.status === "failed");
-  if (filter.value === "updates") return hasUpdate(p.pluginId);
-  if (filter.value === "required") return Boolean(p.required);
-  return true;
-}
-
-/**
- * Compute the plugin list shown in the grid.
- *
- * @returns Filtered catalog list.
- */
-function computeFiltered(): PluginCatalogEntry[] {
-  const needle = q.value.trim().toLowerCase();
-  const items = catalogStore.value.catalog.value;
-  const out: PluginCatalogEntry[] = [];
-  for (const p of items) {
-    if (!matchesSource(p)) continue;
-    if (!matchesQuery(p, needle)) continue;
-    if (!matchesFilter(p)) continue;
-    out.push(p);
-  }
-  return out;
-}
-
-const filtered = computed(computeFiltered);
-
-/**
- * Resolve the currently selected catalog entry (drawer content).
- *
- * @returns Selected plugin entry, or `null` when none.
+ * @returns 选中的插件条目；为空则返回 `null`。
  */
 function computeSelectedPlugin(): PluginCatalogEntry | null {
   return byId.value[selectedId.value] ?? null;
@@ -269,9 +151,9 @@ function computeSelectedPlugin(): PluginCatalogEntry | null {
 const selectedPlugin = computed(computeSelectedPlugin);
 
 /**
- * Resolve the currently selected installed state (drawer content).
+ * 获取当前选中的已安装状态（抽屉内容）。
  *
- * @returns Selected install state, or `null` when none.
+ * @returns 选中的安装状态；为空则返回 `null`。
  */
 function computeSelectedInstalled() {
   return installStore.value.installedById[selectedId.value] ?? null;
@@ -280,9 +162,9 @@ function computeSelectedInstalled() {
 const selectedInstalled = computed(computeSelectedInstalled);
 
 /**
- * Open the plugin detail drawer for a given plugin.
+ * 打开某插件的详情抽屉。
  *
- * @param pluginId - Target plugin id.
+ * @param pluginId - 目标插件 id。
  */
 function openDetail(pluginId: string): void {
   selectedId.value = pluginId;
@@ -290,17 +172,17 @@ function openDetail(pluginId: string): void {
 }
 
 /**
- * Close the plugin detail drawer.
+ * 关闭详情抽屉。
  */
 function closeDetail(): void {
   drawerOpen.value = false;
 }
 
 /**
- * Drawer event: install a specific version for the selected plugin.
+ * 抽屉事件：安装指定版本。
  *
- * @param version - Target version.
- * @returns void
+ * @param version - 目标版本。
+ * @returns 无返回值。
  */
 function handleDrawerInstall(version: string): void {
   const plugin = selectedPlugin.value;
@@ -309,9 +191,9 @@ function handleDrawerInstall(version: string): void {
 }
 
 /**
- * Drawer event: update selected plugin to latest.
+ * 抽屉事件：更新到最新版本。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleDrawerUpdate(): void {
   const plugin = selectedPlugin.value;
@@ -320,9 +202,9 @@ function handleDrawerUpdate(): void {
 }
 
 /**
- * Drawer event: enable selected plugin.
+ * 抽屉事件：启用插件。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleDrawerEnable(): void {
   const plugin = selectedPlugin.value;
@@ -331,9 +213,9 @@ function handleDrawerEnable(): void {
 }
 
 /**
- * Drawer event: disable selected plugin.
+ * 抽屉事件：禁用插件。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleDrawerDisable(): void {
   const plugin = selectedPlugin.value;
@@ -342,10 +224,10 @@ function handleDrawerDisable(): void {
 }
 
 /**
- * Drawer event: switch selected plugin to a specific version.
+ * 抽屉事件：切换到指定版本。
  *
- * @param version - Target version.
- * @returns void
+ * @param version - 目标版本。
+ * @returns 无返回值。
  */
 function handleDrawerSwitchVersion(version: string): void {
   const plugin = selectedPlugin.value;
@@ -354,9 +236,9 @@ function handleDrawerSwitchVersion(version: string): void {
 }
 
 /**
- * Drawer event: rollback selected plugin to the previous version.
+ * 抽屉事件：回滚到先前版本。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleDrawerRollback(): void {
   const plugin = selectedPlugin.value;
@@ -365,27 +247,23 @@ function handleDrawerRollback(): void {
 }
 
 /**
- * Ensure catalog + installed state are loaded for the current server.
+ * 确保当前服务端的目录与已安装状态已加载。
  *
- * This is called:
- * - On mount
- * - When server socket changes
- * - When user explicitly requests refresh
+ * 调用时机：
+ * - 组件挂载；
+ * - server socket 变化；
+ * - 用户显式点击刷新/复核。
  *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function ensureData(): Promise<void> {
   if (!serverSocket.value) return;
-  await Promise.all([
-    serverInfoStore.value.refresh(),
-    catalogStore.value.refresh(),
-    installStore.value.refreshInstalled(),
-  ]);
+  await Promise.all([refreshServerInfo(), refreshCatalog(), refreshInstalled()]);
   installStore.value.recheckRequired(requiredIds.value);
 }
 
 /**
- * Sync current UI filters to route query for shareable/refresh-safe URLs.
+ * 将当前筛选条件同步到路由 query，便于分享与刷新后保持状态。
  */
 function syncQuery(): void {
   void router.replace({
@@ -401,9 +279,9 @@ function syncQuery(): void {
 watch([filter, source], syncQuery);
 
 /**
- * Debounce query syncing when the search input changes.
+ * 搜索框变化时对 query 同步进行 debounce。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleQueryChange(): void {
   if (queryTimer) window.clearTimeout(queryTimer);
@@ -413,18 +291,18 @@ function handleQueryChange(): void {
 watch(q, handleQueryChange);
 
 /**
- * Watch-source: server socket.
+ * watch 源：server socket。
  *
- * @returns Current server socket.
+ * @returns 当前 server socket。
  */
 function watchServerSocket(): string {
   return serverSocket.value;
 }
 
 /**
- * Refresh page data when server socket changes.
+ * server socket 变化时刷新页面数据。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleServerSocketChange(): void {
   void ensureData();
@@ -433,19 +311,19 @@ function handleServerSocketChange(): void {
 watch(watchServerSocket, handleServerSocketChange, { immediate: true });
 
 /**
- * Watch-source: focus plugin id.
+ * watch 源：聚焦插件 id。
  *
- * @returns Current focus plugin id.
+ * @returns 当前聚焦插件 id。
  */
 function watchFocusPluginId(): string {
   return focusPluginId.value;
 }
 
 /**
- * Open drawer when focus plugin id is provided in route query.
+ * 当路由提供 focus plugin id 时，自动打开抽屉并聚焦该插件。
  *
- * @param id - Target plugin id.
- * @returns void
+ * @param id - 目标插件 id。
+ * @returns 无返回值。
  */
 function handleFocusPluginIdChange(id: string): void {
   if (!id) return;
@@ -456,137 +334,99 @@ function handleFocusPluginIdChange(id: string): void {
 watch(watchFocusPluginId, handleFocusPluginIdChange, { immediate: true });
 
 /**
- * Component mount hook: prefetch data for current server.
+ * 组件挂载：预拉取当前服务端的数据。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   void ensureData();
+
+  window.addEventListener("keydown", onGlobalKeydown);
 }
 
 onMounted(handleMounted);
+
+/**
+ * 组件卸载：移除全局快捷键监听。
+ */
+function handleBeforeUnmount(): void {
+  window.removeEventListener("keydown", onGlobalKeydown);
+}
+
+onBeforeUnmount(handleBeforeUnmount);
+
+/**
+ * 插件中心全局快捷键。
+ *
+ * - `Esc`：关闭详情抽屉
+ * - `Ctrl/Cmd+,`：打开设置页
+ *
+ * @param e - 键盘事件。
+ */
+function onGlobalKeydown(e: KeyboardEvent): void {
+  if (e.key === "Escape" && drawerOpen.value) {
+    e.preventDefault();
+    closeDetail();
+    return;
+  }
+
+  const meta = e.metaKey || e.ctrlKey;
+  if (!meta || e.key !== ",") return;
+  e.preventDefault();
+  void router.push("/settings");
+}
 </script>
 
 <template>
   <!-- 页面：PluginCenterPage｜职责：插件中心（模块机柜） -->
   <!-- 区块：<main> .cp-plugins -->
   <main class="cp-plugins">
-    <aside class="cp-plugins__filters">
-      <div class="cp-plugins__filtersTitle">MODULE RACK</div>
-      <div class="cp-plugins__filtersSub">Search · Filter · Source</div>
-
-      <div class="cp-plugins__search">
-        <t-input v-model="q" :placeholder="t('plugin_search_placeholder')" clearable />
-      </div>
-
-      <div class="cp-plugins__group">
-        <div class="cp-plugins__label">Filter</div>
-        <div class="cp-seg">
-          <button class="cp-seg__btn" :data-active="filter === 'all'" type="button" @click="filter = 'all'">{{ t("plugin_filter_all") }}</button>
-          <button class="cp-seg__btn" :data-active="filter === 'installed'" type="button" @click="filter = 'installed'">{{ t("plugin_filter_installed") }}</button>
-          <button class="cp-seg__btn" :data-active="filter === 'enabled'" type="button" @click="filter = 'enabled'">{{ t("plugin_filter_enabled") }}</button>
-          <button class="cp-seg__btn" :data-active="filter === 'failed'" type="button" @click="filter = 'failed'">{{ t("plugin_filter_failed") }}</button>
-          <button class="cp-seg__btn" :data-active="filter === 'updates'" type="button" @click="filter = 'updates'">{{ t("plugin_filter_updates") }}</button>
-          <button class="cp-seg__btn" :data-active="filter === 'required'" type="button" @click="filter = 'required'">{{ t("plugin_filter_required") }}</button>
-        </div>
-      </div>
-
-      <div class="cp-plugins__group">
-        <div class="cp-plugins__label">Source</div>
-        <div class="cp-seg">
-          <button class="cp-seg__btn" :data-active="source === 'all'" type="button" @click="source = 'all'">All</button>
-          <button class="cp-seg__btn" :data-active="source === 'server'" type="button" @click="source = 'server'">Server</button>
-          <button class="cp-seg__btn" :data-active="source === 'repo'" type="button" @click="source = 'repo'">Repo</button>
-        </div>
-      </div>
-
-      <div class="cp-plugins__group">
-        <div class="cp-plugins__label">Repo Sources</div>
-        <div class="cp-plugins__repoMeta">
-          <div class="cp-plugins__muted">{{ enabledRepoSources.length }} enabled · {{ repoSources.length }} total</div>
-          <button class="cp-plugins__repoBtn" type="button" @click="showRepoManager = !showRepoManager">
-            {{ showRepoManager ? "Hide" : "Manage" }}
-          </button>
-        </div>
-        <div v-if="showRepoManager" class="cp-plugins__repoPanel">
-          <t-input v-model="repoDraft" placeholder="https://repo.example.com" clearable />
-          <t-input v-model="repoNoteDraft" placeholder="Note (optional)" clearable />
-          <button class="cp-plugins__repoAdd" type="button" @click="handleAddRepo">Add Repo</button>
-          <div v-if="repoError" class="cp-plugins__repoErr">{{ repoError }}</div>
-
-          <div v-if="repoSources.length === 0" class="cp-plugins__muted">No repos added.</div>
-          <div v-else class="cp-plugins__repoList">
-            <div v-for="r in repoSources" :key="r.id" class="cp-plugins__repoRow">
-              <label class="cp-plugins__repoToggle">
-                <input :checked="r.enabled" type="checkbox" @change="handleToggleRepo(r.id, !r.enabled)" />
-                <span>Enabled</span>
-              </label>
-              <div class="cp-plugins__repoInfo">
-                <div class="cp-plugins__repoUrl">{{ r.baseUrl }}</div>
-                <div v-if="r.note" class="cp-plugins__repoNote">{{ r.note }}</div>
-              </div>
-              <button class="cp-plugins__repoRemove" type="button" @click="handleRemoveRepo(r.id)">Remove</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="cp-plugins__group">
-        <div class="cp-plugins__label">Required Gate</div>
-        <div class="cp-plugins__gate">
-          <div class="cp-plugins__gateLine">
-            <span class="cp-plugins__gateK">missing</span>
-            <span class="cp-plugins__gateV">{{ installStore.missingRequiredIds.value.length }}</span>
-          </div>
-          <button class="cp-plugins__gateBtn" type="button" @click="filter = 'required'">{{ t("open_plugin_center_required") }}</button>
-          <button class="cp-plugins__gateBtn" type="button" @click="ensureData">{{ t("recheck_required") }}</button>
-        </div>
-      </div>
-    </aside>
+    <PluginCenterFilterRail
+      v-model:q="q"
+      v-model:filter="filter"
+      v-model:source="source"
+      v-model:show-repo-manager="showRepoManager"
+      v-model:repo-draft="repoDraft"
+      v-model:repo-note-draft="repoNoteDraft"
+      :enabled-repo-count="enabledRepoSources.length"
+      :repo-sources="repoSources"
+      :repo-error="repoError"
+      :missing-required-count="installStore.missingRequiredIds.value.length"
+      @add-repo="handleAddRepo"
+      @toggle-repo="handleToggleRepo"
+      @remove-repo="handleRemoveRepo"
+      @open-required="filter = 'required'"
+      @recheck-required="ensureData"
+    />
 
     <section class="cp-plugins__gridWrap">
-      <header class="cp-plugins__head">
-        <div class="cp-plugins__headLeft">
-          <div class="cp-plugins__headTitle">{{ t("plugin_center") }}</div>
-          <div class="cp-plugins__headMeta">
-            <span class="cp-plugins__mono">{{ serverSocket || "no-server" }}</span>
-            <span class="cp-plugins__dot"></span>
-            <span class="cp-plugins__mono">{{ serverId || "missing-server_id" }}</span>
-            <span class="cp-plugins__dot"></span>
-            <span class="cp-plugins__muted">{{ filtered.length }} modules</span>
-          </div>
-        </div>
-        <div class="cp-plugins__headRight">
-          <button class="cp-plugins__headBtn" type="button" @click="ensureData">{{ t("refresh") }}</button>
-          <button class="cp-plugins__headBtn" type="button" @click="$router.push('/domains')">Domains</button>
-          <button class="cp-plugins__headBtn" type="button" @click="$router.push('/chat')">{{ t("back_to_patchbay") }}</button>
-        </div>
-      </header>
+      <PluginCenterGridHeader
+        :server-socket="serverSocket"
+        :server-id="serverId"
+        :modules-count="filtered.length"
+        @refresh="ensureData"
+        @open-domains="router.push('/domains')"
+        @back-to-chat="router.push('/chat')"
+      />
 
-      <div v-if="serverSocket && !serverId" class="cp-plugins__state err">
-        Plugin Center is locked: missing `server_id` from `GET /api/server`. Install/enable/update are disabled until fixed.
-      </div>
-      <div v-if="catalogStore.loading.value" class="cp-plugins__state">Loading catalog…</div>
-      <div v-else-if="catalogStore.error.value" class="cp-plugins__state err">{{ catalogStore.error.value }}</div>
-      <div v-else class="cp-plugins__grid">
-        <ModuleCard
-          v-for="p in filtered"
-          :key="p.pluginId"
-          :plugin="p"
-          :installed="installStore.installedById[p.pluginId] ?? null"
-          :progress="installStore.progressById[p.pluginId] ?? null"
-          :focused="p.pluginId === selectedId || p.pluginId === focusPluginId"
-          :has-update="hasUpdate(p.pluginId)"
-          :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-          disabled-reason="Missing server_id — plugin operations are disabled"
-          @install="installStore.install(p, p.versions[0] || '')"
-          @update="installStore.updateToLatest(p, p.versions[0] || '')"
-          @enable="installStore.enable(p.pluginId)"
-          @disable="installStore.disable(p.pluginId)"
-          @uninstall="installStore.uninstall(p.pluginId)"
-          @detail="openDetail(p.pluginId)"
-        />
-      </div>
+      <PluginCenterCatalogGrid
+        :server-socket="serverSocket"
+        :server-id="serverId"
+        :loading="catalogStore.loading.value"
+        :error="catalogStore.error.value || ''"
+        :plugins="filtered"
+        :installed-by-id="installStore.installedById"
+        :progress-by-id="installStore.progressById"
+        :selected-id="selectedId"
+        :focus-plugin-id="focusPluginId"
+        :has-update="hasUpdate"
+        @install="handleCardInstall"
+        @update="handleCardUpdate"
+        @enable="handleCardEnable"
+        @disable="handleCardDisable"
+        @uninstall="handleCardUninstall"
+        @detail="openDetail"
+      />
     </section>
 
     <ModuleDetailDrawer
@@ -608,8 +448,7 @@ onMounted(handleMounted);
 </template>
 
 <style scoped lang="scss">
-/* PluginCenterPage styles */
-/* Layout: filter rail + grid area */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；整体为两列布局（左筛选栏 + 右内容区）。 */
 .cp-plugins {
   height: 100%;
   display: grid;
@@ -618,231 +457,6 @@ onMounted(handleMounted);
   padding: 14px;
 }
 
-/* Left rail: filters panel */
-.cp-plugins__filters {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: var(--cp-shadow-soft);
-  overflow: auto;
-}
-
-/* Rail title */
-.cp-plugins__filtersTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text);
-}
-
-/* Rail subtitle */
-.cp-plugins__filtersSub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* Search field wrapper */
-.cp-plugins__search {
-  margin-top: 12px;
-}
-
-/* Filter group (segmented controls) */
-.cp-plugins__group {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--cp-border-light);
-}
-
-/* Group label */
-.cp-plugins__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  margin-bottom: 10px;
-}
-
-/* Segmented control container */
-.cp-seg {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Segmented control button */
-.cp-seg__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
-}
-
-/* Segmented control hover */
-.cp-seg__btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cp-highlight-border);
-  background: var(--cp-hover-bg);
-}
-
-/* Segmented control active */
-.cp-seg__btn[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
-}
-
-/* Required-gate summary box */
-.cp-plugins__gate {
-  border: 1px dashed rgba(148, 163, 184, 0.26);
-  border-radius: 16px;
-  padding: 12px;
-  background: var(--cp-panel-muted);
-}
-
-/* Gate key/value row */
-.cp-plugins__gateLine {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* Gate key */
-.cp-plugins__gateK {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* Gate value */
-.cp-plugins__gateV {
-  font-family: var(--cp-font-mono);
-  font-size: 12px;
-  color: var(--cp-text);
-}
-
-/* Gate action button */
-.cp-plugins__gateBtn {
-  margin-top: 10px;
-  width: 100%;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-	    border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* Gate button hover */
-.cp-plugins__gateBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Repo sources meta row */
-.cp-plugins__repoMeta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* Repo sources manager panel */
-.cp-plugins__repoPanel {
-  margin-top: 10px;
-  display: grid;
-  gap: 10px;
-}
-
-.cp-plugins__repoBtn,
-.cp-plugins__repoAdd,
-.cp-plugins__repoRemove {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-plugins__repoBtn:hover,
-.cp-plugins__repoAdd:hover,
-.cp-plugins__repoRemove:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-plugins__repoErr {
-  font-size: 12px;
-  color: var(--cp-danger);
-}
-
-.cp-plugins__repoList {
-  display: grid;
-  gap: 10px;
-}
-
-.cp-plugins__repoRow {
-  border: 1px solid var(--cp-border-light);
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 14px;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
-}
-
-.cp-plugins__repoToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--cp-text);
-}
-
-.cp-plugins__repoInfo {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.cp-plugins__repoUrl {
-  font-family: var(--cp-font-mono);
-  font-size: 12px;
-  color: var(--cp-text);
-  overflow-wrap: anywhere;
-}
-
-.cp-plugins__repoNote {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* Right area: header + grid container */
 .cp-plugins__gridWrap {
   border: 1px solid var(--cp-border);
   background: var(--cp-surface);
@@ -854,101 +468,11 @@ onMounted(handleMounted);
   min-width: 0;
 }
 
-/* Grid header */
-.cp-plugins__head {
-  padding: 14px 14px 12px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .cp-plugins,
+  .cp-plugins * {
+    scroll-behavior: auto !important;
+  }
 }
 
-/* Header title */
-.cp-plugins__headTitle {
-  font-family: var(--cp-font-display);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
-}
-
-/* Header meta row */
-.cp-plugins__headMeta {
-  margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Mono meta chip */
-.cp-plugins__mono {
-  font-family: var(--cp-font-mono);
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* Dot separator */
-.cp-plugins__dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.5);
-}
-
-/* Muted meta */
-.cp-plugins__muted {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* Header right actions */
-.cp-plugins__headRight {
-  display: flex;
-  gap: 10px;
-}
-
-/* Header action button */
-.cp-plugins__headBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-	    border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* Header button hover */
-.cp-plugins__headBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Loading/error state */
-.cp-plugins__state {
-  padding: 18px;
-  color: var(--cp-text-muted);
-  font-size: 13px;
-}
-
-/* Error state */
-.cp-plugins__state.err {
-  color: rgba(248, 113, 113, 0.92);
-}
-
-/* Module grid */
-.cp-plugins__grid {
-  padding: 14px;
-  overflow: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  min-height: 0;
-}
 </style>

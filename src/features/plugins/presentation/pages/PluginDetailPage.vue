@@ -1,37 +1,23 @@
 <script setup lang="ts">
 /**
  * @fileoverview PluginDetailPage.vue
- * @description Plugin detail route (/plugins/detail/:pluginId).
+ * @description plugins｜页面：PluginDetailPage。
  */
 
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
-import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
-import { usePluginInstallStore } from "@/features/plugins/presentation/store/pluginInstallStore";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import type { PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
+import { createPluginContext, type PluginCatalogEntry } from "@/features/plugins/api";
+import { useCurrentServerContext } from "@/features/servers/api";
 
 const route = useRoute();
 const router = useRouter();
 
 /**
- * Compute the current server socket.
+ * 从路由参数中读取插件 id。
  *
- * @returns Trimmed socket string.
- */
-function computeServerSocket(): string {
-  return currentServerSocket.value.trim();
-}
-
-const serverSocket = computed(computeServerSocket);
-
-/**
- * Read the plugin id from route params.
- *
- * @returns Plugin id.
+ * @returns 插件 id。
  */
 function computePluginId(): string {
   return String(route.params.pluginId ?? "").trim();
@@ -39,54 +25,14 @@ function computePluginId(): string {
 
 const pluginId = computed(computePluginId);
 
-/**
- * Resolve server-info store for current socket.
- *
- * @returns Server-info store.
- */
-function computeServerInfoStore() {
-  return useServerInfoStore(serverSocket.value);
-}
-
-const serverInfoStore = computed(computeServerInfoStore);
+const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = useCurrentServerContext();
+const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
+const { catalogStore, installStore, refreshCatalog, refreshInstalled } = createPluginContext({ socket: serverSocket, requiredPluginsDeclared });
 
 /**
- * Expose `server_id` for gate behavior.
+ * 获取当前页面对应的插件目录条目。
  *
- * @returns server_id (empty when missing).
- */
-function computeServerId(): string {
-  return serverInfoStore.value.info.value?.serverId ?? "";
-}
-
-const serverId = computed(computeServerId);
-
-/**
- * Resolve catalog store for current socket.
- *
- * @returns Plugin catalog store.
- */
-function computeCatalogStore() {
-  return usePluginCatalogStore(serverSocket.value);
-}
-
-const catalogStore = computed(computeCatalogStore);
-
-/**
- * Resolve install store for current socket.
- *
- * @returns Plugin install store.
- */
-function computeInstallStore() {
-  return usePluginInstallStore(serverSocket.value);
-}
-
-const installStore = computed(computeInstallStore);
-
-/**
- * Resolve the catalog entry for this page.
- *
- * @returns Catalog entry, or `null` when not found.
+ * @returns 目录条目；未找到时返回 `null`。
  */
 function computePlugin(): PluginCatalogEntry | null {
   return catalogStore.value.byId.value[pluginId.value] ?? null;
@@ -95,9 +41,9 @@ function computePlugin(): PluginCatalogEntry | null {
 const plugin = computed(computePlugin);
 
 /**
- * Resolve the installed state for this plugin.
+ * 获取当前插件的已安装状态。
  *
- * @returns Installed state, or `null` when not installed.
+ * @returns 已安装状态；未安装时返回 `null`。
  */
 function computeInstalled() {
   return installStore.value.installedById[pluginId.value] ?? null;
@@ -106,9 +52,9 @@ function computeInstalled() {
 const installed = computed(computeInstalled);
 
 /**
- * Whether an update is available (catalog latest differs from installed current).
+ * 判断是否存在可用更新（目录最新版与当前已启用版本不同）。
  *
- * @returns `true` when update is available.
+ * @returns 存在更新则为 `true`。
  */
 function computeHasUpdate(): boolean {
   const latest = plugin.value?.versions?.[0] ?? "";
@@ -119,9 +65,9 @@ function computeHasUpdate(): boolean {
 const hasUpdate = computed(computeHasUpdate);
 
 /**
- * Format provides-domains labels for display.
+ * 格式化插件提供的 domains 标签，供展示使用。
  *
- * @returns Joined labels, or empty string when plugin is missing.
+ * @returns 拼接后的标签文本；插件缺失时返回空字符串。
  */
 function computeDomainLabelsText(): string {
   const p = plugin.value;
@@ -134,23 +80,19 @@ function computeDomainLabelsText(): string {
 const domainLabelsText = computed(computeDomainLabelsText);
 
 /**
- * Ensure catalog + installed state are available for this detail view.
+ * 确保详情页所需数据已就绪（server info + catalog + installed）。
  *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function ensureData(): Promise<void> {
   if (!serverSocket.value) return;
-  await Promise.all([
-    serverInfoStore.value.refresh(),
-    catalogStore.value.refresh(),
-    installStore.value.refreshInstalled(),
-  ]);
+  await Promise.all([refreshServerInfo(), refreshCatalog(), refreshInstalled()]);
 }
 
 /**
- * Component mount hook: prefetch data.
+ * 组件挂载：预拉取数据。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   void ensureData();
@@ -281,8 +223,7 @@ onMounted(handleMounted);
 </template>
 
 <style scoped lang="scss">
-/* PluginDetailPage styles */
-/* Page wrapper */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；主体为两列网格，底部为动作按钮行。 */
 .cp-plugin-detail {
   height: 100%;
   padding: 14px;
@@ -291,7 +232,6 @@ onMounted(handleMounted);
   gap: 12px;
 }
 
-/* Header card (back + title + badges) */
 .cp-plugin-detail__head {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -304,7 +244,6 @@ onMounted(handleMounted);
   align-items: center;
 }
 
-/* Back button */
 .cp-plugin-detail__back {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -316,14 +255,12 @@ onMounted(handleMounted);
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Back hover */
 .cp-plugin-detail__back:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Plugin display name */
 .cp-plugin-detail__name {
   font-family: var(--cp-font-display);
   font-weight: 800;
@@ -332,7 +269,6 @@ onMounted(handleMounted);
   color: var(--cp-text);
 }
 
-/* Meta row (socket / server_id / plugin_id) */
 .cp-plugin-detail__meta {
   margin-top: 8px;
   display: inline-flex;
@@ -340,14 +276,12 @@ onMounted(handleMounted);
   gap: 8px;
 }
 
-/* Mono meta item */
 .cp-plugin-detail__mono {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Dot separator */
 .cp-plugin-detail__dot {
   width: 4px;
   height: 4px;
@@ -355,7 +289,6 @@ onMounted(handleMounted);
   background: rgba(148, 163, 184, 0.5);
 }
 
-/* Status badges container */
 .cp-plugin-detail__badges {
   display: flex;
   gap: 8px;
@@ -363,7 +296,6 @@ onMounted(handleMounted);
   flex-wrap: wrap;
 }
 
-/* Main body panel */
 .cp-plugin-detail__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -378,7 +310,6 @@ onMounted(handleMounted);
   gap: 12px;
 }
 
-/* Info card */
 .cp-plugin-detail__card {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -386,13 +317,11 @@ onMounted(handleMounted);
   padding: 12px;
 }
 
-/* Danger card variant */
 .cp-plugin-detail__card.danger {
   border-color: color-mix(in oklab, var(--cp-danger) 28%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
 }
 
-/* Card label */
 .cp-plugin-detail__k {
   font-family: var(--cp-font-display);
   letter-spacing: 0.1em;
@@ -401,7 +330,6 @@ onMounted(handleMounted);
   color: var(--cp-text-muted);
 }
 
-/* Card value */
 .cp-plugin-detail__v {
   margin-top: 10px;
   font-size: 12px;
@@ -409,7 +337,6 @@ onMounted(handleMounted);
   line-height: 1.45;
 }
 
-/* Card value row */
 .cp-plugin-detail__vRow {
   margin-top: 10px;
   display: flex;
@@ -418,7 +345,6 @@ onMounted(handleMounted);
   align-items: center;
 }
 
-/* Source pill */
 .cp-plugin-detail__pill {
   padding: 6px 10px;
   border-radius: 999px;
@@ -430,7 +356,6 @@ onMounted(handleMounted);
   letter-spacing: 0.06em;
 }
 
-/* Domains row */
 .cp-plugin-detail__ports {
   margin-top: 10px;
   display: flex;
@@ -439,7 +364,6 @@ onMounted(handleMounted);
   flex-wrap: wrap;
 }
 
-/* Domain dot */
 .cp-plugin-detail__port {
   width: 10px;
   height: 10px;
@@ -447,13 +371,11 @@ onMounted(handleMounted);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-border) 70%, transparent);
 }
 
-/* Domains text */
 .cp-plugin-detail__portsText {
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Permissions list */
 .cp-plugin-detail__perms {
   margin-top: 10px;
   display: flex;
@@ -461,7 +383,6 @@ onMounted(handleMounted);
   gap: 8px;
 }
 
-/* Permission row */
 .cp-plugin-detail__perm {
   display: grid;
   grid-template-columns: 96px 1fr auto;
@@ -473,20 +394,17 @@ onMounted(handleMounted);
   background: var(--cp-panel-muted);
 }
 
-/* Permission key */
 .cp-plugin-detail__permKey {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Permission label */
 .cp-plugin-detail__permLabel {
   font-size: 12px;
   color: var(--cp-text);
 }
 
-/* Permission risk */
 .cp-plugin-detail__permRisk {
   font-family: var(--cp-font-display);
   letter-spacing: 0.08em;
@@ -495,19 +413,16 @@ onMounted(handleMounted);
   color: var(--cp-text-muted);
 }
 
-/* Permission risk: high */
 .cp-plugin-detail__perm[data-risk="high"] {
   border-color: color-mix(in oklab, var(--cp-danger) 28%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
 }
 
-/* Permission risk: medium */
 .cp-plugin-detail__perm[data-risk="medium"] {
   border-color: color-mix(in oklab, var(--cp-warn) 28%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel-muted));
 }
 
-/* Installed kv grid */
 .cp-plugin-detail__kv {
   margin-top: 10px;
   display: grid;
@@ -515,7 +430,6 @@ onMounted(handleMounted);
   gap: 10px;
 }
 
-/* KV item */
 .cp-plugin-detail__kvItem {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -523,13 +437,11 @@ onMounted(handleMounted);
   padding: 10px;
 }
 
-/* KV key */
 .cp-plugin-detail__kvK {
   font-size: 11px;
   color: var(--cp-text-muted);
 }
 
-/* KV value */
 .cp-plugin-detail__kvV {
   margin-top: 6px;
   font-family: var(--cp-font-mono);
@@ -537,7 +449,6 @@ onMounted(handleMounted);
   color: var(--cp-text);
 }
 
-/* Actions row */
 .cp-plugin-detail__actions {
   grid-column: 1 / -1;
   display: flex;
@@ -545,7 +456,6 @@ onMounted(handleMounted);
   gap: 10px;
 }
 
-/* Action button */
 .cp-plugin-detail__btn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -557,33 +467,28 @@ onMounted(handleMounted);
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Action hover */
 .cp-plugin-detail__btn:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Action disabled */
 .cp-plugin-detail__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-/* Primary action */
 .cp-plugin-detail__btn.primary {
   border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
 }
 
-/* Primary hover */
 .cp-plugin-detail__btn.primary:hover {
   border-color: rgba(34, 197, 94, 0.42);
   background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
 }
 
-/* Empty state wrapper */
 .cp-plugin-detail__empty {
   flex: 1 1 auto;
   border: 1px solid var(--cp-border);
@@ -595,7 +500,6 @@ onMounted(handleMounted);
   gap: 12px;
 }
 
-/* Empty state text */
 .cp-plugin-detail__emptyText {
   color: var(--cp-text-muted);
 }

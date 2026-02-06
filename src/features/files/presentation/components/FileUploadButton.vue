@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview FileUploadButton.vue
- * @description Button component for selecting and uploading files.
+ * @description files｜组件：FileUploadButton。
  */
 
 import { ref } from "vue";
@@ -24,19 +24,19 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
 
 /**
- * Open native file picker.
+ * 打开系统文件选择器。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleClick(): void {
   fileInput.value?.click();
 }
 
 /**
- * Handle file selection and upload.
+ * 处理文件选择并触发上传。
  *
- * @param e - Change event for file input.
- * @returns Promise<void>.
+ * @param e - 文件 input 的 change 事件。
+ * @returns 无返回值。
  */
 async function handleFileChange(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;

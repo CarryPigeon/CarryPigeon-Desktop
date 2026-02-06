@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ChannelBansPage.vue
- * @description Channel bans management page.
+ * @description chat｜页面：ChannelBansPage。
  */
 
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -37,10 +37,10 @@ const durationOptions = [
 ];
 
 /**
- * Format a ban-until timestamp.
+ * 格式化禁言截止时间。
  *
- * @param ms - Timestamp (ms). `0` means permanent.
- * @returns User-facing string.
+ * @param ms - 时间戳（毫秒）。`0` 表示永久禁言。
+ * @returns 面向用户显示的时间字符串。
  */
 function formatBanUntil(ms: number): string {
   if (!ms || ms === 0) return t("ban_permanent");
@@ -48,9 +48,9 @@ function formatBanUntil(ms: number): string {
 }
 
 /**
- * Load current bans + members for the selected channel.
+ * 加载当前频道的禁言列表与成员列表。
  *
- * @returns Promise<void>.
+ * @returns 无返回值。
  */
 async function loadData(): Promise<void> {
   if (!channelId.value) return;
@@ -76,9 +76,9 @@ const bannableMembers = computed(() => {
 });
 
 /**
- * Add a new ban to the channel.
+ * 新增禁言。
  *
- * @returns Promise<void>.
+ * @returns 无返回值。
  */
 async function handleAddBan(): Promise<void> {
   if (!selectedUid.value) return;
@@ -97,10 +97,10 @@ async function handleAddBan(): Promise<void> {
 }
 
 /**
- * Remove ban by uid.
+ * 解除禁言。
  *
- * @param uid - Target user id.
- * @returns Promise<void>.
+ * @param uid - 目标用户 id。
+ * @returns 无返回值。
  */
 async function handleRemoveBan(uid: string): Promise<void> {
   try {
@@ -112,9 +112,9 @@ async function handleRemoveBan(uid: string): Promise<void> {
 }
 
 /**
- * Handle window-level channel changed events and refresh bans when needed.
+ * 处理窗口级频道变更事件：当目标频道的禁言状态可能变化时刷新。
  *
- * @param e - Window event.
+ * @param e - 窗口事件。
  */
 function handleChannelChanged(e: Event): void {
   const evt = e as CustomEvent<ChannelChangedEventDetail>;
@@ -126,7 +126,7 @@ function handleChannelChanged(e: Event): void {
 }
 
 /**
- * Component mount hook: load data and register event listeners.
+ * 组件挂载：加载数据并注册事件监听。
  */
 function handleMounted(): void {
   void loadData();
@@ -134,7 +134,7 @@ function handleMounted(): void {
 }
 
 /**
- * Component unmount hook: remove event listeners.
+ * 组件卸载：移除事件监听。
  */
 function handleBeforeUnmount(): void {
   window.removeEventListener(CHANNEL_CHANGED_EVENT, handleChannelChanged);

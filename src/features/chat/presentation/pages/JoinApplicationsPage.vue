@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview JoinApplicationsPage.vue
- * @description Channel join applications management page.
+ * @description chat｜页面：JoinApplicationsPage。
  */
 
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -23,10 +23,10 @@ const loading = ref(true);
 const error = ref("");
 
 /**
- * Format apply timestamp.
+ * 格式化申请时间。
  *
- * @param ms - Apply timestamp (ms).
- * @returns Date/time string.
+ * @param ms - 申请时间戳（毫秒）。
+ * @returns 面向用户显示的时间字符串。
  */
 function formatApplyTime(ms: number): string {
   if (!ms) return "—";
@@ -34,9 +34,9 @@ function formatApplyTime(ms: number): string {
 }
 
 /**
- * Load pending applications for the selected channel.
+ * 加载当前频道的入群申请列表（仅管理页使用）。
  *
- * @returns Promise<void>.
+ * @returns 无返回值。
  */
 async function loadApplications(): Promise<void> {
   if (!channelId.value) return;
@@ -52,11 +52,11 @@ async function loadApplications(): Promise<void> {
 }
 
 /**
- * Decide (approve/reject) an application.
+ * 处理申请（同意/拒绝）。
  *
- * @param applicationId - Application id.
- * @param approved - Whether to approve.
- * @returns Promise<void>.
+ * @param applicationId - 申请 id。
+ * @param approved - 是否同意。
+ * @returns 无返回值。
  */
 async function handleDecide(applicationId: string, approved: boolean): Promise<void> {
   try {
@@ -70,9 +70,9 @@ async function handleDecide(applicationId: string, approved: boolean): Promise<v
 const pendingApplications = computed(() => applications.value.filter((a) => a.status === "pending"));
 
 /**
- * Handle window-level channel changed events and refresh applications when needed.
+ * 处理窗口级频道变更事件：当目标频道的申请状态可能变化时刷新。
  *
- * @param e - Window event.
+ * @param e - 窗口事件。
  */
 function handleChannelChanged(e: Event): void {
   const evt = e as CustomEvent<ChannelChangedEventDetail>;
@@ -84,7 +84,7 @@ function handleChannelChanged(e: Event): void {
 }
 
 /**
- * Component mount hook: load data and register event listeners.
+ * 组件挂载：加载数据并注册事件监听。
  */
 function handleMounted(): void {
   void loadApplications();
@@ -92,7 +92,7 @@ function handleMounted(): void {
 }
 
 /**
- * Component unmount hook: remove event listeners.
+ * 组件卸载：移除事件监听。
  */
 function handleBeforeUnmount(): void {
   window.removeEventListener(CHANNEL_CHANGED_EVENT, handleChannelChanged);

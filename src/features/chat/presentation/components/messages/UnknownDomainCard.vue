@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview UnknownDomainCard.vue
- * @description Unpatched Signal downgrade card (unknown domain renderer).
+ * @description chat｜组件：UnknownDomainCard。
  */
 
 import { useI18n } from "vue-i18n";
@@ -56,8 +56,7 @@ const { t } = useI18n();
 </template>
 
 <style scoped lang="scss">
-/* UnknownDomainCard styles */
-/* Selector: `.cp-unpatched` — downgrade card container for unknown domain signals. */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；卡片包含标题/标签区、预览区与安装引导按钮。 */
 .cp-unpatched {
   border: 1px dashed rgba(148, 163, 184, 0.34);
   background: var(--cp-panel-muted);
@@ -66,7 +65,6 @@ const { t } = useI18n();
   box-shadow: var(--cp-shadow-soft);
 }
 
-/* Selector: `.cp-unpatched__top` — header row (title + tags). */
 .cp-unpatched__top {
   display: flex;
   align-items: flex-start;
@@ -74,14 +72,12 @@ const { t } = useI18n();
   gap: 10px;
 }
 
-/* Selector: `.cp-unpatched__title` — title stack wrapper. */
 .cp-unpatched__title {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-/* Selector: `.cp-unpatched__titleEn` — English title (industrial label). */
 .cp-unpatched__titleEn {
   font-family: var(--cp-font-display);
   letter-spacing: 0.10em;
@@ -90,13 +86,11 @@ const { t } = useI18n();
   color: var(--cp-text);
 }
 
-/* Selector: `.cp-unpatched__titleZh` — localized subtitle. */
 .cp-unpatched__titleZh {
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Selector: `.cp-unpatched__tags` — right-aligned metadata tags. */
 .cp-unpatched__tags {
   display: flex;
   gap: 8px;
@@ -104,7 +98,6 @@ const { t } = useI18n();
   justify-content: flex-end;
 }
 
-/* Selector: `.cp-unpatched__body` — content row (preview + decorative cable). */
 .cp-unpatched__body {
   margin-top: 10px;
   display: grid;
@@ -113,7 +106,6 @@ const { t } = useI18n();
   align-items: center;
 }
 
-/* Selector: `.cp-unpatched__preview` — preview text (must wrap long tokens). */
 .cp-unpatched__preview {
   font-size: 12px;
   line-height: 1.45;
@@ -124,14 +116,12 @@ const { t } = useI18n();
   min-width: 0;
 }
 
-/* Selector: `.cp-unpatched__cable` — decorative broken cable glyph container. */
 .cp-unpatched__cable {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Selector: `.cp-unpatched__cableDot` — cable endpoint dot. */
 .cp-unpatched__cableDot {
   width: 10px;
   height: 10px;
@@ -140,7 +130,6 @@ const { t } = useI18n();
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
 }
 
-/* Selector: `.cp-unpatched__cableDash` — dashed cable segment. */
 .cp-unpatched__cableDash {
   width: 56px;
   height: 1px;
@@ -148,14 +137,12 @@ const { t } = useI18n();
   opacity: 0.8;
 }
 
-/* Selector: `.cp-unpatched__actions` — footer row (CTA alignment). */
 .cp-unpatched__actions {
   margin-top: 10px;
   display: flex;
   justify-content: flex-end;
 }
 
-/* Selector: `.cp-unpatched__btn` — CTA button base. */
 .cp-unpatched__btn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -170,20 +157,17 @@ const { t } = useI18n();
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-unpatched__btn:hover` — hover lift + highlight border. */
 .cp-unpatched__btn:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Selector: `.cp-unpatched__btn.primary` — primary CTA styling. */
 .cp-unpatched__btn.primary {
   border-color: var(--cp-highlight-border-strong);
   background: var(--cp-highlight-bg);
 }
 
-/* Selector: `.cp-unpatched__btn.primary:hover` — stronger hover for CTA. */
 .cp-unpatched__btn.primary:hover {
   border-color: var(--cp-highlight-border-strong);
   background: var(--cp-highlight-bg-strong);

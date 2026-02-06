@@ -1,6 +1,6 @@
 /**
  * @fileoverview settings.di.ts
- * @description Composition root for settings feature.
+ * @description settings｜依赖组装（DI）：settings.di。
  */
 
 import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
@@ -17,37 +17,38 @@ let configPort: ConfigPort | null = null;
 // ============================================================================
 
 /**
- * Get singleton ConfigPort.
+ * 获取单例 `ConfigPort`。
  *
- * Note: Even in mock mode, we typically use localStorage for theme to avoid
- * visual flash. Override with mock if needed for testing.
+ * 说明：
+ * - 主题（theme）强依赖持久化：即便在 mock 模式也倾向使用 localStorage，避免启动时出现“闪屏”（theme flash）。
+ * - 如需在测试中替换为 mock，可在此处按需调整选择规则。
  *
- * @returns ConfigPort.
+ * @returns `ConfigPort` 实例。
  */
 export function getConfigPort(): ConfigPort {
   if (configPort) return configPort;
-  // Keep theme persistence stable in protocol mode as well (localStorage).
+  // 协议层 mock 也保持主题持久化稳定（localStorage）。
   configPort = USE_MOCK_TRANSPORT ? localStorageConfigPort : USE_MOCK_API ? mockConfigPort : localStorageConfigPort;
   return configPort;
 }
 
 // ============================================================================
-// Usecases
+// 用例
 // ============================================================================
 
 /**
- * Get GetConfig usecase.
+ * 获取 `GetConfig` 用例实例。
  *
- * @returns GetConfig usecase instance.
+ * @returns `GetConfig` 实例。
  */
 export function getGetConfigUsecase(): GetConfig {
   return new GetConfig(getConfigPort());
 }
 
 /**
- * Get SetTheme usecase.
+ * 获取 `SetTheme` 用例实例。
  *
- * @returns SetTheme usecase instance.
+ * @returns `SetTheme` 实例。
  */
 export function getSetThemeUsecase(): SetTheme {
   return new SetTheme(getConfigPort());

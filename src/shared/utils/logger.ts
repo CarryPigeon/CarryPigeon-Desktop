@@ -48,6 +48,9 @@ function prefix(level: string, scope?: string): string {
   return `[${nowIso()}] [${level}]${scope ? ` [${scope}]` : ""}`;
 }
 
+/**
+ * 前端 logger 接口（带 `debug/info/warn/error` 四级）。
+ */
 export type Logger = {
   debug(message: string, meta?: LogMeta): void;
   info(message: string, meta?: LogMeta): void;

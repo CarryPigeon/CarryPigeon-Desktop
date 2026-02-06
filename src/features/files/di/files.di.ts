@@ -1,6 +1,6 @@
 /**
  * @fileoverview files.di.ts
- * @description Composition root for files feature.
+ * @description files｜依赖组装（DI）：files.di。
  */
 
 import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
@@ -18,9 +18,14 @@ let fileServicePort: FileServicePort | null = null;
 // ============================================================================
 
 /**
- * Get singleton FileServicePort.
+ * 获取 `FileServicePort`（单例）。
  *
- * @returns FileServicePort.
+ * 选择规则：
+ * - `USE_MOCK_TRANSPORT=true`：使用真实 HTTP 适配器（便于协议层联调）。
+ * - `USE_MOCK_API=true`：使用内存 mock（用于 UI 预览/开发联调）。
+ * - 其它情况：使用真实 HTTP 适配器。
+ *
+ * @returns `FileServicePort` 实例。
  */
 export function getFileServicePort(): FileServicePort {
   if (fileServicePort) return fileServicePort;
@@ -29,31 +34,31 @@ export function getFileServicePort(): FileServicePort {
 }
 
 // ============================================================================
-// Usecases
+// 用例
 // ============================================================================
 
 /**
- * Get RequestFileUpload usecase.
+ * 获取 `RequestFileUpload` 用例实例。
  *
- * @returns RequestFileUpload usecase instance.
+ * @returns `RequestFileUpload` 实例。
  */
 export function getRequestFileUploadUsecase(): RequestFileUpload {
   return new RequestFileUpload(getFileServicePort());
 }
 
 /**
- * Get PerformFileUpload usecase.
+ * 获取 `PerformFileUpload` 用例实例。
  *
- * @returns PerformFileUpload usecase instance.
+ * @returns `PerformFileUpload` 实例。
  */
 export function getPerformFileUploadUsecase(): PerformFileUpload {
   return new PerformFileUpload(getFileServicePort());
 }
 
 /**
- * Get GetDownloadUrl usecase.
+ * 获取 `GetDownloadUrl` 用例实例。
  *
- * @returns GetDownloadUrl usecase instance.
+ * @returns `GetDownloadUrl` 实例。
  */
 export function getGetDownloadUrlUsecase(): GetDownloadUrl {
   return new GetDownloadUrl(getFileServicePort());

@@ -1,82 +1,40 @@
 <script setup lang="ts">
 /**
  * @fileoverview DomainCatalogPage.vue
- * @description Domain Catalog viewer (/domains) — contract discovery for plugin developers and better diagnostics.
+ * @description plugins｜页面：DomainCatalogPage。
  *
- * PRD mapping:
+ * PRD 映射：
  * - PRD 6.4 Domain Catalog：展示 domains/versions/providers/contract 指针。
  *
- * API mapping:
+ * API 映射：
  * - `GET /api/domains/catalog` (`docs/api/11-HTTP端点清单（v1，标准版）.md`)
  */
 
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import { useDomainCatalogStore } from "@/features/plugins/presentation/store/domainCatalogStore";
+import { createDomainCatalogContext } from "@/features/plugins/api";
+import { useCurrentServerContext } from "@/features/servers/api";
 
 const router = useRouter();
 const q = ref("");
 
-/**
- * Compute the current server socket key.
- *
- * @returns Trimmed socket string.
- */
-function computeSocket(): string {
-  return currentServerSocket.value.trim();
-}
-
-const socket = computed(computeSocket);
+const { socket, serverId, refreshServerInfo } = useCurrentServerContext();
+const { domainCatalogStore, refreshDomainCatalog } = createDomainCatalogContext(socket);
 
 /**
- * Resolve the server-info store scoped to the current socket.
+ * 刷新 server info 与 domain catalog（best-effort）。
  *
- * @returns Server-info store.
- */
-function computeServerInfoStore() {
-  return useServerInfoStore(socket.value);
-}
-
-const serverInfoStore = computed(computeServerInfoStore);
-
-/**
- * Expose server_id for diagnostics (plugins are disabled when missing).
- *
- * @returns server_id (empty when missing).
- */
-function computeServerId(): string {
-  return serverInfoStore.value.info.value?.serverId ?? "";
-}
-
-const serverId = computed(computeServerId);
-
-/**
- * Resolve the domain catalog store scoped to the current socket.
- *
- * @returns Domain catalog store.
- */
-function computeDomainCatalogStore() {
-  return useDomainCatalogStore(socket.value);
-}
-
-const domainCatalogStore = computed(computeDomainCatalogStore);
-
-/**
- * Refresh both server info and domain catalog (best-effort).
- *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function refresh(): Promise<void> {
-  await Promise.all([serverInfoStore.value.refresh(), domainCatalogStore.value.refresh()]);
+  await Promise.all([refreshServerInfo(), refreshDomainCatalog()]);
 }
 
 /**
- * Compute filtered domain items by search query.
+ * 根据搜索关键字计算过滤后的 domain 列表。
  *
- * @returns Filtered list.
+ * @returns 过滤后的列表。
  */
 function computeFiltered() {
   const needle = q.value.trim().toLowerCase();
@@ -90,16 +48,16 @@ const filtered = computed(computeFiltered);
 let queryTimer: number | null = null;
 
 /**
- * Watch-source: search query.
+ * watch 源：搜索关键字。
  *
- * @returns Query string.
+ * @returns 当前 query 字符串。
  */
 function watchQuery(): string {
   return q.value;
 }
 
 /**
- * Debounce query changes to keep typing smooth.
+ * 对输入变化做 debounce，保持输入体验流畅。
  */
 function handleQueryChange(): void {
   if (queryTimer) window.clearTimeout(queryTimer);

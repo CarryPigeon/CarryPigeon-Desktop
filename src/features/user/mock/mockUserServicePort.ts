@@ -1,6 +1,6 @@
 /**
  * @fileoverview mockUserServicePort.ts
- * @description Mock UserServicePort implementation for UI preview.
+ * @description user｜Mock 实现：mockUserServicePort（用于本地预览/测试）。
  */
 
 import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
@@ -9,10 +9,10 @@ import type { UserServicePort } from "../domain/ports/UserServicePort";
 import type { UserMe, UserPublic } from "../domain/types/UserTypes";
 
 /**
- * Create a mock UserServicePort.
+ * 创建 `UserServicePort` 的 mock 实现。
  *
- * @param serverSocket - Server socket (unused by mock).
- * @returns UserServicePort implementation.
+ * @param serverSocket - 服务器 Socket 地址（mock 中不使用，仅保留签名一致性）。
+ * @returns `UserServicePort` 实现。
  */
 export function createMockUserServicePort(serverSocket: string): UserServicePort {
   void serverSocket;
