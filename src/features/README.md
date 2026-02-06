@@ -2,6 +2,17 @@
 
 本项目采用“按 Feature 划分 +（必要时）Subfeature 细分”的结构组织代码，并且**不保留旧路径的向前兼容**：所有 import 必须指向当前真实路径。
 
+## 模块级文档（强约定）
+
+- 每个 feature 目录必须提供 `README.md`，用于说明该模块的：
+  - 定位（为什么存在）
+  - 职责边界（做什么/不做什么）
+  - 关键概念与核心入口（关键文件导航）
+  - 关键流程（数据流/调用链概览）
+  - 与其他模块的协作方式
+- 若未来出现 `subfeatures/<name>/`，则 **每个子包也必须提供 `subfeatures/<name>/README.md`**，其内容标准与 feature README 一致。
+- 除 `README.md` 外，不要求在 `di/data/domain/...` 目录额外增加“文档占位文件”（避免无意义的 `index.ts` 只为写说明）。
+
 ## 总体约定
 
 每个 Feature 目录下可以包含以下目录（按需出现）：
@@ -18,12 +29,26 @@
 
 - `presentation` → `di` → `domain` → `data/mock`
 - `presentation` 之间尽量不要互相引用；需要共享时，优先抽到 Feature 根目录的 `domain/*`、`data/*`，或 `src/shared/*`
+- **跨 Feature 只能通过 `src/features/<feature>/api.ts` 访问**（公共边界）；
+  禁止直接 import 其它 Feature 的 `presentation/*`、`data/*`、`di/*`、`domain/*` 内部路径。
 
 ### Subfeature 规则（避免“为了划分而划分”）
 
 - 只有当某 Feature 内部存在多个明显子域/流程/子能力（且它们各自有相对独立的 presentation）时，才创建 `subfeatures/<name>/`
 - 如果只是“一个 Feature + 若干页面/组件”，优先直接放在 Feature 根目录的 `presentation/` 中
 - 当前仓库已完成一次清理：现阶段 `src/features/*` 不使用 `subfeatures/`，后续如出现明确层级再引入
+
+## 快速入口（从 README 开始读）
+
+- `auth`：`src/features/auth/README.md`
+- `chat`：`src/features/chat/README.md`
+- `files`：`src/features/files/README.md`
+- `network`：`src/features/network/README.md`
+- `platform`：`src/features/platform/README.md`
+- `plugins`：`src/features/plugins/README.md`
+- `servers`：`src/features/servers/README.md`
+- `settings`：`src/features/settings/README.md`
+- `user`：`src/features/user/README.md`
 
 ## Mock 模式（store / protocol）
 
@@ -87,9 +112,13 @@
 
 ## 常用 import 示例
 
-- 使用某 Feature 的核心 DI：
-  - `import { getPluginManagerPort } from "@/features/plugins/di/plugins.di";`
+- 跨 Feature 访问 plugins 能力：
+  - `import { getPluginManagerPort } from "@/features/plugins/api";`
+- 跨 Feature 访问 network 连接状态：
+  - `import { connectWithRetry } from "@/features/network/api";`
+- 跨 Feature 访问 servers 上下文：
+  - `import { useCurrentServerContext } from "@/features/servers/api";`
 - 使用 chat store 门面：
   - `import { ensureChatReady } from "@/features/chat/presentation/store/chatStore";`
 - 使用当前用户 store：
-  - `import { currentUser } from "@/features/user/presentation/store/userData";`
+  - `import { currentUser } from "@/features/user/api";`

@@ -12,9 +12,23 @@ import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import SHA256 from "crypto-js/sha256";
 import type { DbExecResult, DbQueryResult, DbStatement, DbValue } from "./types";
 import { getServerScopeKey } from "@/shared/serverIdentity";
+import { NO_SERVER_KEY } from "@/shared/serverKey";
 
+/**
+ * 数据库初始化类型。
+ *
+ * - `system`：系统库（全局配置、服务器列表等）。
+ * - `server`：按 server scope 隔离的业务库（频道/消息等）。
+ */
 export type DbInitKind = "system" | "server";
 
+/**
+ * 前端数据库客户端接口（Tauri DB）。
+ *
+ * 说明：
+ * - 所有操作最终都会通过 `invokeTauri` 转交给 Rust 的 DB commands 执行；
+ * - 该接口刻意保持“小而清晰”，便于在不同模块复用。
+ */
 export interface DbClient {
   /**
    * 初始化/打开 DB 实例。
@@ -123,11 +137,11 @@ export const tauriDbClient = createDbClient(SYSTEM_DB_KEY);
  *
  * 说明：对 socket 做哈希，保证 key 对文件系统友好，并避免在文件名/日志中泄露服务器地址。
  *
- * @param serverSocket - server socket。
+ * @param serverSocket - 服务器 Socket 地址。
  * @returns 命名空间化的 DB key。
  */
 export function serverDbKey(serverSocket: string): string {
-  const normalized = getServerScopeKey(serverSocket) || serverSocket.trim() || "__no_server__";
+  const normalized = getServerScopeKey(serverSocket) || serverSocket.trim() || NO_SERVER_KEY;
   const hash = SHA256(normalized).toString();
   return `server_${hash}`;
 }
@@ -135,7 +149,7 @@ export function serverDbKey(serverSocket: string): string {
 /**
  * 获取缓存的 per-server DB client（不会自动 init）。
  *
- * @param serverSocket - server socket。
+ * @param serverSocket - 服务器 Socket 地址。
  * @returns 缓存的 DbClient。
  */
 export function getServerDbClient(serverSocket: string): DbClient {
@@ -161,7 +175,7 @@ export async function ensureSystemDb(): Promise<DbClient> {
 /**
  * 确保 per-server DB 已初始化并可用。
  *
- * @param serverSocket - server socket。
+ * @param serverSocket - 服务器 Socket 地址。
  * @returns 已初始化的 server DbClient。
  */
 export async function ensureServerDb(serverSocket: string): Promise<DbClient> {
@@ -173,8 +187,8 @@ export async function ensureServerDb(serverSocket: string): Promise<DbClient> {
 /**
  * 关闭 per-server DB，并从缓存中移除。
  *
- * @param serverSocket - server socket。
- * @returns Promise<void>
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns 无返回值。
  */
 export async function closeServerDb(serverSocket: string): Promise<void> {
   const key = serverDbKey(serverSocket);
@@ -186,8 +200,8 @@ export async function closeServerDb(serverSocket: string): Promise<void> {
 /**
  * 删除 per-server DB（破坏性操作），并从缓存中移除。
  *
- * @param serverSocket - server socket。
- * @returns Promise<void>
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns 无返回值。
  */
 export async function removeServerDb(serverSocket: string): Promise<void> {
   const key = serverDbKey(serverSocket);

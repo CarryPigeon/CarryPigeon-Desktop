@@ -1,15 +1,14 @@
 <script setup lang="ts">
 /**
  * @fileoverview ServerManagerPage.vue
- * @description Server rack manager (/servers) — add/edit/delete/pin racks and configure per-server preview options.
+ * @description servers｜页面：ServerManagerPage。
  *
- * PRD mapping:
+ * PRD 对照：
  * - P0-S1 服务器管理：新增/编辑/删除服务器条目（socket、备注名、TLS 信任策略、通知模式）。
  *
- * Clean Architecture note:
- * This page is presentation-only and edits the presentation store
- * `src/features/servers/presentation/store/serverList.ts`.
- * Real persistence (DB) can be wired behind a port later; the UI contract stays stable.
+ * 分层说明（Clean Architecture）：
+ * - 本页面仅负责展示层交互，直接编辑展示层 store：`src/features/servers/presentation/store/serverList.ts`。
+ * - 若后续需要接入真实持久化（DB），可通过端口抽象完成替换，UI 契约保持稳定。
  */
 
 import { computed, reactive, ref, watch } from "vue";
@@ -25,7 +24,7 @@ import {
   updateServerRack,
   type ServerRack,
 } from "../store/serverList";
-import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store/currentServer";
+import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store";
 
 type DraftRack = {
   id: string;
@@ -58,15 +57,15 @@ const draft = reactive<DraftRack>({
 });
 
 /**
- * Normalize a TLS certificate fingerprint string into a compact hex form.
+ * 归一化 TLS 证书指纹字符串为紧凑的 hex 格式。
  *
- * Accepts common formats:
+ * 支持常见输入格式：
  * - `AA:BB:...`
  * - `aa bb ...`
  * - `aabb...`
  *
- * @param raw - Raw fingerprint input.
- * @returns Normalized lowercase hex without separators (may be empty).
+ * @param raw - 原始指纹输入。
+ * @returns 小写 hex 串（去除分隔符；可能为空）。
  */
 function normalizeFingerprint(raw: string): string {
   const s = String(raw ?? "").trim().toLowerCase();
@@ -76,9 +75,9 @@ function normalizeFingerprint(raw: string): string {
 }
 
 /**
- * Compute the active server socket currently selected for preview.
+ * 计算当前用于预览/连接的 active server socket。
  *
- * @returns Trimmed socket string.
+ * @returns trim 后的 socket 字符串。
  */
 function computeActiveSocket(): string {
   return currentServerSocket.value.trim();
@@ -87,9 +86,9 @@ function computeActiveSocket(): string {
 const activeSocket = computed(computeActiveSocket);
 
 /**
- * Start editing a rack by copying its fields into the local draft buffer.
+ * 开始编辑某个 rack：将字段拷贝到本地 draft 缓冲区。
  *
- * @param rack - Rack to edit.
+ * @param rack - 需要编辑的 rack。
  */
 function beginEdit(rack: ServerRack): void {
   editingId.value = rack.id;
@@ -103,7 +102,7 @@ function beginEdit(rack: ServerRack): void {
 }
 
 /**
- * Exit edit mode and clear the draft buffer.
+ * 退出编辑态并清空 draft 缓冲区。
  */
 function cancelEdit(): void {
   editingId.value = "";
@@ -117,9 +116,9 @@ function cancelEdit(): void {
 }
 
 /**
- * Apply the current draft edits to the underlying rack store.
+ * 将当前 draft 的修改应用到 rack store。
  *
- * @returns `true` when saved successfully.
+ * @returns 保存成功则为 `true`。
  */
 function saveEdit(): boolean {
   if (!editingId.value) return false;
@@ -132,7 +131,7 @@ function saveEdit(): boolean {
     notifyMode: draft.notifyMode,
   });
   if (!ok) {
-    logger.warn("Update rack rejected", {
+    logger.warn("Action: update_rack_rejected", {
       id: editingId.value,
       serverSocket: draft.serverSocket,
     });
@@ -143,21 +142,21 @@ function saveEdit(): boolean {
 }
 
 /**
- * Add a new rack from the create form and focus it as the active server.
+ * 从“新增表单”添加 rack，并将其作为当前 active server（用于预览/连接）。
  */
 function handleCreate(): void {
   const socket = creating.serverSocket.trim();
   if (!socket) return;
   addServer(socket, creating.name.trim());
-  logger.info("Server added", { socket });
+  logger.info("Action: server_added", { socket });
   creating.name = "";
   creating.serverSocket = "";
 }
 
 /**
- * Remove a rack and keep the UI stable (exit edit mode if deleting the edited row).
+ * 删除 rack，并保持 UI 稳定（若删除的是当前编辑行，则先退出编辑态）。
  *
- * @param id - Rack id.
+ * @param id - rack id。
  */
 function handleRemove(id: string): void {
   if (editingId.value === id) cancelEdit();
@@ -170,31 +169,31 @@ function handleRemove(id: string): void {
     }
   }
   removeServerById(id);
-  logger.info("Server removed", { id, socket: rack?.serverSocket ?? "" });
+  logger.info("Action: server_removed", { id, socket: rack?.serverSocket ?? "" });
 }
 
 /**
- * Select a rack as the current active server for preview.
+ * 选择某个 rack 作为当前 active server（用于预览/连接）。
  *
- * @param socket - Target server socket.
+ * @param socket - 目标服务器 Socket 地址。
  */
 function selectRack(socket: string): void {
   setServerSocket(socket);
 }
 
 /**
- * Watch-source: active socket.
+ * watch 源：active socket。
  *
- * @returns Current active socket.
+ * @returns 当前 active socket。
  */
 function watchActiveSocket(): string {
   return activeSocket.value;
 }
 
 /**
- * When changing racks, avoid leaving stale edit buffers around.
+ * 当 active rack 变化时，避免遗留过期的编辑缓冲区。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleActiveSocketChange(): void {
   if (editingId.value) cancelEdit();

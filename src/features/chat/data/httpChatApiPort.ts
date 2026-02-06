@@ -1,11 +1,14 @@
 /**
  * @fileoverview httpChatApiPort.ts
- * @description Data adapter: implements `ChatApiPort` using the HTTP JSON client.
+ * @description chat｜数据层实现：httpChatApiPort。
  */
 
 import type { ChatApiPort } from "../domain/ports/chatApiPort";
 import type {
   ChannelDto,
+  ChannelApplicationDto,
+  ChannelBanDto,
+  ChannelMemberDto,
   ListMessagesResponseDto,
   MessageDto,
   ReadStateRequestDto,
@@ -13,12 +16,23 @@ import type {
   UnreadItemDto,
 } from "../domain/types/chatWireDtos";
 import {
+  httpAddChannelAdmin,
   httpApplyJoinChannel,
+  httpCreateChannel,
   httpDeleteMessage,
+  httpDeleteChannel,
+  httpDeleteChannelBan,
   httpGetUnreads,
+  httpKickChannelMember,
+  httpListChannelApplications,
+  httpListChannelBans,
   httpListChannelMessages,
+  httpListChannelMembers,
   httpListChannels,
   httpPatchChannel,
+  httpPutChannelBan,
+  httpRemoveChannelAdmin,
+  httpDecideChannelApplication,
   httpSendChannelMessage,
   httpUpdateReadState,
 } from "./httpChatApi";
@@ -74,5 +88,66 @@ export const httpChatApiPort: ChatApiPort = {
     patch: Partial<Pick<ChannelDto, "name" | "brief" | "avatar">>,
   ): Promise<ChannelDto> {
     return (await httpPatchChannel(serverSocket, accessToken, cid, patch)) as unknown as ChannelDto;
+  },
+
+  async listChannelMembers(serverSocket: string, accessToken: string, cid: string): Promise<ChannelMemberDto[]> {
+    return (await httpListChannelMembers(serverSocket, accessToken, cid)) as unknown as ChannelMemberDto[];
+  },
+
+  async kickChannelMember(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
+    return httpKickChannelMember(serverSocket, accessToken, cid, uid);
+  },
+
+  async addChannelAdmin(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
+    return httpAddChannelAdmin(serverSocket, accessToken, cid, uid);
+  },
+
+  async removeChannelAdmin(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
+    return httpRemoveChannelAdmin(serverSocket, accessToken, cid, uid);
+  },
+
+  async listChannelApplications(serverSocket: string, accessToken: string, cid: string): Promise<ChannelApplicationDto[]> {
+    return (await httpListChannelApplications(serverSocket, accessToken, cid)) as unknown as ChannelApplicationDto[];
+  },
+
+  async decideChannelApplication(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    applicationId: string,
+    decision: "approve" | "reject",
+  ): Promise<void> {
+    return httpDecideChannelApplication(serverSocket, accessToken, cid, applicationId, decision);
+  },
+
+  async listChannelBans(serverSocket: string, accessToken: string, cid: string): Promise<ChannelBanDto[]> {
+    return (await httpListChannelBans(serverSocket, accessToken, cid)) as unknown as ChannelBanDto[];
+  },
+
+  async putChannelBan(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    uid: string,
+    until: number,
+    reason: string,
+  ): Promise<void> {
+    return httpPutChannelBan(serverSocket, accessToken, cid, uid, until, reason);
+  },
+
+  async deleteChannelBan(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
+    return httpDeleteChannelBan(serverSocket, accessToken, cid, uid);
+  },
+
+  async createChannel(
+    serverSocket: string,
+    accessToken: string,
+    req: Pick<ChannelDto, "name"> & Partial<Pick<ChannelDto, "brief" | "avatar">>,
+  ): Promise<ChannelDto> {
+    return (await httpCreateChannel(serverSocket, accessToken, req)) as unknown as ChannelDto;
+  },
+
+  async deleteChannel(serverSocket: string, accessToken: string, cid: string): Promise<void> {
+    return httpDeleteChannel(serverSocket, accessToken, cid);
   },
 };

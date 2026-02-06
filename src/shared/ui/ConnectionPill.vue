@@ -26,7 +26,7 @@ const emit = defineEmits<{
 /**
  * 触发可选动作按钮的 `action` 事件。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleAction(): void {
   emit("action");
@@ -148,6 +148,11 @@ function handleAction(): void {
     background: var(--cp-hover-bg);
     border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
   }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+    outline-offset: 2px;
+  }
 }
 
 /* 动画：`cp-led-blink`｜用途：离线 LED 闪烁循环 */
@@ -172,6 +177,16 @@ function handleAction(): void {
   55% {
     transform: scale(0.92);
     opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-led {
+    animation: none !important;
+  }
+
+  .cp-connection-action {
+    transition: none !important;
   }
 }
 </style>

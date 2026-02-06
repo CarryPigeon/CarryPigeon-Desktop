@@ -1,83 +1,30 @@
 <script setup lang="ts">
 /**
  * @fileoverview RequiredSetupPage.vue
- * @description Required plugin setup wizard (/required-setup).
+ * @description auth｜页面：RequiredSetupPage。
  */
 
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { currentServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
 import { missingRequiredPlugins, setMissingRequiredPlugins } from "../store/requiredGate";
-import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
-import { usePluginInstallStore } from "@/features/plugins/presentation/store/pluginInstallStore";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import { checkRequiredGate } from "@/features/auth/data/requiredGateService";
+import { getCheckRequiredGateUsecase } from "@/features/auth/di/auth.di";
+import { useCurrentServerContext } from "@/features/servers/api";
+import { createPluginContext } from "@/features/plugins/api";
 
 const router = useRouter();
 const { t } = useI18n();
 
-/**
- * Compute the current server socket key.
- *
- * @returns Trimmed socket string.
- */
-function computeServerSocket(): string {
-  return currentServerSocket.value.trim();
-}
-
-const serverSocket = computed(computeServerSocket);
+const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = useCurrentServerContext();
+const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
+const { catalogStore, installStore, refreshCatalog, refreshInstalled } = createPluginContext({ socket: serverSocket, requiredPluginsDeclared });
 
 /**
- * Resolve server-info store scoped to current socket.
+ * 计算 required 插件的目录条目列表。
  *
- * @returns Server-info store instance.
- */
-function computeServerInfoStore() {
-  return useServerInfoStore(serverSocket.value);
-}
-
-const serverInfoStore = computed(computeServerInfoStore);
-
-/**
- * Expose current `server_id` for gate copy.
- *
- * @returns server_id (empty when missing).
- */
-function computeServerId(): string {
-  return serverInfoStore.value.info.value?.serverId ?? "";
-}
-
-const serverId = computed(computeServerId);
-
-/**
- * Resolve plugin catalog store scoped to current socket.
- *
- * @returns Catalog store instance.
- */
-function computeCatalogStore() {
-  return usePluginCatalogStore(serverSocket.value);
-}
-
-const catalogStore = computed(computeCatalogStore);
-
-/**
- * Resolve plugin install store scoped to current socket.
- *
- * @returns Install store instance.
- */
-function computeInstallStore() {
-  return usePluginInstallStore(serverSocket.value);
-}
-
-const installStore = computed(computeInstallStore);
-
-/**
- * Compute the required plugin catalog entries.
- *
- * @returns Required catalog entries.
+ * @returns required 插件目录条目列表。
  */
 function computeRequiredEntries() {
   const out = [];
@@ -90,9 +37,9 @@ function computeRequiredEntries() {
 const requiredEntries = computed(computeRequiredEntries);
 
 /**
- * Compute required plugin ids (used by `recheckRequired()`).
+ * 计算 required 插件 id 列表（用于 `recheckRequired()`）。
  *
- * @returns Required plugin ids.
+ * @returns required 插件 id 列表。
  */
 function computeRequiredIds(): string[] {
   const out: string[] = [];
@@ -103,9 +50,9 @@ function computeRequiredIds(): string[] {
 const requiredIds = computed(computeRequiredIds);
 
 /**
- * Expose missing required plugin ids passed from login errors.
+ * 读取登录失败时携带的“缺失 required 插件”提示列表。
  *
- * @returns Missing ids hint list.
+ * @returns 缺失插件 id 列表。
  */
 function computeMissingIdsHint(): string[] {
   return missingRequiredPlugins.value;
@@ -114,13 +61,13 @@ function computeMissingIdsHint(): string[] {
 const missingIdsHint = computed(computeMissingIdsHint);
 
 /**
- * Compute whether the required gate is satisfied.
+ * 计算“必装插件闸门”是否已满足。
  *
- * Rules:
- * - All required ids must be installed, enabled, and status ok.
- * - The server must define at least one required plugin (avoids showing “closed” on empty lists).
+ * 规则：
+ * - 所有 required id 必须已安装、已启用且状态为 ok。
+ * - 服务端必须声明至少一个 required 插件（避免在 required 列表为空时误判为“已满足”）。
  *
- * @returns `true` when latch is closed.
+ * @returns 当闸门“已关闭”（即要求已满足）时返回 `true`。
  */
 function computeLatchClosed(): boolean {
   if (requiredIds.value.length <= 0) return false;
@@ -133,50 +80,50 @@ function computeLatchClosed(): boolean {
 }
 
 const latchClosed = computed(computeLatchClosed);
+const justClosedLatch = ref(false);
 
 const autoReleased = ref(false);
 
 /**
- * Ensure plugin catalog + installed state are loaded for the current server.
+ * 确保当前服务器的“插件目录 + 已安装状态”已加载完成。
  *
- * The required gate depends on both:
- * - Catalog: which plugins are required
- * - Installed: which required plugins are enabled and healthy
+ * required gate 同时依赖：
+ * - catalog：有哪些插件被标记为 required
+ * - installed：这些 required 插件是否已启用且健康
  *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function ensureData(): Promise<void> {
   if (!serverSocket.value) return;
   await Promise.all([
-    serverInfoStore.value.refresh(),
-    catalogStore.value.refresh(),
-    installStore.value.refreshInstalled(),
+    refreshServerInfo(),
+    refreshCatalog(),
+    refreshInstalled(),
   ]);
   installStore.value.recheckRequired(requiredIds.value);
 
-  // Server-side gate precheck: keep the missing list up-to-date even when the
-  // user lands here without a fresh login error (see required gate precheck endpoint).
+  // 服务端 gate 预检：即便用户不是从“最新登录失败”跳转到此页，也尽力保持缺失列表最新（参考 required gate precheck 端点）。
   try {
-    const missing = await checkRequiredGate(serverSocket.value);
+    const missing = await getCheckRequiredGateUsecase().execute(serverSocket.value);
     setMissingRequiredPlugins(missing);
   } catch {
-    // Best-effort: local install state is still shown; server may be offline.
+    // best-effort：仍展示本地安装状态；服务端可能离线。
   }
 }
 
 /**
- * Open Plugin Center with `required` filter.
+ * 打开插件中心，并启用 `required` 过滤器。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function openPluginCenterRequired(): void {
   void router.push({ path: "/plugins", query: { filter: "required" } });
 }
 
 /**
- * Clear current required gate state and return to login to pick another server.
+ * 清理 required gate 状态并返回登录页，以便切换服务器。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function switchServer(): void {
   setMissingRequiredPlugins([]);
@@ -184,31 +131,35 @@ function switchServer(): void {
 }
 
 /**
- * Watch-source: latch state.
+ * watch 源：闸门闭合状态。
  *
- * @returns Whether latch is closed.
+ * @returns 闸门已闭合时返回 `true`。
  */
 function watchLatchClosed(): boolean {
   return latchClosed.value;
 }
 
 /**
- * Auto-release flow: when latch becomes closed the first time, clear gate state and return to login.
+ * 自动释放流程：当闸门首次闭合时，清理 gate 状态并返回登录页。
  *
- * @param ok - Latch closed state.
- * @returns void
+ * @param ok - 闸门闭合状态。
+ * @returns 无返回值。
  */
 function handleLatchClosedChange(ok: boolean): void {
   if (!ok || autoReleased.value) return;
+  justClosedLatch.value = true;
+  window.setTimeout(() => {
+    justClosedLatch.value = false;
+  }, 640);
   autoReleased.value = true;
   setMissingRequiredPlugins([]);
   window.setTimeout(handleAutoReleaseTimeout, 650);
 }
 
 /**
- * Timeout callback: navigate back to login after auto-release.
+ * 定时回调：在自动释放后返回登录页。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleAutoReleaseTimeout(): void {
   void router.replace("/");
@@ -217,9 +168,9 @@ function handleAutoReleaseTimeout(): void {
 watch(watchLatchClosed, handleLatchClosedChange);
 
 /**
- * Component mount hook: prefetch catalog/installed state.
+ * 组件挂载：预拉取 catalog/installed 状态（best-effort）。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleMounted(): void {
   void ensureData();
@@ -232,7 +183,7 @@ onMounted(handleMounted);
   <!-- 页面：RequiredSetupPage｜职责：必需插件门禁向导（Power Latch） -->
   <!-- 区块：<main> .cp-required -->
   <main class="cp-required">
-    <header class="cp-required__banner" :data-ok="latchClosed">
+    <header class="cp-required__banner" :data-ok="latchClosed" :data-just-closed="justClosedLatch">
       <div class="cp-required__title">
         <span class="cp-required__mono">{{ latchClosed ? "POWER LATCH CLOSED" : "POWER LATCH OPEN" }}</span>
         <div class="cp-required__titleZh">{{ latchClosed ? t("power_latch_closed") : t("power_latch_open") }}</div>
@@ -377,12 +328,22 @@ onMounted(handleMounted);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    transform 220ms var(--cp-ease);
+  animation: cp-latch-alert 380ms ease-out 1;
 }
 
 /* Banner variant when latch is closed */
 .cp-required__banner[data-ok="true"] {
   border-color: color-mix(in oklab, var(--cp-accent) 26%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 10%, var(--cp-panel));
+  animation: none;
+}
+
+.cp-required__banner[data-just-closed="true"] {
+  animation: cp-latch-close 520ms cubic-bezier(0.22, 1, 0.36, 1) 1;
 }
 
 /* Banner mono title */
@@ -674,5 +635,44 @@ onMounted(handleMounted);
 .cp-required__footerBtn.primary:hover {
   border-color: color-mix(in oklab, var(--cp-accent) 42%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+}
+
+@keyframes cp-latch-alert {
+  0% {
+    transform: translateX(-3px);
+  }
+  35% {
+    transform: translateX(2px);
+  }
+  70% {
+    transform: translateX(-1px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes cp-latch-close {
+  0% {
+    transform: scale(0.992);
+    box-shadow: var(--cp-shadow-soft);
+  }
+  45% {
+    transform: scale(1.008);
+    box-shadow: 0 16px 40px color-mix(in oklab, var(--cp-accent) 20%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: var(--cp-shadow-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-required__banner,
+  .cp-required__btn,
+  .cp-required__footerBtn {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 </style>

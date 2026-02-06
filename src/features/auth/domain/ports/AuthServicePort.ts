@@ -1,48 +1,48 @@
 /**
  * @fileoverview AuthServicePort.ts
- * @description Domain port: authentication operations (login, token refresh, revoke).
+ * @description auth｜领域端口：AuthServicePort。
  *
- * Implementations:
- * - `mock`: deterministic auth for UI preview
- * - `http`: real HTTP-backed auth service
+ * 实现说明：
+ * - `mock`：用于 UI 预览/开发联调的确定性实现
+ * - `http`：基于后端 API 的真实实现
  */
 
 import type { AuthLoginResult, TokenLoginResult } from "../types/AuthTypes";
 
 /**
- * Authentication service port.
+ * 认证服务端口（领域层）。
  */
 export interface AuthServicePort {
   /**
-   * Authenticate user via email + verification code.
+   * 使用邮箱 + 验证码登录并获取 token。
    *
-   * @param email - User email address.
-   * @param code - Verification code sent to email.
-   * @returns Authentication result with tokens.
-   * @throws AuthRequiredPluginMissingError when required plugins are not satisfied.
+   * @param email - 用户邮箱地址。
+   * @param code - 邮箱验证码。
+   * @returns 登录结果（access/refresh token 等）。
+   * @throws AuthRequiredPluginMissingError 当 required gate 不满足（缺少必需插件）时抛出。
    */
   loginWithEmailCode(email: string, code: string): Promise<AuthLoginResult>;
 
   /**
-   * Validate an existing access token and retrieve user info.
+   * 校验并使用已有 access token 获取用户信息。
    *
-   * @param token - Access token to validate.
-   * @returns Token login result with uid.
+   * @param token - 要校验的 access token。
+   * @returns token 登录结果（包含 uid）。
    */
   tokenLogin(token: string): Promise<TokenLoginResult>;
 
   /**
-   * Refresh access token using refresh token.
+   * 使用 refresh token 刷新 access token。
    *
-   * @param refreshToken - Refresh token.
-   * @returns New authentication result with rotated tokens.
+   * @param refreshToken - refresh token。
+   * @returns 刷新后的登录结果（可能发生 refresh token 轮换）。
    */
   refreshAccessToken(refreshToken: string): Promise<AuthLoginResult>;
 
   /**
-   * Revoke a refresh token (logout).
+   * 撤销 refresh token（通常用于退出登录）。
    *
-   * @param refreshToken - Refresh token to revoke.
+   * @param refreshToken - 要撤销的 refresh token。
    */
   revokeRefreshToken(refreshToken: string): Promise<void>;
 }

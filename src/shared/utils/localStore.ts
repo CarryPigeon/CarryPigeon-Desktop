@@ -29,7 +29,7 @@ export function readJson<T>(key: string, fallback: T): T {
  *
  * @param key - localStorage key。
  * @param value - 要序列化并写入的值。
- * @returns void
+ * @returns 无返回值。
  */
 export function writeJson<T>(key: string, value: T): void {
   try {

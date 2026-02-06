@@ -12,500 +12,143 @@
 //! - `design/client/APP-URL-SPEC.md`
 //! - `docs/api/*`（/api/server, /api/plugins/catalog）
 
-use std::{
-    collections::BTreeSet,
-    io::{Cursor, Read},
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
-use tokio::net::TcpStream;
-use zip::ZipArchive;
 
+mod api;
+mod download;
+mod hash;
+mod json_io;
+mod net_fetch;
+mod origin;
+mod paths;
+mod state;
+mod storage;
+mod tls;
+mod unpack;
+
+use api::{fetch_plugin_catalog, fetch_server_id};
+use download::download_plugin_zip_bytes;
+use hash::{eq_hash_hex, sha256_hex};
+use origin::to_http_origin;
+use paths::{base_plugins_dir, manifest_file_path, plugin_root_dir, plugin_version_dir};
+use state::{
+    PluginCurrent, PluginStateFile, build_installed_state, read_current, write_current,
+    write_state_file,
+};
+use tls::build_server_client;
+use unpack::unpack_plugin_zip;
+
+/// 插件清单中声明的“提供 domain”条目。
+///
+/// # 说明
+/// - 该结构用于对齐前端插件中心的“domain 绑定/渲染”能力；
+/// - 序列化字段使用 `snake_case`，与 `plugin.json` 保持一致。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct PluginProvidesDomain {
+    /// domain id（例如 `Core:Text`）。
     pub domain: String,
+    /// domain 协议版本（例如 `v1`）。
     pub domain_version: String,
 }
 
+/// `plugin.json`（V1）清单结构。
+///
+/// # 说明
+/// - 该结构是插件包的“权威元数据”，用于安装校验与运行时入口解析；
+/// - 字段命名与文档约定一致（`snake_case`）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct PluginManifestV1 {
+    /// 插件 id（稳定标识）。
     pub plugin_id: String,
+    /// 插件名称（展示用）。
     pub name: String,
+    /// 插件版本（语义化版本或其它约定）。
     pub version: String,
+    /// 宿主最低版本要求（用于兼容性判断）。
     pub min_host_version: String,
+    /// 插件描述（可选）。
     pub description: Option<String>,
+    /// 作者信息（可选）。
     pub author: Option<String>,
+    /// 许可证信息（可选）。
     pub license: Option<String>,
+    /// 运行时入口相对路径（相对于插件版本目录）。
     pub entry: String,
+    /// 插件权限列表（字符串 key）。
     pub permissions: Vec<String>,
+    /// 插件提供的 domain 列表。
     pub provides_domains: Vec<PluginProvidesDomain>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct PluginCurrent {
-    pub version: String,
-    pub enabled: bool,
-}
+// current.json/state.json 的结构体与读写逻辑已下沉到 `state` 子模块。
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct PluginStateFile {
-    pub status: String,      // "ok" | "failed"
-    pub last_error: String,  // human readable
-}
-
+/// 已安装插件的汇总状态（面向前端展示）。
+///
+/// # 说明
+/// - 该结构是“安装目录 + current.json + state.json”的汇总视图；
+/// - 序列化字段使用 `camelCase`，与前端 TS 类型保持一致。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledPluginState {
+    /// 插件 id。
     pub plugin_id: String,
+    /// 已安装版本列表（目录扫描结果）。
     pub installed_versions: Vec<String>,
+    /// 当前选择版本（来自 current.json）。
     pub current_version: Option<String>,
+    /// 是否启用（来自 current.json）。
     pub enabled: bool,
-    pub status: String,      // "ok" | "failed"
+    /// 插件状态（例如 `"ok"`/`"failed"`）。
+    pub status: String, // "ok" | "failed"
+    /// 最近一次错误消息（来自 state.json）。
     pub last_error: String,
 }
 
+/// 插件运行时入口信息（供前端动态 import）。
+///
+/// # 说明
+/// - 前端通过该结构拼装 `app://plugins/...` URL 并加载插件模块；
+/// - 序列化字段使用 `camelCase`，与前端 TS 类型保持一致。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginRuntimeEntry {
+    /// 服务端 id（由 `/api/server/id` 返回，用于本地隔离目录）。
     pub server_id: String,
+    /// 插件 id。
     pub plugin_id: String,
+    /// 插件版本。
     pub version: String,
+    /// 入口相对路径（来自 plugin.json）。
     pub entry: String,
+    /// 宿主最低版本要求（来自 plugin.json）。
     pub min_host_version: String,
+    /// 权限列表（来自 plugin.json）。
     pub permissions: Vec<String>,
+    /// 插件提供的 domain 列表（来自 plugin.json）。
     pub provides_domains: Vec<PluginProvidesDomain>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct ApiServerInfo {
-    server_id: String,
-}
+// 路径映射、JSON 读写、状态文件管理已下沉到子模块：`paths` / `json_io` / `state`。
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct ApiPluginCatalog {
-    plugins: Vec<ApiCatalogItem>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct ApiCatalogItem {
-    plugin_id: String,
-    version: String,
-    download: Option<ApiDownload>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct ApiDownload {
-    url: String,
-    sha256: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TlsPolicy {
-    Strict,
-    Insecure,
-    TrustFingerprint,
-}
-
-fn parse_tls_policy(raw: Option<&str>) -> TlsPolicy {
-    match raw.unwrap_or("strict").trim() {
-        "insecure" => TlsPolicy::Insecure,
-        "trust_fingerprint" => TlsPolicy::TrustFingerprint,
-        _ => TlsPolicy::Strict,
-    }
-}
-
-fn normalize_fingerprint(raw: &str) -> String {
-    raw.trim()
-        .to_ascii_lowercase()
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit())
-        .collect()
-}
-
-fn base_plugins_dir() -> PathBuf {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let parent = cwd
-        .file_name()
-        .map(|name| name == "src-tauri")
-        .unwrap_or(false)
-        .then(|| cwd.parent().map(|p| p.to_path_buf()))
-        .flatten();
-    let root = parent.unwrap_or(cwd);
-    root.join("data").join("plugins")
-}
-
-fn sanitize_segment(seg: &str) -> anyhow::Result<String> {
-    let s = seg.trim();
-    if s.is_empty() {
-        return Err(anyhow::anyhow!("Invalid empty path segment"));
-    }
-    if s == "." || s == ".." || s.contains('\\') || s.contains('/') {
-        return Err(anyhow::anyhow!("Invalid path segment: {}", s));
-    }
-    if s.contains(':') {
-        return Err(anyhow::anyhow!("Invalid path segment (contains ':'): {}", s));
-    }
-    Ok(s.to_string())
-}
-
-fn safe_join(root: &Path, segments: &[String]) -> anyhow::Result<PathBuf> {
-    let mut p = root.to_path_buf();
-    for s in segments {
-        let seg = sanitize_segment(s)?;
-        p.push(seg);
-    }
-    Ok(p)
-}
-
-fn to_http_origin(server_socket: &str) -> anyhow::Result<String> {
-    let raw = server_socket.trim();
-    if raw.is_empty() {
-        return Err(anyhow::anyhow!("Missing server socket"));
-    }
-
-    let mapped = if raw.starts_with("ws://") {
-        format!("http://{}", &raw["ws://".len()..])
-    } else if raw.starts_with("wss://") {
-        format!("https://{}", &raw["wss://".len()..])
-    } else if raw.starts_with("tcp://") {
-        format!("http://{}", &raw["tcp://".len()..])
-    } else if raw.starts_with("tls://") {
-        format!("https://{}", &raw["tls://".len()..])
-    } else if raw.starts_with("tls-insecure://") {
-        format!("https://{}", &raw["tls-insecure://".len()..])
-    } else if raw.starts_with("tls-fp://") {
-        // `tls-fp://{fp}@host:port`
-        let rest = &raw["tls-fp://".len()..];
-        let addr = rest.split_once('@').map(|x| x.1).unwrap_or(rest);
-        format!("https://{}", addr)
-    } else if raw.starts_with("http://") || raw.starts_with("https://") {
-        raw.to_string()
-    } else {
-        format!("https://{}", raw)
-    };
-
-    let u = reqwest::Url::parse(&mapped).context("Invalid server socket URL")?;
-    Ok(format!(
-        "{}://{}{}",
-        u.scheme(),
-        u.host_str().unwrap_or_default(),
-        port_suffix(&u)
-    ))
-}
-
-fn port_suffix(u: &reqwest::Url) -> String {
-    match u.port() {
-        Some(p) => format!(":{}", p),
-        None => "".to_string(),
-    }
-}
-
-fn extract_host_port_from_origin(origin: &str) -> anyhow::Result<(String, u16)> {
-    let u = reqwest::Url::parse(origin).context("Invalid origin URL")?;
-    let host = u.host_str().unwrap_or_default().to_string();
-    if host.trim().is_empty() {
-        return Err(anyhow::anyhow!("Invalid origin host"));
-    }
-    let port = u
-        .port_or_known_default()
-        .ok_or_else(|| anyhow::anyhow!("Missing origin port"))?;
-    Ok((host, port))
-}
-
-async fn verify_https_fingerprint(origin: &str, expected_sha256: &str) -> anyhow::Result<()> {
-    let expected = normalize_fingerprint(expected_sha256);
-    if expected.len() != 64 {
-        return Err(anyhow::anyhow!(
-            "Invalid TLS fingerprint: expected SHA-256 (64 hex chars), got len={}",
-            expected.len()
-        ));
-    }
-
-    let (host, port) = extract_host_port_from_origin(origin)?;
-    let addr = format!("{}:{}", host, port);
-    let stream = TcpStream::connect(addr.clone())
-        .await
-        .with_context(|| format!("Failed to connect for TLS fingerprint check: {}", addr))?;
-
-    let mut builder = native_tls::TlsConnector::builder();
-    // We always allow invalid certs/hostnames here; fingerprint is the trust root.
-    builder.danger_accept_invalid_certs(true);
-    builder.danger_accept_invalid_hostnames(true);
-    let connector = tokio_native_tls::TlsConnector::from(builder.build()?);
-    let tls = connector
-        .connect(&host, stream)
-        .await
-        .map_err(|e| anyhow::anyhow!("TLS handshake failed (fingerprint check): {}", e))?;
-
-    let peer = tls
-        .get_ref()
-        .peer_certificate()
-        .map_err(|e| anyhow::anyhow!("Failed to read peer certificate: {}", e))?;
-    let Some(cert) = peer else {
-        return Err(anyhow::anyhow!("TLS fingerprint check failed: missing peer certificate"));
-    };
-    let der = cert
-        .to_der()
-        .map_err(|e| anyhow::anyhow!("Failed to export peer certificate DER: {}", e))?;
-    let actual = sha256_hex(&der);
-    if actual != expected {
-        return Err(anyhow::anyhow!(
-            "TLS fingerprint mismatch: expected={} actual={}",
-            expected,
-            actual
-        ));
-    }
-    Ok(())
-}
-
-fn build_reqwest_client(policy: TlsPolicy) -> anyhow::Result<reqwest::Client> {
-    let mut builder = reqwest::Client::builder();
-    if policy != TlsPolicy::Strict {
-        builder = builder
-            .danger_accept_invalid_certs(true)
-            .danger_accept_invalid_hostnames(true);
-    }
-    Ok(builder.build()?)
-}
-
-async fn build_server_client(
-    origin: &str,
-    tls_policy: Option<&str>,
-    tls_fingerprint: Option<&str>,
-) -> anyhow::Result<reqwest::Client> {
-    // Only HTTPS needs special TLS handling.
-    if !origin.trim().starts_with("https://") {
-        return Ok(reqwest::Client::new());
-    }
-    let policy = parse_tls_policy(tls_policy);
-    if policy == TlsPolicy::TrustFingerprint {
-        verify_https_fingerprint(origin, tls_fingerprint.unwrap_or("")).await?;
-    }
-    build_reqwest_client(policy)
-}
-
-async fn fetch_server_id(origin: &str, client: &reqwest::Client) -> anyhow::Result<String> {
-    let url = format!("{}/api/server", origin);
-    let res = client
-        .get(url)
-        .header("Accept", "application/vnd.carrypigeon+json; version=1")
-        .send()
-        .await
-        .context("Failed to request /api/server")?
-        .error_for_status()
-        .context("GET /api/server returned an error status")?;
-    let info: ApiServerInfo = res.json().await.context("Failed to parse /api/server JSON")?;
-    let id = info.server_id.trim().to_string();
-    if id.is_empty() {
-        return Err(anyhow::anyhow!("Missing server_id in /api/server response"));
-    }
-    Ok(id)
-}
-
-async fn fetch_plugin_catalog(origin: &str, client: &reqwest::Client) -> anyhow::Result<ApiPluginCatalog> {
-    let url = format!("{}/api/plugins/catalog", origin);
-    let res = client
-        .get(url)
-        .header("Accept", "application/vnd.carrypigeon+json; version=1")
-        .send()
-        .await
-        .context("Failed to request /api/plugins/catalog")?
-        .error_for_status()
-        .context("GET /api/plugins/catalog returned an error status")?;
-    Ok(res
-        .json::<ApiPluginCatalog>()
-        .await
-        .context("Failed to parse /api/plugins/catalog JSON")?)
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(bytes);
-    hex::encode(hasher.finalize())
-}
-
-fn eq_hash_hex(a: &str, b: &str) -> bool {
-    a.trim().eq_ignore_ascii_case(b.trim())
-}
-
-fn normalize_zip_name(raw: &str) -> String {
-    raw.replace('\\', "/").trim_start_matches('/').to_string()
-}
-
-fn is_zip_name_safe(name: &str) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-    if name.starts_with('/') {
-        return false;
-    }
-    // Disallow drive letters / scheme-ish hints.
-    if name.contains(':') {
-        return false;
-    }
-    // Disallow traversal segments.
-    for seg in name.split('/') {
-        if seg.is_empty() || seg == "." || seg == ".." {
-            return false;
-        }
-    }
-    true
-}
-
-fn detect_single_root_prefix(names: &[String]) -> Option<String> {
-    let mut prefix: Option<&str> = None;
-    for n in names {
-        let segs: Vec<&str> = n.split('/').collect();
-        if segs.len() < 2 {
-            return None;
-        }
-        match prefix {
-            Some(p) if p != segs[0] => return None,
-            None => prefix = Some(segs[0]),
-            _ => {}
-        }
-    }
-    prefix.map(|s| s.to_string())
-}
-
-fn strip_root_prefix(name: &str, prefix: &str) -> String {
-    if !name.starts_with(prefix) {
-        return name.to_string();
-    }
-    let trimmed = name.strip_prefix(prefix).unwrap_or(name);
-    trimmed.trim_start_matches('/').to_string()
-}
-
-async fn ensure_dir(path: &Path) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent)
-            .await
-            .with_context(|| format!("Failed to create dir: {}", parent.display()))?;
-    }
-    Ok(())
-}
-
-async fn read_json_file<T: for<'de> Deserialize<'de>>(path: &Path) -> anyhow::Result<Option<T>> {
-    match tokio::fs::read_to_string(path).await {
-        Ok(s) => {
-            let trimmed = s.trim();
-            if trimmed.is_empty() {
-                return Ok(None);
-            }
-            let parsed = serde_json::from_str::<T>(trimmed)
-                .with_context(|| format!("Failed to parse JSON: {}", path.display()))?;
-            Ok(Some(parsed))
-        }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(err) => Err(err.into()),
-    }
-}
-
-async fn write_json_file<T: Serialize>(path: &Path, value: &T) -> anyhow::Result<()> {
-    ensure_dir(path).await?;
-    let s = serde_json::to_string_pretty(value).context("Failed to serialize JSON")?;
-    tokio::fs::write(path, s)
-        .await
-        .with_context(|| format!("Failed to write file: {}", path.display()))?;
-    Ok(())
-}
-
-fn plugin_root_dir(server_id: &str, plugin_id: &str) -> anyhow::Result<PathBuf> {
-    let base = base_plugins_dir();
-    let segments = vec![server_id.to_string(), plugin_id.to_string()];
-    safe_join(&base, &segments)
-}
-
-fn plugin_version_dir(server_id: &str, plugin_id: &str, version: &str) -> anyhow::Result<PathBuf> {
-    let base = base_plugins_dir();
-    let segments = vec![server_id.to_string(), plugin_id.to_string(), version.to_string()];
-    safe_join(&base, &segments)
-}
-
-fn current_file_path(server_id: &str, plugin_id: &str) -> anyhow::Result<PathBuf> {
-    Ok(plugin_root_dir(server_id, plugin_id)?.join("current.json"))
-}
-
-fn state_file_path(server_id: &str, plugin_id: &str) -> anyhow::Result<PathBuf> {
-    Ok(plugin_root_dir(server_id, plugin_id)?.join("state.json"))
-}
-
-fn manifest_file_path(server_id: &str, plugin_id: &str, version: &str) -> anyhow::Result<PathBuf> {
-    Ok(plugin_version_dir(server_id, plugin_id, version)?.join("plugin.json"))
-}
-
-async fn list_installed_versions(server_id: &str, plugin_id: &str) -> anyhow::Result<Vec<String>> {
-    let root = plugin_root_dir(server_id, plugin_id)?;
-    let mut set = BTreeSet::<String>::new();
-    let mut rd = match tokio::fs::read_dir(&root).await {
-        Ok(rd) => rd,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
-        Err(err) => return Err(err.into()),
-    };
-    while let Some(ent) = rd.next_entry().await? {
-        let ty = ent.file_type().await?;
-        if !ty.is_dir() {
-            continue;
-        }
-        let name = ent.file_name().to_string_lossy().to_string();
-        if name.trim().is_empty() {
-            continue;
-        }
-        set.insert(name);
-    }
-    Ok(set.into_iter().collect())
-}
-
-async fn read_current(server_id: &str, plugin_id: &str) -> anyhow::Result<Option<PluginCurrent>> {
-    let path = current_file_path(server_id, plugin_id)?;
-    read_json_file::<PluginCurrent>(&path).await
-}
-
-async fn write_current(server_id: &str, plugin_id: &str, current: &PluginCurrent) -> anyhow::Result<()> {
-    let path = current_file_path(server_id, plugin_id)?;
-    write_json_file(&path, current).await
-}
-
-async fn read_state_file(server_id: &str, plugin_id: &str) -> anyhow::Result<PluginStateFile> {
-    let path = state_file_path(server_id, plugin_id)?;
-    let existing = read_json_file::<PluginStateFile>(&path).await?;
-    Ok(existing.unwrap_or(PluginStateFile {
-        status: "ok".to_string(),
-        last_error: "".to_string(),
-    }))
-}
-
-async fn write_state_file(server_id: &str, plugin_id: &str, st: &PluginStateFile) -> anyhow::Result<()> {
-    let path = state_file_path(server_id, plugin_id)?;
-    write_json_file(&path, st).await
-}
-
-async fn build_installed_state(server_id: &str, plugin_id: &str) -> anyhow::Result<InstalledPluginState> {
-    let installed_versions = list_installed_versions(server_id, plugin_id).await?;
-    let current = read_current(server_id, plugin_id).await?;
-    let state = read_state_file(server_id, plugin_id).await?;
-
-    Ok(InstalledPluginState {
-        plugin_id: plugin_id.to_string(),
-        installed_versions,
-        current_version: current.as_ref().map(|c| c.version.clone()),
-        enabled: current.as_ref().map(|c| c.enabled).unwrap_or(false),
-        status: state.status,
-        last_error: state.last_error,
-    })
-}
-
+/// 列出某个服务端下本地已安装的插件状态列表。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket（用于解析 origin 并获取 server_id）。
+/// - `tls_policy`：TLS 策略（可选）。
+/// - `tls_fingerprint`：TLS 指纹（可选）。
+///
+/// # 返回值
+/// - `Ok(Vec<InstalledPluginState>)`：已安装插件状态列表。
+/// - `Err(anyhow::Error)`：读取/解析失败原因。
+///
+/// # 说明
+/// - 本函数会先请求服务端 id，再在本地 `data/plugins/{server_id}` 下扫描安装目录；
+/// - 若目录不存在，返回空列表（视为“未安装任何插件”）。
 pub async fn list_installed(
     server_socket: &str,
     tls_policy: Option<&str>,
@@ -536,6 +179,17 @@ pub async fn list_installed(
     Ok(out)
 }
 
+/// 获取某个插件的本地安装状态。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(Some(InstalledPluginState))`：已安装则返回状态。
+/// - `Ok(None)`：未安装。
+/// - `Err(anyhow::Error)`：读取失败原因。
 pub async fn get_installed(
     server_socket: &str,
     plugin_id: &str,
@@ -552,6 +206,19 @@ pub async fn get_installed(
     Ok(Some(build_installed_state(&server_id, plugin_id).await?))
 }
 
+/// 获取插件“当前版本”的运行时入口信息。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(PluginRuntimeEntry)`：运行时入口信息。
+/// - `Err(anyhow::Error)`：插件未安装或解析失败原因。
+///
+/// # 说明
+/// 当前版本来自 `current.json`；若插件未安装，会返回错误（而非 `None`）。
 pub async fn get_runtime_entry(
     server_socket: &str,
     plugin_id: &str,
@@ -567,6 +234,17 @@ pub async fn get_runtime_entry(
     get_runtime_entry_for_version_inner(&origin, &server_id, plugin_id, &current.version).await
 }
 
+/// 获取插件“指定版本”的运行时入口信息。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `version`：目标版本（不能为空）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(PluginRuntimeEntry)`：运行时入口信息。
+/// - `Err(anyhow::Error)`：解析失败原因（例如版本为空/清单缺失）。
 pub async fn get_runtime_entry_for_version(
     server_socket: &str,
     plugin_id: &str,
@@ -623,6 +301,22 @@ async fn get_runtime_entry_for_version_inner(
     })
 }
 
+/// 从服务端插件目录（catalog）安装插件。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `expected_version`：期望版本（可选；若提供且不匹配则报错）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：安装后的插件状态。
+/// - `Err(anyhow::Error)`：安装失败原因（下载/校验/解压/写入状态等）。
+///
+/// # 说明
+/// - 会根据 catalog 的 download url + sha256 下载 zip 并做完整性校验；
+/// - 解压后会校验 `plugin.json` 的 `plugin_id/version/entry` 等关键字段；
+/// - 首次安装会初始化 `current.json`（默认 disabled），并将 `state.json` 重置为 ok。
 pub async fn install_from_server_catalog(
     server_socket: &str,
     plugin_id: &str,
@@ -664,29 +358,16 @@ pub async fn install_from_server_catalog(
     let download_url = if dl.url.starts_with("http://") || dl.url.starts_with("https://") {
         dl.url.clone()
     } else {
-        format!("{}/{}", origin.trim_end_matches('/'), dl.url.trim_start_matches('/'))
+        format!(
+            "{}/{}",
+            origin.trim_end_matches('/'),
+            dl.url.trim_start_matches('/')
+        )
     };
 
     let base = reqwest::Url::parse(&origin).context("Invalid server origin")?;
     let download_parsed = reqwest::Url::parse(&download_url).context("Invalid download url")?;
-    let same_origin = download_parsed.scheme() == base.scheme()
-        && download_parsed.host_str() == base.host_str()
-        && port_suffix(&download_parsed) == port_suffix(&base);
-
-    let bytes = (if same_origin {
-        client.get(download_url)
-    } else {
-        reqwest::Client::new().get(download_url)
-    })
-        .send()
-        .await
-        .context("Failed to download plugin zip")?
-        .error_for_status()
-        .context("Plugin download returned an error status")?
-        .bytes()
-        .await
-        .context("Failed to read plugin zip bytes")?
-        .to_vec();
+    let bytes = download_plugin_zip_bytes(&base, &client, download_parsed).await?;
 
     let got = sha256_hex(&bytes);
     if !eq_hash_hex(&got, &dl.sha256) {
@@ -704,73 +385,9 @@ pub async fn install_from_server_catalog(
         .await
         .with_context(|| format!("Failed to create dir: {}", version_dir.display()))?;
 
-    // Unpack zip in a blocking task to avoid stalling the async runtime.
-    let write_root = version_dir.clone();
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-        let mut archive = ZipArchive::new(Cursor::new(bytes)).context("Invalid zip archive")?;
+    unpack_plugin_zip(bytes, version_dir.clone()).await?;
 
-        // Determine whether the zip wraps everything into a single root directory.
-        let mut names: Vec<String> = vec![];
-        for i in 0..archive.len() {
-            let f = archive.by_index(i)?;
-            if f.is_dir() {
-                continue;
-            }
-            let normalized = normalize_zip_name(f.name());
-            if normalized.is_empty() {
-                continue;
-            }
-            names.push(normalized);
-        }
-        let root_prefix = detect_single_root_prefix(&names);
-
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            let normalized = normalize_zip_name(file.name());
-            if normalized.is_empty() {
-                continue;
-            }
-            if !is_zip_name_safe(&normalized) {
-                return Err(anyhow::anyhow!("Unsafe zip entry path: {}", normalized));
-            }
-
-            let final_name = if let Some(prefix) = root_prefix.as_deref() {
-                strip_root_prefix(&normalized, prefix)
-            } else {
-                normalized
-            };
-            if final_name.is_empty() {
-                continue;
-            }
-            if !is_zip_name_safe(&final_name) {
-                return Err(anyhow::anyhow!("Unsafe zip entry path after strip: {}", final_name));
-            }
-
-            let out_path = write_root.join(&final_name);
-            if file.is_dir() {
-                std::fs::create_dir_all(&out_path)?;
-                continue;
-            }
-            if is_forbidden_source_file(&final_name) {
-                return Err(anyhow::anyhow!(
-                    "Plugin package contains forbidden source file: {}",
-                    final_name
-                ));
-            }
-            if let Some(parent) = out_path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let mut out = std::fs::File::create(&out_path)?;
-            let mut buf = Vec::with_capacity(file.size() as usize);
-            file.read_to_end(&mut buf)?;
-            std::io::Write::write_all(&mut out, &buf)?;
-        }
-        Ok(())
-    })
-    .await
-    .context("Unpack task join failed")??;
-
-    // Verify manifest exists and matches expected plugin/version.
+    // 校验 plugin.json 存在且 plugin/version 与预期一致。
     let manifest_path = version_dir.join("plugin.json");
     let raw = tokio::fs::read_to_string(&manifest_path)
         .await
@@ -796,7 +413,7 @@ pub async fn install_from_server_catalog(
         return Err(anyhow::anyhow!("Manifest entry is empty"));
     }
 
-    // Initialize current.json on first install; keep existing current selection if present.
+    // 首次安装初始化 current.json；若已存在则保留原选择。
     let current = read_current(&server_id, plugin_id).await?;
     if current.is_none() {
         write_current(
@@ -810,7 +427,7 @@ pub async fn install_from_server_catalog(
         .await?;
     }
 
-    // Reset state to ok after successful install.
+    // 安装成功后把 state 重置为 ok。
     write_state_file(
         &server_id,
         plugin_id,
@@ -824,6 +441,22 @@ pub async fn install_from_server_catalog(
     build_installed_state(&server_id, plugin_id).await
 }
 
+/// 从指定 URL 安装插件（自定义来源）。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id（不能为空）。
+/// - `version`：插件版本（不能为空）。
+/// - `download_url`：插件 zip 下载地址（不能为空）。
+/// - `sha256_expected`：期望 sha256（不能为空）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：安装后的插件状态。
+/// - `Err(anyhow::Error)`：安装失败原因。
+///
+/// # 说明
+/// 流程与 `install_from_server_catalog` 类似，但安装源由调用方显式指定。
 pub async fn install_from_url(
     server_socket: &str,
     plugin_id: &str,
@@ -856,24 +489,7 @@ pub async fn install_from_url(
 
     let base = reqwest::Url::parse(&origin).context("Invalid server origin")?;
     let download_parsed = reqwest::Url::parse(url).context("Invalid download url")?;
-    let same_origin = download_parsed.scheme() == base.scheme()
-        && download_parsed.host_str() == base.host_str()
-        && port_suffix(&download_parsed) == port_suffix(&base);
-
-    let bytes = (if same_origin {
-        server_client.get(url)
-    } else {
-        reqwest::Client::new().get(url)
-    })
-        .send()
-        .await
-        .context("Failed to download plugin zip")?
-        .error_for_status()
-        .context("Plugin download returned an error status")?
-        .bytes()
-        .await
-        .context("Failed to read plugin zip bytes")?
-        .to_vec();
+    let bytes = download_plugin_zip_bytes(&base, &server_client, download_parsed).await?;
 
     let got = sha256_hex(&bytes);
     if !eq_hash_hex(&got, sha) {
@@ -890,70 +506,9 @@ pub async fn install_from_url(
         .await
         .with_context(|| format!("Failed to create dir: {}", version_dir.display()))?;
 
-    let write_root = version_dir.clone();
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-        let mut archive = ZipArchive::new(Cursor::new(bytes)).context("Invalid zip archive")?;
-        let mut names: Vec<String> = vec![];
-        for i in 0..archive.len() {
-            let f = archive.by_index(i)?;
-            if f.is_dir() {
-                continue;
-            }
-            let normalized = normalize_zip_name(f.name());
-            if normalized.is_empty() {
-                continue;
-            }
-            names.push(normalized);
-        }
-        let root_prefix = detect_single_root_prefix(&names);
+    unpack_plugin_zip(bytes, version_dir.clone()).await?;
 
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            let normalized = normalize_zip_name(file.name());
-            if normalized.is_empty() {
-                continue;
-            }
-            if !is_zip_name_safe(&normalized) {
-                return Err(anyhow::anyhow!("Unsafe zip entry path: {}", normalized));
-            }
-
-            let final_name = if let Some(prefix) = root_prefix.as_deref() {
-                strip_root_prefix(&normalized, prefix)
-            } else {
-                normalized
-            };
-            if final_name.is_empty() {
-                continue;
-            }
-            if !is_zip_name_safe(&final_name) {
-                return Err(anyhow::anyhow!("Unsafe zip entry path after strip: {}", final_name));
-            }
-
-            let out_path = write_root.join(&final_name);
-            if file.is_dir() {
-                std::fs::create_dir_all(&out_path)?;
-                continue;
-            }
-            if is_forbidden_source_file(&final_name) {
-                return Err(anyhow::anyhow!(
-                    "Plugin package contains forbidden source file: {}",
-                    final_name
-                ));
-            }
-            if let Some(parent) = out_path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let mut out = std::fs::File::create(&out_path)?;
-            let mut buf = Vec::with_capacity(file.size() as usize);
-            file.read_to_end(&mut buf)?;
-            std::io::Write::write_all(&mut out, &buf)?;
-        }
-        Ok(())
-    })
-    .await
-    .context("Unpack task join failed")??;
-
-    // Verify manifest exists and matches expected plugin/version.
+    // 校验 plugin.json 存在且 plugin/version 与预期一致。
     let manifest_path = version_dir.join("plugin.json");
     let raw = tokio::fs::read_to_string(&manifest_path)
         .await
@@ -1005,19 +560,20 @@ pub async fn install_from_url(
     build_installed_state(&server_id, id).await
 }
 
-fn is_forbidden_source_file(path: &str) -> bool {
-    let lower = path.to_lowercase();
-    if lower.ends_with(".d.ts") {
-        return false;
-    }
-    lower.ends_with(".vue")
-        || lower.ends_with(".ts")
-        || lower.ends_with(".tsx")
-        || lower.ends_with(".scss")
-        || lower.ends_with(".sass")
-        || lower.ends_with(".less")
-}
-
+/// 启用已安装插件。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：启用后的插件状态。
+/// - `Err(anyhow::Error)`：启用失败原因。
+///
+/// # 说明
+/// - 启用前会校验 `plugin.json` 与入口文件是否存在；
+/// - 若入口缺失，会将状态写为 failed 并返回错误，避免 UI “显示可用但无法加载”。
 pub async fn enable(
     server_socket: &str,
     plugin_id: &str,
@@ -1031,7 +587,7 @@ pub async fn enable(
         .await?
         .ok_or_else(|| anyhow::anyhow!("Plugin is not installed: {}", plugin_id))?;
 
-    // Validate required files exist before marking enabled.
+    // 标记 enabled 之前先校验关键文件存在，避免 UI 显示“可用”但实际无法加载。
     let manifest_path = manifest_file_path(&server_id, plugin_id, &current.version)?;
     let raw = tokio::fs::read_to_string(&manifest_path)
         .await
@@ -1067,6 +623,21 @@ pub async fn enable(
     build_installed_state(&server_id, plugin_id).await
 }
 
+/// 将插件标记为失败，并写入错误信息。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `message`：错误信息（会做 trim）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：更新后的插件状态。
+/// - `Err(anyhow::Error)`：更新失败原因。
+///
+/// # 说明
+/// - 该操作会强制将 `current.enabled` 置为 false；
+/// - `state.json` 会被写为 `failed` 并更新 `last_error`。
 pub async fn set_failed(
     server_socket: &str,
     plugin_id: &str,
@@ -1094,6 +665,19 @@ pub async fn set_failed(
     build_installed_state(&server_id, plugin_id).await
 }
 
+/// 清除插件错误信息（将状态恢复为 ok，清空 last_error）。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：更新后的插件状态。
+/// - `Err(anyhow::Error)`：更新失败原因。
+///
+/// # 说明
+/// 该操作不会修改 `current.enabled`。
 pub async fn clear_error(
     server_socket: &str,
     plugin_id: &str,
@@ -1115,129 +699,19 @@ pub async fn clear_error(
     build_installed_state(&server_id, plugin_id).await
 }
 
-fn storage_file_path(server_id: &str, plugin_id: &str) -> anyhow::Result<PathBuf> {
-    Ok(plugin_root_dir(server_id, plugin_id)?.join("storage.json"))
-}
+pub use net_fetch::{PluginFetchResponse, network_fetch};
+pub use storage::{storage_get, storage_set};
 
-pub async fn storage_get(
-    server_socket: &str,
-    plugin_id: &str,
-    key: &str,
-    tls_policy: Option<&str>,
-    tls_fingerprint: Option<&str>,
-) -> anyhow::Result<Option<serde_json::Value>> {
-    let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
-    let path = storage_file_path(&server_id, plugin_id)?;
-    let raw = match tokio::fs::read_to_string(&path).await {
-        Ok(v) => v,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e.into()),
-    };
-    let map: serde_json::Map<String, serde_json::Value> =
-        serde_json::from_str(&raw).context("Invalid storage.json")?;
-    Ok(map.get(key).cloned())
-}
-
-pub async fn storage_set(
-    server_socket: &str,
-    plugin_id: &str,
-    key: &str,
-    value: serde_json::Value,
-    tls_policy: Option<&str>,
-    tls_fingerprint: Option<&str>,
-) -> anyhow::Result<()> {
-    let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
-    let path = storage_file_path(&server_id, plugin_id)?;
-    let mut map: serde_json::Map<String, serde_json::Value> = match tokio::fs::read_to_string(&path).await {
-        Ok(v) => serde_json::from_str(&v).context("Invalid storage.json")?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::Map::new(),
-        Err(e) => return Err(e.into()),
-    };
-    map.insert(key.to_string(), value);
-    let out = serde_json::to_string_pretty(&map).context("Failed to serialize storage")?;
-    if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent)
-            .await
-            .with_context(|| format!("Failed to create dir: {}", parent.display()))?;
-    }
-    tokio::fs::write(&path, out)
-        .await
-        .with_context(|| format!("Failed to write: {}", path.display()))?;
-    Ok(())
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PluginFetchResponse {
-    pub ok: bool,
-    pub status: u16,
-    pub body_text: String,
-    pub headers: std::collections::HashMap<String, String>,
-}
-
-pub async fn network_fetch(
-    server_socket: &str,
-    url: &str,
-    method: &str,
-    headers: std::collections::HashMap<String, String>,
-    body: Option<String>,
-    tls_policy: Option<&str>,
-    tls_fingerprint: Option<&str>,
-) -> anyhow::Result<PluginFetchResponse> {
-    let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let base = reqwest::Url::parse(&origin).context("Invalid server origin")?;
-
-    let raw_url = url.trim();
-    if raw_url.is_empty() {
-        return Err(anyhow::anyhow!("Missing url"));
-    }
-    let full = if raw_url.starts_with('/') {
-        format!("{}{}", origin.trim_end_matches('/'), raw_url)
-    } else {
-        raw_url.to_string()
-    };
-    let target = reqwest::Url::parse(&full).context("Invalid url")?;
-
-    let same_origin = target.scheme() == base.scheme()
-        && target.host_str() == base.host_str()
-        && port_suffix(&target) == port_suffix(&base);
-    if !same_origin {
-        return Err(anyhow::anyhow!("Network access denied: cross-origin"));
-    }
-
-    let m = reqwest::Method::from_bytes(method.trim().to_uppercase().as_bytes())
-        .context("Invalid method")?;
-    let mut req = client.request(m, target);
-    for (k, v) in headers {
-        if k.trim().is_empty() {
-            continue;
-        }
-        req = req.header(k, v);
-    }
-    if let Some(b) = body {
-        req = req.body(b);
-    }
-    let res = req.send().await.context("Request failed")?;
-    let status = res.status();
-    let mut out_headers = std::collections::HashMap::new();
-    for (k, v) in res.headers().iter() {
-        if let Ok(s) = v.to_str() {
-            out_headers.insert(k.to_string(), s.to_string());
-        }
-    }
-    let body_text = res.text().await.unwrap_or_default();
-    Ok(PluginFetchResponse {
-        ok: status.is_success(),
-        status: status.as_u16(),
-        body_text,
-        headers: out_headers,
-    })
-}
+/// 禁用已安装插件。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：禁用后的插件状态。
+/// - `Err(anyhow::Error)`：禁用失败原因。
 pub async fn disable(
     server_socket: &str,
     plugin_id: &str,
@@ -1255,6 +729,21 @@ pub async fn disable(
     build_installed_state(&server_id, plugin_id).await
 }
 
+/// 切换插件当前版本。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `version`：目标版本（必须已安装）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(InstalledPluginState)`：切换后的插件状态。
+/// - `Err(anyhow::Error)`：切换失败原因（例如版本未安装）。
+///
+/// # 说明
+/// - 若 `current.json` 不存在，会创建默认 current（enabled=false）；
+/// - 若存在，会保留 enabled 标记，仅更新 version。
 pub async fn switch_version(
     server_socket: &str,
     plugin_id: &str,
@@ -1285,6 +774,16 @@ pub async fn switch_version(
     build_installed_state(&server_id, plugin_id).await
 }
 
+/// 卸载插件（删除本地安装目录）。
+///
+/// # 参数
+/// - `server_socket`：服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(())`：卸载成功或目录不存在。
+/// - `Err(anyhow::Error)`：卸载失败原因。
 pub async fn uninstall(
     server_socket: &str,
     plugin_id: &str,
@@ -1302,35 +801,16 @@ pub async fn uninstall(
     }
 }
 
-/// Resolve a file path for the `app://plugins/...` custom protocol.
+/// 解析 `app://plugins/...` 自定义 scheme 对应的本地文件路径。
 ///
-/// The returned path always points into the repository `data/plugins` directory
-/// (dev-friendly). Callers must still ensure they set correct Content-Type.
+/// 说明：
+/// - 返回路径始终落在仓库的 `data/plugins` 目录下（开发态友好，便于直接查看文件）；
+/// - 调用方仍需自行设置正确的 Content-Type（该函数不推断 MIME）。
 pub fn resolve_app_plugins_path(
     server_id: &str,
     plugin_id: &str,
     version: &str,
     rel_path: &str,
 ) -> anyhow::Result<PathBuf> {
-    let base = base_plugins_dir();
-    let rel = rel_path.trim().trim_start_matches('/');
-    if rel.is_empty() {
-        return Err(anyhow::anyhow!("Missing relative path"));
-    }
-    if rel.contains('\\') {
-        return Err(anyhow::anyhow!("Invalid relative path (contains backslash)"));
-    }
-    // Prevent traversal. We keep the rule strict: no "."/".." segments.
-    for seg in rel.split('/') {
-        if seg.is_empty() || seg == "." || seg == ".." {
-            return Err(anyhow::anyhow!("Invalid relative path segment"));
-        }
-    }
-    let segments = vec![
-        server_id.to_string(),
-        plugin_id.to_string(),
-        version.to_string(),
-    ];
-    let root = safe_join(&base, &segments)?;
-    Ok(root.join(rel))
+    paths::resolve_app_plugins_path(server_id, plugin_id, version, rel_path)
 }

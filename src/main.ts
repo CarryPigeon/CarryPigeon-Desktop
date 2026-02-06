@@ -16,22 +16,19 @@ import App from "./App.vue";
 import { router } from "./app/router";
 import { i18n } from "./app/i18n";
 import "tdesign-vue-next/es/style/index.css";
+import "@/features/chat/presentation/styles/patchbay.scss";
 import { listenUserProfileRequest, emitUserProfileResponse } from "@/shared/tauri";
-import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store/currentServer";
-import { serverRacks } from "@/features/servers/presentation/store/serverList";
-import { createUserService } from "@/features/user/data/userServiceFactory";
-import { createAuthService, createEmailService } from "@/features/auth/data/authServiceFactory";
-import { setCurrentUser, currentUser } from "@/features/user/presentation/store/userData";
+import { currentServerSocket, serverRacks, setServerSocket, useServerInfoStore } from "@/features/servers/api";
+import { createUserService, currentUser, setCurrentUser } from "@/features/user/api";
+import { createAuthService, createEmailService, setMissingRequiredPlugins } from "@/features/auth/api";
 import { readAuthSession, writeAuthSession } from "@/shared/utils/localState";
 import { getStoredTheme, setTheme } from "@/shared/utils/theme";
-import { connectWithRetry } from "@/features/network/presentation/store/connectionStore";
-import { useServerInfoStore } from "@/features/servers/presentation/store/serverInfoStore";
+import { connectWithRetry } from "@/features/network/api";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
-import { setMissingRequiredPlugins } from "@/features/auth/presentation/store/requiredGate";
 import { USE_MOCK_API } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
-import { getPluginManagerPort } from "@/features/plugins/di/plugins.di";
+import { getPluginManagerPort } from "@/features/plugins/api";
 
 /**
  * 当该 WebView 以“辅助窗口”启动时，将其路由到正确页面。
@@ -214,7 +211,7 @@ function ensureInitialServerSocket(): void {
  * - 通过调用 `GET /api/users/me` 校验 access token 是否仍有效。
  * - 成功后写入 `currentUser`，并在当前路由为 `/` 时跳转到 `/chat`。
  *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function tryRestoreSession(): Promise<void> {
   const socket = currentServerSocket.value.trim();

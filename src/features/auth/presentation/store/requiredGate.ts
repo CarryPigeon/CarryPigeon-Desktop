@@ -1,31 +1,32 @@
 /**
  * @fileoverview requiredGate.ts
- * @description Presentation store: required plugin missing info (for /required-setup).
+ * @description auth｜展示层状态（store）：requiredGate。
  */
 
 import { ref } from "vue";
 
 /**
- * Plugin ids that are missing/enforced by the current server.
+ * 当前服务端要求但客户端缺失的插件 id 列表。
  *
- * This store is typically populated after a failed sign-in attempt or by a
- * server-side "required_plugin_missing" response mapping.
+ * 说明：
+ * - 该 store 通常在登录失败后，由服务端 `required_plugin_missing` 错误映射而来；
+ * - UI 可据此引导用户安装/启用必需插件，再重试登录。
  *
  * @constant
  */
 export const missingRequiredPlugins = ref<string[]>([]);
 
 /**
- * Replace the missing required plugin list (normalized + deduplicated).
+ * 替换缺失插件列表（归一化 + 去重）。
  *
- * Normalization:
- * - Coerces to string
- * - Trims whitespace
- * - Drops empty values
- * - Deduplicates while keeping stable ordering
+ * 归一化规则：
+ * - 强制转为 string
+ * - trim 空白
+ * - 丢弃空值
+ * - 保持稳定顺序去重
  *
- * @param ids - Raw plugin id list.
- * @returns void
+ * @param ids - 原始插件 id 列表。
+ * @returns void。
  */
 export function setMissingRequiredPlugins(ids: string[]): void {
   const seen = new Set<string>();

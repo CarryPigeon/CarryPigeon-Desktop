@@ -1,10 +1,10 @@
 /**
  * @fileoverview httpAuthServicePort.ts
- * @description HTTP implementation of AuthServicePort.
+ * @description auth｜数据层实现：httpAuthServicePort。
  *
- * API alignment:
- * - See `docs/api/*` for auth endpoints and error model
- * - required gate: PRD 5.6 + `required_plugin_missing`
+ * API 对齐说明：
+ * - 认证相关接口与错误模型：见 `docs/api/*`
+ * - required gate：PRD 5.6 + `required_plugin_missing`
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
@@ -13,7 +13,7 @@ import { getDeviceId } from "@/shared/utils/deviceId";
 import type { AuthServicePort } from "../domain/ports/AuthServicePort";
 import type { AuthLoginResult, TokenLoginResult } from "../domain/types/AuthTypes";
 import { AuthRequiredPluginMissingError } from "../domain/errors/AuthErrors";
-import { getPluginManagerPort } from "@/features/plugins/di/plugins.di";
+import { getPluginManagerPort } from "@/features/plugins/api";
 
 type ApiTokenResponse = {
   token_type: string;
@@ -32,18 +32,18 @@ type ApiUserMeResponse = {
 };
 
 /**
- * Create an HTTP-backed AuthServicePort.
+ * 创建 HTTP 版本的 AuthServicePort。
  *
- * @param serverSocket - Server socket.
- * @returns AuthServicePort implementation.
+ * @param serverSocket - 服务端 socket。
+ * @returns AuthServicePort 实现。
  */
 export function createHttpAuthServicePort(serverSocket: string): AuthServicePort {
   const baseClient = new HttpJsonClient({ serverSocket, apiVersion: 1 });
 
   /**
-   * Build the `installed_plugins[]` payload required by the required-gate design.
+   * 构造 required-gate 设计所需的 `installed_plugins[]` 载荷。
    *
-   * @returns Plugin payload list for auth requests.
+   * @returns 用于认证请求的插件声明列表。
    */
   async function listInstalledPluginsForAuth(): Promise<Array<{ plugin_id: string; version: string }>> {
     try {
@@ -61,10 +61,10 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
   }
 
   /**
-   * Convert an API error into an auth-domain error when possible.
+   * 尝试把 API error 转换为 auth 领域错误（可识别时）。
    *
-   * @param e - Unknown error thrown by HTTP client.
-   * @returns Never returns; always throws.
+   * @param e - HTTP client 抛出的未知错误。
+   * @returns 该函数不会返回；只会抛出错误。
    */
   function rethrowIfRequiredGate(e: unknown): never {
     if (isApiRequestError(e) && e.reason === "required_plugin_missing") {

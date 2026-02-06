@@ -1,25 +1,25 @@
 /**
  * @fileoverview UpdateUserProfile.ts
- * @description Usecase: update user profile.
+ * @description user｜用例：UpdateUserProfile。
  */
 
 import type { UserServicePort } from "../ports/UserServicePort";
 
 /**
- * Update user profile usecase.
+ * 用例：更新用户资料。
  */
 export class UpdateUserProfile {
   constructor(private readonly userService: UserServicePort) {}
 
   /**
-   * Execute update user profile.
+   * 执行：修改当前用户基础资料。
    *
-   * @param username - New username.
-   * @param avatar - Avatar id.
-   * @param sex - Sex code.
-   * @param brief - Bio.
-   * @param birthday - Birthday timestamp.
-   * @returns Promise<void>.
+   * @param username - 昵称。
+   * @param avatar - 头像 id（由服务端定义的资源编号）。
+   * @param sex - 性别 code（由服务端枚举定义）。
+   * @param brief - 简介。
+   * @param birthday - 生日时间戳（毫秒）。
+   * @returns 无返回值。
    */
   execute(
     username: string,

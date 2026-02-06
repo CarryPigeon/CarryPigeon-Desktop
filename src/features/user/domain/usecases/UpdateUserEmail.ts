@@ -1,22 +1,22 @@
 /**
  * @fileoverview UpdateUserEmail.ts
- * @description Usecase: update user email.
+ * @description user｜用例：UpdateUserEmail。
  */
 
 import type { UserServicePort } from "../ports/UserServicePort";
 
 /**
- * Update user email usecase.
+ * 用例：更新用户邮箱。
  */
 export class UpdateUserEmail {
   constructor(private readonly userService: UserServicePort) {}
 
   /**
-   * Execute update user email.
+   * 执行：修改当前用户邮箱。
    *
-   * @param email - New email.
-   * @param code - Verification code.
-   * @returns Promise<void>.
+   * @param email - 新邮箱地址。
+   * @param code - 邮箱验证码。
+   * @returns 无返回值。
    */
   execute(email: string, code: string): Promise<void> {
     return this.userService.updateUserEmail(email, code);

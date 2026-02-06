@@ -1,6 +1,6 @@
 /**
  * @fileoverview WS `event_id` 比较工具。
- * @description
+ * @description 网络基础设施：eventId。
  * 协议约定：服务端推送事件必须携带单调递增 `event_id`（推荐 Snowflake，十进制字符串）。
  *
  * 客户端需要把 `event_id` 当作“不透明但可比较”的游标，用于：

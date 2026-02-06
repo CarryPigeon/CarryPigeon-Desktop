@@ -7,8 +7,16 @@ import { computed, ref } from "vue";
 import { MOCK_SERVER_SOCKET, USE_MOCK_API } from "@/shared/config/runtime";
 import { readJson, writeJson } from "@/shared/utils/localStore";
 import { MOCK_KEYS } from "@/shared/mock/mockKeys";
-import { currentServerSocket, setServerSocket } from "@/features/servers/presentation/store/currentServer";
+import { currentServerSocket, setServerSocket } from "./currentServer";
+import { setServerTlsConfigProvider } from "@/shared/net/tls/serverTlsConfigProvider";
 
+/**
+ * 服务端机架（Rack）记录（展示层模型）。
+ *
+ * 说明：
+ * - 该结构用于 server rail、quick switcher、以及连接层的 TLS 配置解析；
+ * - 当前持久化实现以 localStorage 为主（mock/开发态）。
+ */
 export type ServerRack = {
   id: string;
   name: string;
@@ -84,7 +92,7 @@ const state = ref<StoredServersState>(
 /**
  * 从存储读取后，确保 state 结构被归一化。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function normalizeState(): void {
   const next: ServerRack[] = [];
@@ -117,12 +125,15 @@ function computeServerRacks(): ServerRack[] {
  */
 export const serverRacks = computed(computeServerRacks);
 
+/**
+ * 某个 server socket 对应的 TLS 配置（从 rack 记录解析）。
+ */
 export type ServerTlsConfig = { tlsPolicy: ServerRack["tlsPolicy"]; tlsFingerprint: string };
 
 /**
  * 从 rack store 中解析指定 socket 的 TLS 配置。
  *
- * @param serverSocket - server socket key。
+ * @param serverSocket - 服务器 Socket 地址（作为 rack 的唯一 key）。
  * @returns TLS 配置（默认 strict + 空指纹）。
  */
 export function getTlsConfigForSocket(serverSocket: string): ServerTlsConfig {
@@ -131,6 +142,9 @@ export function getTlsConfigForSocket(serverSocket: string): ServerTlsConfig {
   if (!rack) return { tlsPolicy: "strict", tlsFingerprint: "" };
   return { tlsPolicy: rack.tlsPolicy, tlsFingerprint: rack.tlsFingerprint };
 }
+
+// 依赖倒置：由 servers feature 提供 per-server TLS 配置，供 shared/net 基础设施消费。
+setServerTlsConfigProvider(getTlsConfigForSocket);
 
 /**
  * 按 pinned 标记比较 rack（pinned 优先）。
@@ -146,7 +160,7 @@ function comparePinnedFirst(a: ServerRack, b: ServerRack): number {
 /**
  * 原地排序机架列表：pinned 项优先。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function sortRacksPinnedFirst(): void {
   state.value.servers.sort(comparePinnedFirst);
@@ -168,7 +182,7 @@ function findRackById(id: string): ServerRack | null {
 /**
  * 按 server socket 查找 rack。
  *
- * @param socket - server socket（必须已 `trim()`）。
+ * @param socket - 服务器 Socket 地址（必须已 `trim()`）。
  * @returns 找到则返回 rack；否则返回 `null`。
  */
 function findRackBySocket(socket: string): ServerRack | null {
@@ -181,7 +195,7 @@ function findRackBySocket(socket: string): ServerRack | null {
 /**
  * 判断是否存在使用指定 socket 的 rack。
  *
- * @param socket - server socket（必须已 `trim()`）。
+ * @param socket - 服务器 Socket 地址（必须已 `trim()`）。
  * @returns 当存在 rack 使用该 socket 时返回 `true`。
  */
 function hasRackWithSocket(socket: string): boolean {
@@ -196,7 +210,7 @@ function hasRackWithSocket(socket: string): boolean {
  * - 若 socket 已存在：直接切换为当前 active server。
  * - 新 rack 会插入到列表头部。
  *
- * @param serverSocket - 要添加/选择的 server socket。
+ * @param serverSocket - 要添加/选择的服务器 Socket 地址。
  * @param name - 可选展示名称。
  */
 export function addServer(serverSocket: string, name: string): void {

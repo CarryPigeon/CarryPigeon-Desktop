@@ -1,6 +1,6 @@
 /**
  * @fileoverview UserTypes.ts
- * @description Domain types for user feature (framework-agnostic).
+ * @description user｜领域类型：UserTypes。
  */
 
 /**

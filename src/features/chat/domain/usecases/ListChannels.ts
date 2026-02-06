@@ -1,23 +1,23 @@
 /**
  * @fileoverview ListChannels.ts
- * @description Usecase: list channels visible to current user.
+ * @description chat｜用例：ListChannels。
  */
 
 import type { ChatApiPort } from "../ports/chatApiPort";
 import type { ChannelDto } from "../types/chatWireDtos";
 
 /**
- * List channels usecase.
+ * 用例：获取频道列表。
  */
 export class ListChannels {
   constructor(private readonly api: ChatApiPort) {}
 
   /**
-   * Execute list channels.
+   * 执行：获取当前用户可见的频道列表。
    *
-   * @param serverSocket - Server socket.
-   * @param accessToken - Bearer token.
-   * @returns Channels list.
+   * @param serverSocket - 服务器 Socket 地址。
+   * @param accessToken - 访问令牌（Bearer）。
+   * @returns 频道列表。
    */
   execute(serverSocket: string, accessToken: string): Promise<ChannelDto[]> {
     return this.api.listChannels(serverSocket, accessToken);

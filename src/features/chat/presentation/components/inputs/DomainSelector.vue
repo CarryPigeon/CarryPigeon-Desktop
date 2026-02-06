@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview DomainSelector.vue
- * @description Domain selector for ComposerHost.
+ * @description chat｜组件：DomainSelector。
  */
 
 const props = defineProps<{
@@ -14,10 +14,10 @@ const emit = defineEmits<{
 }>();
 
 /**
- * Pick a domain option and update v-model.
+ * 选择一个 domain 并更新 v-model。
  *
- * @param id - Domain id.
- * @returns void
+ * @param id - domain id。
+ * @returns 无返回值。
  */
 function handlePick(id: string): void {
   emit("update:modelValue", id);
@@ -43,15 +43,15 @@ function handlePick(id: string): void {
 </template>
 
 <style scoped lang="scss">
-/* DomainSelector styles */
-/* Selector: `.cp-domain-selector` — wrapper for domain option pills. */
+/* 样式：DomainSelector */
+/* 选择器：`.cp-domain-selector` —— domain 选项胶囊的容器。 */
 .cp-domain-selector {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* Selector: `.cp-domain` — domain option button (inactive). */
+/* 选择器：`.cp-domain` —— domain 选项按钮（未激活）。 */
 .cp-domain {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -70,21 +70,21 @@ function handlePick(id: string): void {
     color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-domain:hover` — hover lift + highlight border. */
+/* 选择器：`.cp-domain:hover` —— hover 抬升 + 强调边框。 */
 .cp-domain:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Selector: `.cp-domain[data-active="true"]` — active domain selection. */
+/* 选择器：`.cp-domain[data-active="true"]` —— 激活态 domain 选中样式。 */
 .cp-domain[data-active="true"] {
   border-color: var(--cp-highlight-border-strong);
   background: var(--cp-highlight-bg);
   color: var(--cp-text);
 }
 
-/* Selector: `.cp-domain__dot` — left color dot (domain color). */
+/* 选择器：`.cp-domain__dot` —— 左侧颜色圆点（domain 色）。 */
 .cp-domain__dot {
   width: 10px;
   height: 10px;
@@ -92,7 +92,7 @@ function handlePick(id: string): void {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-border) 70%, transparent);
 }
 
-/* Selector: `.cp-domain__label` — domain label (no wrap). */
+/* 选择器：`.cp-domain__label` —— domain 文案（不换行）。 */
 .cp-domain__label {
   white-space: nowrap;
 }

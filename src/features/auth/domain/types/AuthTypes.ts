@@ -1,6 +1,6 @@
 /**
  * @fileoverview AuthTypes.ts
- * @description Domain types for auth feature (framework-agnostic).
+ * @description auth｜领域类型：AuthTypes。
  */
 
 /**

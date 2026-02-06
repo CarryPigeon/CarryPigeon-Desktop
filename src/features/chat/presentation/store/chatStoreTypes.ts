@@ -1,10 +1,20 @@
 /**
- * @fileoverview chatStoreTypes.ts
- * @description Presentation-layer types for the Patchbay chat store.
+ * @fileoverview Patchbay 聊天展示层类型定义。
+ * @description chat｜展示层状态（store）：chatStoreTypes。
+ * 该文件仅包含展示层（presentation）会直接消费的类型：
+ * - Store 暴露给页面/组件的状态结构
+ * - 组件渲染需要的消息/频道/成员模型
+ *
+ * 约定：
+ * - 注释统一使用中文
+ * - 日志输出统一使用英文（由调用方 logger 控制）
  */
 
 import type { Ref } from "vue";
 
+/**
+ * 频道条目（展示层模型）。
+ */
 export type ChatChannel = {
   id: string;
   name: string;
@@ -14,12 +24,18 @@ export type ChatChannel = {
   joinRequested: boolean;
 };
 
+/**
+ * 频道成员（轻量展示）。
+ */
 export type ChatMember = {
   id: string;
   name: string;
   role: "owner" | "admin" | "member";
 };
 
+/**
+ * 频道成员（管理页模型）。
+ */
 export type ChannelMember = {
   uid: string;
   nickname: string;
@@ -28,6 +44,9 @@ export type ChannelMember = {
   joinTime: number;
 };
 
+/**
+ * 入群申请条目（管理页模型）。
+ */
 export type ChannelApplication = {
   applicationId: string;
   cid: string;
@@ -39,6 +58,9 @@ export type ChannelApplication = {
   status: "pending" | "approved" | "rejected" | string;
 };
 
+/**
+ * 封禁条目（管理页模型）。
+ */
 export type ChannelBan = {
   cid: string;
   uid: string;
@@ -49,6 +71,9 @@ export type ChannelBan = {
   createTime: number;
 };
 
+/**
+ * 消息 domain 描述（用于渲染色条/插件提示等）。
+ */
 export type MessageDomain = {
   id: string;
   label: string;
@@ -62,6 +87,9 @@ export type MessageDomain = {
   version?: string;
 };
 
+/**
+ * 编辑器提交载荷（Core:Text 或插件 composer）。
+ */
 export type ComposerSubmitPayload = {
   domain: string;
   domain_version: string;
@@ -69,6 +97,9 @@ export type ComposerSubmitPayload = {
   reply_to_mid?: string;
 };
 
+/**
+ * 聊天消息展示模型（支持 core 文本与 domain 消息）。
+ */
 export type ChatMessage =
   | {
       id: string;
@@ -90,6 +121,13 @@ export type ChatMessage =
       replyToId?: string;
     };
 
+/**
+ * 聊天展示层 store 对外暴露的接口类型。
+ *
+ * 说明：
+ * - 用于组件/页面做类型约束；
+ * - 具体实现位于 `chatStore`（包含 socket scope、WS/HTTP 编排等）。
+ */
 export type ChatStore = {
   channels: Readonly<Ref<ChatChannel[]>>;
   allChannels: Readonly<Ref<ChatChannel[]>>;

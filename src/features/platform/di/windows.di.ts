@@ -1,6 +1,6 @@
 /**
  * @fileoverview windows.di.ts
- * @description Composition root for windows feature (usecase singletons).
+ * @description platform｜依赖组装（DI）：windows.di。
  */
 import { tauriWindowCommandsAdapter } from "../data/tauriWindowCommandsAdapter";
 import { OpenInfoWindow } from "../domain/usecases/OpenInfoWindow";
@@ -12,9 +12,9 @@ let openPopoverWindow: OpenPopoverWindow | null = null;
 let openInfoWindow: OpenInfoWindow | null = null;
 
 /**
- * Get singleton `ResizeChatWindow` usecase.
+ * 获取 `ResizeChatWindow` 用例（单例）。
  *
- * @returns Usecase instance.
+ * @returns `ResizeChatWindow` 实例。
  */
 export function getResizeChatWindowUsecase(): ResizeChatWindow {
   if (resizeChatWindow) return resizeChatWindow;
@@ -23,9 +23,9 @@ export function getResizeChatWindowUsecase(): ResizeChatWindow {
 }
 
 /**
- * Get singleton `OpenPopoverWindow` usecase.
+ * 获取 `OpenPopoverWindow` 用例（单例）。
  *
- * @returns Usecase instance.
+ * @returns `OpenPopoverWindow` 实例。
  */
 export function getOpenPopoverWindowUsecase(): OpenPopoverWindow {
   if (openPopoverWindow) return openPopoverWindow;
@@ -34,9 +34,9 @@ export function getOpenPopoverWindowUsecase(): OpenPopoverWindow {
 }
 
 /**
- * Get singleton `OpenInfoWindow` usecase.
+ * 获取 `OpenInfoWindow` 用例（单例）。
  *
- * @returns Usecase instance.
+ * @returns `OpenInfoWindow` 实例。
  */
 export function getOpenInfoWindowUsecase(): OpenInfoWindow {
   if (openInfoWindow) return openInfoWindow;

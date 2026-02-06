@@ -34,7 +34,7 @@ const display = computed(computeDisplay);
  *
  * 设计说明：该组件不主动弹 toast，以保持通用性（由上层决定提示方式）。
  *
- * @returns Promise<void>
+ * @returns 无返回值。
  */
 async function handleCopy(): Promise<void> {
   if (!props.copyable) return;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview UserPopoverPage.vue
- * @description Lightweight popover window for user info (minimal for preview).
+ * @description user｜页面：UserPopoverPage。
  */
 
 import { computed } from "vue";
@@ -11,27 +11,27 @@ import MonoTag from "@/shared/ui/MonoTag.vue";
 const route = useRoute();
 
 /**
- * Read user display name from query params.
+ * 从 query 参数中读取用户显示名。
  *
- * @returns Name string.
+ * @returns 名称字符串。
  */
 function computeName(): string {
   return String(route.query.name ?? "");
 }
 
 /**
- * Read user email from query params.
+ * 从 query 参数中读取用户邮箱。
  *
- * @returns Email string.
+ * @returns 邮箱字符串。
  */
 function computeEmail(): string {
   return String(route.query.email ?? "");
 }
 
 /**
- * Read user bio from query params.
+ * 从 query 参数中读取用户简介。
  *
- * @returns Bio string.
+ * @returns 简介字符串。
  */
 function computeBio(): string {
   return String(route.query.bio ?? "");

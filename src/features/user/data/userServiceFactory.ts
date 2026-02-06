@@ -1,19 +1,25 @@
 /**
  * @fileoverview userServiceFactory.ts
- * @description Data-layer factory: re-exports for backward compatibility.
+ * @description user｜数据层实现：userServiceFactory。
  *
- * @deprecated Use domain/ports and di/ instead.
+ * @deprecated 请改用 domain/ports 与 di/（依赖注入入口）。
  *
- * API alignment:
- * - User read endpoints live under `docs/api/*` → Users
- * - Profile mutation endpoints are not part of the current HTTP API (kept as future/legacy hooks)
+ * API 对齐说明：
+ * - 用户信息接口参见 `docs/api/*` → Users
+ * - 用户资料变更接口尚未纳入当前 HTTP API（保留为历史/未来扩展点）
  */
 
-// Re-export types from domain layer for backward compatibility
+/**
+ * 向后兼容导出：重导出领域层用户类型。
+ */
 export type { UserMe, UserPublic } from "../domain/types/UserTypes";
 
-// Re-export port type as service type for backward compatibility
+/**
+ * 向后兼容导出：将领域端口类型重命名为 service 类型别名。
+ */
 export type { UserServicePort as UserService } from "../domain/ports/UserServicePort";
 
-// Re-export factory function for backward compatibility
+/**
+ * 向后兼容导出：重导出旧工厂函数名。
+ */
 export { createUserService } from "../di/user.di";

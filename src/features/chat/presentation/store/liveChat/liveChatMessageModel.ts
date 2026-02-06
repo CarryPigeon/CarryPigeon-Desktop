@@ -1,6 +1,6 @@
 /**
  * @fileoverview 聊天消息模型映射与合并工具。
- * @description
+ * @description chat｜展示层状态（store）：liveChatMessageModel。
  * 将 wire DTO（HTTP/WS 返回）转换为 UI 可渲染的消息模型，并提供：
  * - domain → UI 颜色 token 映射
  * - domain → pluginIdHint 推断（用于 UnknownDomain 降级卡片）
@@ -9,8 +9,7 @@
  * 该模块刻意保持“纯工具”风格：不维护状态，仅依赖入参与只读 store。
  */
 
-import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
-import { useDomainCatalogStore } from "@/features/plugins/presentation/store/domainCatalogStore";
+import { useDomainCatalogStore, usePluginCatalogStore } from "@/features/plugins/api";
 import type { MessageDto } from "@/features/chat/domain/types/chatWireDtos";
 import type { ChatMessage, MessageDomain } from "../chatStoreTypes";
 
@@ -39,7 +38,7 @@ function mapDomainColorVar(domain: string): MessageDomain["colorVar"] {
  *
  * 用途：UnknownDomain 降级卡片可直接跳转到插件中心并聚焦插件。
  *
- * @param serverSocket - server socket。
+ * @param serverSocket - 服务器 Socket 地址。
  * @param domain - domain 标签。
  * @returns pluginId 提示；不存在则返回空字符串。
  */
@@ -64,7 +63,7 @@ function findPluginHintForDomain(serverSocket: string, domain: string): string {
 /**
  * 将 API Message DTO 映射为 UI 渲染模型。
  *
- * @param serverSocket - server socket（用于 domain → plugin hint 推断）。
+ * @param serverSocket - 服务器 Socket 地址（用于 domain → plugin hint 推断）。
  * @param m - API message DTO。
  * @returns UI message model。
  */
@@ -147,4 +146,3 @@ export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]):
   out.sort(compareMessages);
   return out;
 }
-

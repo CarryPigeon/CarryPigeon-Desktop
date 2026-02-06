@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview SignalStrip.vue
- * @description 2px domain-colored strip for message rows.
+ * @description 消息行左侧的 2px domain 色条，用于快速识别消息所属域（domain）。
  */
 
 const props = withDefaults(
@@ -21,8 +21,7 @@ const props = withDefaults(
 </template>
 
 <style scoped lang="scss">
-/* SignalStrip styles */
-/* Selector: `.cp-signal-strip` — 2px vertical domain-colored strip (height follows row). */
+/* 样式：SignalStrip｜2px 垂直 domain 色条（高度跟随消息行） */
 .cp-signal-strip {
   display: block;
   width: 2px;

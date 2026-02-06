@@ -1,24 +1,23 @@
 /**
  * @fileoverview ServerInfoPort.ts
- * @description Domain port: fetch server basic info and stable `server_id`.
+ * @description servers｜领域端口：ServerInfoPort。
  */
 
 import type { ServerInfo } from "../types/serverInfo";
 
 /**
- * Server info port.
+ * 服务端信息端口（领域层）。
  *
- * Implementations:
- * - `mock`: deterministic server info for local UI preview
- * - `tauri`: TCP/HTTP-backed server info from real backend
+ * 实现说明：
+ * - `mock`：用于本地 UI 预览的确定性实现
+ * - `tauri`：通过 TCP/HTTP 从真实后端获取服务端信息
  */
 export interface ServerInfoPort {
   /**
-   * Fetch server info for a given socket.
+   * 获取指定 server socket 的服务端信息。
    *
-   * @param serverSocket - Target server socket string.
-   * @returns Server info including `serverId`.
+   * @param serverSocket - 目标 server socket 字符串。
+   * @returns 服务端信息（包含 `serverId` 等字段）。
    */
   getServerInfo(serverSocket: string): Promise<ServerInfo>;
 }
-

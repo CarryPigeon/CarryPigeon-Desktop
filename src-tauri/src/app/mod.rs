@@ -1,3 +1,13 @@
+//! 应用组装入口（Tauri Builder）。
+//!
+//! 本模块负责：
+//! - 组装 Tauri `Builder`（托盘、窗口事件、command 注册等）
+//! - 注册 `app://` 自定义 scheme（用于安全地加载本地插件静态资源）
+//!
+//! 约定：
+//! - 注释统一使用中文，便于团队维护与交接。
+//! - 日志输出统一使用英文，便于跨端检索与与上游/第三方日志对齐。
+
 use anyhow::Context;
 use tauri::{
     Manager,
@@ -9,12 +19,16 @@ use crate::features::network::init_tcp_service;
 use crate::features::plugins::data::plugin_store;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// 启动 Tauri 应用。
+///
+/// # 返回值
+/// 当 Builder 组装或初始化失败时返回错误。
 pub fn run() -> anyhow::Result<()> {
     tauri::Builder::default()
         .register_uri_scheme_protocol("app", |_, req| match handle_app_scheme(req) {
             Ok(res) => res,
             Err(e) => {
-                tracing::warn!("app:// scheme handler failed: {}", e);
+                tracing::warn!(action = "app_scheme_handler_failed", error = %e);
                 tauri::http::Response::builder()
                     .status(500)
                     .body(Vec::new())
@@ -35,22 +49,23 @@ pub fn run() -> anyhow::Result<()> {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
-                        println!("quit menu item was clicked");
+                        tracing::info!(action = "tray_menu_clicked", item_id = "quit");
                         app.exit(0);
                     }
                     _ => {
-                        tracing::warn!("menu item {:?} not handled", event.id);
+                        tracing::warn!(action = "tray_menu_unhandled", item_id = ?event.id);
                     }
                 })
-                .on_tray_icon_event(|tray, event| match event {
+                .on_tray_icon_event(|tray, event| {
                     // 设置鼠标左键单击行为
-                    TrayIconEvent::Click {
+                    if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         position: _,
                         id: _,
                         rect: _,
-                    } => {
+                    } = event
+                    {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.unminimize();
@@ -58,16 +73,15 @@ pub fn run() -> anyhow::Result<()> {
                             let _ = window.set_focus();
                         }
                     }
-                    _ => {}
                 })
                 .build(app)?;
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == "user-info-popover" {
-                if let tauri::WindowEvent::Focused(false) = event {
-                    let _ = window.close();
-                }
+            if window.label() == "user-info-popover"
+                && matches!(event, &tauri::WindowEvent::Focused(false))
+            {
+                let _ = window.close();
             }
         })
         .plugin(tauri_plugin_opener::init())
@@ -132,6 +146,13 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 根据文件后缀推导 MIME 类型。
+///
+/// # 参数
+/// - `path`: 文件路径（通常为 URL 的相对路径）。
+///
+/// # 返回值
+/// MIME 字符串（默认 `application/octet-stream`）。
 fn mime_by_path(path: &str) -> &'static str {
     let p = path.to_lowercase();
     if p.ends_with(".js") || p.ends_with(".mjs") {
@@ -167,8 +188,16 @@ fn mime_by_path(path: &str) -> &'static str {
     "application/octet-stream"
 }
 
+/// 最小化 percent 解码器。
+///
+/// 说明：只覆盖本项目 scheme 中会出现的 URL path segment（server_id/plugin_id/version/path）。
+///
+/// # 参数
+/// - `input`: URL path segment（可能包含 `%xx`）。
+///
+/// # 返回值
+/// 解码后的字符串（对非法输入做 best-effort 处理）。
 fn percent_decode(input: &str) -> String {
-    // Minimal percent decoder: enough for URL segments used by plugin_id/version/path.
     let bytes = input.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0usize;
@@ -196,11 +225,21 @@ fn percent_decode(input: &str) -> String {
     String::from_utf8_lossy(&out).to_string()
 }
 
+/// 处理 `app://` scheme 请求。
+///
+/// 当前仅支持插件静态资源：
+/// `app://plugins/<server_id>/<plugin_id>/<version>/<path>`
+///
+/// # 参数
+/// - `req`: Tauri scheme 请求。
+///
+/// # 返回值
+/// HTTP 响应（200/400/404）。
 fn handle_app_scheme(
     req: tauri::http::Request<Vec<u8>>,
 ) -> Result<tauri::http::Response<Vec<u8>>, anyhow::Error> {
     let uri = req.uri().to_string();
-    // We only handle plugin assets: `app://plugins/<server_id>/<plugin_id>/<version>/<path>`
+    // 只处理插件静态资源请求：`app://plugins/<server_id>/<plugin_id>/<version>/<path>`
     if !uri.starts_with("app://plugins/") {
         return Ok(tauri::http::Response::builder()
             .status(404)
@@ -208,7 +247,13 @@ fn handle_app_scheme(
             .unwrap());
     }
     let rest = &uri["app://plugins/".len()..];
-    let path_only = rest.split('?').next().unwrap_or(rest).split('#').next().unwrap_or(rest);
+    let path_only = rest
+        .split('?')
+        .next()
+        .unwrap_or(rest)
+        .split('#')
+        .next()
+        .unwrap_or(rest);
     let segs: Vec<&str> = path_only.split('/').filter(|s| !s.is_empty()).collect();
     if segs.len() < 4 {
         return Ok(tauri::http::Response::builder()
@@ -226,7 +271,8 @@ fn handle_app_scheme(
         .collect::<Vec<String>>()
         .join("/");
 
-    let file_path = plugin_store::resolve_app_plugins_path(&server_id, &plugin_id, &version, &rel_path)?;
+    let file_path =
+        plugin_store::resolve_app_plugins_path(&server_id, &plugin_id, &version, &rel_path)?;
     let bytes = std::fs::read(&file_path)
         .with_context(|| format!("Failed to read plugin file: {}", file_path.display()))?;
 

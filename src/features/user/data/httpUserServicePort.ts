@@ -1,6 +1,6 @@
 /**
  * @fileoverview httpUserServicePort.ts
- * @description HTTP implementation of UserServicePort.
+ * @description user｜数据层实现：httpUserServicePort。
  */
 
 import type { UserServicePort } from "../domain/ports/UserServicePort";
@@ -8,10 +8,10 @@ import type { UserMe, UserPublic } from "../domain/types/UserTypes";
 import { httpGetCurrentUser, httpGetUser, httpListUsers } from "./httpUserApi";
 
 /**
- * Create an HTTP-backed UserServicePort.
+ * 创建 HTTP 版本的 UserServicePort。
  *
- * @param serverSocket - Server socket.
- * @returns UserServicePort implementation.
+ * @param serverSocket - 服务端 socket。
+ * @returns UserServicePort 实现。
  */
 export function createHttpUserServicePort(serverSocket: string): UserServicePort {
   const socket = serverSocket.trim();

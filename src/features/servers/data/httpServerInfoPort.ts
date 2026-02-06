@@ -1,13 +1,13 @@
 /**
  * @fileoverview httpServerInfoPort.ts
- * @description HTTP-backed `ServerInfoPort` implementation for the `/api/server` endpoint.
+ * @description servers｜数据层实现：httpServerInfoPort。
  *
- * API doc reference:
- * - See `docs/api/*` → `GET /api/server`
+ * API 文档：
+ * - 见 `docs/api/*` → `GET /api/server`
  *
- * Notes:
- * - This adapter is used when the app is configured to talk to an HTTP+WS server.
- * - It maps server fields into the domain `ServerInfo` shape.
+ * 说明：
+ * - 当应用以 HTTP+WS 方式对接服务端时使用该适配器。
+ * - 负责把接口字段映射为领域模型 `ServerInfo`。
  */
 
 import type { ServerInfoPort } from "../domain/ports/ServerInfoPort";
@@ -32,10 +32,10 @@ type ApiServerResponse = {
 };
 
 /**
- * Map `/api/server` response into the domain `ServerInfo`.
+ * 将 `/api/server` 响应映射为领域模型 `ServerInfo`。
  *
- * @param raw - Raw API response.
- * @returns Domain `ServerInfo`.
+ * @param raw - 原始 API 响应。
+ * @returns 领域 `ServerInfo`。
  */
 function mapServerInfo(raw: ApiServerResponse): ServerInfo {
   const serverId = String(raw.server_id ?? "").trim();
@@ -54,7 +54,7 @@ function mapServerInfo(raw: ApiServerResponse): ServerInfo {
 }
 
 /**
- * HTTP ServerInfoPort implementation.
+ * HTTP 版本的 ServerInfoPort 实现。
  *
  * @constant
  */
@@ -69,7 +69,7 @@ export const httpServerInfoPort: ServerInfoPort = {
       if (info.serverId) rememberServerId(socket, info.serverId);
       return info;
     } catch (e) {
-      logger.error("Get server info failed", { socket, error: String(e) });
+      logger.error("Action: get_server_info_failed", { socket, error: String(e) });
       throw e;
     }
   },

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview UserInfoPage.vue
- * @description User info window/page (minimal for UI preview).
+ * @description user｜页面：UserInfoPage。
  */
 
 import { computed } from "vue";
@@ -13,39 +13,54 @@ const route = useRoute();
 const router = useRouter();
 
 /**
- * Read the user id to display (query param wins, store fallback).
+ * 读取某个字段的展示值（query 优先，store 作为兜底）。
  *
- * @returns User id as string.
+ * 说明：
+ * - 该页面既可通过路由 query 直达，也可展示当前登录用户（store）。
+ * - 统一用 `String(...)` 归一化，避免 query 为数组类型时导致渲染异常。
+ *
+ * @param key - query 字段名（例如 `uid` / `email`）。
+ * @param fallback - store 兜底值。
+ * @returns 归一化后的字符串值。
+ */
+function readQueryOrFallback(key: "uid" | "name" | "email" | "bio", fallback: unknown): string {
+  return String(route.query[key] ?? fallback ?? "");
+}
+
+/**
+ * 读取要展示的用户 id（query 优先，store 兜底）。
+ *
+ * @returns 用户 id 字符串。
  */
 function computeUid(): string {
-  return String(route.query.uid ?? currentUser.id ?? "");
+  return readQueryOrFallback("uid", currentUser.id);
 }
 
 /**
- * Read the display name (query param wins, store fallback).
+ * 读取展示名称（query 优先，store 兜底）。
  *
- * @returns User name.
+ * @returns 用户名称。
  */
 function computeName(): string {
-  return String(route.query.name ?? currentUser.username ?? "");
+  return readQueryOrFallback("name", currentUser.username);
 }
 
 /**
- * Read the email (query param wins, store fallback).
+ * 读取邮箱（query 优先，store 兜底）。
  *
- * @returns User email.
+ * @returns 用户邮箱。
  */
 function computeEmail(): string {
-  return String(route.query.email ?? currentUser.email ?? "");
+  return readQueryOrFallback("email", currentUser.email);
 }
 
 /**
- * Read the bio/description (query param wins, store fallback).
+ * 读取简介/描述（query 优先，store 兜底）。
  *
- * @returns User bio.
+ * @returns 用户简介。
  */
 function computeBio(): string {
-  return String(route.query.bio ?? currentUser.description ?? "");
+  return readQueryOrFallback("bio", currentUser.description);
 }
 
 const uid = computed(computeUid);
@@ -84,8 +99,7 @@ const bio = computed(computeBio);
 </template>
 
 <style scoped lang="scss">
-/* UserInfoPage styles */
-/* Selector: `.cp-info` — page wrapper. */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；页面为“头部卡片 + 内容网格面板”。 */
 .cp-info {
   height: 100%;
   padding: 14px;
@@ -94,7 +108,6 @@ const bio = computed(computeBio);
   gap: 12px;
 }
 
-/* Selector: `.cp-info__head` — header card (back + title). */
 .cp-info__head {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -107,7 +120,6 @@ const bio = computed(computeBio);
   align-items: center;
 }
 
-/* Selector: `.cp-info__back` — back button. */
 .cp-info__back {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -119,14 +131,12 @@ const bio = computed(computeBio);
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Selector: `.cp-info__back:hover` — hover lift + highlight border. */
 .cp-info__back:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* Selector: `.cp-info__name` — page title. */
 .cp-info__name {
   font-family: var(--cp-font-display);
   font-weight: 900;
@@ -135,14 +145,12 @@ const bio = computed(computeBio);
   color: var(--cp-text);
 }
 
-/* Selector: `.cp-info__sub` — subtitle line. */
 .cp-info__sub {
   margin-top: 6px;
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Selector: `.cp-info__body` — scrollable grid panel. */
 .cp-info__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -157,7 +165,6 @@ const bio = computed(computeBio);
   gap: 12px;
 }
 
-/* Selector: `.cp-info__card` — info card. */
 .cp-info__card {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -165,12 +172,10 @@ const bio = computed(computeBio);
   padding: 12px;
 }
 
-/* Selector: `.cp-info__card.wide` — wide card spanning both columns. */
 .cp-info__card.wide {
   grid-column: 1 / -1;
 }
 
-/* Selector: `.cp-info__k` — card key label (uppercase). */
 .cp-info__k {
   font-family: var(--cp-font-display);
   letter-spacing: 0.1em;
@@ -179,7 +184,6 @@ const bio = computed(computeBio);
   color: var(--cp-text-muted);
 }
 
-/* Selector: `.cp-info__v` — card value. */
 .cp-info__v {
   margin-top: 10px;
   font-size: 12px;

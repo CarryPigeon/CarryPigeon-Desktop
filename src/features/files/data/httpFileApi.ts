@@ -1,20 +1,22 @@
 /**
  * @fileoverview httpFileApi.ts
- * @description HTTP data adapter for file upload/download flows.
+ * @description files｜数据层实现：httpFileApi。
  *
- * API doc reference:
- * - See `docs/api/*` → Files section
+ * API 文档：
+ * - 见 `docs/api/*` → Files 相关接口
  *
- * Notes:
- * - Upload is a two-step flow: request an upload descriptor, then perform the
- *   actual upload directly to `upload.url`.
- * - Download is performed via `/api/files/download/{share_key}` as a binary response.
+ * 说明：
+ * - 上传为两段式：先请求 upload descriptor，再将文件直接上传到 `upload.url`。
+ * - 下载通过 `/api/files/download/{share_key}` 以二进制响应完成。
  */
 
-import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
+import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 
+/**
+ * 请求文件上传的参数。
+ */
 export type ApiRequestUploadRequest = {
   filename: string;
   mime_type: string;
@@ -22,6 +24,9 @@ export type ApiRequestUploadRequest = {
   sha256?: string;
 };
 
+/**
+ * 上传 descriptor：告诉客户端“怎么上传到上传端点”。
+ */
 export type ApiUploadDescriptor = {
   method: string;
   url: string;
@@ -29,6 +34,9 @@ export type ApiUploadDescriptor = {
   expires_at: number;
 };
 
+/**
+ * 请求上传响应：返回 file_id/share_key 以及 upload descriptor。
+ */
 export type ApiRequestUploadResponse = {
   file_id: string;
   share_key: string;
@@ -36,34 +44,19 @@ export type ApiRequestUploadResponse = {
 };
 
 /**
- * Create an authenticated HTTP client bound to a server socket and token.
+ * 请求文件上传的 upload descriptor。
  *
- * @param serverSocket - Server socket string.
- * @param accessToken - Bearer token.
- * @returns HttpJsonClient.
- */
-function createAuthedClient(serverSocket: string, accessToken: string): HttpJsonClient {
-  const socket = serverSocket.trim();
-  const token = accessToken.trim();
-  if (!socket) throw new Error("Missing server socket");
-  if (!token) throw new Error("Missing access token");
-  return new HttpJsonClient({ serverSocket: socket, apiVersion: 1, accessToken: token });
-}
-
-/**
- * Request an upload descriptor for a file.
- *
- * @param serverSocket - Server socket.
- * @param accessToken - Access token.
- * @param req - Upload request details.
- * @returns Upload descriptor response.
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param req - 上传请求参数。
+ * @returns upload descriptor 响应。
  */
 export async function httpRequestFileUpload(
   serverSocket: string,
   accessToken: string,
   req: ApiRequestUploadRequest,
 ): Promise<ApiRequestUploadResponse> {
-  const client = createAuthedClient(serverSocket, accessToken);
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const filename = String(req?.filename ?? "").trim();
   const mimeType = String(req?.mime_type ?? "").trim();
   const sizeBytes = Number(req?.size_bytes ?? 0);
@@ -80,14 +73,15 @@ export async function httpRequestFileUpload(
 }
 
 /**
- * Perform the actual upload using the provided descriptor.
+ * 使用 upload descriptor 执行实际上传。
  *
- * This intentionally does not try to infer content-type; the upload endpoint
- * decides. Callers may include `Content-Type` inside `upload.headers` if required.
+ * 说明：
+ * - 该函数不会推断 content-type；由上传端点自行决定。
+ * - 若服务端要求，可在 `upload.headers` 中携带 `Content-Type`。
  *
- * @param upload - Upload descriptor returned by `httpRequestFileUpload`.
- * @param body - Binary payload (Blob/ArrayBuffer/Uint8Array).
- * @returns Promise<void>
+ * @param upload - `httpRequestFileUpload` 返回的 upload descriptor。
+ * @param body - 二进制载荷（Blob/ArrayBuffer/Uint8Array）。
+ * @returns Promise<void>。
  */
 export async function httpPerformFileUpload(
   upload: ApiUploadDescriptor,
@@ -106,10 +100,10 @@ export async function httpPerformFileUpload(
   for (const [k, v] of Object.entries(upload?.headers ?? {})) headers[k] = String(v);
 
   /**
-   * Convert supported binary inputs into a `fetch`-compatible body.
+   * 将支持的二进制输入转换为 `fetch` 可接受的 body。
    *
-   * @param input - Binary input.
-   * @returns Fetch body.
+   * @param input - 二进制输入。
+   * @returns `fetch` 可接受的 body。
    */
   function toFetchBody(input: Blob | ArrayBuffer | Uint8Array): Blob | ArrayBuffer {
     if (input instanceof Blob) return input;
@@ -132,11 +126,11 @@ export async function httpPerformFileUpload(
 }
 
 /**
- * Build the absolute download URL for a share key.
+ * 构建 share key 对应的绝对下载 URL。
  *
- * @param serverSocket - Server socket.
- * @param shareKey - File share key.
- * @returns Absolute URL like `https://host/api/files/download/{share_key}`.
+ * @param serverSocket - 服务端 socket。
+ * @param shareKey - 文件 share key。
+ * @returns 绝对 URL，例如 `https://host/api/files/download/{share_key}`。
  */
 export function buildFileDownloadUrl(serverSocket: string, shareKey: string): string {
   const origin = toHttpOrigin(serverSocket.trim());

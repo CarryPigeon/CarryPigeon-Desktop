@@ -1,56 +1,72 @@
 /**
  * @fileoverview chatEventsPort.ts
- * @description Domain port: chat event stream connection (push-based).
+ * @description chat｜领域端口：chatEventsPort。
  *
- * Notes:
- * - This port abstracts the push channel (typically WebSocket).
- * - The connect method is intentionally narrow: the store drives reauth/close
- *   based on session changes and UI lifecycle.
+ * 说明：
+ * - 该端口抽象“推送通道”（通常为 WebSocket）。
+ * - `connect` 的能力刻意保持“窄接口”：由 store 基于会话变更与 UI 生命周期驱动 reauth/close。
  */
 
 import type { WsEventDto } from "../types/chatWireEvents";
 
+/**
+ * 事件流连接句柄（由 data 层实现返回）。
+ *
+ * 说明：
+ * - store 负责在 token 变更/页面卸载时调用 close；
+ * - 若 access token 刷新，可调用 reauth 进行无感续期（由实现决定是否支持）。
+ */
 export type ChatEventsClient = {
   /**
-   * Close the underlying connection and stop timers.
+   * 关闭底层连接，并停止内部定时器。
    */
   close(): void;
   /**
-   * Re-authenticate the connection with a new access token.
+   * 使用新的 access token 对连接进行 reauth。
    *
-   * @param nextAccessToken - New access token.
+   * @param nextAccessToken - 新 access token。
    */
   reauth(nextAccessToken: string): void;
 };
 
+/**
+ * 事件流连接可选项（用于 override 与回调）。
+ */
 export type ChatEventsConnectOptions = {
   /**
-   * Optional explicit WS endpoint returned by `GET /api/server` (`ws_url`).
+   * 可选：由 `GET /api/server` 返回的明确 WS 端点（`ws_url`）。
    *
-   * When provided, the client should prefer it over the default `${origin}/api/ws`
-   * construction to support custom WS routing.
+   * 说明：
+   * - 当提供该字段时，client 应优先使用它，而不是默认的 `${origin}/api/ws` 拼接规则，
+   *   以支持自定义 WS 路由。
    */
   wsUrlOverride?: string;
   /**
-   * Called when the server reports resume is not possible; the client must
-   * catch up via request/response APIs.
+   * 当服务端报告无法 resume 时回调；客户端必须通过 HTTP（request/response）补拉追平。
    */
   onResumeFailed?: (reason: string) => void;
   /**
-   * Called when the server rejects auth/reauth; the client should refresh and/or reconnect.
+   * 当服务端拒绝 auth/reauth 时回调；客户端应刷新 token 并重连（或按策略降级）。
    */
   onAuthError?: (reason: string) => void;
 };
 
+/**
+ * 聊天事件流端口（domain 层）。
+ *
+ * 说明：
+ * - 该端口抽象推送通道（通常为 WebSocket）；
+ * - 具体实现由 data 层提供（真实 WS vs mock）。
+ */
 export type ChatEventsPort = {
   /**
-   * Connect to the chat event stream and authenticate.
+   * 连接聊天事件流并完成鉴权。
    *
-   * @param serverSocket - Server socket used to derive origin.
-   * @param accessToken - Bearer access token.
-   * @param onEvent - Event envelope callback.
-   * @param options - Optional connection callbacks.
-   * @returns Client handle.
+   * @param serverSocket - 用于推导 origin 的 server socket。
+   * @param accessToken - Bearer access token。
+   * @param onEvent - 事件 envelope 回调。
+   * @param options - 可选：连接回调与 override。
+   * @returns client 句柄。
    */
   connect(
     serverSocket: string,

@@ -8,6 +8,9 @@
  */
 export const FORWARD_MESSAGE_EVENT = "carrypigeon:forward-message";
 
+/**
+ * 转发消息事件载荷结构。
+ */
 export type ForwardMessageEventDetail = {
   content: string;
 };
@@ -33,8 +36,18 @@ export function dispatchForwardMessage(content: string): void {
  */
 export const INSERT_TEXT_EVENT = "carrypigeon:insert-text";
 
+/**
+ * 插入文本模式。
+ *
+ * - `append`：追加到末尾
+ * - `prepend`：插入到开头
+ * - `replace`：替换全部内容
+ */
 export type InsertTextMode = "append" | "prepend" | "replace";
 
+/**
+ * 插入文本事件载荷结构。
+ */
 export type InsertTextEventDetail = {
   content: string;
   mode?: InsertTextMode;
@@ -64,6 +77,12 @@ export function dispatchInsertText(content: string, mode: InsertTextMode = "appe
  */
 export const CHANNEL_CHANGED_EVENT = "carrypigeon:channel-changed";
 
+/**
+ * 频道变化事件载荷结构。
+ *
+ * 说明：
+ * - `scope` 用于提示“变化影响范围”，让订阅方按需刷新（例如 members/bans/messages）。
+ */
 export type ChannelChangedEventDetail = {
   cid: string;
   scope?: string;

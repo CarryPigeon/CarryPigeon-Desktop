@@ -1,15 +1,15 @@
 /**
  * @fileoverview pluginInstallStore.ts
- * @description Presentation store: installed/enabled/progress states (per server).
+ * @description plugins｜展示层状态（store）：pluginInstallStore。
  *
- * Responsibilities (presentation layer):
- * - Track installed plugins and their enablement status for a server.
- * - Track in-flight progress (install/enable/update/switch/rollback) for UI.
- * - Provide convenience predicates (`isInstalled`/`isEnabled`/`isFailed`).
+ * 职责（展示层）：
+ * - 跟踪某个服务端上下文下已安装插件及其启用状态。
+ * - 跟踪进行中的操作进度（install/enable/update/switch/rollback），供 UI 展示。
+ * - 提供便捷判断（`isInstalled`/`isEnabled`/`isFailed`）。
  *
- * Clean Architecture note:
- * The store talks to the domain via `PluginManagerPort` (DI) so that we can
- * swap implementations (mock vs Tauri commands) without changing UI code.
+ * 分层说明（Clean Architecture）：
+ * 本 store 通过 DI 获取 `PluginManagerPort` 与领域层交互，从而在不修改 UI 的前提下
+ * 切换不同实现（mock / Tauri commands）。
  */
 
 import { computed, reactive, ref, type Ref } from "vue";
@@ -17,6 +17,7 @@ import { getPluginManagerPort } from "@/features/plugins/di/plugins.di";
 import type { InstalledPluginState, PluginCatalogEntry, PluginProgress } from "@/features/plugins/domain/types/pluginTypes";
 import { createLogger } from "@/shared/utils/logger";
 import { USE_MOCK_API } from "@/shared/config/runtime";
+import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
 import { useDomainRegistryStore } from "@/features/plugins/presentation/store/domainRegistryStore";
 
 type InstallStore = {
@@ -42,16 +43,16 @@ const logger = createLogger("pluginInstallStore");
 const stores = new Map<string, InstallStore>();
 
 /**
- * Get (or create) a per-server install store.
+ * 获取（或创建）某个服务端上下文对应的安装状态 store。
  *
- * - Stores are keyed by `serverSocket.trim()`.
- * - Empty socket uses `"__no_server__"` so UI preview can still work.
+ * - 以 `serverSocket.trim()` 作为 key。
+ * - 空 socket 使用 `NO_SERVER_KEY`，用于 UI 预览态（无真实后端）。
  *
- * @param serverSocket - Current server socket.
- * @returns The stable store instance for that server.
+ * @param serverSocket - 当前服务端 socket。
+ * @returns 该 socket 对应的稳定 store 实例。
  */
 export function usePluginInstallStore(serverSocket: string): InstallStore {
-  const key = serverSocket.trim() || "__no_server__";
+  const key = normalizeServerKey(serverSocket);
   const existing = stores.get(key);
   if (existing) return existing;
 
@@ -59,17 +60,17 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   const progressById = reactive<Record<string, PluginProgress | null>>({});
   const busyIdsRef = ref<Set<string>>(new Set());
   const missingRequiredIds = ref<string[]>([]);
-  const runtimeSupported = !USE_MOCK_API && key !== "__no_server__";
+  const runtimeSupported = !USE_MOCK_API && key !== NO_SERVER_KEY;
   const domainRegistry = runtimeSupported ? useDomainRegistryStore(key) : null;
 
   /**
-   * Mark a plugin as "busy" (an operation is in progress) for UI disabling.
+   * 标记插件为“忙碌态”（有操作进行中），用于 UI 禁用交互。
    *
-   * Implementation detail:
-   * We replace the Set instance so Vue can observe the change.
+   * 实现细节：
+   * 通过替换 `Set` 实例触发 Vue 观察更新（避免就地 mutate 不触发）。
    *
-   * @param pluginId - Target plugin id.
-   * @param busy - Whether the plugin should be considered busy.
+   * @param pluginId - 目标插件 id。
+   * @param busy - 是否标记为忙碌。
    */
   function setBusy(pluginId: string, busy: boolean): void {
     const next = new Set(busyIdsRef.value);
@@ -79,20 +80,20 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Create a progress handler that writes progress into `progressById[targetId]`.
+   * 创建进度回调：将进度写入 `progressById[targetId]`。
    *
-   * This factory avoids inline arrow callbacks so the code stays “code as docs”
-   * and keeps the handler strongly associated with a specific `pluginId`.
+   * 使用工厂函数避免在调用点内联箭头回调，保证“代码即文档”的可读性，
+   * 同时让回调与具体 `pluginId` 形成强绑定，减少误用风险。
    *
-   * @param targetId - Target plugin id.
-   * @returns Progress handler function.
+   * @param targetId - 目标插件 id。
+   * @returns 进度回调函数。
    */
   function createProgressHandler(targetId: string): (p: PluginProgress) => void {
     /**
-     * Handle progress updates emitted by the backend operation.
+     * 处理后端操作的进度回调。
      *
-     * @param p - Progress payload.
-     * @returns void
+     * @param p - 进度数据。
+     * @returns 无返回值。
      */
     function handleProgress(p: PluginProgress): void {
       progressById[targetId] = p;
@@ -101,16 +102,16 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Create a timeout callback that clears `progressById[targetId]` when not busy.
+   * 创建延迟清理回调：当插件不处于忙碌态时，清空 `progressById[targetId]`。
    *
-   * @param targetId - Target plugin id.
-   * @returns Timeout callback.
+   * @param targetId - 目标插件 id。
+   * @returns `setTimeout` 回调。
    */
   function createClearProgressHandler(targetId: string): () => void {
     /**
-     * Clear progress UI when no other operation is running for this plugin.
+     * 当该插件没有其他操作运行时，清理进度 UI。
      *
-     * @returns void
+     * @returns 无返回值。
      */
     function handleClear(): void {
       if (!busyIdsRef.value.has(targetId)) progressById[targetId] = null;
@@ -119,24 +120,23 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Schedule progress UI to clear after a small delay.
+   * 延迟清理进度 UI。
    *
-   * The delay prevents flicker when operations complete quickly and gives
-   * users time to perceive the success state.
+   * 延迟用于避免操作瞬时完成导致的闪烁，并让用户能感知到成功态。
    *
-   * @param targetId - Target plugin id.
-   * @returns void
+   * @param targetId - 目标插件 id。
+   * @returns 无返回值。
    */
   function scheduleProgressClear(targetId: string): void {
     window.setTimeout(createClearProgressHandler(targetId), 900);
   }
 
   /**
-   * Validate that a target version can be dynamically imported by the runtime.
+   * 校验某个版本是否能被运行时动态加载（import）。
    *
-   * @param pluginId - Plugin id.
-   * @param version - Installed version to validate.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @param version - 需要校验的已安装版本号。
+   * @returns 无返回值。
    */
   async function validateRuntimeVersion(pluginId: string, version: string): Promise<void> {
     if (!domainRegistry) return;
@@ -144,10 +144,10 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Reload plugin runtime for current version (disable + enable).
+   * 重新加载插件运行时（disable + enable），用于切换版本/修复加载态。
    *
-   * @param pluginId - Plugin id.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @returns 无返回值。
    */
   async function reloadRuntime(pluginId: string): Promise<void> {
     if (!domainRegistry) return;
@@ -156,10 +156,10 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Disable plugin runtime (best-effort).
+   * 禁用插件运行时（尽力而为）。
    *
-   * @param pluginId - Plugin id.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @returns 无返回值。
    */
   async function disableRuntime(pluginId: string): Promise<void> {
     if (!domainRegistry) return;
@@ -167,11 +167,11 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Check whether a plugin id exists in the installed list returned by backend.
+   * 判断某插件 id 是否存在于后端返回的已安装列表中。
    *
-   * @param list - Backend installed list.
-   * @param pluginId - Plugin id to search for.
-   * @returns `true` when found.
+   * @param list - 后端已安装列表。
+   * @param pluginId - 目标插件 id。
+   * @returns 存在则为 `true`。
    */
   function listContainsInstalledId(list: InstalledPluginState[], pluginId: string): boolean {
     for (const x of list) {
@@ -181,13 +181,13 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Refresh installed plugins from backend and reconcile local cache.
+   * 从后端刷新已安装插件列表，并与本地缓存对齐。
    *
-   * Behavior:
-   * - Updates `installedById` entries found in the backend list.
-   * - Removes entries that are no longer present.
+   * 行为：
+   * - 更新后端列表中存在的 `installedById` 条目；
+   * - 删除后端已不存在的条目（避免 UI 显示“幽灵插件”）。
    *
-   * @returns Promise<void>
+   * @returns 无返回值。
    */
   async function refreshInstalled(): Promise<void> {
     try {
@@ -197,21 +197,21 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
         if (!listContainsInstalledId(list, id)) delete installedById[id];
       }
     } catch (e) {
-      logger.error("List installed failed", { key, error: String(e) });
+      logger.error("Action: list_installed_plugins_failed", { key, error: String(e) });
     }
   }
 
   /**
-   * Install a plugin version.
+   * 安装指定插件版本。
    *
-   * UI contract:
-   * - Sets `progressById[pluginId]` during the operation (so cards/drawers can show progress).
-   * - Clears progress shortly after completion (unless another op started).
-   * - On failure, keeps/refreshes the last known installed state.
+   * UI 约定：
+   * - 操作期间写入 `progressById[pluginId]`（卡片/抽屉展示进度）；
+   * - 完成后延迟清理进度（除非紧接着又开始了新操作）；
+   * - 失败时尽量回填/刷新最近一次已知的安装状态。
    *
-   * @param plugin - Catalog entry (used to decide install source).
-   * @param version - Target version to install.
-   * @returns Promise<void>
+   * @param plugin - 插件目录条目（用于决定安装来源）。
+   * @param version - 目标版本。
+   * @returns 无返回值。
    */
   async function install(plugin: PluginCatalogEntry, version: string): Promise<void> {
     const id = String(plugin?.pluginId ?? "").trim();
@@ -234,7 +234,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
           : await getPluginManagerPort().install(key, id, version, onProgress);
       installedById[id] = next;
     } catch (e) {
-      logger.error("Install failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_install_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -245,17 +245,17 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Update a plugin to the given latest version.
+   * 将插件更新到指定“最新版本”。
    *
-   * Behavior:
-   * - Installs the target version (does not switch current selection yet).
-   * - Validates that the new version can be dynamically imported.
-   * - Switches current version to the new one.
-   * - If the plugin was enabled, reloads runtime; on failure, auto-rolls back.
+   * 行为：
+   * - 安装目标版本（此时不切换当前版本）；
+   * - 校验新版本可被运行时动态加载；
+   * - 切换当前版本到新版本；
+   * - 若插件之前处于启用态，则尝试 reload runtime；失败则自动回滚。
    *
-   * @param plugin - Catalog entry (used to decide install source).
-   * @param latestVersion - Version to update to (usually the catalog's newest).
-   * @returns Promise<void>
+   * @param plugin - 插件目录条目（用于决定安装来源）。
+   * @param latestVersion - 目标版本（通常为目录的最新版）。
+   * @returns 无返回值。
    */
   async function updateToLatest(plugin: PluginCatalogEntry, latestVersion: string): Promise<void> {
     const id = String(plugin?.pluginId ?? "").trim();
@@ -284,7 +284,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
           : await getPluginManagerPort().install(key, id, v, onProgress);
       installedById[id] = installed;
 
-      // Validate the new version can be loaded before switching current selection.
+      // 在切换当前版本之前，先校验新版本是否可被运行时加载。
       if (runtimeSupported) {
         progressById[id] = { pluginId: id, stage: "unpacking", percent: 60, message: "Validating runtime…" };
         await validateRuntimeVersion(id, v);
@@ -294,13 +294,13 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       const switched = await getPluginManagerPort().switchVersion(key, id, v, onProgress);
       installedById[id] = switched;
 
-      // If it was enabled, reload the runtime and rollback on failure.
+      // 若此前处于启用态：尝试 reload runtime；失败则回滚。
       if (wasEnabled && runtimeSupported) {
         try {
           await reloadRuntime(id);
         } catch (e) {
           const reason = String(e) || "Runtime enable failed";
-          logger.error("Update enable failed; attempting rollback", { key, pluginId: id, version: v, prevVersion, error: reason });
+          logger.error("Action: plugin_update_enable_failed_attempting_rollback", { key, pluginId: id, version: v, prevVersion, error: reason });
           if (prevVersion) {
             progressById[id] = { pluginId: id, stage: "rolling_back", percent: 88, message: "Rolling back…" };
             const rolled = await getPluginManagerPort().switchVersion(key, id, prevVersion, onProgress);
@@ -321,7 +321,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
         }
       }
     } catch (e) {
-      logger.error("Update failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_update_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -332,11 +332,11 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Switch the currently active version of an already-installed plugin.
+   * 切换已安装插件的“当前启用版本”。
    *
-   * @param pluginId - Plugin identifier.
-   * @param version - Target installed version to activate.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @param version - 目标已安装版本号。
+   * @returns 无返回值。
    */
   async function switchVersion(pluginId: string, version: string): Promise<void> {
     const id = pluginId.trim();
@@ -358,7 +358,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
         await reloadRuntime(id);
       }
     } catch (e) {
-      logger.error("Switch version failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_switch_version_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       if (wasEnabled && prev && runtimeSupported) {
         try {
@@ -366,7 +366,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
           installedById[id] = rolled;
           await reloadRuntime(id);
         } catch (re) {
-          logger.error("Switch rollback failed", { key, pluginId: id, error: String(re) });
+          logger.error("Action: plugin_switch_rollback_failed", { key, pluginId: id, error: String(re) });
         }
       }
       const existing = await getPluginManagerPort().getInstalledState(key, id);
@@ -378,14 +378,14 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Roll back to a previous installed version (simple "pick a different version" strategy).
+   * 回滚到先前已安装的某个版本（简单策略：选择一个不同于 current 的版本）。
    *
-   * Current strategy:
-   * - Choose the first installed version that differs from `currentVersion`.
-   * - If the plugin is currently enabled, re-enable after switching to keep it on.
+   * 当前策略：
+   * - 从 `installedVersions` 中选取第一个与 `currentVersion` 不同的版本；
+   * - 若插件当前处于启用态，切换版本后重新加载以保持启用。
    *
-   * @param pluginId - Plugin identifier.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @returns 无返回值。
    */
   async function rollback(pluginId: string): Promise<void> {
     const id = pluginId.trim();
@@ -416,7 +416,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
         await reloadRuntime(id);
       }
     } catch (e) {
-      logger.error("Rollback failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_rollback_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -427,10 +427,10 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Enable a plugin (power it on).
+   * 启用插件（power on）。
    *
-   * @param pluginId - Plugin identifier.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @returns 无返回值。
    */
   async function enable(pluginId: string): Promise<void> {
     const id = pluginId.trim();
@@ -452,7 +452,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
         }
       }
     } catch (e) {
-      logger.error("Enable failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_enable_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -463,10 +463,10 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * Disable a plugin (power it off).
+   * 禁用插件（power off）。
    *
-   * @param pluginId - Plugin identifier.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @returns 无返回值。
    */
   async function disable(pluginId: string): Promise<void> {
     const id = pluginId.trim();
@@ -477,17 +477,17 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       if (next) installedById[id] = next;
       if (runtimeSupported) await disableRuntime(id);
     } catch (e) {
-      logger.error("Disable failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_disable_failed", { key, pluginId: id, error: String(e) });
     } finally {
       setBusy(id, false);
     }
   }
 
   /**
-   * Uninstall a plugin completely from the local machine for this server context.
+   * 卸载插件（在当前服务端上下文下从本机彻底移除）。
    *
-   * @param pluginId - Plugin identifier.
-   * @returns Promise<void>
+   * @param pluginId - 插件 id。
+   * @returns 无返回值。
    */
   async function uninstall(pluginId: string): Promise<void> {
     const id = pluginId.trim();
@@ -498,19 +498,19 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       await getPluginManagerPort().uninstall(key, id);
       delete installedById[id];
     } catch (e) {
-      logger.error("Uninstall failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugin_uninstall_failed", { key, pluginId: id, error: String(e) });
     } finally {
       setBusy(id, false);
     }
   }
 
   /**
-   * Recompute "missing required plugins" from a list of required plugin ids.
+   * 根据“服务端要求的插件列表”重新计算缺失项。
    *
-   * This drives UI gates such as `/required-setup`.
+   * 该结果用于驱动 `/required-setup` 等 UI gate。
    *
-   * @param requiredIds - Plugin ids that the server marks as required.
-   * @returns void
+   * @param requiredIds - 服务端标记为 required 的插件 id 列表。
+   * @returns 无返回值。
    */
   function recheckRequired(requiredIds: string[]): void {
     const missing: string[] = [];
@@ -522,33 +522,39 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   }
 
   /**
-   * @param pluginId - Plugin identifier.
-   * @returns `true` if the plugin has any installed current version.
+   * 判断是否“已安装”（存在 currentVersion）。
+   *
+   * @param pluginId - 插件 id。
+   * @returns 已安装则为 `true`。
    */
   function isInstalled(pluginId: string): boolean {
     return Boolean(installedById[pluginId]?.currentVersion);
   }
 
   /**
-   * @param pluginId - Plugin identifier.
-   * @returns `true` if the plugin is enabled and its status is OK.
+   * 判断是否“已启用”（enabled=true 且 status=ok）。
+   *
+   * @param pluginId - 插件 id。
+   * @returns 已启用则为 `true`。
    */
   function isEnabled(pluginId: string): boolean {
     return Boolean(installedById[pluginId]?.enabled && installedById[pluginId]?.status === "ok");
   }
 
   /**
-   * @param pluginId - Plugin identifier.
-   * @returns `true` if the last enable/boot status is failed.
+   * 判断是否“失败态”（status=failed）。
+   *
+   * @param pluginId - 插件 id。
+   * @returns 失败态则为 `true`。
    */
   function isFailed(pluginId: string): boolean {
     return Boolean(installedById[pluginId]?.status === "failed");
   }
 
   /**
-   * Expose the current busy-id set as a computed ref.
+   * 以 computed 的形式暴露 busy-id 集合。
    *
-   * @returns Busy id set.
+   * @returns busy id 集合。
    */
   function computeBusyIds(): Set<string> {
     return busyIdsRef.value;

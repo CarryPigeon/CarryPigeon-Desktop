@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview FileMessageBubble.vue
- * @description Component for rendering file messages in chat.
+ * @description files｜组件：FileMessageBubble。
  */
 
 import { computed } from "vue";
@@ -25,10 +25,10 @@ const isImage = computed(() => {
 });
 
 /**
- * Format byte size into a compact label.
+ * 将字节数格式化为紧凑的可读标签。
  *
- * @param bytes - File size in bytes.
- * @returns Human-readable size string.
+ * @param bytes - 文件大小（字节）。
+ * @returns 人类可读的大小字符串。
  */
 function formatFileSize(bytes: number | undefined): string {
   if (!bytes) return "";
@@ -38,10 +38,10 @@ function formatFileSize(bytes: number | undefined): string {
 }
 
 /**
- * Pick an icon for a file based on mime type.
+ * 基于 mime type 选择文件图标（emoji）。
  *
- * @param mimeType - File mime type.
- * @returns Emoji icon string.
+ * @param mimeType - 文件 mime type。
+ * @returns emoji 图标字符串。
  */
 function getFileIcon(mimeType: string | undefined): string {
   const mime = mimeType?.toLowerCase() ?? "";
@@ -55,9 +55,9 @@ function getFileIcon(mimeType: string | undefined): string {
 }
 
 /**
- * Open the file download in a new tab.
+ * 在新标签页中打开文件下载链接。
  *
- * @returns void
+ * @returns 无返回值。
  */
 function handleDownload(): void {
   if (!downloadUrl.value) return;
