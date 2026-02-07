@@ -3,7 +3,39 @@
 //! 约定：注释中文，日志英文（tracing）。
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{io::Write, path::Path};
+use std::path::Path;
+
+const CONFIG_FILE: &str = "./config.json";
+
+fn default_config_json() -> String {
+    serde_json::to_string(&Config::default()).unwrap_or_else(|error| {
+        tracing::error!(action = "settings_config_default_serialize_failed", error = %error);
+        "{}".to_string()
+    })
+}
+
+async fn ensure_config_file_exists() -> String {
+    let config_file = Path::new(CONFIG_FILE);
+    let default_json = default_config_json();
+
+    match tokio::fs::write(config_file, &default_json).await {
+        Ok(_) => {
+            tracing::info!(
+                action = "settings_config_file_initialized",
+                path = CONFIG_FILE
+            );
+            default_json
+        }
+        Err(error) => {
+            tracing::error!(
+                action = "settings_config_file_initialize_failed",
+                path = CONFIG_FILE,
+                error = %error
+            );
+            default_json
+        }
+    }
+}
 
 /// 单个服务器配置条目（用于本地配置文件持久化）。
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -42,31 +74,22 @@ pub struct Config {
 /// # 返回值
 /// - 返回原始 JSON 字符串；若文件不存在或为空，会自动写入默认配置并返回默认值。
 pub async fn get_config() -> String {
-    // 读取配置文件内容
-    let config_file = Path::new("./config.json");
-    let data = Box::new(tokio::fs::read_to_string(config_file).await);
-    match *data {
+    let config_file = Path::new(CONFIG_FILE);
+    match tokio::fs::read_to_string(config_file).await {
         Ok(data) => {
             if data.is_empty() {
-                let mut file = std::fs::File::create(config_file).unwrap();
-                file.write_all(
-                    serde_json::to_string(&Config::default())
-                        .unwrap()
-                        .as_bytes(),
-                )
-                .unwrap();
+                tracing::warn!(action = "settings_config_file_empty", path = CONFIG_FILE);
+                return ensure_config_file_exists().await;
             }
             data
         }
-        Err(_) => {
-            let mut file = std::fs::File::create(config_file).unwrap();
-            file.write_all(
-                serde_json::to_string(&Config::default())
-                    .unwrap()
-                    .as_bytes(),
-            )
-            .unwrap();
-            serde_json::to_string(&Config::default()).unwrap()
+        Err(error) => {
+            tracing::warn!(
+                action = "settings_config_file_read_failed",
+                path = CONFIG_FILE,
+                error = %error
+            );
+            ensure_config_file_exists().await
         }
     }
 }
@@ -132,7 +155,7 @@ where
 {
     let config_str = get_config().await;
     let value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
-        tracing::error!(action = "config_parse_failed", error = %e);
+        tracing::error!(action = "settings_config_parse_failed", error = %e);
         Value::Null
     });
     if let Value::Object(map) = value {
@@ -140,7 +163,7 @@ where
             .map(|v| T::extract(v))
             .unwrap_or_else(|| T::default())
     } else {
-        tracing::error!(action = "config_invalid_json_object");
+        tracing::error!(action = "settings_config_invalid_json_object");
         T::default()
     }
 }
@@ -162,7 +185,7 @@ where
 {
     let config_str = get_config().await;
     let value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
-        tracing::error!(action = "config_parse_failed", error = %e);
+        tracing::error!(action = "settings_config_parse_failed", error = %e);
         Value::Null
     });
     if let Value::Object(map) = value {
@@ -177,7 +200,7 @@ where
         }
         T::default()
     } else {
-        tracing::error!(action = "config_invalid_json_object");
+        tracing::error!(action = "settings_config_invalid_json_object");
         T::default()
     }
 }
@@ -198,26 +221,32 @@ pub async fn update_config<T>(key: String, value: T)
 where
     T: ConfigValueExtractor<T> + Default,
 {
-    tracing::info!(action = "config_update", key = %key);
+    tracing::info!(action = "settings_config_updated", key = %key);
     let config_str = get_config().await;
     let mut config_value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
-        tracing::error!(action = "config_parse_failed", error = %e);
+        tracing::error!(action = "settings_config_parse_failed", error = %e);
         Value::Null
     });
     if let Value::Object(ref mut map) = config_value {
         map.insert(key, value.into_json());
-        let config_file = Path::new("./config.json");
-        let mut file = std::fs::File::create(config_file).unwrap();
-        file.write_all(
-            serde_json::to_string_pretty(&config_value)
-                .unwrap()
-                .as_bytes(),
-        )
-        .unwrap_or_else(|e| {
-            tracing::error!(action = "config_write_failed", error = %e);
-        });
+        let config_file = Path::new(CONFIG_FILE);
+        let data = match serde_json::to_string_pretty(&config_value) {
+            Ok(serialized) => serialized,
+            Err(error) => {
+                tracing::error!(action = "settings_config_serialize_failed", error = %error);
+                return;
+            }
+        };
+
+        if let Err(error) = tokio::fs::write(config_file, data).await {
+            tracing::error!(
+                action = "settings_config_write_failed",
+                path = CONFIG_FILE,
+                error = %error
+            );
+        }
     } else {
-        tracing::error!(action = "config_invalid_json_object");
+        tracing::error!(action = "settings_config_invalid_json_object");
     }
 }
 

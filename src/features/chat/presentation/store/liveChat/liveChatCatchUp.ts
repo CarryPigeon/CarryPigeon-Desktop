@@ -79,7 +79,7 @@ export function createResumeFailedCatchUp(deps: ResumeFailedCatchUpDeps) {
     if (!key) return;
     if (deps.getActiveServerSocket() !== key) return;
 
-    deps.logger.warn("Action: resume_failed_catch_up", { socket: key, reason });
+    deps.logger.warn("Action: chat_catch_up_resume_failed", { socket: key, reason });
 
     await deps.refreshChannels();
     if (deps.getActiveServerSocket() !== key) return;
@@ -109,7 +109,7 @@ export function createResumeFailedCatchUp(deps: ResumeFailedCatchUpDeps) {
       try {
         await deps.refreshChannelLatestPage(cid);
       } catch (e) {
-        deps.logger.warn("Action: catch_up_refresh_latest_failed", { cid, error: String(e) });
+        deps.logger.warn("Action: chat_catch_up_refresh_latest_failed", { cid, error: String(e) });
       }
     }
 

@@ -3,7 +3,7 @@
  * @description files｜依赖组装（DI）：files.di。
  */
 
-import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import type { FileServicePort } from "../domain/ports/FileServicePort";
 import { httpFileServicePort } from "../data/httpFileServicePort";
 import { mockFileServicePort } from "../mock/mockFileServicePort";
@@ -22,14 +22,18 @@ let fileServicePort: FileServicePort | null = null;
  *
  * 选择规则：
  * - `USE_MOCK_TRANSPORT=true`：使用真实 HTTP 适配器（便于协议层联调）。
- * - `USE_MOCK_API=true`：使用内存 mock（用于 UI 预览/开发联调）。
+ * - `IS_STORE_MOCK=true`：使用内存 mock（用于 UI 预览/开发联调）。
  * - 其它情况：使用真实 HTTP 适配器。
  *
  * @returns `FileServicePort` 实例。
  */
 export function getFileServicePort(): FileServicePort {
   if (fileServicePort) return fileServicePort;
-  fileServicePort = USE_MOCK_TRANSPORT ? httpFileServicePort : USE_MOCK_API ? mockFileServicePort : httpFileServicePort;
+  fileServicePort = selectByMockMode<FileServicePort>({
+    off: () => httpFileServicePort,
+    store: () => mockFileServicePort,
+    protocol: () => httpFileServicePort,
+  });
   return fileServicePort;
 }
 

@@ -66,3 +66,8 @@ auth 负责“用户如何在某个服务器上下文中完成登录并获得可
 
 - 前端静态检查：`npm run lint`、`npx vue-tsc --noEmit`
 - mock 模式：见 `src/shared/config/runtime.ts` 与 `docs/前端调试与Mock.md`
+
+## 跨 Feature API 边界
+
+- 建议通过 `src/features/auth/api.ts` 暴露的 usecase 能力协作（例如发送验证码、撤销 token）。
+- 不建议跨 feature 直接依赖 auth 的 data factory（保留在 feature 内部用于兼容迁移）。

@@ -3,7 +3,7 @@
  * @description plugins｜依赖组装（DI）：plugins.di。
  */
 
-import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import { mockPluginManager } from "@/features/plugins/mock/mockPluginManager";
 import { hybridPluginManager } from "@/features/plugins/data/hybridPluginManager";
 import { protocolMockPluginManager } from "@/features/plugins/data/protocolMockPluginManager";
@@ -22,6 +22,7 @@ import { SwitchPluginVersion } from "../domain/usecases/SwitchPluginVersion";
 import { EnablePlugin } from "../domain/usecases/EnablePlugin";
 import { DisablePlugin } from "../domain/usecases/DisablePlugin";
 import { UninstallPlugin } from "../domain/usecases/UninstallPlugin";
+import { ApplyPluginRuntimeOps } from "../domain/usecases/ApplyPluginRuntimeOps";
 
 let pluginManager: PluginManagerPort | null = null;
 let repoCatalog: RepoPluginCatalogPort | null = null;
@@ -36,14 +37,18 @@ let domainCatalog: DomainCatalogPort | null = null;
  *
  * 选择规则：
  * - `USE_MOCK_TRANSPORT=true`：使用协议层 mock（模拟端到端协议但不依赖真实服务端）。
- * - `USE_MOCK_API=true`：使用内存 mock（用于 UI 预览/开发联调）。
+ * - `IS_STORE_MOCK=true`：使用内存 mock（用于 UI 预览/开发联调）。
  * - 其它情况：使用混合实现（通常为真实数据源）。
  *
  * @returns `PluginManagerPort` 实例。
  */
 export function getPluginManagerPort(): PluginManagerPort {
   if (pluginManager) return pluginManager;
-  pluginManager = USE_MOCK_TRANSPORT ? protocolMockPluginManager : USE_MOCK_API ? mockPluginManager : hybridPluginManager;
+  pluginManager = selectByMockMode<PluginManagerPort>({
+    off: () => hybridPluginManager,
+    store: () => mockPluginManager,
+    protocol: () => protocolMockPluginManager,
+  });
   return pluginManager;
 }
 
@@ -144,4 +149,16 @@ export function getDisablePluginUsecase(): DisablePlugin {
  */
 export function getUninstallPluginUsecase(): UninstallPlugin {
   return new UninstallPlugin(getPluginManagerPort());
+}
+
+/**
+ * 获取 `ApplyPluginRuntimeOps` 用例实例。
+ *
+ * @param runtime - 插件运行时操作端口。
+ * @returns `ApplyPluginRuntimeOps` 实例。
+ */
+export function getApplyPluginRuntimeOpsUsecase(
+  runtime: ConstructorParameters<typeof ApplyPluginRuntimeOps>[1],
+): ApplyPluginRuntimeOps {
+  return new ApplyPluginRuntimeOps(getPluginManagerPort(), runtime);
 }

@@ -258,7 +258,7 @@ export function connectChatWs(
         resume,
       },
     };
-    logger.info("Action: ws_open_auth", { wsUrl, hasResume: Boolean(lastEventId) });
+    logger.info("Action: chat_ws_auth_opened", { wsUrl, hasResume: Boolean(lastEventId) });
     ws?.send(JSON.stringify(msg));
     startPing();
   }
@@ -281,7 +281,7 @@ export function connectChatWs(
     if (parsed && typeof parsed === "object" && parsed.type === "resume.failed") {
       const msg = parsed as WsResumeFailed;
       const reason = String(msg.data?.reason ?? "").trim() || "resume_failed";
-      logger.warn("Action: ws_resume_failed", { wsUrl, reason });
+      logger.warn("Action: chat_ws_resume_failed", { wsUrl, reason });
       writeLastEventId(socket, "");
       options?.onResumeFailed?.(reason);
       return;
@@ -291,13 +291,13 @@ export function connectChatWs(
       const env = parsed as WsEventEnvelope;
       const eid = String(env.data?.event_id ?? "").trim();
       if (!eid) {
-        logger.warn("Action: ws_event_missing_event_id_ignored", { wsUrl, eventType: String(env.data?.event_type ?? "").trim() });
+        logger.warn("Action: chat_ws_event_missing_event_id_ignored", { wsUrl, eventType: String(env.data?.event_type ?? "").trim() });
         return;
       }
 
       const last = readLastEventId(socket).trim();
       if (last && compareEventId(eid, last) <= 0) {
-        logger.debug("Action: ws_event_ignored_duplicate_or_out_of_order", {
+        logger.debug("Action: chat_ws_event_ignored_duplicate_or_out_of_order", {
           wsUrl,
           eid,
           last,
@@ -310,7 +310,7 @@ export function connectChatWs(
         onEvent(env);
       } catch (e) {
         // 重要：消费端失败时，不能前移 last_event_id，否则会丢事件。
-        logger.error("Action: ws_event_handler_failed_keep_last_event_id", {
+        logger.error("Action: chat_ws_event_handler_failed_kept_last_event_id", {
           wsUrl,
           eid,
           eventType: String(env.data?.event_type ?? "").trim(),
@@ -325,7 +325,7 @@ export function connectChatWs(
 
     if (parsed && typeof parsed === "object" && typeof (parsed as WsCommandErr).error === "object") {
       const e = parsed as WsCommandErr;
-      logger.warn("Action: ws_command_error", { type: e.type, id: e.id ?? "", reason: e.error?.reason ?? "" });
+      logger.warn("Action: chat_ws_command_failed", { type: e.type, id: e.id ?? "", reason: e.error?.reason ?? "" });
       if (e.type === "auth.err" || e.type === "reauth.err") {
         const reason = String(e.error?.reason ?? "").trim() || "unauthorized";
         options?.onAuthError?.(reason);
@@ -334,7 +334,7 @@ export function connectChatWs(
     }
 
     const ok = parsed as WsCommandOk;
-    logger.debug("Action: ws_message", { type: ok.type, id: ok.id ?? "" });
+    logger.debug("Action: chat_ws_message_received", { type: ok.type, id: ok.id ?? "" });
   }
 
   /**
@@ -351,7 +351,7 @@ export function connectChatWs(
       reconnectTimer = null;
       connect();
     }, delayMs);
-    logger.warn("Action: ws_reconnect_scheduled", { wsUrl, attempt: reconnectAttempt, delayMs });
+    logger.warn("Action: chat_ws_reconnect_scheduled", { wsUrl, attempt: reconnectAttempt, delayMs });
   }
 
   /**
@@ -380,12 +380,12 @@ export function connectChatWs(
 
     ws.addEventListener("close", () => {
       stopPing();
-      logger.warn("Action: ws_closed", { wsUrl });
+      logger.warn("Action: chat_ws_connection_closed", { wsUrl });
       scheduleReconnect();
     });
 
     ws.addEventListener("error", () => {
-      logger.warn("Action: ws_error", { wsUrl });
+      logger.warn("Action: chat_ws_receive_failed", { wsUrl });
     });
   }
 

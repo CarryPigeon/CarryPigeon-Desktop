@@ -15,7 +15,7 @@ pub async fn open_info_window_impl(
     query: String,
     width: f64,
     height: f64,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let safe_label = if label.trim().is_empty() {
         "info-window".to_string()
     } else {
@@ -38,7 +38,7 @@ pub async fn open_info_window_impl(
         .center()
         .inner_size(width.max(min_width), height.max(min_height))
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     let _ = window.set_focus();
 

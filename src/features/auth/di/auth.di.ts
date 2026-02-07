@@ -7,7 +7,7 @@
  * - 其他模式：使用基于 HTTP 的实现（真实服务端或 protocol-mock transport）。
  */
 
-import { MOCK_MODE } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import type { AuthServicePort } from "../domain/ports/AuthServicePort";
 import type { EmailServicePort } from "../domain/ports/EmailServicePort";
 import { createHttpAuthServicePort } from "../data/httpAuthServicePort";
@@ -30,9 +30,10 @@ import { requiredGatePort } from "../data/requiredGatePort";
  * @returns EmailServicePort 实例。
  */
 export function getEmailServicePort(serverSocket: string): EmailServicePort {
-  return MOCK_MODE === "store"
-    ? createMockEmailServicePort(serverSocket)
-    : createHttpEmailServicePort(serverSocket);
+  return selectByMockMode<EmailServicePort>({
+    off: () => createHttpEmailServicePort(serverSocket),
+    store: () => createMockEmailServicePort(serverSocket),
+  });
 }
 
 /**
@@ -42,9 +43,10 @@ export function getEmailServicePort(serverSocket: string): EmailServicePort {
  * @returns AuthServicePort 实例。
  */
 export function getAuthServicePort(serverSocket: string): AuthServicePort {
-  return MOCK_MODE === "store"
-    ? createMockAuthServicePort(serverSocket)
-    : createHttpAuthServicePort(serverSocket);
+  return selectByMockMode<AuthServicePort>({
+    off: () => createHttpAuthServicePort(serverSocket),
+    store: () => createMockAuthServicePort(serverSocket),
+  });
 }
 
 /**

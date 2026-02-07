@@ -109,7 +109,7 @@ class FuncMap {
    */
   public id_allocate(): number {
     if (this.id_list.length >= this.MAX_ID + 1) {
-      tauriLog.warn("All 8-bit callback IDs are in use; recycling the oldest ID.");
+      tauriLog.warn("Action: network_callback_id_pool_exhausted_recycled_oldest");
       return this.id_list.shift()!;
     }
 
@@ -208,7 +208,7 @@ export class TcpService {
                 callback(<string>res);
             }
         } catch (e) {
-            tauriLog.error("Send failed", { error: String(e) });
+            tauriLog.error("Action: network_tcp_send_failed", { error: String(e) });
             throw e;
         }
     }
@@ -238,7 +238,7 @@ export class TcpService {
         try {
             temp = JSON.parse(raw_data) as Record<string, unknown>;
         } catch (e) {
-            tauriLog.error("sendWithResponse payload is not valid JSON", { error: String(e) });
+            tauriLog.error("Action: network_tcp_send_with_response_payload_invalid_json", { error: String(e) });
             this.funcMap.remove(id);
             throw e;
         }
@@ -273,12 +273,12 @@ export class TcpService {
             value = JSON.parse(data);
         } catch (e) {
             // 忽略JSON解析错误，可能是不完整的消息或其他格式
-            tauriLog.error("JSON parse error", { error: String(e) });
+            tauriLog.error("Action: network_json_parse_failed", { error: String(e) });
             return;
         }
         
         // 记录接收到的所有消息，便于调试
-        tauriLog.debug("Received message", { value });
+        tauriLog.debug("Action: network_tcp_message_received", { value });
         
         // 处理握手成功通知（/handshake）
         if (this.encrypter.tryHandleHandshakeResponse(value)) {
@@ -292,7 +292,7 @@ export class TcpService {
                     this.handshakeRejecter(e);
                     this.cleanupHandshake();
                 }
-                tauriLog.error("Handshake failed", { error: String(e) });
+                tauriLog.error("Action: network_handshake_failed", { error: String(e) });
             }
         } 
         // 处理普通消息 / 通知
@@ -325,13 +325,13 @@ listenTcpFrame(async (endata: Event<TcpMessageEvent>) => {
         plaintext = await service.encrypter.decrypt(framePayload);
     } catch (e) {
         if (service.encrypter.isHandshakeComplete()) {
-            tauriLog.error("Encrypted frame decrypt failed after handshake", { error: String(e) });
+            tauriLog.error("Action: network_frame_decrypt_failed_after_handshake", { error: String(e) });
             return;
         }
         try {
             plaintext = new TextDecoder("utf-8").decode(framePayload);
         } catch {
-            tauriLog.error("Frame decode failed", { error: String(e) });
+            tauriLog.error("Action: network_frame_decode_failed", { error: String(e) });
             return;
         }
     }
@@ -340,7 +340,7 @@ listenTcpFrame(async (endata: Event<TcpMessageEvent>) => {
     try {
         await service.listen(plaintext, endata.payload.server_socket);
     } catch (e) {
-        tauriLog.error("Listen error", { error: String(e) });
+        tauriLog.error("Action: network_tcp_listen_failed", { error: String(e) });
     }
 }).then(() => {});
 
@@ -368,22 +368,22 @@ export async function createServerTcpService(socket: string, connectSocket?: str
     TCP_SERVICE.set(serverSocketKey, service);
     await service.waitForInit();
 
-    tauriLog.debug("Starting TCP service initialization", { serverSocketKey, transportSocket, frameConfig });
+    tauriLog.debug("Action: network_tcp_service_initialization_started", { serverSocketKey, transportSocket, frameConfig });
 
     try {
         await service.encrypter.swapKey(0);
-        tauriLog.debug("Handshake initiated", { serverSocketKey, transportSocket, frameConfig });
+        tauriLog.debug("Action: network_handshake_started", { serverSocketKey, transportSocket, frameConfig });
 
         if (!isMockSocket) {
             await service.waitForKeyExchange(15000);
-            tauriLog.debug("Handshake completed", { serverSocketKey, transportSocket, frameConfig });
+            tauriLog.debug("Action: network_handshake_completed", { serverSocketKey, transportSocket, frameConfig });
         } else {
-            tauriLog.debug("Mock handshake bypassed", { serverSocketKey, transportSocket, frameConfig });
+            tauriLog.debug("Action: network_handshake_mock_bypassed", { serverSocketKey, transportSocket, frameConfig });
         }
 
         return service;
     } catch (e) {
-        tauriLog.error("TCP service initialization failed", { serverSocketKey, transportSocket, frameConfig, error: String(e) });
+        tauriLog.error("Action: network_tcp_service_initialization_failed", { serverSocketKey, transportSocket, frameConfig, error: String(e) });
         TCP_SERVICE.delete(serverSocketKey);
         throw e;
     }

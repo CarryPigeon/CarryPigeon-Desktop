@@ -13,6 +13,7 @@
 import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { buildProtocolMockDownloadUrl } from "@/shared/mock/protocol/protocolMockTransport";
 
 /**
  * 请求文件上传的参数。
@@ -133,9 +134,11 @@ export async function httpPerformFileUpload(
  * @returns 绝对 URL，例如 `https://host/api/files/download/{share_key}`。
  */
 export function buildFileDownloadUrl(serverSocket: string, shareKey: string): string {
-  const origin = toHttpOrigin(serverSocket.trim());
-  if (!origin) return "";
+  const socket = serverSocket.trim();
   const key = String(shareKey ?? "").trim();
-  if (!key) return "";
+  if (!socket || !key) return "";
+  if (USE_MOCK_TRANSPORT) return buildProtocolMockDownloadUrl(socket, key);
+  const origin = toHttpOrigin(socket);
+  if (!origin) return "";
   return `${origin}/api/files/download/${encodeURIComponent(key)}`;
 }

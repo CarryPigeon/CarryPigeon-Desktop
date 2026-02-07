@@ -13,7 +13,7 @@
 import { computed, ref, type Ref } from "vue";
 import { createLogger } from "@/shared/utils/logger";
 import type { DomainCatalogItem } from "@/features/plugins/domain/types/domainCatalogTypes";
-import { USE_MOCK_API } from "@/shared/config/runtime";
+import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import { NO_SERVER_KEY } from "@/shared/serverKey";
 import { getOrCreateServerScopedStore } from "@/shared/utils/scopedStoreCache";
 import { getDomainCatalogPort } from "@/features/plugins/di/plugins.di";
@@ -64,7 +64,7 @@ export function useDomainCatalogStore(serverSocket: string): DomainCatalogStore 
      * @returns 无返回值。
      */
     async function refresh(): Promise<void> {
-      if (USE_MOCK_API || key === NO_SERVER_KEY) {
+      if (IS_STORE_MOCK || key === NO_SERVER_KEY) {
         items.value = [];
         error.value = "";
         return;
@@ -74,7 +74,7 @@ export function useDomainCatalogStore(serverSocket: string): DomainCatalogStore 
       try {
         items.value = await getDomainCatalogPort().fetch(key);
       } catch (e) {
-        logger.warn("Action: fetch_domain_catalog_failed", { key, error: String(e) });
+        logger.warn("Action: plugins_domain_catalog_fetch_failed", { key, error: String(e) });
         error.value = String(e);
         items.value = [];
       } finally {

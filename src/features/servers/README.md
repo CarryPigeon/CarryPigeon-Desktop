@@ -31,6 +31,8 @@ servers 负责“当前连接的是哪一台服务器”这一全局上下文：
 - server info 缓存：`src/features/servers/presentation/store/serverInfoStore.ts`
 - 服务器管理页：`src/features/servers/presentation/pages/ServerManagerPage.vue`
 - store 统一入口（跨 feature 推荐）：`src/features/servers/presentation/store/index.ts`
+- rack 持久化端口：`src/features/servers/domain/ports/ServerRackStatePort.ts`
+- rack 本地适配器：`src/features/servers/data/localServerRackStatePort.ts`
 
 ## 对外入口（推荐）
 
@@ -43,6 +45,11 @@ servers 负责“当前连接的是哪一台服务器”这一全局上下文：
   2) 其他 feature（chat/plugins/network）基于该值初始化各自的 per-server store 与连接
 - 维护 rack：
   - `addServer` / `updateServerRack` 更新列表并持久化（当前主要基于 localStorage）
+
+说明：
+
+- rack 的持久化读写已通过 `ServerRackStatePort` 下沉到 data 层；
+- presentation store 只负责状态组织与交互编排，不直接依赖 localStorage API。
 - 获取 server info：
   1) `useServerInfoStore(socket).refresh()`
   2) 通过 `servers` 领域用例/port 拉取信息（HTTP 或 tauri 实现）

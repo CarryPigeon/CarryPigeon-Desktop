@@ -14,7 +14,7 @@ const logger = createLogger("mockTcpConnector");
  */
 export const mockTcpConnector: TcpConnectorPort = {
   async connect(serverSocket: string): Promise<void> {
-    logger.info("Action: mock_connect_server", { serverSocket });
+    logger.info("Action: network_mock_server_connect_started", { serverSocket });
     // No-op for mock mode.
     return;
   },

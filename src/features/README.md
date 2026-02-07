@@ -56,7 +56,11 @@
 
 - `VITE_USE_MOCK_API=true`：开启 mock
 - `VITE_MOCK_MODE=store`（默认）：使用 feature 本地 mock ports/stores（更偏 UI 预览）
-- `VITE_MOCK_MODE=protocol`：启用**协议级** mock transport（HTTP+WS），让 live stores 走真实的 HTTP/WS adapter，但不会访问真实网络
+- `VITE_MOCK_MODE=protocol`：启用**协议级** mock transport（HTTP+WS），让 live stores 走真实的 HTTP/WS adapter，但不会访问真实网络（插件 runtime 动态加载默认禁用）
+
+模式选择工具：
+
+- `src/shared/config/mockModeSelector.ts:1`（统一 `off/store/protocol` 选择，避免各 feature 手写分支漂移）
 
 协议级 mock 的实现入口：
 

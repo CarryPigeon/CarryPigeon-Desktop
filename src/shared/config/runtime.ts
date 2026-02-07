@@ -38,11 +38,32 @@ export const MOCK_MODE: MockMode = (() => {
 })();
 
 /**
+ * 是否启用任意 mock 模式（store 或 protocol）。
+ *
+ * @constant
+ */
+export const IS_MOCK_ENABLED = MOCK_MODE !== "off";
+
+/**
+ * 是否处于 store mock 模式。
+ *
+ * @constant
+ */
+export const IS_STORE_MOCK = MOCK_MODE === "store";
+
+/**
+ * 是否处于 protocol mock 模式。
+ *
+ * @constant
+ */
+export const IS_PROTOCOL_MOCK = MOCK_MODE === "protocol";
+
+/**
  * 是否使用协议级 mock transport（HTTP+WS）替代真实网络。
  *
  * @constant
  */
-export const USE_MOCK_TRANSPORT = MOCK_MODE === "protocol";
+export const USE_MOCK_TRANSPORT = IS_PROTOCOL_MOCK;
 /**
  * 模拟（mock）延迟（毫秒）：用于模拟网络耗时。
  *

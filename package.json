@@ -9,9 +9,11 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "lint": "eslint . --max-warnings 0 && node scripts/check-markup-style-docs.mjs",
+    "lint": "eslint . --max-warnings 0 && npm run -s lint:logs:std && node scripts/check-markup-style-docs.mjs",
     "lint:fix": "eslint . --fix",
-    "lint:docs": "node scripts/check-markup-style-docs.mjs"
+    "lint:docs": "node scripts/check-markup-style-docs.mjs",
+    "lint:rust:std": "bash scripts/check-rust-standards.sh",
+    "lint:logs:std": "bash scripts/check-log-standards.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.1",

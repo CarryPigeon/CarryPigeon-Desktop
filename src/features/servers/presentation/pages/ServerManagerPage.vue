@@ -131,7 +131,7 @@ function saveEdit(): boolean {
     notifyMode: draft.notifyMode,
   });
   if (!ok) {
-    logger.warn("Action: update_rack_rejected", {
+    logger.warn("Action: servers_rack_update_rejected", {
       id: editingId.value,
       serverSocket: draft.serverSocket,
     });
@@ -148,7 +148,7 @@ function handleCreate(): void {
   const socket = creating.serverSocket.trim();
   if (!socket) return;
   addServer(socket, creating.name.trim());
-  logger.info("Action: server_added", { socket });
+  logger.info("Action: servers_server_added", { socket });
   creating.name = "";
   creating.serverSocket = "";
 }
@@ -169,7 +169,7 @@ function handleRemove(id: string): void {
     }
   }
   removeServerById(id);
-  logger.info("Action: server_removed", { id, socket: rack?.serverSocket ?? "" });
+  logger.info("Action: servers_server_removed", { id, socket: rack?.serverSocket ?? "" });
 }
 
 /**

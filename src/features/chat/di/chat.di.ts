@@ -8,7 +8,7 @@
  * - 提供领域用例（usecase）的工厂方法，供展示层调用。
  */
 
-import { MOCK_MODE } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import type { ChatApiPort } from "../domain/ports/chatApiPort";
 import type { ChatEventsPort } from "../domain/ports/chatEventsPort";
 import { httpChatApiPort } from "../data/httpChatApiPort";
@@ -66,18 +66,18 @@ export function getChatEventsPort(): ChatEventsPort {
  * 获取 chat store（展示层 store，单例）。
  *
  * mock 选择规则：
- * - `MOCK_MODE="store"`：使用确定性的内存 store（用于 UI 预览/开发联调）。
+ * - `IS_STORE_MOCK=true`：使用确定性的内存 store（用于 UI 预览/开发联调）。
  * - 其它情况：使用由 ports 驱动的 live store。
  *
  * @returns `ChatStore` 实例。
  */
 export function getChatStore(): ChatStore {
   if (store) return store;
-  if (MOCK_MODE === "store") {
-    store = createMockChatStore();
-    return store;
-  }
-  store = createLiveChatStore({ api: getChatApiPort(), events: getChatEventsPort() });
+  store = selectByMockMode<ChatStore>({
+    off: () => createLiveChatStore({ api: getChatApiPort(), events: getChatEventsPort() }),
+    store: () => createMockChatStore(),
+    protocol: () => createLiveChatStore({ api: getChatApiPort(), events: getChatEventsPort() }),
+  });
   return store;
 }
 

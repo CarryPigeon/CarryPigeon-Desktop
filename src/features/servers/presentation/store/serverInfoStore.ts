@@ -53,7 +53,7 @@ export function useServerInfoStore(serverSocket: string): ServerInfoStore {
       try {
         info.value = await getGetServerInfoUsecase().execute(socket);
       } catch (e) {
-        logger.error("Action: refresh_server_info_failed", { socket, error: String(e) });
+        logger.error("Action: servers_info_refresh_failed", { socket, error: String(e) });
         info.value = null;
         error.value = String(e);
       } finally {

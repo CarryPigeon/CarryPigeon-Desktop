@@ -163,7 +163,7 @@ export function createLiveChatEnsureReady(deps: LiveChatEnsureReadyDeps) {
       deps.wsManager.close();
       if (deps.polling && deps.polling.isRunningFor(key)) return;
       deps.stopPolling();
-      deps.logger.info("Action: ws_disabled_start_polling_fallback", { socket: key, tlsPolicy, origin });
+      deps.logger.info("Action: chat_ws_disabled_polling_fallback_started", { socket: key, tlsPolicy, origin });
       deps.polling?.start(key);
       return;
     }
@@ -172,7 +172,7 @@ export function createLiveChatEnsureReady(deps: LiveChatEnsureReadyDeps) {
     deps.stopPolling();
     if (deps.wsManager.isConnectedFor(key)) return;
     const wsUrlOverride = deps.getWsUrlOverride(key);
-    deps.logger.info("Action: ws_connect", { socket: key, wsUrlOverride: wsUrlOverride ?? "" });
+    deps.logger.info("Action: chat_ws_connect_started", { socket: key, wsUrlOverride: wsUrlOverride ?? "" });
 
     const options: ChatEventsConnectOptions = {
       wsUrlOverride,
