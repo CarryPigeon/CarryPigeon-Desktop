@@ -338,22 +338,33 @@ fn eq_hash_hex(a: &str, b: &str) -> bool {
 
 pub static PLUGINMANAGER: OnceLock<PluginManager> = OnceLock::new();
 
-/// 获取全局插件管理器单例。
+fn create_plugin_manager() -> anyhow::Result<PluginManager> {
+    let mut config = wasmtime::Config::new();
+    config.wasm_component_model(true);
+    let engine = Engine::new(&config).context("Failed to create Wasmtime engine")?;
+    PluginManager::new(engine, PathBuf::from("./plugin_cache"))
+        .context("Failed to init PluginManager")
+}
+
+/// 获取全局插件管理器单例（可失败版本）。
 ///
 /// # 返回值
-/// 返回 `PluginManager` 的静态引用。
-///
-/// # 说明
-/// - 单例会在首次调用时初始化；
-/// - 当前 cache 目录固定为 `./plugin_cache`。
-pub fn plugin_manager() -> &'static PluginManager {
-    PLUGINMANAGER.get_or_init(|| {
-        let mut config = wasmtime::Config::new();
-        config.wasm_component_model(true);
-        let engine = Engine::new(&config).expect("Failed to create Wasmtime engine");
-        PluginManager::new(engine, PathBuf::from("./plugin_cache"))
-            .expect("Failed to init PluginManager")
-    })
+/// - `Ok(&'static PluginManager)`：获取成功。
+/// - `Err(anyhow::Error)`：初始化失败原因。
+pub fn plugin_manager() -> anyhow::Result<&'static PluginManager> {
+    if let Some(manager) = PLUGINMANAGER.get() {
+        return Ok(manager);
+    }
+
+    let manager = create_plugin_manager()?;
+    match PLUGINMANAGER.set(manager) {
+        Ok(()) => PLUGINMANAGER
+            .get()
+            .context("PluginManager initialized but missing from OnceLock"),
+        Err(_) => PLUGINMANAGER
+            .get()
+            .context("PluginManager set raced and final value is missing"),
+    }
 }
 
 /// 列出本地已保存的插件清单列表。
@@ -362,5 +373,10 @@ pub fn plugin_manager() -> &'static PluginManager {
 /// - `Ok(Vec<PluginManifest>)`：清单列表。
 /// - `Err(anyhow::Error)`：读取失败原因。
 pub async fn list_installed_manifests() -> anyhow::Result<Vec<PluginManifest>> {
-    Ok(PluginManifestList::new().await?.plugins)
+    let manifests = PluginManifestList::new().await?.plugins;
+    tracing::debug!(
+        action = "plugins_runtime_list_installed",
+        count = manifests.len()
+    );
+    Ok(manifests)
 }

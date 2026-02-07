@@ -14,11 +14,13 @@
 
 import { computed, reactive, ref, type Ref } from "vue";
 import { getPluginManagerPort } from "@/features/plugins/di/plugins.di";
+import { getApplyPluginRuntimeOpsUsecase } from "@/features/plugins/di/plugins.di";
 import type { InstalledPluginState, PluginCatalogEntry, PluginProgress } from "@/features/plugins/domain/types/pluginTypes";
 import { createLogger } from "@/shared/utils/logger";
-import { USE_MOCK_API } from "@/shared/config/runtime";
+import { IS_STORE_MOCK, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
 import { useDomainRegistryStore } from "@/features/plugins/presentation/store/domainRegistryStore";
+import type { PluginRuntimeOpsPort } from "@/features/plugins/domain/usecases/ApplyPluginRuntimeOps";
 
 type InstallStore = {
   installedById: Record<string, InstalledPluginState>;
@@ -60,8 +62,21 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   const progressById = reactive<Record<string, PluginProgress | null>>({});
   const busyIdsRef = ref<Set<string>>(new Set());
   const missingRequiredIds = ref<string[]>([]);
-  const runtimeSupported = !USE_MOCK_API && key !== NO_SERVER_KEY;
+  const runtimeSupported = !IS_STORE_MOCK && !USE_MOCK_TRANSPORT && key !== NO_SERVER_KEY;
   const domainRegistry = runtimeSupported ? useDomainRegistryStore(key) : null;
+  const runtimeOps: PluginRuntimeOpsPort = {
+    supported: runtimeSupported,
+    validateVersion(pluginId: string, version: string): Promise<void> {
+      return validateRuntimeVersion(pluginId, version);
+    },
+    reload(pluginId: string): Promise<void> {
+      return reloadRuntime(pluginId);
+    },
+    disable(pluginId: string): Promise<void> {
+      return disableRuntime(pluginId);
+    },
+  };
+  const runtimeOpsUsecase = getApplyPluginRuntimeOpsUsecase(runtimeOps);
 
   /**
    * 标记插件为“忙碌态”（有操作进行中），用于 UI 禁用交互。
@@ -197,7 +212,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
         if (!listContainsInstalledId(list, id)) delete installedById[id];
       }
     } catch (e) {
-      logger.error("Action: list_installed_plugins_failed", { key, error: String(e) });
+      logger.error("Action: plugins_list_installed_failed", { key, error: String(e) });
     }
   }
 
@@ -234,7 +249,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
           : await getPluginManagerPort().install(key, id, version, onProgress);
       installedById[id] = next;
     } catch (e) {
-      logger.error("Action: plugin_install_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_install_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -259,7 +274,6 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
    */
   async function updateToLatest(plugin: PluginCatalogEntry, latestVersion: string): Promise<void> {
     const id = String(plugin?.pluginId ?? "").trim();
-    const source = plugin?.source ?? "server";
     const v = latestVersion.trim();
     if (!id || !v) return;
     const onProgress = createProgressHandler(id);
@@ -267,61 +281,21 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     progressById[id] = { pluginId: id, stage: "checking_updates", percent: 10, message: "Checking updates…" };
     try {
       const before = installedById[id] ?? (await getPluginManagerPort().getInstalledState(key, id));
-      const prevVersion = before?.currentVersion ?? "";
-      const wasEnabled = Boolean(before?.enabled && before?.status === "ok" && before?.currentVersion);
-
-      progressById[id] = { pluginId: id, stage: "downloading", percent: 22, message: "Downloading…" };
-      const installed =
-        source === "repo"
-          ? await getPluginManagerPort().installFromUrl(
-              key,
-              id,
-              v,
-              String(plugin.downloadUrl ?? ""),
-              String(plugin.sha256 ?? ""),
-              onProgress,
-            )
-          : await getPluginManagerPort().install(key, id, v, onProgress);
-      installedById[id] = installed;
-
-      // 在切换当前版本之前，先校验新版本是否可被运行时加载。
-      if (runtimeSupported) {
-        progressById[id] = { pluginId: id, stage: "unpacking", percent: 60, message: "Validating runtime…" };
-        await validateRuntimeVersion(id, v);
-      }
-
-      progressById[id] = { pluginId: id, stage: "switching", percent: 76, message: "Switching version…" };
-      const switched = await getPluginManagerPort().switchVersion(key, id, v, onProgress);
-      installedById[id] = switched;
-
-      // 若此前处于启用态：尝试 reload runtime；失败则回滚。
-      if (wasEnabled && runtimeSupported) {
-        try {
-          await reloadRuntime(id);
-        } catch (e) {
-          const reason = String(e) || "Runtime enable failed";
-          logger.error("Action: plugin_update_enable_failed_attempting_rollback", { key, pluginId: id, version: v, prevVersion, error: reason });
-          if (prevVersion) {
-            progressById[id] = { pluginId: id, stage: "rolling_back", percent: 88, message: "Rolling back…" };
-            const rolled = await getPluginManagerPort().switchVersion(key, id, prevVersion, onProgress);
-            installedById[id] = rolled;
-            try {
-              await reloadRuntime(id);
-            } catch (re) {
-              const finalReason = String(re) || reason;
-              const failed = await getPluginManagerPort().setFailed(key, id, finalReason);
-              installedById[id] = failed;
-              throw new Error(finalReason);
-            }
-            throw new Error(`Update failed; rolled back to ${prevVersion}: ${reason}`);
-          }
-          const failed = await getPluginManagerPort().setFailed(key, id, reason);
-          installedById[id] = failed;
-          throw new Error(reason);
-        }
-      }
+      await runtimeOpsUsecase.updateToLatest({
+        serverSocket: key,
+        plugin,
+        latestVersion: v,
+        before,
+        onProgress,
+        onState(state: InstalledPluginState): void {
+          installedById[id] = state;
+        },
+        setProgress(p: PluginProgress): void {
+          progressById[id] = p;
+        },
+      });
     } catch (e) {
-      logger.error("Action: plugin_update_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_update_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -349,16 +323,21 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     setBusy(id, true);
     progressById[id] = { pluginId: id, stage: "switching", percent: 22, message: "Switching version…" };
     try {
-      if (runtimeSupported) {
-        await validateRuntimeVersion(id, v);
-      }
-      const next = await getPluginManagerPort().switchVersion(key, id, v, onProgress);
-      installedById[id] = next;
-      if (wasEnabled && runtimeSupported) {
-        await reloadRuntime(id);
-      }
+      await runtimeOpsUsecase.switchVersion({
+        serverSocket: key,
+        pluginId: id,
+        version: v,
+        before,
+        onProgress,
+        onState(state: InstalledPluginState): void {
+          installedById[id] = state;
+        },
+        setProgress(p: PluginProgress): void {
+          progressById[id] = p;
+        },
+      });
     } catch (e) {
-      logger.error("Action: plugin_switch_version_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_switch_version_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       if (wasEnabled && prev && runtimeSupported) {
         try {
@@ -366,7 +345,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
           installedById[id] = rolled;
           await reloadRuntime(id);
         } catch (re) {
-          logger.error("Action: plugin_switch_rollback_failed", { key, pluginId: id, error: String(re) });
+          logger.error("Action: plugins_switch_rollback_failed", { key, pluginId: id, error: String(re) });
         }
       }
       const existing = await getPluginManagerPort().getInstalledState(key, id);
@@ -393,7 +372,6 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     const installed = installedById[id];
     const versions = installed?.installedVersions ?? [];
     const current = installed?.currentVersion ?? "";
-    const wasEnabled = Boolean(installed?.enabled && installed?.status === "ok" && installed?.currentVersion);
     let prev = "";
     for (const x of versions) {
       if (x && x !== current) {
@@ -406,17 +384,21 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     setBusy(id, true);
     progressById[id] = { pluginId: id, stage: "rolling_back", percent: 18, message: "Rolling back…" };
     try {
-      if (runtimeSupported) {
-        await validateRuntimeVersion(id, prev);
-      }
       const onProgress = createProgressHandler(id);
-      const next = await getPluginManagerPort().switchVersion(key, id, prev, onProgress);
-      installedById[id] = next;
-      if (wasEnabled && runtimeSupported) {
-        await reloadRuntime(id);
-      }
+      await runtimeOpsUsecase.rollback({
+        serverSocket: key,
+        pluginId: id,
+        before: installed,
+        onProgress,
+        onState(state: InstalledPluginState): void {
+          installedById[id] = state;
+        },
+        setProgress(p: PluginProgress): void {
+          progressById[id] = p;
+        },
+      });
     } catch (e) {
-      logger.error("Action: plugin_rollback_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_rollback_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -439,20 +421,16 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     setBusy(id, true);
     progressById[id] = { pluginId: id, stage: "enabling", percent: 18, message: "Enabling…" };
     try {
-      const next = await getPluginManagerPort().enable(key, id, onProgress);
-      installedById[id] = next;
-      if (runtimeSupported && domainRegistry) {
-        try {
-          await domainRegistry.enablePluginRuntime(id);
-        } catch (e) {
-          const msg = String(e) || "Runtime load failed";
-          const failed = await getPluginManagerPort().setFailed(key, id, msg);
-          installedById[id] = failed;
-          throw new Error(msg);
-        }
-      }
+      await runtimeOpsUsecase.enable({
+        serverSocket: key,
+        pluginId: id,
+        onProgress,
+        onState(state: InstalledPluginState): void {
+          installedById[id] = state;
+        },
+      });
     } catch (e) {
-      logger.error("Action: plugin_enable_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_enable_failed", { key, pluginId: id, error: String(e) });
       progressById[id] = { pluginId: id, stage: "failed", percent: 100, message: String(e) || "Failed" };
       const existing = await getPluginManagerPort().getInstalledState(key, id);
       if (existing) installedById[id] = existing;
@@ -477,7 +455,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       if (next) installedById[id] = next;
       if (runtimeSupported) await disableRuntime(id);
     } catch (e) {
-      logger.error("Action: plugin_disable_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_disable_failed", { key, pluginId: id, error: String(e) });
     } finally {
       setBusy(id, false);
     }
@@ -498,7 +476,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       await getPluginManagerPort().uninstall(key, id);
       delete installedById[id];
     } catch (e) {
-      logger.error("Action: plugin_uninstall_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_uninstall_failed", { key, pluginId: id, error: String(e) });
     } finally {
       setBusy(id, false);
     }

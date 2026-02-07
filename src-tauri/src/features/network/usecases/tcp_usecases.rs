@@ -2,6 +2,7 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
+use anyhow::anyhow;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
@@ -71,7 +72,7 @@ fn parse_mock_mode(socket: &str) -> MockTcpMode {
 ///
 /// # 返回值
 /// - `Ok(())`：创建成功并已写入注册表。
-/// - `Err(String)`：创建失败原因（例如未初始化/连接失败等）。
+/// - `Err(anyhow::Error)`：创建失败原因（例如未初始化/连接失败等）。
 ///
 /// # 说明
 /// - 当真实连接失败时，会降级为 mock backend（ConnectFailed），以保证 UI 可继续工作；
@@ -80,11 +81,11 @@ pub async fn add_tcp_service(
     app: AppHandle,
     server_socket: String,
     socket: String,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let registry = TCP_REGISTRY
         .get()
         .cloned()
-        .ok_or("TCP Service not initialized")?;
+        .ok_or_else(|| anyhow!("TCP Service not initialized"))?;
     let mut lock = registry.write().await;
 
     let mut backend = if socket.starts_with("mock://") {
@@ -94,7 +95,7 @@ pub async fn add_tcp_service(
             Ok(real) => TcpBackend::Real(real),
             Err(err) => {
                 tracing::warn!(
-                    action = "tcp_connect_failed_fallback_mock",
+                    action = "network_tcp_connect_failed_fallback_mock",
                     socket = %socket,
                     error = %err,
                     "TCP connect failed; falling back to mock (no-server)",
@@ -117,18 +118,18 @@ pub async fn add_tcp_service(
 ///
 /// # 返回值
 /// - `Ok(())`：发送成功。
-/// - `Err(String)`：发送失败原因。
-pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<(), String> {
+/// - `Err(anyhow::Error)`：发送失败原因。
+pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> anyhow::Result<()> {
     let registry = TCP_REGISTRY
         .get()
         .cloned()
-        .ok_or("TCP Service not initialized")?;
+        .ok_or_else(|| anyhow!("TCP Service not initialized"))?;
     let mut lock = registry.write().await;
     let backend = lock
         .map
         .get_mut(&server_socket)
-        .ok_or_else(|| format!("TCP service not found for server_socket: {}", server_socket))?;
-    backend.send(data).await.map_err(|e| e.to_string())
+        .ok_or_else(|| anyhow!("TCP service not found for server_socket: {}", server_socket))?;
+    backend.send(data).await
 }
 
 /// 监听（或重启）指定 server_socket 的 TCP backend。
@@ -139,20 +140,20 @@ pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<()
 ///
 /// # 返回值
 /// - `Ok(())`：启动成功。
-/// - `Err(String)`：启动失败原因（例如服务未初始化/找不到 backend）。
+/// - `Err(anyhow::Error)`：启动失败原因（例如服务未初始化/找不到 backend）。
 ///
 /// # 说明
 /// 当前实现会调用 backend 的 `start`，用于注册监听或发送初始事件（mock）。
-pub async fn listen_tcp_service(server_socket: String, app: AppHandle) -> Result<(), String> {
+pub async fn listen_tcp_service(server_socket: String, app: AppHandle) -> anyhow::Result<()> {
     let registry = TCP_REGISTRY
         .get()
         .cloned()
-        .ok_or("TCP Service not initialized")?;
+        .ok_or_else(|| anyhow!("TCP Service not initialized"))?;
     let mut lock = registry.write().await;
     let backend = lock
         .map
         .get_mut(&server_socket)
-        .ok_or_else(|| format!("TCP service not found for server_socket: {}", server_socket))?;
+        .ok_or_else(|| anyhow!("TCP service not found for server_socket: {}", server_socket))?;
     backend.start(app, server_socket);
     Ok(())
 }

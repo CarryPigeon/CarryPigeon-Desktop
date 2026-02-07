@@ -156,7 +156,7 @@ async function verifyHttpApi(serverSocket: string): Promise<void> {
       rememberServerId(socket, serverId);
     } else {
       // PRD：核心聊天必须在缺失 `server_id` 时仍可用（插件功能禁用）。
-      logger.warn("Action: missing_server_id_plugins_disabled", { socket });
+      logger.warn("Action: network_server_id_missing_plugins_disabled", { socket });
     }
 
     const minSupported = String(json?.min_supported_api_version ?? "").trim();
@@ -194,20 +194,20 @@ export const tauriTcpConnector: TcpConnectorPort = {
   async connect(serverSocket: string): Promise<void> {
     const serverSocketKey = serverSocket.trim();
     if (!serverSocketKey) throw new Error("Missing server socket");
-    logger.info("Action: connect_server_start", { serverSocket: serverSocketKey });
+    logger.info("Action: network_connect_server_started", { serverSocket: serverSocketKey });
     try {
       if (isHttpLike(serverSocketKey)) {
         await Promise.all([ensureServerDb(serverSocketKey), verifyHttpApi(serverSocketKey)]);
-        logger.info("Action: http_like_socket_skip_tcp_handshake", { serverSocket: serverSocketKey });
+        logger.info("Action: network_http_like_socket_tcp_handshake_skipped", { serverSocket: serverSocketKey });
         return;
       }
 
       const tls = resolveTlsConfig(serverSocketKey);
       const connectSocket = toNativeConnectSocket(serverSocketKey, tls.tlsPolicy, tls.tlsFingerprint);
       await Promise.all([ensureServerDb(serverSocketKey), createServerTcpService(serverSocketKey, connectSocket)]);
-      logger.info("Action: connect_server_success", { serverSocket: serverSocketKey, connectSocket, tlsPolicy: tls.tlsPolicy });
+      logger.info("Action: network_connect_server_succeeded", { serverSocket: serverSocketKey, connectSocket, tlsPolicy: tls.tlsPolicy });
     } catch (e) {
-      logger.error("Action: connect_server_failed", { serverSocket: serverSocketKey, error: String(e) });
+      logger.error("Action: network_connect_server_failed", { serverSocket: serverSocketKey, error: String(e) });
       throw e;
     }
   },

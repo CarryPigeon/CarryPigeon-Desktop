@@ -41,6 +41,7 @@ plugins 负责“插件能力”的客户端侧全链路落地：从服务端获
   - Domain 目录：`src/features/plugins/presentation/pages/DomainCatalogPage.vue`
 - 领域端口：`src/features/plugins/domain/ports/PluginManagerPort.ts`
 - 领域用例：`src/features/plugins/domain/usecases/`
+  - 运行时编排用例：`src/features/plugins/domain/usecases/ApplyPluginRuntimeOps.ts`
 - 运行时加载：`src/features/plugins/presentation/runtime/pluginRuntime.ts`
 - 展示层 store（按 server scope 缓存）：
   - 目录：`src/features/plugins/presentation/store/pluginCatalogStore.ts`
@@ -65,6 +66,11 @@ plugins 负责“插件能力”的客户端侧全链路落地：从服务端获
 - 启用/禁用与切换版本：
   - 更新 installed state
   - `DomainRegistryStore` 动态加载对应版本的运行时模块并注册 domains
+
+说明：
+
+- 展示层 `pluginInstallStore` 负责 UI 状态（busy/progress）与错误呈现；
+- 版本切换/回滚/运行时校验等编排逻辑已下沉到领域用例 `ApplyPluginRuntimeOps`，避免 store 过重。
 
 ## 与其他模块的协作
 

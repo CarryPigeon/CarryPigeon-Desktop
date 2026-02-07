@@ -22,7 +22,7 @@ pub async fn open_popover_window_impl(
     y: f64,
     width: f64,
     height: f64,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     // 同一时间只允许存在一个 popover
     // 直接关闭旧窗口再创建新窗口，避免状态与 URL 不一致
     keep_one_popover_window(&app);
@@ -47,8 +47,10 @@ pub async fn open_popover_window_impl(
     // 尝试根据点击点找到对应显示器；找不到则 fallback 到主显示器
     let monitor = app
         .monitor_from_point(x, y)
-        .map_err(|e| e.to_string())?
-        .or(app.primary_monitor().map_err(|e| e.to_string())?);
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .or(app
+            .primary_monitor()
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?);
 
     if let Some(monitor) = monitor {
         // work_area 是“可用区域”（一般会排除任务栏/停靠栏）。
@@ -115,7 +117,7 @@ pub async fn open_popover_window_impl(
         // 兜底：在创建时再做一次“防溢出”检查。
         .prevent_overflow()
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // 失焦自动关闭：popover 交互常用模式。
     let window_for_close = window.clone();

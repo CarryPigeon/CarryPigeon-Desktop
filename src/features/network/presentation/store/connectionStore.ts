@@ -258,7 +258,7 @@ export async function connectNow(serverSocket: string): Promise<void> {
     state.value = { phase: "connected", reason: "ok", detail: "Connected", lastServerSocket: socket };
   } catch (e) {
     const reason = mapConnectErrorReason(e);
-    logger.error("Action: connect_failed", { socket, error: String(e) });
+    logger.error("Action: network_connect_server_failed", { socket, error: String(e) });
     state.value = {
       phase: "failed",
       reason,

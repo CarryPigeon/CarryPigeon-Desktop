@@ -11,7 +11,7 @@
 
 import { reactive, ref, type Ref } from "vue";
 import type { Component } from "vue";
-import { USE_MOCK_API } from "@/shared/config/runtime";
+import { IS_STORE_MOCK, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { createLogger } from "@/shared/utils/logger";
 import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
 import { currentUser } from "@/features/user/api";
@@ -78,6 +78,35 @@ const logger = createLogger("domainRegistryStore");
 const stores = new Map<string, DomainRegistryStore>();
 
 /**
+ * 是否禁用插件运行时动态加载。
+ *
+ * @returns 禁用则返回 `true`。
+ */
+function isRuntimeLoadingDisabled(): boolean {
+  return IS_STORE_MOCK || USE_MOCK_TRANSPORT;
+}
+
+/**
+ * 创建“空能力”插件模块（用于降级路径）。
+ *
+ * @param pluginId - 插件 id。
+ * @param version - 插件版本。
+ * @returns 最小可用的加载结果。
+ */
+function createNoopLoadedPluginModule(pluginId: string, version: string): LoadedPluginModule {
+  return {
+    pluginId: String(pluginId ?? "").trim(),
+    version: String(version ?? "").trim() || "0.0.0",
+    manifest: null,
+    permissions: [],
+    providesDomains: [],
+    renderers: {},
+    composers: {},
+    contracts: [],
+  };
+}
+
+/**
  * 获取（或创建）指定 server socket 对应的 domain 注册表 store。
  *
  * 说明：
@@ -96,8 +125,16 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
   const bindingByDomain = reactive<Record<string, DomainBinding>>({});
   const loading = ref(false);
   const error = ref("");
+  const runtimeLoadingDisabled = isRuntimeLoadingDisabled();
 
   let hostBridge: DomainRegistryHostBridge | null = null;
+
+  if (runtimeLoadingDisabled) {
+    logger.info("Action: plugins_runtime_loading_disabled", {
+      key,
+      mode: USE_MOCK_TRANSPORT ? "protocol" : "store",
+    });
+  }
 
   /**
    * 基于 runtime 条目构建插件上下文（PluginContext）。
@@ -198,7 +235,10 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * @returns 归一化后的插件模块。
    */
   async function tryLoadVersion(pluginId: string, version: string): Promise<LoadedPluginModule> {
-    if (USE_MOCK_API) throw new Error("tryLoadVersion is not supported in mock mode");
+    if (runtimeLoadingDisabled) {
+      logger.warn("Action: plugins_runtime_validate_version_skipped", { key, pluginId, version });
+      return createNoopLoadedPluginModule(pluginId, version);
+    }
     const runtime = await getRuntimeEntryForVersion(key, pluginId, version);
     return loadFromRuntime(runtime);
   }
@@ -210,7 +250,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * @returns 无返回值。
    */
   async function enablePluginRuntime(pluginId: string): Promise<void> {
-    if (USE_MOCK_API) return;
+    if (runtimeLoadingDisabled) return;
     const id = pluginId.trim();
     if (!id) return;
 
@@ -226,7 +266,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     try {
       if (loaded.activate) await Promise.resolve(loaded.activate(ctx));
     } catch (e) {
-      logger.error("Action: plugin_activate_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_activate_failed", { key, pluginId: id, error: String(e) });
       // 激活失败不应导致宿主 UI 崩溃；插件仍保持注册态，但可能不可用。
     }
   }
@@ -248,7 +288,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     try {
       await Promise.resolve(loaded.deactivate());
     } catch (e) {
-      logger.error("Action: plugin_deactivate_failed", { key, pluginId: id, error: String(e) });
+      logger.error("Action: plugins_deactivate_failed", { key, pluginId: id, error: String(e) });
     }
   }
 
@@ -262,7 +302,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * @returns 插件上下文；若插件未加载则返回 `null`。
    */
   function getContextForPlugin(pluginId: string): PluginContext | null {
-    if (USE_MOCK_API) return null;
+    if (runtimeLoadingDisabled) return null;
     const id = pluginId.trim();
     if (!id) return null;
     const runtime = runtimeById[id] ?? null;
@@ -303,7 +343,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * @returns 无返回值。
    */
   async function ensureLoaded(): Promise<void> {
-    if (USE_MOCK_API) return;
+    if (runtimeLoadingDisabled) return;
     if (key === NO_SERVER_KEY) return;
     loading.value = true;
     error.value = "";
@@ -317,11 +357,11 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
           await enablePluginRuntime(st.pluginId);
         } catch (e) {
           const msg = String(e) || "Runtime load failed";
-          logger.error("Action: plugin_runtime_load_failed_marking_failed", { key, pluginId: st.pluginId, error: msg });
+          logger.error("Action: plugins_runtime_load_failed_mark_failed", { key, pluginId: st.pluginId, error: msg });
           try {
             await getPluginManagerPort().setFailed(key, st.pluginId, msg);
           } catch (se) {
-            logger.error("Action: plugin_mark_failed_failed", { key, pluginId: st.pluginId, error: String(se) });
+            logger.error("Action: plugins_mark_failed_state_failed", { key, pluginId: st.pluginId, error: String(se) });
           }
         }
       }
@@ -332,7 +372,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
       }
     } catch (e) {
       error.value = String(e);
-      logger.error("Action: plugin_ensure_loaded_failed", { key, error: String(e) });
+      logger.error("Action: plugins_ensure_loaded_failed", { key, error: String(e) });
     } finally {
       loading.value = false;
     }

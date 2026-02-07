@@ -124,12 +124,12 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
         catalog.value = merged;
         if (repoErrors.length > 0) {
           const msg = `Repo catalog errors:\n${repoErrors.join("\n")}`;
-          logger.warn("Action: repo_catalog_errors", { key, errorCount: repoErrors.length });
-          logger.debug("Action: repo_catalog_error_details", { key, errors: repoErrors });
+          logger.warn("Action: plugins_repo_catalog_errors_detected", { key, errorCount: repoErrors.length });
+          logger.debug("Action: plugins_repo_catalog_error_details_logged", { key, errors: repoErrors });
           error.value = msg;
         }
       } catch (e) {
-        logger.error("Action: list_plugin_catalog_failed", { key, error: String(e) });
+        logger.error("Action: plugins_catalog_list_failed", { key, error: String(e) });
         error.value = String(e);
         catalog.value = [];
       } finally {

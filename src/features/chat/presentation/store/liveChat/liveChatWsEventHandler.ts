@@ -151,6 +151,6 @@ export function createLiveChatWsEventHandler(deps: LiveChatWsEventHandlerDeps) {
       return;
     }
 
-    deps.logger.debug("Action: ws_event_ignored", { eventType });
+    deps.logger.debug("Action: chat_ws_event_ignored", { eventType });
   };
 }

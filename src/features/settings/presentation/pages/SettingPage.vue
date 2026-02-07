@@ -8,7 +8,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { getStoredTheme, setTheme, type AppTheme } from "@/shared/utils/theme";
-import { USE_MOCK_API } from "@/shared/config/runtime";
+import { IS_MOCK_ENABLED, MOCK_MODE } from "@/shared/config/runtime";
 import { currentServerSocket, setServerSocket, useServerInfoStore } from "@/features/servers/api";
 import { getServerScopeKey, getKnownServerId, forgetServerIdentity } from "@/shared/serverIdentity";
 import { removeServerDb } from "@/shared/db";
@@ -182,7 +182,11 @@ async function clearCurrentServerData(): Promise<void> {
         <div class="cp-settings__v">
           <div class="cp-settings__row">
             <span class="cp-settings__muted">mock api</span>
-            <MonoTag :value="USE_MOCK_API ? 'true' : 'false'" title="VITE_USE_MOCK_API" :copyable="true" />
+            <MonoTag :value="IS_MOCK_ENABLED ? 'true' : 'false'" title="VITE_USE_MOCK_API" :copyable="true" />
+          </div>
+          <div class="cp-settings__row">
+            <span class="cp-settings__muted">mock mode</span>
+            <MonoTag :value="MOCK_MODE" title="VITE_MOCK_MODE" :copyable="true" />
           </div>
           <div class="cp-settings__hint">
             Use `.env.local` to enable mock mode for local UI preview.

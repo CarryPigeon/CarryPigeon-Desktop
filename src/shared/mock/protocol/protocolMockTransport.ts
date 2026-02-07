@@ -281,6 +281,38 @@ function getServer(serverSocket: string): ServerState {
 }
 
 /**
+ * 生成 protocol-mock 文件下载 URL（data URL，避免访问真实网络）。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @param shareKey - 文件 share key。
+ * @returns 可直接用于 <img src> / window.open 的 data URL。
+ */
+export function buildProtocolMockDownloadUrl(serverSocket: string, shareKey: string): string {
+  const key = String(shareKey ?? "").trim();
+  if (!key) return "";
+  const server = getServer(serverSocket);
+  const file = server.filesByShareKey.get(key) ?? null;
+  const filename = String(file?.filename ?? key).trim() || key;
+  const mimeType = String(file?.mime_type ?? "").trim().toLowerCase();
+
+  if (mimeType.startsWith("image/")) {
+    const svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270" viewBox="0 0 480 270">',
+      '<rect width="480" height="270" fill="#0f172a"/>',
+      '<rect x="24" y="24" width="432" height="222" rx="16" fill="#111827" stroke="#334155"/>',
+      '<text x="40" y="96" fill="#cbd5e1" font-family="monospace" font-size="18">Mock Image</text>',
+      `<text x="40" y="132" fill="#94a3b8" font-family="monospace" font-size="14">${filename}</text>`,
+      `<text x="40" y="160" fill="#64748b" font-family="monospace" font-size="12">share_key=${key}</text>`,
+      '</svg>',
+    ].join("");
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  const body = `Mock file download\nfilename=${filename}\nshare_key=${key}`;
+  return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
+}
+
+/**
  * 从请求头中解析并验证会话（Authorization: Bearer ...）。
  *
  * @param server - server state。
@@ -454,6 +486,13 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   // -------------------------------------------------------------------------
   // Auth (public)
   // -------------------------------------------------------------------------
+  if (method === "POST" && pathname === "/auth/email_codes") {
+    const body = req.body as { email?: string } | null;
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    if (!email) return { ok: false, error: apiError(400, "invalid_request", "Missing email") };
+    return { ok: true, status: 204, body: null };
+  }
+
   if (method === "POST" && pathname === "/auth/tokens") {
     const body = req.body as
       | {

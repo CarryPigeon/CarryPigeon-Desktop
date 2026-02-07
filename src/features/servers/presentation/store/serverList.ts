@@ -4,9 +4,8 @@
  */
 
 import { computed, ref } from "vue";
-import { MOCK_SERVER_SOCKET, USE_MOCK_API } from "@/shared/config/runtime";
-import { readJson, writeJson } from "@/shared/utils/localStore";
-import { MOCK_KEYS } from "@/shared/mock/mockKeys";
+import { localServerRackStatePort } from "@/features/servers/data/localServerRackStatePort";
+import type { ServerRackRecord } from "@/features/servers/domain/ports/ServerRackStatePort";
 import { currentServerSocket, setServerSocket } from "./currentServer";
 import { setServerTlsConfigProvider } from "@/shared/net/tls/serverTlsConfigProvider";
 
@@ -71,22 +70,7 @@ function normalizeRack(raw: Partial<ServerRack> & { id?: unknown; serverSocket?:
  * - 非 mock：当前默认从空列表开始（待接入真实持久化）。
  */
 const state = ref<StoredServersState>(
-  readJson<StoredServersState>(MOCK_KEYS.serversState, {
-    servers: USE_MOCK_API
-      ? [
-          {
-            id: "rack-0",
-            name: "Mock Rack",
-            serverSocket: MOCK_SERVER_SOCKET,
-            pinned: true,
-            note: "",
-            tlsPolicy: "strict",
-            tlsFingerprint: "",
-            notifyMode: "notify",
-          },
-        ]
-      : [],
-  }),
+  localServerRackStatePort.read(),
 );
 
 /**
@@ -106,7 +90,18 @@ normalizeState();
  * 将当前机架列表状态写入本地存储。
  */
 function persist(): void {
-  writeJson(MOCK_KEYS.serversState, state.value);
+  localServerRackStatePort.write({
+    servers: state.value.servers.map((rack): ServerRackRecord => ({
+      id: rack.id,
+      name: rack.name,
+      serverSocket: rack.serverSocket,
+      pinned: rack.pinned,
+      note: rack.note,
+      tlsPolicy: rack.tlsPolicy,
+      tlsFingerprint: rack.tlsFingerprint,
+      notifyMode: rack.notifyMode,
+    })),
+  });
 }
 
 /**

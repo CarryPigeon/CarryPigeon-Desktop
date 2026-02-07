@@ -119,9 +119,9 @@ async function refreshViaHttp(serverSocket: string, refreshToken: string): Promi
     return { accessToken, refreshToken: nextRefreshToken, uid: uid || undefined, expiresAtMs };
   } catch (e) {
     if (isApiRequestError(e)) {
-      logger.warn("Action: auth_refresh_failed", { socket, reason: e.reason, status: e.status });
+      logger.warn("Action: auth_session_refresh_failed", { socket, reason: e.reason, status: e.status });
     } else {
-      logger.warn("Action: auth_refresh_failed", { socket, error: String(e) });
+      logger.warn("Action: auth_session_refresh_failed", { socket, error: String(e) });
     }
     return null;
   }
@@ -221,7 +221,7 @@ export function startAuthSessionAutoRefresh(serverSocket: string): AutoRefreshHa
     }, delayMs);
 
     autoRefreshTimers.set(socket, id);
-    logger.debug("Action: auth_auto_refresh_scheduled", { socket, delayMs });
+    logger.debug("Action: auth_session_auto_refresh_scheduled", { socket, delayMs });
   }
 
   scheduleNext();
@@ -254,9 +254,9 @@ export async function revokeAndClearSession(serverSocket: string): Promise<void>
     await client.requestJson<void>("POST", "/auth/revoke", { refresh_token: refreshToken, client: { device_id: getDeviceId() } });
   } catch (e) {
     if (isApiRequestError(e)) {
-      logger.warn("Action: auth_revoke_failed_best_effort", { socket, reason: e.reason, status: e.status });
+      logger.warn("Action: auth_session_revoke_failed_best_effort", { socket, reason: e.reason, status: e.status });
       return;
     }
-    logger.warn("Action: auth_revoke_failed_best_effort", { socket, error: String(e) });
+    logger.warn("Action: auth_session_revoke_failed_best_effort", { socket, error: String(e) });
   }
 }

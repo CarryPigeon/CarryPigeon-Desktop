@@ -23,6 +23,35 @@ function formatMeta(meta?: LogMeta): string {
 }
 
 /**
+ * 将任意 message 归一化为 `Action: <snake_case>`。
+ *
+ * @param message - 原始日志消息。
+ * @returns 归一化后的动作消息。
+ */
+function normalizeActionMessage(message: string): string {
+  const trimmed = message.trim();
+  const noPrefix = trimmed.replace(/^Action:\s*/i, "");
+  const withWordBoundary = noPrefix.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
+  const snake = withWordBoundary
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+  return `Action: ${snake || "unknown_action"}`;
+}
+
+/**
+ * 组合规范化动作消息与结构化元信息。
+ *
+ * @param message - 原始日志消息。
+ * @param meta - 可选结构化元信息。
+ * @returns 最终写入 Rust 侧的日志文本。
+ */
+function buildMessage(message: string, meta?: LogMeta): string {
+  return `${normalizeActionMessage(message)}${formatMeta(meta)}`;
+}
+
+/**
  * 尽力而为（best-effort）地调用 Rust 侧命令。
  *
  * 约束：日志链路不应导致 UI 崩溃，因此调用失败会被吞掉。
@@ -43,15 +72,15 @@ function safeInvoke(command: string, args: Record<string, unknown>): void {
  */
 export const tauriLog = {
   debug(message: string, meta?: LogMeta) {
-    safeInvoke(TAURI_COMMANDS.logDebug, { msg: `${message}${formatMeta(meta)}` });
+    safeInvoke(TAURI_COMMANDS.logDebug, { message: buildMessage(message, meta) });
   },
   info(message: string, meta?: LogMeta) {
-    safeInvoke(TAURI_COMMANDS.logInfo, { msg: `${message}${formatMeta(meta)}` });
+    safeInvoke(TAURI_COMMANDS.logInfo, { message: buildMessage(message, meta) });
   },
   warn(message: string, meta?: LogMeta) {
-    safeInvoke(TAURI_COMMANDS.logWarning, { msg: `${message}${formatMeta(meta)}` });
+    safeInvoke(TAURI_COMMANDS.logWarning, { message: buildMessage(message, meta) });
   },
   error(message: string, meta?: LogMeta) {
-    safeInvoke(TAURI_COMMANDS.logError, { error: `${message}${formatMeta(meta)}` });
+    safeInvoke(TAURI_COMMANDS.logError, { message: buildMessage(message, meta) });
   },
 };
