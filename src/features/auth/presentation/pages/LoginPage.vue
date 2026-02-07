@@ -202,7 +202,7 @@ async function handleConnect(): Promise<void> {
   await connectWithRetry(socket, { maxAttempts: 6 });
   if (connectionPhase.value === "connected") {
     await serverInfoStore.value.refresh();
-    logger.info("Action: server_info_refreshed", { socket, serverId: serverInfo.value?.serverId ?? "" });
+    logger.info("Action: servers_info_refreshed", { socket, serverId: serverInfo.value?.serverId ?? "" });
   }
 }
 

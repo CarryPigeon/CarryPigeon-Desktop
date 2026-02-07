@@ -66,7 +66,7 @@ export const tauriServerInfoPort: ServerInfoPort = {
       if (info.serverId) rememberServerId(socket, info.serverId);
       return info;
     } catch (e) {
-      logger.error("Action: get_server_info_failed", { socket, error: String(e) });
+      logger.error("Action: servers_info_get_failed", { socket, error: String(e) });
       throw e;
     }
   },

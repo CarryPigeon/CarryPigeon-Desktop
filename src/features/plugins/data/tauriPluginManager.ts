@@ -127,7 +127,7 @@ export const tauriPluginManager: PluginManagerPort = {
       emitProgress(id, "installed", 100, "已安装", onProgress);
       return mapInstalledState(raw);
     } catch (e) {
-      logger.error("Action: plugin_install_failed", { serverSocket: socket, pluginId: id, version: v, error: String(e) });
+      logger.error("Action: plugins_install_failed", { serverSocket: socket, pluginId: id, version: v, error: String(e) });
       emitProgress(id, "failed", 100, String(e) || "Failed", onProgress);
       throw e;
     }
@@ -168,7 +168,7 @@ export const tauriPluginManager: PluginManagerPort = {
       emitProgress(id, "installed", 100, "已安装", onProgress);
       return mapInstalledState(raw);
     } catch (e) {
-      logger.error("Action: plugin_install_from_url_failed", { serverSocket: socket, pluginId: id, version: v, url: u, error: String(e) });
+      logger.error("Action: plugins_install_from_url_failed", { serverSocket: socket, pluginId: id, version: v, url: u, error: String(e) });
       emitProgress(id, "failed", 100, String(e) || "Failed", onProgress);
       throw e;
     }

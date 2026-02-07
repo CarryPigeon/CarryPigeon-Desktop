@@ -4,6 +4,7 @@
 use tauri::{AppHandle, LogicalSize, Manager};
 
 use crate::features::windows::di::{info_window, popover_window};
+use crate::shared::error::{CommandResult, command_error, to_command_error};
 
 /// 将主窗口调整为聊天视图的推荐尺寸。
 ///
@@ -11,15 +12,22 @@ use crate::features::windows::di::{info_window, popover_window};
 /// - `app`：Tauri 应用句柄，用于查找并操作窗口。
 ///
 /// # 返回值
-/// 无返回值。
+/// - `Ok(())`：调整成功。
+/// - `Err(String)`：窗口不存在或调整失败原因。
 ///
 /// # 说明
 /// - 该命令面向前端触发（`#[tauri::command]`）。
-/// - 当前实现对 `main` 窗口使用 `unwrap()`：若窗口不存在会 panic（保持与既有行为一致）。
 #[tauri::command]
-pub fn to_chat_window_size(app: AppHandle) {
-    let window = app.get_webview_window("main").unwrap();
-    window.set_size(LogicalSize::new(1211, 702)).unwrap()
+pub fn to_chat_window_size(app: AppHandle) -> CommandResult<()> {
+    let window = app.get_webview_window("main").ok_or_else(|| {
+        tracing::warn!(action = "windows_chat_window_size_main_window_missing");
+        command_error("WINDOW_MAIN_NOT_FOUND", "Main window not found")
+    })?;
+
+    window.set_size(LogicalSize::new(1211, 702)).map_err(|err| {
+        tracing::warn!(action = "windows_chat_window_size_failed", error = %err);
+        to_command_error("WINDOW_RESIZE_FAILED", err)
+    })
 }
 
 /// 打开用户信息弹窗（Popover）窗口。
@@ -44,8 +52,10 @@ pub async fn open_popover_window(
     y: f64,
     width: f64,
     height: f64,
-) -> Result<(), String> {
-    popover_window::open_popover_window_impl(app, query, x, y, width, height).await
+) -> CommandResult<()> {
+    popover_window::open_popover_window_impl(app, query, x, y, width, height)
+        .await
+        .map_err(|err| to_command_error("WINDOW_POPOVER_OPEN_FAILED", err))
 }
 
 /// 打开信息展示窗口（Info window）。
@@ -71,6 +81,8 @@ pub async fn open_info_window(
     query: String,
     width: f64,
     height: f64,
-) -> Result<(), String> {
-    info_window::open_info_window_impl(app, label, title, query, width, height).await
+) -> CommandResult<()> {
+    info_window::open_info_window_impl(app, label, title, query, width, height)
+        .await
+        .map_err(|err| to_command_error("WINDOW_INFO_OPEN_FAILED", err))
 }

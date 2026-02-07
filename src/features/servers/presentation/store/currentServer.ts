@@ -4,7 +4,8 @@
  */
 
 import { ref } from "vue";
-import { MOCK_SERVER_SOCKET, USE_MOCK_API } from "@/shared/config/runtime";
+import { MOCK_SERVER_SOCKET } from "@/shared/config/runtime";
+import { selectByMockEnabled } from "@/shared/config/mockModeSelector";
 
 /**
  * 当前选中的 server socket。
@@ -14,7 +15,7 @@ import { MOCK_SERVER_SOCKET, USE_MOCK_API } from "@/shared/config/runtime";
  *
  * @constant
  */
-export const currentServerSocket = ref<string>(USE_MOCK_API ? MOCK_SERVER_SOCKET : "");
+export const currentServerSocket = ref<string>(selectByMockEnabled(() => MOCK_SERVER_SOCKET, () => ""));
 
 /**
  * 更新当前 server socket（写入前会 trim）。

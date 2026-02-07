@@ -9,6 +9,8 @@ use sea_orm::{
 };
 use tauri::command;
 
+use crate::shared::error::{CommandResult, command_error, to_command_error};
+
 use super::{close_db, connect_named, get_db, get_entry, remove_db};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,9 +170,9 @@ fn base_db_dir() -> PathBuf {
     root.join("data").join("db")
 }
 
-fn ensure_parent_dir(path: &Path) -> Result<(), String> {
+fn ensure_parent_dir(path: &Path) -> CommandResult<()> {
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create db dir: {e}"))?;
+        std::fs::create_dir_all(dir).map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", e))?;
     }
     Ok(())
 }
@@ -226,9 +228,9 @@ fn exec_result(result: &sea_orm::ExecResult) -> DbExecResult {
 /// # 说明
 /// - 前端应先调用该命令，再调用 `db_execute/db_query/db_transaction` 等命令。
 /// - 若 `path` 为空，将使用默认路径 `data/db/{key}.db`。
-pub async fn db_init(req: DbInitRequest) -> Result<(), String> {
+pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
     if req.key.trim().is_empty() {
-        return Err("key is required".into());
+        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
 
     let path = req
@@ -238,8 +240,10 @@ pub async fn db_init(req: DbInitRequest) -> Result<(), String> {
     ensure_parent_dir(&path)?;
     connect_named(&req.key, path)
         .await
-        .map_err(|e| e.to_string())?;
-    run_migrations(&req.key, req.kind.as_deref()).await
+        .map_err(|e| to_command_error("DB_CONNECT_FAILED", e))?;
+    run_migrations(&req.key, req.kind.as_deref())
+        .await
+        .map_err(|e| to_command_error("DB_MIGRATE_FAILED", e))
 }
 
 #[command]
@@ -251,11 +255,16 @@ pub async fn db_init(req: DbInitRequest) -> Result<(), String> {
 /// # 返回值
 /// - `Ok(DbExecResult)`：执行结果（行数等）。
 /// - `Err(String)`：执行失败原因。
-pub async fn db_execute(req: DbExecuteRequest) -> Result<DbExecResult, String> {
-    let db = get_db(&req.key).await?;
+pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
+    let db = get_db(&req.key)
+        .await
+        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
     let conn = &db.connection;
     let stmt = RawStatement::new(req.sql, map_values(req.params));
-    let result = conn.execute(&stmt).await.map_err(|e| e.to_string())?;
+    let result = conn
+        .execute(&stmt)
+        .await
+        .map_err(|e| to_command_error("DB_EXECUTE_FAILED", e))?;
     Ok(exec_result(&result))
 }
 
@@ -272,15 +281,20 @@ pub async fn db_execute(req: DbExecuteRequest) -> Result<DbExecResult, String> {
 /// # 说明
 /// - 为减少跨端类型推断复杂度，调用方必须显式提供 `columns`。
 /// - 若 `columns` 为空，直接返回错误。
-pub async fn db_query(req: DbQueryRequest) -> Result<DbQueryResult, String> {
+pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
     if req.columns.is_empty() {
-        return Err("columns is required".into());
+        return Err(command_error("DB_COLUMNS_REQUIRED", "columns is required"));
     }
 
-    let db = get_db(&req.key).await?;
+    let db = get_db(&req.key)
+        .await
+        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
     let conn = &db.connection;
     let stmt = RawStatement::new(req.sql, map_values(req.params));
-    let rows = conn.query_all(&stmt).await.map_err(|e| e.to_string())?;
+    let rows = conn
+        .query_all(&stmt)
+        .await
+        .map_err(|e| to_command_error("DB_QUERY_FAILED", e))?;
     let mut result_rows = Vec::with_capacity(rows.len());
 
     for row in rows.iter() {
@@ -306,19 +320,29 @@ pub async fn db_query(req: DbQueryRequest) -> Result<DbQueryResult, String> {
 /// # 返回值
 /// - `Ok(Vec<DbExecResult>)`：每条语句的执行结果列表（与输入 statements 顺序一致）。
 /// - `Err(String)`：执行失败原因。
-pub async fn db_transaction(req: DbTransactionRequest) -> Result<Vec<DbExecResult>, String> {
-    let db = get_db(&req.key).await?;
+pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbExecResult>> {
+    let db = get_db(&req.key)
+        .await
+        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
     let conn = &db.connection;
-    let txn = conn.begin().await.map_err(|e| e.to_string())?;
+    let txn = conn
+        .begin()
+        .await
+        .map_err(|e| to_command_error("DB_TRANSACTION_BEGIN_FAILED", e))?;
     let mut results = Vec::with_capacity(req.statements.len());
 
     for statement in req.statements {
         let stmt = RawStatement::new(statement.sql, map_values(statement.params));
-        let res = txn.execute(&stmt).await.map_err(|e| e.to_string())?;
+        let res = txn
+            .execute(&stmt)
+            .await
+            .map_err(|e| to_command_error("DB_TRANSACTION_EXECUTE_FAILED", e))?;
         results.push(exec_result(&res));
     }
 
-    txn.commit().await.map_err(|e| e.to_string())?;
+    txn.commit()
+        .await
+        .map_err(|e| to_command_error("DB_TRANSACTION_COMMIT_FAILED", e))?;
     Ok(results)
 }
 
@@ -334,11 +358,13 @@ pub async fn db_transaction(req: DbTransactionRequest) -> Result<Vec<DbExecResul
 ///
 /// # 说明
 /// 该操作会从内存注册表移除连接；连接对象被 drop 后由底层驱动完成资源释放。
-pub async fn db_close(key: String) -> Result<(), String> {
+pub async fn db_close(key: String) -> CommandResult<()> {
     if key.trim().is_empty() {
-        return Err("key is required".into());
+        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
-    close_db(&key).await
+    close_db(&key)
+        .await
+        .map_err(|e| to_command_error("DB_CLOSE_FAILED", e))
 }
 
 #[command]
@@ -354,17 +380,18 @@ pub async fn db_close(key: String) -> Result<(), String> {
 /// # 说明
 /// - 该命令会先从注册表移除连接，再删除文件。
 /// - 若注册表中不存在该 key，则使用默认路径作为删除目标兜底。
-pub async fn db_remove(key: String) -> Result<(), String> {
+pub async fn db_remove(key: String) -> CommandResult<()> {
     if key.trim().is_empty() {
-        return Err("key is required".into());
+        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
 
     let path = remove_db(&key)
-        .await?
+        .await
+        .map_err(|e| to_command_error("DB_REMOVE_FAILED", e))?
         .unwrap_or_else(|| default_db_path(&key));
 
     if path.exists() {
-        std::fs::remove_file(&path).map_err(|e| format!("Failed to remove db file: {e}"))?;
+        std::fs::remove_file(&path).map_err(|e| to_command_error("DB_FILE_REMOVE_FAILED", e))?;
     }
     Ok(())
 }
@@ -382,9 +409,9 @@ pub async fn db_remove(key: String) -> Result<(), String> {
 /// # 说明
 /// - 若注册表中存在该 key，则返回初始化时的路径。
 /// - 若不存在，则返回默认路径 `data/db/{key}.db`。
-pub async fn db_path(key: String) -> Result<String, String> {
+pub async fn db_path(key: String) -> CommandResult<String> {
     if key.trim().is_empty() {
-        return Err("key is required".into());
+        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
     let path = match get_entry_path(&key).await {
         Ok(path) => path,
@@ -393,8 +420,10 @@ pub async fn db_path(key: String) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-async fn get_entry_path(key: &str) -> Result<PathBuf, String> {
-    let entry = get_entry(key).await?;
+async fn get_entry_path(key: &str) -> CommandResult<PathBuf> {
+    let entry = get_entry(key)
+        .await
+        .map_err(|e| to_command_error("DB_ENTRY_LOOKUP_FAILED", e))?;
     Ok(entry.path.clone())
 }
 
@@ -476,7 +505,7 @@ struct Migration {
     statements: Vec<&'static str>,
 }
 
-async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> Result<(), String> {
+async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> CommandResult<()> {
     let stmt = RawStatement::new(
         r#"
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -488,16 +517,21 @@ async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> Result<(
         .to_string(),
         Vec::new(),
     );
-    conn.execute(&stmt).await.map_err(|e| e.to_string())?;
+    conn.execute(&stmt)
+        .await
+        .map_err(|e| to_command_error("DB_MIGRATIONS_TABLE_ENSURE_FAILED", e))?;
     Ok(())
 }
 
-async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> Result<Vec<i64>, String> {
+async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> CommandResult<Vec<i64>> {
     let stmt = RawStatement::new(
         "SELECT version FROM schema_migrations ORDER BY version ASC".to_string(),
         Vec::new(),
     );
-    let rows = conn.query_all(&stmt).await.map_err(|e| e.to_string())?;
+    let rows = conn
+        .query_all(&stmt)
+        .await
+        .map_err(|e| to_command_error("DB_MIGRATIONS_FETCH_APPLIED_FAILED", e))?;
     let mut versions = Vec::with_capacity(rows.len());
     for row in rows.iter() {
         if let Ok(Some(v)) = row.try_get::<Option<i64>>("", "version") {
@@ -507,8 +541,10 @@ async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> Result<Ve
     Ok(versions)
 }
 
-async fn run_migrations(key: &str, kind: Option<&str>) -> Result<(), String> {
-    let db = get_db(key).await?;
+async fn run_migrations(key: &str, kind: Option<&str>) -> CommandResult<()> {
+    let db = get_db(key)
+        .await
+        .map_err(|e| to_command_error("DB_MIGRATIONS_DB_GET_FAILED", e))?;
     let conn = &db.connection;
     ensure_migrations_table(conn).await?;
     let applied = fetch_applied_versions(conn).await?;
@@ -531,10 +567,15 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> Result<(), String> {
         if applied.contains(&migration.version) {
             continue;
         }
-        let txn = conn.begin().await.map_err(|e| e.to_string())?;
+        let txn = conn
+            .begin()
+            .await
+            .map_err(|e| to_command_error("DB_MIGRATIONS_TXN_BEGIN_FAILED", e))?;
         for statement in migration.statements.iter() {
             let stmt = RawStatement::new((*statement).to_string(), Vec::new());
-            txn.execute(&stmt).await.map_err(|e| e.to_string())?;
+            txn.execute(&stmt)
+                .await
+                .map_err(|e| to_command_error("DB_MIGRATIONS_STATEMENT_EXECUTE_FAILED", e))?;
         }
         let insert_stmt = RawStatement::new(
             "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)"
@@ -545,8 +586,12 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> Result<(), String> {
                 Value::BigInt(Some(now_ms())),
             ],
         );
-        txn.execute(&insert_stmt).await.map_err(|e| e.to_string())?;
-        txn.commit().await.map_err(|e| e.to_string())?;
+        txn.execute(&insert_stmt)
+            .await
+            .map_err(|e| to_command_error("DB_MIGRATIONS_RECORD_INSERT_FAILED", e))?;
+        txn.commit()
+            .await
+            .map_err(|e| to_command_error("DB_MIGRATIONS_TXN_COMMIT_FAILED", e))?;
     }
 
     Ok(())

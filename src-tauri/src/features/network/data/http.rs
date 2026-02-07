@@ -78,7 +78,7 @@ pub async fn download_avatar_impl(
     };
 
     // 发送GET请求
-    info!("Starting download: url={}", url);
+    info!(action = "network_download_started", url = %url);
     let mut response = client.get(url).send().await?;
 
     // 创建输出文件
@@ -120,10 +120,10 @@ pub async fn download_avatar_impl(
     // 计算最终哈希
     let hash = format!("{:x}", hasher.finalize());
     info!(
-        "Download completed: path={}, bytes={}, sha256={}",
-        output_path.display(),
+        action = "network_download_completed",
+        path = %output_path.display(),
         downloaded,
-        hash,
+        sha256 = %hash
     );
 
     // 验证文件完整性
@@ -138,8 +138,8 @@ pub async fn download_avatar_impl(
             ));
         }
         info!(
-            "File integrity check passed: path={}",
-            output_path.display()
+            action = "network_download_integrity_check_passed",
+            path = %output_path.display()
         );
     }
 
@@ -159,11 +159,13 @@ pub async fn download_avatar(avatar_id: &str, url: &str) -> anyhow::Result<()> {
                 if total > 0 {
                     let progress = (downloaded as f64 / total as f64) * 100.0;
                     debug!(
-                        "Avatar download progress: {:.2}% ({}/{})",
-                        progress, downloaded, total
+                        action = "network_avatar_download_progress",
+                        progress_percent = progress,
+                        downloaded,
+                        total
                     );
                 } else {
-                    debug!("Avatar download progress: bytes={}", downloaded);
+                    debug!(action = "network_avatar_download_progress", downloaded);
                 }
             })
         })),
@@ -208,7 +210,7 @@ mod tests {
             progress_callback: Some(Box::new(|downloaded, total| {
                 Box::pin(async move {
                     tracing::debug!(
-                        action = "download_progress",
+                        action = "network_avatar_download_progress",
                         downloaded,
                         total,
                         "Download progress"
@@ -225,7 +227,7 @@ mod tests {
 
         // 清理测试文件
         if let Err(e) = tokio::fs::remove_file(output_path).await {
-            tracing::warn!(action = "cleanup_test_file_failed", error = %e);
+            tracing::warn!(action = "test_cleanup_file_failed", error = %e);
         }
     }
 
@@ -243,7 +245,7 @@ mod tests {
         // 清理测试文件
         let output_path = format!("./avatar/{}.jpg", avatar_id);
         if let Err(e) = tokio::fs::remove_file(output_path).await {
-            tracing::warn!(action = "cleanup_test_avatar_file_failed", error = %e);
+            tracing::warn!(action = "test_cleanup_avatar_file_failed", error = %e);
         }
     }
 }

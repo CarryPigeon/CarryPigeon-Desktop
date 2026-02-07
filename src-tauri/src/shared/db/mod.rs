@@ -3,6 +3,7 @@
 //! 说明：该文件负责导出子模块与组织依赖关系。
 //!
 //! 约定：注释中文，日志英文（tracing）。
+use anyhow::anyhow;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -124,7 +125,7 @@ pub async fn connect_named(key: &str, path: PathBuf) -> anyhow::Result<()> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let url = sqlite_url_for_path(&path);
     tracing::info!(
-        action = "db_open",
+        action = "db_connection_opened",
         key = %key,
         path = %path.display(),
         url = %url,
@@ -147,14 +148,14 @@ pub async fn connect_named(key: &str, path: PathBuf) -> anyhow::Result<()> {
 ///
 /// # 返回值
 /// - `Ok(Arc<CPDatabase>)`：数据库连接。
-/// - `Err(String)`：未初始化或其他错误。
-pub async fn get_db(key: &str) -> Result<Arc<CPDatabase>, String> {
+/// - `Err(anyhow::Error)`：未初始化或其他错误。
+pub async fn get_db(key: &str) -> anyhow::Result<Arc<CPDatabase>> {
     let registry = init_db_registry();
     let lock = registry.read().await;
     lock.map
         .get(key)
         .map(|entry| entry.db.clone())
-        .ok_or_else(|| format!("Database not initialized for key: {}", key))
+        .ok_or_else(|| anyhow!("Database not initialized for key: {}", key))
 }
 
 /// 获取指定 key 对应的数据库条目（含路径信息）。
@@ -164,14 +165,14 @@ pub async fn get_db(key: &str) -> Result<Arc<CPDatabase>, String> {
 ///
 /// # 返回值
 /// - `Ok(Arc<DbEntry>)`：条目。
-/// - `Err(String)`：未初始化或其他错误。
-pub async fn get_entry(key: &str) -> Result<Arc<DbEntry>, String> {
+/// - `Err(anyhow::Error)`：未初始化或其他错误。
+pub async fn get_entry(key: &str) -> anyhow::Result<Arc<DbEntry>> {
     let registry = init_db_registry();
     let lock = registry.read().await;
     lock.map
         .get(key)
         .cloned()
-        .ok_or_else(|| format!("Database not initialized for key: {}", key))
+        .ok_or_else(|| anyhow!("Database not initialized for key: {}", key))
 }
 
 /// 关闭并移除指定 key 的数据库连接。
@@ -181,8 +182,8 @@ pub async fn get_entry(key: &str) -> Result<Arc<DbEntry>, String> {
 ///
 /// # 返回值
 /// - `Ok(())`：移除成功（即便 key 不存在也视为成功）。
-/// - `Err(String)`：当前实现不会返回错误（预留接口形态）。
-pub async fn close_db(key: &str) -> Result<(), String> {
+/// - `Err(anyhow::Error)`：当前实现通常不会返回错误（预留接口形态）。
+pub async fn close_db(key: &str) -> anyhow::Result<()> {
     let registry = init_db_registry();
     let mut lock = registry.write().await;
     lock.map.remove(key);
@@ -197,8 +198,8 @@ pub async fn close_db(key: &str) -> Result<(), String> {
 /// # 返回值
 /// - `Ok(Some(PathBuf))`：存在该 key，返回其数据库路径。
 /// - `Ok(None)`：不存在该 key。
-/// - `Err(String)`：当前实现不会返回错误（预留接口形态）。
-pub async fn remove_db(key: &str) -> Result<Option<PathBuf>, String> {
+/// - `Err(anyhow::Error)`：当前实现通常不会返回错误（预留接口形态）。
+pub async fn remove_db(key: &str) -> anyhow::Result<Option<PathBuf>> {
     let registry = init_db_registry();
     let mut lock = registry.write().await;
     Ok(lock.map.remove(key).map(|entry| entry.path.clone()))

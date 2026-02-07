@@ -117,7 +117,7 @@ impl TcpServiceReal {
                                 payload: chunk.clone(),
                             },
                         ) {
-                            tracing::warn!(action = "tcp_emit_message_failed", error = ?e);
+                            tracing::warn!(action = "network_tcp_emit_message_failed", error = ?e);
                         }
 
                         // New: deframe and emit payload frames.
@@ -135,7 +135,7 @@ impl TcpServiceReal {
                             }
                             // Hard limit: 10MB payload.
                             if len > 10_000_000 {
-                                tracing::warn!(action = "tcp_frame_invalid_length", len);
+                                tracing::warn!(action = "network_tcp_frame_invalid_length", len);
                                 acc.clear();
                                 break;
                             }
@@ -153,12 +153,12 @@ impl TcpServiceReal {
                                     payload,
                                 },
                             ) {
-                                tracing::warn!(action = "tcp_emit_frame_failed", error = ?e);
+                                tracing::warn!(action = "network_tcp_emit_frame_failed", error = ?e);
                             }
                         }
                     }
                     Err(e) => {
-                        tracing::warn!(action = "tcp_read_failed", error = ?e);
+                        tracing::warn!(action = "network_tcp_read_failed", error = ?e);
                         break;
                     }
                 }

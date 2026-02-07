@@ -3,11 +3,11 @@
  * @description user｜依赖组装（DI）：user.di。
  *
  * 选择规则：
- * - `USE_MOCK_API`：使用确定性的内存实现（用于 UI 预览/开发联调）。
+ * - `IS_STORE_MOCK`：使用确定性的内存实现（用于 UI 预览/开发联调）。
  * - 其它情况：使用基于 HTTP 的真实实现。
  */
 
-import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import type { UserServicePort } from "../domain/ports/UserServicePort";
 import { createHttpUserServicePort } from "../data/httpUserServicePort";
 import { createMockUserServicePort } from "../mock/mockUserServicePort";
@@ -24,9 +24,11 @@ import { UpdateUserProfile } from "../domain/usecases/UpdateUserProfile";
  * @returns UserServicePort 实例。
  */
 export function getUserServicePort(serverSocket: string): UserServicePort {
-  if (USE_MOCK_TRANSPORT) return createHttpUserServicePort(serverSocket);
-  if (USE_MOCK_API) return createMockUserServicePort(serverSocket);
-  return createHttpUserServicePort(serverSocket);
+  return selectByMockMode<UserServicePort>({
+    off: () => createHttpUserServicePort(serverSocket),
+    store: () => createMockUserServicePort(serverSocket),
+    protocol: () => createHttpUserServicePort(serverSocket),
+  });
 }
 
 /**

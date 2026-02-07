@@ -6,6 +6,7 @@ use crate::features::plugins::data::plugin_manifest::PluginManifest;
 use crate::features::plugins::data::plugin_store;
 use crate::features::plugins::data::plugin_store::{InstalledPluginState, PluginRuntimeEntry};
 use crate::features::plugins::usecases::plugin_usecases;
+use crate::shared::error::{CommandResult, to_command_error};
 use std::collections::HashMap;
 
 /// 加载并实例化一个插件（由 manifest 指定）。
@@ -20,8 +21,10 @@ use std::collections::HashMap;
 /// # 说明
 /// 该命令主要用于调试/开发态：前端传入 manifest 后触发本地插件加载流程。
 #[tauri::command]
-pub async fn load_plugin(manifest: PluginManifest) -> Result<PluginLoadResult, String> {
-    plugin_usecases::load_plugin(manifest).await
+pub async fn load_plugin(manifest: PluginManifest) -> CommandResult<PluginLoadResult> {
+    plugin_usecases::load_plugin(manifest)
+        .await
+        .map_err(|e| to_command_error("PLUGINS_LOAD_FAILED", e))
 }
 
 /// 列出本地已保存的插件清单列表。
@@ -30,8 +33,10 @@ pub async fn load_plugin(manifest: PluginManifest) -> Result<PluginLoadResult, S
 /// - `Ok(Vec<PluginManifest>)`：清单列表。
 /// - `Err(String)`：读取失败原因。
 #[tauri::command]
-pub async fn list_plugins() -> Result<Vec<PluginManifest>, String> {
-    plugin_usecases::list_plugins().await
+pub async fn list_plugins() -> CommandResult<Vec<PluginManifest>> {
+    plugin_usecases::list_plugins()
+        .await
+        .map_err(|e| to_command_error("PLUGINS_LIST_FAILED", e))
 }
 
 /// 查询服务端已安装插件列表（含当前版本/启用态/错误等状态）。
@@ -49,14 +54,14 @@ pub async fn plugins_list_installed(
     server_socket: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<Vec<InstalledPluginState>, String> {
+) -> CommandResult<Vec<InstalledPluginState>> {
     plugin_store::list_installed(
         &server_socket,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_LIST_INSTALLED_FAILED", e))
 }
 
 /// 查询某个插件在服务端的安装状态。
@@ -76,7 +81,7 @@ pub async fn plugins_get_installed_state(
     plugin_id: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<Option<InstalledPluginState>, String> {
+) -> CommandResult<Option<InstalledPluginState>> {
     plugin_store::get_installed(
         &server_socket,
         &plugin_id,
@@ -84,7 +89,7 @@ pub async fn plugins_get_installed_state(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_GET_INSTALLED_STATE_FAILED", e))
 }
 
 /// 获取插件运行时入口（用于前端动态 import 插件模块）。
@@ -103,7 +108,7 @@ pub async fn plugins_get_runtime_entry(
     plugin_id: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<PluginRuntimeEntry, String> {
+) -> CommandResult<PluginRuntimeEntry> {
     plugin_store::get_runtime_entry(
         &server_socket,
         &plugin_id,
@@ -111,7 +116,7 @@ pub async fn plugins_get_runtime_entry(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FAILED", e))
 }
 
 /// 获取指定版本的插件运行时入口。
@@ -132,7 +137,7 @@ pub async fn plugins_get_runtime_entry_for_version(
     version: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<PluginRuntimeEntry, String> {
+) -> CommandResult<PluginRuntimeEntry> {
     plugin_store::get_runtime_entry_for_version(
         &server_socket,
         &plugin_id,
@@ -141,7 +146,7 @@ pub async fn plugins_get_runtime_entry_for_version(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FOR_VERSION_FAILED", e))
 }
 
 /// 从服务端插件目录安装插件。
@@ -162,7 +167,7 @@ pub async fn plugins_install_from_server_catalog(
     version: Option<String>,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::install_from_server_catalog(
         &server_socket,
         &plugin_id,
@@ -171,7 +176,7 @@ pub async fn plugins_install_from_server_catalog(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_SERVER_CATALOG_FAILED", e))
 }
 
 /// 从指定 URL 安装插件（自定义来源）。
@@ -196,7 +201,7 @@ pub async fn plugins_install_from_url(
     sha256: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::install_from_url(
         &server_socket,
         &plugin_id,
@@ -207,7 +212,7 @@ pub async fn plugins_install_from_url(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_URL_FAILED", e))
 }
 
 /// 启用已安装插件。
@@ -226,7 +231,7 @@ pub async fn plugins_enable(
     plugin_id: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::enable(
         &server_socket,
         &plugin_id,
@@ -234,7 +239,7 @@ pub async fn plugins_enable(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_ENABLE_FAILED", e))
 }
 
 /// 禁用已安装插件。
@@ -253,7 +258,7 @@ pub async fn plugins_disable(
     plugin_id: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::disable(
         &server_socket,
         &plugin_id,
@@ -261,7 +266,7 @@ pub async fn plugins_disable(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_DISABLE_FAILED", e))
 }
 
 /// 切换已安装插件的当前版本。
@@ -282,7 +287,7 @@ pub async fn plugins_switch_version(
     version: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::switch_version(
         &server_socket,
         &plugin_id,
@@ -291,7 +296,7 @@ pub async fn plugins_switch_version(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_SWITCH_VERSION_FAILED", e))
 }
 
 /// 卸载插件（移除服务端安装记录与本地缓存）。
@@ -310,7 +315,7 @@ pub async fn plugins_uninstall(
     plugin_id: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<(), String> {
+) -> CommandResult<()> {
     plugin_store::uninstall(
         &server_socket,
         &plugin_id,
@@ -318,7 +323,7 @@ pub async fn plugins_uninstall(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_UNINSTALL_FAILED", e))
 }
 
 /// 将插件状态标记为失败（写入 last_error 等字段）。
@@ -339,7 +344,7 @@ pub async fn plugins_set_failed(
     message: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::set_failed(
         &server_socket,
         &plugin_id,
@@ -348,7 +353,7 @@ pub async fn plugins_set_failed(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_SET_FAILED_STATE_FAILED", e))
 }
 
 /// 清除插件的错误信息（从 failed 恢复）。
@@ -367,7 +372,7 @@ pub async fn plugins_clear_error(
     plugin_id: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<InstalledPluginState, String> {
+) -> CommandResult<InstalledPluginState> {
     plugin_store::clear_error(
         &server_socket,
         &plugin_id,
@@ -375,7 +380,7 @@ pub async fn plugins_clear_error(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_CLEAR_ERROR_FAILED", e))
 }
 
 /// 读取插件私有存储（KV）。
@@ -397,7 +402,7 @@ pub async fn plugins_storage_get(
     key: String,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<Option<serde_json::Value>, String> {
+) -> CommandResult<Option<serde_json::Value>> {
     plugin_store::storage_get(
         &server_socket,
         &plugin_id,
@@ -406,7 +411,7 @@ pub async fn plugins_storage_get(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_STORAGE_GET_FAILED", e))
 }
 
 /// 写入插件私有存储（KV）。
@@ -429,7 +434,7 @@ pub async fn plugins_storage_set(
     value: serde_json::Value,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<(), String> {
+) -> CommandResult<()> {
     plugin_store::storage_set(
         &server_socket,
         &plugin_id,
@@ -439,7 +444,7 @@ pub async fn plugins_storage_set(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_STORAGE_SET_FAILED", e))
 }
 
 /// 以插件权限边界发起网络请求（供插件 runtime 调用）。
@@ -464,7 +469,7 @@ pub async fn plugins_network_fetch(
     body: Option<String>,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> Result<plugin_store::PluginFetchResponse, String> {
+) -> CommandResult<plugin_store::PluginFetchResponse> {
     plugin_store::network_fetch(
         &server_socket,
         &url,
@@ -475,5 +480,5 @@ pub async fn plugins_network_fetch(
         tls_fingerprint.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| to_command_error("PLUGINS_NETWORK_FETCH_FAILED", e))
 }

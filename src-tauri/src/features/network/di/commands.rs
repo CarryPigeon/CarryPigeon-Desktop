@@ -6,6 +6,7 @@ use tauri::AppHandle;
 
 use crate::features::network::usecases::api_usecases;
 use crate::features::network::usecases::tcp_usecases;
+use crate::shared::error::{CommandResult, to_command_error};
 
 /// 初始化全局 TCP service（best-effort）。
 pub fn init_tcp_service() {
@@ -27,8 +28,10 @@ pub async fn add_tcp_service(
     app: AppHandle,
     server_socket: String,
     socket: String,
-) -> Result<(), String> {
-    tcp_usecases::add_tcp_service(app, server_socket, socket).await
+) -> CommandResult<()> {
+    tcp_usecases::add_tcp_service(app, server_socket, socket)
+        .await
+        .map_err(|e| to_command_error("NETWORK_TCP_ADD_FAILED", e))
 }
 
 #[tauri::command]
@@ -41,8 +44,10 @@ pub async fn add_tcp_service(
 /// # 返回值
 /// - `Ok(())`：发送成功。
 /// - `Err(String)`：发送失败原因。
-pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<(), String> {
-    tcp_usecases::send_tcp_service(server_socket, data).await
+pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> CommandResult<()> {
+    tcp_usecases::send_tcp_service(server_socket, data)
+        .await
+        .map_err(|e| to_command_error("NETWORK_TCP_SEND_FAILED", e))
 }
 
 #[tauri::command]
@@ -53,12 +58,15 @@ pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> Result<()
 /// - `app`：Tauri 应用句柄。
 ///
 /// # 返回值
-/// 无返回值。
+/// - `Ok(())`：监听启动成功。
+/// - `Err(String)`：监听失败原因。
 ///
 /// # 说明
-/// 该命令会忽略内部错误（保持前端调用方简单），详细错误会由下层日志输出。
-pub async fn listen_tcp_service(server_socket: String, app: AppHandle) {
-    let _ = tcp_usecases::listen_tcp_service(server_socket, app).await;
+/// 为保持统一标准，该命令返回 `CommandResult<()>`。
+pub async fn listen_tcp_service(server_socket: String, app: AppHandle) -> CommandResult<()> {
+    tcp_usecases::listen_tcp_service(server_socket, app)
+        .await
+        .map_err(|error| to_command_error("NETWORK_TCP_LISTEN_FAILED", error))
 }
 
 /// `/api/*` JSON 请求参数（前端 -> Rust）。
@@ -105,8 +113,8 @@ pub struct ApiRequestJsonResult {
 /// - WebView 的 `fetch/WebSocket` 无法绕过自签证书校验；
 /// - 桌面端可通过 Rust sidecar 按 TLS 策略（insecure/指纹）完成请求。
 #[tauri::command]
-pub async fn api_request_json(args: ApiRequestJsonArgs) -> Result<ApiRequestJsonResult, String> {
+pub async fn api_request_json(args: ApiRequestJsonArgs) -> CommandResult<ApiRequestJsonResult> {
     api_usecases::api_request_json(args)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| to_command_error("NETWORK_API_REQUEST_FAILED", e))
 }

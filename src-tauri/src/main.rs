@@ -18,6 +18,9 @@ async fn main() -> anyhow::Result<()> {
         .with(formatting_layer)
         .init();
 
-    tracing::info!(action = "app_started", "CarryPigeon Desktop started");
+    tracing::info!(
+        action = "app_lifecycle_started",
+        "CarryPigeon Desktop started"
+    );
     carrypigeon_desktop_lib::run()
 }

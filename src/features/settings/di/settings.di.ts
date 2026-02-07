@@ -3,7 +3,7 @@
  * @description settings｜依赖组装（DI）：settings.di。
  */
 
-import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import type { ConfigPort } from "../domain/ports/ConfigPort";
 import { localStorageConfigPort } from "../data/localStorageConfigPort";
 import { mockConfigPort } from "../mock/mockConfigPort";
@@ -28,7 +28,11 @@ let configPort: ConfigPort | null = null;
 export function getConfigPort(): ConfigPort {
   if (configPort) return configPort;
   // 协议层 mock 也保持主题持久化稳定（localStorage）。
-  configPort = USE_MOCK_TRANSPORT ? localStorageConfigPort : USE_MOCK_API ? mockConfigPort : localStorageConfigPort;
+  configPort = selectByMockMode<ConfigPort>({
+    off: () => localStorageConfigPort,
+    store: () => mockConfigPort,
+    protocol: () => localStorageConfigPort,
+  });
   return configPort;
 }
 

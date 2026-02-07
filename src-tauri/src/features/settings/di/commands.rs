@@ -2,14 +2,15 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 use crate::features::settings::usecases::config_usecases;
+use crate::shared::error::CommandResult;
 
 /// 获取应用配置文件的原始 JSON 字符串。
 ///
 /// # 返回值
 /// 返回配置文件内容；若文件不存在会自动初始化为默认配置并返回默认值。
 #[tauri::command]
-pub async fn get_config() -> String {
-    config_usecases::get_config().await
+pub async fn get_config() -> CommandResult<String> {
+    Ok(config_usecases::get_config().await)
 }
 
 /// 读取 bool 类型配置值（顶层字段）。
@@ -20,8 +21,8 @@ pub async fn get_config() -> String {
 /// # 返回值
 /// 返回 bool；缺失/非法时返回默认值（false）。
 #[tauri::command]
-pub async fn get_config_bool(key: String) -> bool {
-    config_usecases::get_config_bool(key).await
+pub async fn get_config_bool(key: String) -> CommandResult<bool> {
+    Ok(config_usecases::get_config_bool(key).await)
 }
 
 /// 读取 u32 类型配置值（顶层字段）。
@@ -32,8 +33,8 @@ pub async fn get_config_bool(key: String) -> bool {
 /// # 返回值
 /// 返回 u32；缺失/非法时返回默认值（0）。
 #[tauri::command]
-pub async fn get_config_u32(key: String) -> u32 {
-    config_usecases::get_config_u32(key).await
+pub async fn get_config_u32(key: String) -> CommandResult<u32> {
+    Ok(config_usecases::get_config_u32(key).await)
 }
 
 /// 读取 u64 类型配置值（顶层字段）。
@@ -44,8 +45,8 @@ pub async fn get_config_u32(key: String) -> u32 {
 /// # 返回值
 /// 返回 u64；缺失/非法时返回默认值（0）。
 #[tauri::command]
-pub async fn get_config_u64(key: String) -> u64 {
-    config_usecases::get_config_u64(key).await
+pub async fn get_config_u64(key: String) -> CommandResult<u64> {
+    Ok(config_usecases::get_config_u64(key).await)
 }
 
 /// 读取 string 类型配置值（顶层字段）。
@@ -56,8 +57,8 @@ pub async fn get_config_u64(key: String) -> u64 {
 /// # 返回值
 /// 返回 string；缺失/非法时返回默认值（空字符串）。
 #[tauri::command]
-pub async fn get_config_string(key: String) -> String {
-    config_usecases::get_config_string(key).await
+pub async fn get_config_string(key: String) -> CommandResult<String> {
+    Ok(config_usecases::get_config_string(key).await)
 }
 
 /// 读取与 server_socket 相关的 string 值（历史 API）。
@@ -68,8 +69,8 @@ pub async fn get_config_string(key: String) -> String {
 /// # 返回值
 /// 返回 string；缺失/非法时返回默认值（空字符串）。
 #[tauri::command]
-pub async fn get_server_config_string(server_socket: String) -> String {
-    config_usecases::get_server_config_string(server_socket).await
+pub async fn get_server_config_string(server_socket: String) -> CommandResult<String> {
+    Ok(config_usecases::get_server_config_string(server_socket).await)
 }
 
 /// 读取与 server_socket 相关的 u32 值（历史 API）。
@@ -80,8 +81,8 @@ pub async fn get_server_config_string(server_socket: String) -> String {
 /// # 返回值
 /// 返回 u32；缺失/非法时返回默认值（0）。
 #[tauri::command]
-pub async fn get_server_config_u32(server_socket: String) -> u32 {
-    config_usecases::get_server_config_u32(server_socket).await
+pub async fn get_server_config_u32(server_socket: String) -> CommandResult<u32> {
+    Ok(config_usecases::get_server_config_u32(server_socket).await)
 }
 
 /// 读取与 server_socket 相关的 u64 值（历史 API）。
@@ -92,8 +93,8 @@ pub async fn get_server_config_u32(server_socket: String) -> u32 {
 /// # 返回值
 /// 返回 u64；缺失/非法时返回默认值（0）。
 #[tauri::command]
-pub async fn get_server_config_u64(server_socket: String) -> u64 {
-    config_usecases::get_server_config_u64(server_socket).await
+pub async fn get_server_config_u64(server_socket: String) -> CommandResult<u64> {
+    Ok(config_usecases::get_server_config_u64(server_socket).await)
 }
 
 /// 读取与 server_socket 相关的 bool 值（历史 API）。
@@ -104,8 +105,8 @@ pub async fn get_server_config_u64(server_socket: String) -> u64 {
 /// # 返回值
 /// 返回 bool；缺失/非法时返回默认值（false）。
 #[tauri::command]
-pub async fn get_server_config_bool(server_socket: String) -> bool {
-    config_usecases::get_server_config_bool(server_socket).await
+pub async fn get_server_config_bool(server_socket: String) -> CommandResult<bool> {
+    Ok(config_usecases::get_server_config_bool(server_socket).await)
 }
 
 /// 写入 bool 类型配置值（顶层字段）。
@@ -117,8 +118,9 @@ pub async fn get_server_config_bool(server_socket: String) -> bool {
 /// # 返回值
 /// 无返回值。
 #[tauri::command]
-pub async fn update_config_bool(key: String, value: bool) {
+pub async fn update_config_bool(key: String, value: bool) -> CommandResult<()> {
     config_usecases::update_config_bool(key, value).await;
+    Ok(())
 }
 
 /// 写入 u32 类型配置值（顶层字段）。
@@ -130,8 +132,9 @@ pub async fn update_config_bool(key: String, value: bool) {
 /// # 返回值
 /// 无返回值。
 #[tauri::command]
-pub async fn update_config_u32(key: String, value: u32) {
+pub async fn update_config_u32(key: String, value: u32) -> CommandResult<()> {
     config_usecases::update_config_u32(key, value).await;
+    Ok(())
 }
 
 /// 写入 u64 类型配置值（顶层字段）。
@@ -143,8 +146,9 @@ pub async fn update_config_u32(key: String, value: u32) {
 /// # 返回值
 /// 无返回值。
 #[tauri::command]
-pub async fn update_config_u64(key: String, value: u64) {
+pub async fn update_config_u64(key: String, value: u64) -> CommandResult<()> {
     config_usecases::update_config_u64(key, value).await;
+    Ok(())
 }
 
 /// 写入 string 类型配置值（顶层字段）。
@@ -156,6 +160,7 @@ pub async fn update_config_u64(key: String, value: u64) {
 /// # 返回值
 /// 无返回值。
 #[tauri::command]
-pub async fn update_config_string(key: String, value: String) {
+pub async fn update_config_string(key: String, value: String) -> CommandResult<()> {
     config_usecases::update_config_string(key, value).await;
+    Ok(())
 }

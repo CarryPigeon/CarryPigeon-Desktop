@@ -4,5 +4,6 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 pub mod db;
+pub mod error;
 pub mod log;
 pub mod net;

@@ -6,4 +6,8 @@
  */
 
 export { currentUser, setCurrentUser, type CurrentUser } from "./presentation/store/userData";
-export { createUserService } from "./data/userServiceFactory";
+export {
+  getGetCurrentUserUsecase,
+  getUpdateUserEmailUsecase,
+  getUpdateUserProfileUsecase,
+} from "./di/user.di";

@@ -358,10 +358,10 @@ export class Encryption {
             this.sessionId = sessionId;
             this.sendSequence = 0;
             this.handshakeComplete = true;
-            tauriLog.debug("Handshake complete", { sessionId: this.sessionId.toString() });
+            tauriLog.debug("Action: network_handshake_completed", { sessionId: this.sessionId.toString() });
             return true;
         } catch (e) {
-            tauriLog.error("Handshake response parse failed", { error: String(e) });
+            tauriLog.error("Action: network_handshake_response_parse_failed", { error: String(e) });
             return false;
         }
     }
@@ -393,10 +393,10 @@ export class Encryption {
             this.sessionId = sessionId;
             this.sendSequence = 0;
             this.handshakeComplete = true;
-            tauriLog.debug("Handshake complete", { sessionId: this.sessionId.toString() });
+            tauriLog.debug("Action: network_handshake_completed", { sessionId: this.sessionId.toString() });
             return true;
         } catch (e) {
-            tauriLog.error("Handshake response parse failed", { error: String(e) });
+            tauriLog.error("Action: network_handshake_response_parse_failed", { error: String(e) });
             return false;
         }
     }
@@ -431,7 +431,7 @@ export class Encryption {
             this.sessionId = 1n;
             this.sendSequence = 0;
             this.handshakeComplete = true;
-            tauriLog.debug("Mock handshake bypassed", { socket: this.transportSocket });
+            tauriLog.debug("Action: network_handshake_mock_bypassed", { socket: this.transportSocket });
             return;
         }
 
@@ -485,7 +485,7 @@ export class Encryption {
             const prefixHex = Array.from(framed.slice(0, this.frameConfig.lengthBytes + 6))
                 .map((b) => b.toString(16).padStart(2, "0"))
                 .join(" ");
-            tauriLog.debug("Handshake request sent", {
+            tauriLog.debug("Action: network_handshake_request_sent", {
                 id: requestId,
                 serviceKey: this.serverSocket,
                 socket: this.transportSocket,
@@ -496,7 +496,7 @@ export class Encryption {
                 pack: redacted,
             });
         } catch (e) {
-            tauriLog.error("Handshake request failed", { error: String(e) });
+            tauriLog.error("Action: network_handshake_request_failed", { error: String(e) });
             throw e;
         }
     }
@@ -525,7 +525,7 @@ export class Encryption {
             this.sendSequence = (this.sendSequence + 1) >>> 0;
             return framed;
         } catch (e) {
-            tauriLog.error("AES-GCM encrypt failed", { error: String(e) });
+            tauriLog.error("Action: network_crypto_aes_gcm_encrypt_failed", { error: String(e) });
             throw e;
         }
     }
@@ -560,7 +560,7 @@ export class Encryption {
             );
             return decoder.decode(decrypted);
         } catch (e) {
-            tauriLog.error("AES-GCM decrypt failed", { error: String(e) });
+            tauriLog.error("Action: network_crypto_aes_gcm_decrypt_failed", { error: String(e) });
             throw e;
         }
     }

@@ -17,8 +17,12 @@
   - 跨端（WebView/Rust）统一检索
   - 与第三方系统/SDK 日志对齐
   - 在用户侧收集日志时减少歧义
-- 前端请使用 `src/shared/utils/logger.ts` 提供的 `createLogger(scope)`，不要直接调用 `console.*`。
+- 前端请使用 `src/shared/utils/logger.ts` 提供的 `createLogger(scope)` 或 `src/shared/tauri/tauriLog.ts`，不要直接调用 `console.*`。
+- 前端日志 `message` 必须使用 `Action: <snake_case>`，并遵守二次分层（例如 `Action: chat_ws_resume_failed`）。
 - Rust 请使用 `tracing` 系列宏（`info!` / `warn!` / `error!` / `debug!`），避免使用 `println!`（测试可例外）。
+- Rust 日志必须包含结构化字段 `action = "..."`，并遵守二次分层前缀（如 `app_` / `network_` / `settings_`）。
+- 提交前必须通过：`bash scripts/check-log-standards.sh` 与 `bash scripts/check-rust-standards.sh`。
+- 词汇规范见：`docs/日志Action词汇表.md`。
 
 ### 3) 文档化注释（结构化）
 
@@ -30,3 +34,12 @@
 - 优先删除“重复实现同一语义”的代码（例如重复 refresh 编排、重复 localStorage key 字符串）。
 - 若暂时无法删除（存在调用方/兼容性），必须在注释中说明“为何保留 + 何时可删”。
 
+
+
+### 5) Tauri 命令统一标准（Rust）
+
+- `#[tauri::command]` 返回值统一使用 `CommandResult<T>`（定义见 `src-tauri/src/shared/error/mod.rs`）。
+- 命令错误统一为 `[ERROR_CODE] message` 格式，错误码使用大写下划线。
+- 命令层（`di/commands`）负责做错误标准化映射：`map_err(|e| to_command_error("ERROR_CODE", e))`。
+- 内部层（`usecases/data/shared`）优先使用 `anyhow::Result<T>`，避免传播 `Result<T, String>`。
+- 详情见：`docs/Rust统一标准.md`。

@@ -5,6 +5,7 @@
 import type { CommandMessage, DataObject } from "./CommandMessage";
 import { createLogger } from "@/shared/utils/logger";
 import { getTcpService } from "@/shared/net/tcp/tcpServiceProvider";
+import { createApiProtocolError, dispatchApiProtocolError } from "@/shared/net/apiErrorEvents";
 
 /**
  * 用于 feature data-layer 的 TCP 请求辅助基类。
@@ -67,7 +68,8 @@ export abstract class BaseAPI {
     const service = getTcpService(socket);
 
     if (!service) {
-      this.logger.error("Action: tcp_service_not_found", { serverSocket: socket, route: normalizedRoute });
+      this.logger.error("Action: network_tcp_service_not_found", { serverSocket: socket, route: normalizedRoute });
+      if (mapResponse) throw new Error("TCP service is not initialized for this server socket");
       return;
     }
 
@@ -83,18 +85,17 @@ export abstract class BaseAPI {
           try {
             const { code, data: responseData } = unwrapResponse(raw);
             if (code !== undefined && code !== 200) {
-              this.handleError(code);
-              reject(new Error(`Request failed with code ${code}`));
+              reject(this.handleError(code));
               return;
             }
             resolve(mapResponse(responseData));
           } catch (e) {
-            this.logger.error("Action: response_mapping_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
+            this.logger.error("Action: network_response_mapping_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
             reject(e);
           }
         })
         .catch((e) => {
-          this.logger.error("Action: send_with_response_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
+          this.logger.error("Action: network_tcp_send_with_response_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
           reject(e);
         });
     });
@@ -105,22 +106,28 @@ export abstract class BaseAPI {
    *
    * @param code - 错误码（协议约定）。
    */
-  protected handleError(code: number): void {
-    switch (code) {
-      case 100:
-        // TODO(UX): 统一弹窗提示失败
-        this.logger.error("Action: operation_failed", { code });
+  protected handleError(code: number): Error {
+    const protocolError = createApiProtocolError(code);
+
+    switch (protocolError.reason) {
+      case "operation_failed":
+        this.logger.error("Action: api_operation_failed", { code: protocolError.code });
         break;
-      case 200:
-        // 成功，无需处理
-        break;
-      case 300:
-        // TODO(UX): 统一弹窗提示权限校验失败
-        this.logger.error("Action: permission_denied", { code });
+      case "permission_denied":
+        this.logger.error("Action: api_permission_denied", { code: protocolError.code });
         break;
       default:
-        this.logger.error("Action: unknown_error_code", { code });
+        this.logger.error("Action: api_unknown_error_code", { code: protocolError.code });
+        break;
     }
+
+    dispatchApiProtocolError({
+      code: protocolError.code,
+      reason: protocolError.reason,
+      message: protocolError.message,
+    });
+
+    return protocolError;
   }
 }
 

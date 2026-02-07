@@ -115,7 +115,7 @@ async function tauriRequestJson(
     if (body !== undefined) args.body = body;
     return await invokeTauri<TauriApiResponse>(TAURI_COMMANDS.apiRequestJson, args);
   } catch (e) {
-    logger.warn("Action: tauri_api_request_json_failed_fallback_fetch", { method, path: apiPath, error: String(e) });
+    logger.warn("Action: http_tauri_api_request_json_failed_fallback_to_fetch", { method, path: apiPath, error: String(e) });
     throw e;
   }
 }
@@ -239,7 +239,7 @@ export class HttpJsonClient {
       });
       if (!res.ok) {
         const err = new ApiRequestError(res.error as ApiErrorEnvelope);
-        logger.warn("Action: http_request_failed", { transport: "mock", method, url, status: err.status, reason: err.reason });
+        logger.warn("Action: http_client_request_failed", { transport: "mock", method, url, status: err.status, reason: err.reason });
         throw err;
       }
       if (res.status === 204) return undefined as T;
@@ -251,7 +251,7 @@ export class HttpJsonClient {
         const tauriRes = await tauriRequestJson(this.serverSocket, method, normalizedPath, headers, body);
         if (!tauriRes.ok) {
           const err = new ApiRequestError(tauriRes.error as ApiErrorEnvelope);
-          logger.warn("Action: http_request_failed", { transport: "tauri", method, url, status: err.status, reason: err.reason });
+          logger.warn("Action: http_client_request_failed", { transport: "tauri", method, url, status: err.status, reason: err.reason });
           throw err;
         }
         if (tauriRes.status === 204) return undefined as T;
@@ -259,7 +259,7 @@ export class HttpJsonClient {
       } catch (e) {
         // 当 invoke 不可用（例如 Web 预览）或命令失败时，回退到 WebView fetch。
         // 对自签证书场景 fetch 仍可能失败，但可以保持行为一致性。
-        logger.warn("Action: http_tauri_invoke_failed_fallback_fetch", { method, url, error: String(e) });
+        logger.warn("Action: http_tauri_invoke_failed_fallback_to_fetch", { method, url, error: String(e) });
       }
     }
 
@@ -271,7 +271,7 @@ export class HttpJsonClient {
 
     if (!res.ok) {
       const err = await toApiError(res);
-      logger.warn("Action: http_request_failed", { transport: "fetch", method, url, status: err.status, reason: err.reason });
+      logger.warn("Action: http_client_request_failed", { transport: "fetch", method, url, status: err.status, reason: err.reason });
       throw err;
     }
 

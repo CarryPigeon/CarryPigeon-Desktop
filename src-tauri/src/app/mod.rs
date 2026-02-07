@@ -29,14 +29,16 @@ pub fn run() -> anyhow::Result<()> {
             Ok(res) => res,
             Err(e) => {
                 tracing::warn!(action = "app_scheme_handler_failed", error = %e);
-                tauri::http::Response::builder()
-                    .status(500)
-                    .body(Vec::new())
-                    .unwrap()
+                build_http_response(500, None, Vec::new())
             }
         })
         .setup(|app| {
             init_tcp_service();
+
+            let tray_icon = app
+                .default_window_icon()
+                .cloned()
+                .context("Default window icon is missing")?;
 
             // 定义托盘菜单行为
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -44,16 +46,16 @@ pub fn run() -> anyhow::Result<()> {
 
             // 定义托盘图标行为
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
-                        tracing::info!(action = "tray_menu_clicked", item_id = "quit");
+                        tracing::info!(action = "app_tray_menu_clicked", item_id = "quit");
                         app.exit(0);
                     }
                     _ => {
-                        tracing::warn!(action = "tray_menu_unhandled", item_id = ?event.id);
+                        tracing::warn!(action = "app_tray_menu_unhandled", item_id = ?event.id);
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -68,9 +70,17 @@ pub fn run() -> anyhow::Result<()> {
                     {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.unminimize();
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                            if let Err(err) = window.unminimize() {
+                                tracing::warn!(action = "app_tray_click_unminimize_failed", error = %err);
+                            }
+                            if let Err(err) = window.show() {
+                                tracing::warn!(action = "app_tray_click_show_failed", error = %err);
+                            }
+                            if let Err(err) = window.set_focus() {
+                                tracing::warn!(action = "app_tray_click_focus_failed", error = %err);
+                            }
+                        } else {
+                            tracing::warn!(action = "app_tray_click_main_window_missing");
                         }
                     }
                 })
@@ -142,8 +152,37 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::plugins::di::commands::plugins_network_fetch,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .context("error while running tauri application")?;
     Ok(())
+}
+
+/// 构建 HTTP 响应（用于自定义 scheme handler）。
+///
+/// # 参数
+/// - `status`：HTTP 状态码。
+/// - `content_type`：可选的 Content-Type。
+/// - `body`：响应体字节。
+fn build_http_response(
+    status: u16,
+    content_type: Option<&str>,
+    body: Vec<u8>,
+) -> tauri::http::Response<Vec<u8>> {
+    let mut builder = tauri::http::Response::builder().status(status);
+    if let Some(content_type) = content_type {
+        builder = builder.header("Content-Type", content_type);
+    }
+
+    match builder.body(body) {
+        Ok(response) => response,
+        Err(err) => {
+            tracing::error!(
+                action = "app_scheme_response_build_failed",
+                status,
+                error = %err
+            );
+            tauri::http::Response::new(Vec::new())
+        }
+    }
 }
 
 /// 根据文件后缀推导 MIME 类型。
@@ -241,10 +280,7 @@ fn handle_app_scheme(
     let uri = req.uri().to_string();
     // 只处理插件静态资源请求：`app://plugins/<server_id>/<plugin_id>/<version>/<path>`
     if !uri.starts_with("app://plugins/") {
-        return Ok(tauri::http::Response::builder()
-            .status(404)
-            .body(Vec::new())
-            .unwrap());
+        return Ok(build_http_response(404, None, Vec::new()));
     }
     let rest = &uri["app://plugins/".len()..];
     let path_only = rest
@@ -256,10 +292,7 @@ fn handle_app_scheme(
         .unwrap_or(rest);
     let segs: Vec<&str> = path_only.split('/').filter(|s| !s.is_empty()).collect();
     if segs.len() < 4 {
-        return Ok(tauri::http::Response::builder()
-            .status(400)
-            .body(Vec::new())
-            .unwrap());
+        return Ok(build_http_response(400, None, Vec::new()));
     }
 
     let server_id = percent_decode(segs[0]);
@@ -276,9 +309,9 @@ fn handle_app_scheme(
     let bytes = std::fs::read(&file_path)
         .with_context(|| format!("Failed to read plugin file: {}", file_path.display()))?;
 
-    Ok(tauri::http::Response::builder()
-        .status(200)
-        .header("Content-Type", mime_by_path(&rel_path))
-        .body(bytes)
-        .unwrap())
+    Ok(build_http_response(
+        200,
+        Some(mime_by_path(&rel_path)),
+        bytes,
+    ))
 }

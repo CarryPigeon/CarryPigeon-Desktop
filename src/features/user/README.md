@@ -56,3 +56,8 @@ user 负责“用户域”的客户端落地：用户信息读取、列表查询
 - `auth`：登录成功后通常会触发 `user` 刷新 current user。
 - `chat`：发送消息/渲染头像/显示用户信息时读取 `currentUser`。
 - `plugins`：构建插件上下文时会读取 uid/lang 等，注入到插件 host API。
+
+## 跨 Feature API 边界
+
+- 建议通过 `src/features/user/api.ts` 暴露的 `currentUser` 与 user usecases 协作。
+- 不建议跨 feature 直接依赖 user 的 data factory（保留在 feature 内部用于兼容迁移）。

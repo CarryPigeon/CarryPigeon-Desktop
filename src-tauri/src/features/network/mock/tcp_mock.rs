@@ -87,7 +87,7 @@ impl MockTcpService {
                     payload: framed,
                 },
             ) {
-                tracing::warn!(action = "tcp_mock_emit_message_failed", error = ?e);
+                tracing::warn!(action = "network_tcp_mock_emit_message_failed", error = ?e);
             }
 
             // 新事件（仅 payload，去掉 length-prefix；由 Rust 侧 deframe 后统一投递）。
@@ -98,7 +98,7 @@ impl MockTcpService {
                     payload: payload[..len as usize].to_vec(),
                 },
             ) {
-                tracing::warn!(action = "tcp_mock_emit_frame_failed", error = ?e);
+                tracing::warn!(action = "network_tcp_mock_emit_frame_failed", error = ?e);
             }
         });
     }

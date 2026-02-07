@@ -3,7 +3,7 @@
  * @description servers｜依赖组装（DI）：servers.di。
  */
 
-import { USE_MOCK_API, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import { GetServerInfo } from "../domain/usecases/GetServerInfo";
 import { mockServerInfoPort } from "../mock/mockServerInfoPort";
 import { httpServerInfoPort } from "../data/httpServerInfoPort";
@@ -17,14 +17,18 @@ let getServerInfo: GetServerInfo | null = null;
  *
  * 选择规则：
  * - `USE_MOCK_TRANSPORT=true`：使用真实 HTTP 适配器（便于协议层联调）。
- * - `USE_MOCK_API=true`：使用内存 mock（用于 UI 预览/开发联调）。
+ * - `IS_STORE_MOCK=true`：使用内存 mock（用于 UI 预览/开发联调）。
  * - 其它情况：使用真实 HTTP 适配器。
  *
  * @returns `ServerInfoPort` 实例。
  */
 export function getServerInfoPort(): ServerInfoPort {
   if (serverInfoPort) return serverInfoPort;
-  serverInfoPort = USE_MOCK_TRANSPORT ? httpServerInfoPort : USE_MOCK_API ? mockServerInfoPort : httpServerInfoPort;
+  serverInfoPort = selectByMockMode<ServerInfoPort>({
+    off: () => httpServerInfoPort,
+    store: () => mockServerInfoPort,
+    protocol: () => httpServerInfoPort,
+  });
   return serverInfoPort;
 }
 

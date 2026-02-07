@@ -29,6 +29,24 @@ function formatMeta(meta?: LogMeta): string {
 }
 
 /**
+ * 将任意 message 归一化为 `Action: <snake_case>`。
+ *
+ * @param message - 原始日志消息。
+ * @returns 归一化后的动作消息。
+ */
+function normalizeActionMessage(message: string): string {
+  const trimmed = message.trim();
+  const noPrefix = trimmed.replace(/^Action:\s*/i, "");
+  const withWordBoundary = noPrefix.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
+  const snake = withWordBoundary
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+  return `Action: ${snake || "unknown_action"}`;
+}
+
+/**
  * @returns 用于日志前缀的 ISO 时间字符串。
  */
 function nowIso(): string {
@@ -63,7 +81,7 @@ export type Logger = {
  *
  * 设计目标：
  * - 统一 console 输出格式与元信息处理。
- * - 鼓励结构化日志（`meta` 对象），避免字符串拼接。
+ * - 强制动作日志格式：`Action: <snake_case>`。
  * - `debug` 仅在 DEV 启用，减少生产环境噪音。
  *
  * @param scope - 可选 scope 标签（通常为模块/组件名）。
@@ -75,16 +93,20 @@ export function createLogger(scope?: string): Logger {
   return {
     debug(message, meta) {
       if (!isDev) return;
-      console.debug(`${prefix("DEBUG", scope)} ${message}${formatMeta(meta)}`);
+      const normalized = normalizeActionMessage(message);
+      console.debug(`${prefix("DEBUG", scope)} ${normalized}${formatMeta(meta)}`);
     },
     info(message, meta) {
-      console.info(`${prefix("INFO", scope)} ${message}${formatMeta(meta)}`);
+      const normalized = normalizeActionMessage(message);
+      console.info(`${prefix("INFO", scope)} ${normalized}${formatMeta(meta)}`);
     },
     warn(message, meta) {
-      console.warn(`${prefix("WARN", scope)} ${message}${formatMeta(meta)}`);
+      const normalized = normalizeActionMessage(message);
+      console.warn(`${prefix("WARN", scope)} ${normalized}${formatMeta(meta)}`);
     },
     error(message, meta) {
-      console.error(`${prefix("ERROR", scope)} ${message}${formatMeta(meta)}`);
+      const normalized = normalizeActionMessage(message);
+      console.error(`${prefix("ERROR", scope)} ${normalized}${formatMeta(meta)}`);
     },
   };
 }

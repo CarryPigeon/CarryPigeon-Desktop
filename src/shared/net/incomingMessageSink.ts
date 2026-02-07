@@ -47,13 +47,13 @@ export function setIncomingMessageSink(next: IncomingMessageSink | null): void {
 export function publishIncomingMessage(payload: unknown, ctx: IncomingMessageContext): void {
   const socket = String(ctx?.serverSocket ?? "").trim();
   if (!sink) {
-    logger.debug("Action: incoming_message_unwired", { serverSocket: socket, payload });
+    logger.debug("Action: network_incoming_message_unwired", { serverSocket: socket, payload });
     return;
   }
   try {
     sink.showNewMessage(payload, { serverSocket: socket });
   } catch (e) {
-    logger.warn("Action: incoming_message_sink_failed", { serverSocket: socket, error: String(e) });
+    logger.warn("Action: network_incoming_message_sink_failed", { serverSocket: socket, error: String(e) });
   }
 }
 
