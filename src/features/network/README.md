@@ -59,4 +59,4 @@ network 负责“客户端如何与服务端建立可靠连接”的底座能力
 ## 相关文档
 
 - `docs/客户端开发指南.md`
-- `design/protocol/`（协议相关设计）
+- `docs/design/protocol/`（协议相关设计）

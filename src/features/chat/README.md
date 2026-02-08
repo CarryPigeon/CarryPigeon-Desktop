@@ -70,4 +70,4 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
 ## 相关文档
 
 - `docs/客户端开发指南.md`
-- `docs/落地矩阵-PRD-v1.1_API-v1.0.md`
+- `docs/tmp/prd-api-migration-matrix-v1.1-v1.0.md`

@@ -80,6 +80,6 @@ plugins 负责“插件能力”的客户端侧全链路落地：从服务端获
 
 ## 相关文档
 
-- `docs/落地矩阵-PRD-v1.1_API-v1.0.md`
-- `design/client/PLUGIN-INSTALL-UPDATE.md`
-- `design/client/APP-URL-SPEC.md`
+- `docs/tmp/prd-api-migration-matrix-v1.1-v1.0.md`
+- `docs/design/client/PLUGIN-INSTALL-UPDATE.md`
+- `docs/design/client/APP-URL-SPEC.md`
