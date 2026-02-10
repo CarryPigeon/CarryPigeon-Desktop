@@ -10,10 +10,12 @@ use tauri::AppHandle;
 use tokio::sync::RwLock;
 
 use crate::features::network::data::tcp_real::TcpServiceReal;
+#[cfg(debug_assertions)]
 use crate::features::network::mock::tcp_mock::{MockTcpMode, MockTcpService};
 
 enum TcpBackend {
     Real(TcpServiceReal),
+    #[cfg(debug_assertions)]
     Mock(MockTcpService),
 }
 
@@ -21,6 +23,7 @@ impl TcpBackend {
     fn start(&mut self, app: AppHandle, server_socket: String) {
         match self {
             TcpBackend::Real(s) => s.start(app, server_socket),
+            #[cfg(debug_assertions)]
             TcpBackend::Mock(s) => s.start(app, server_socket),
         }
     }
@@ -28,6 +31,7 @@ impl TcpBackend {
     async fn send(&mut self, data: Vec<u8>) -> anyhow::Result<()> {
         match self {
             TcpBackend::Real(s) => s.send(data).await,
+            #[cfg(debug_assertions)]
             TcpBackend::Mock(s) => s.send(data).await,
         }
     }
@@ -56,6 +60,7 @@ pub fn init_tcp_service() {
         .clone();
 }
 
+#[cfg(debug_assertions)]
 fn parse_mock_mode(socket: &str) -> MockTcpMode {
     if socket.starts_with("mock://handshake") {
         return MockTcpMode::HandshakeOk;
@@ -89,18 +94,39 @@ pub async fn add_tcp_service(
     let mut lock = registry.write().await;
 
     let mut backend = if socket.starts_with("mock://") {
-        TcpBackend::Mock(MockTcpService::new(parse_mock_mode(&socket)))
+        #[cfg(debug_assertions)]
+        {
+            TcpBackend::Mock(MockTcpService::new(parse_mock_mode(&socket)))
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            return Err(anyhow!(
+                "mock:// socket is only supported in debug builds (server_socket={})",
+                server_socket
+            ));
+        }
     } else {
         match TcpServiceReal::connect(socket.clone()).await {
             Ok(real) => TcpBackend::Real(real),
             Err(err) => {
                 tracing::warn!(
-                    action = "network_tcp_connect_failed_fallback_mock",
+                    action = if cfg!(debug_assertions) {
+                        "network_tcp_connect_failed_fallback_mock"
+                    } else {
+                        "network_tcp_connect_failed"
+                    },
                     socket = %socket,
                     error = %err,
-                    "TCP connect failed; falling back to mock (no-server)",
+                    "TCP connect failed",
                 );
-                TcpBackend::Mock(MockTcpService::new(MockTcpMode::ConnectFailed))
+                #[cfg(debug_assertions)]
+                {
+                    TcpBackend::Mock(MockTcpService::new(MockTcpMode::ConnectFailed))
+                }
+                #[cfg(not(debug_assertions))]
+                {
+                    return Err(err);
+                }
             }
         }
     };
