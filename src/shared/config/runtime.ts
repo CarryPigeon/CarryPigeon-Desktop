@@ -32,7 +32,9 @@ export type MockMode = "off" | "store" | "protocol";
  */
 export const MOCK_MODE: MockMode = (() => {
   if (!USE_MOCK_API) return "off";
-  const raw = String(import.meta.env.VITE_MOCK_MODE ?? "").trim().toLowerCase();
+  const raw = String(import.meta.env.VITE_MOCK_MODE ?? "")
+    .trim()
+    .toLowerCase();
   if (raw === "protocol") return "protocol";
   return "store";
 })();
@@ -65,14 +67,25 @@ export const IS_PROTOCOL_MOCK = MOCK_MODE === "protocol";
  */
 export const USE_MOCK_TRANSPORT = IS_PROTOCOL_MOCK;
 /**
+ * In mock mode, disable required-plugin gate by default for local testing.
+ * Set `VITE_MOCK_DISABLE_REQUIRED_GATE=false` to re-enable gate checks.
+ */
+export const MOCK_DISABLE_REQUIRED_GATE =
+  IS_MOCK_ENABLED &&
+  import.meta.env.VITE_MOCK_DISABLE_REQUIRED_GATE !== "false";
+/**
  * 模拟（mock）延迟（毫秒）：用于模拟网络耗时。
  *
  * @constant
  */
-export const MOCK_LATENCY_MS = Number(import.meta.env.VITE_MOCK_LATENCY_MS ?? 120);
+export const MOCK_LATENCY_MS = Number(
+  import.meta.env.VITE_MOCK_LATENCY_MS ?? 120,
+);
 /**
  * 模拟（mock）模式启用时使用的默认 server socket。
  *
  * @constant
  */
-export const MOCK_SERVER_SOCKET = String(import.meta.env.VITE_MOCK_SERVER_SOCKET ?? "mock://handshake");
+export const MOCK_SERVER_SOCKET = String(
+  import.meta.env.VITE_MOCK_SERVER_SOCKET ?? "mock://handshake",
+);

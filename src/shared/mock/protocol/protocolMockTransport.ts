@@ -10,6 +10,7 @@
  */
 
 import type { ApiErrorEnvelope } from "@/shared/net/http/apiErrors";
+import { MOCK_DISABLE_REQUIRED_GATE } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { normalizeServerKey } from "@/shared/serverKey";
 
@@ -151,6 +152,7 @@ function hashToId(input: string): string {
  * @returns required 插件 id 列表。
  */
 function listRequiredPluginIds(): string[] {
+  if (MOCK_DISABLE_REQUIRED_GATE) return [];
   return MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
 }
 
@@ -434,7 +436,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
           plugin_id: p.pluginId,
           name: p.name,
           version: p.versions[0] ?? "0.0.0",
-          required: p.required,
+          required: !MOCK_DISABLE_REQUIRED_GATE && p.required,
           permissions: (p.permissions ?? []).map((x) => x.key),
           provides_domains: (p.providesDomains ?? []).map((d) => ({ domain: d.id, domain_version: d.version })),
           download: p.downloadUrl ? { url: p.downloadUrl, sha256: p.sha256 } : { sha256: p.sha256 },

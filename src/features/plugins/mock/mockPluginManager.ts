@@ -3,7 +3,7 @@
  * @description plugins｜Mock 实现：mockPluginManager（用于本地预览/测试）。
  */
 
-import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
+import { MOCK_DISABLE_REQUIRED_GATE, MOCK_LATENCY_MS } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState, setMockPluginsState } from "@/shared/mock/mockPluginState";
 import { sleep } from "@/shared/mock/sleep";
@@ -25,7 +25,7 @@ function toDomainCatalog(): PluginCatalogEntry[] {
     source: p.source,
     downloadUrl: p.downloadUrl,
     sha256: p.sha256,
-    required: p.required,
+    required: !MOCK_DISABLE_REQUIRED_GATE && p.required,
     versions: p.versions,
     providesDomains: p.providesDomains,
     permissions: p.permissions,

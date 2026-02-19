@@ -1,6 +1,6 @@
 /**
  * @fileoverview startupSession.ts
- * @description 应用启动编排：默认服务器选择与会话恢复。
+ * @description App startup orchestration: default server selection + session restore.
  */
 
 import type { Router } from "vue-router";
@@ -8,7 +8,7 @@ import { currentServerSocket, serverRacks, setServerSocket, useServerInfoStore }
 import { getGetCurrentUserUsecase, setCurrentUser } from "@/features/user/api";
 import { connectWithRetry } from "@/features/network/api";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
-import { IS_STORE_MOCK } from "@/shared/config/runtime";
+import { IS_STORE_MOCK, MOCK_DISABLE_REQUIRED_GATE } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
 import { getPluginManagerPort } from "@/features/plugins/api";
@@ -16,9 +16,7 @@ import { setMissingRequiredPlugins } from "@/features/auth/api";
 import { readAuthSession, writeAuthSession } from "@/shared/utils/localState";
 
 /**
- * 启动时选择一个合理的默认 server socket。
- *
- * @returns 无返回值。
+ * Select a reasonable default server socket on startup.
  */
 export function ensureInitialServerSocket(): void {
   if (currentServerSocket.value.trim()) return;
@@ -30,10 +28,7 @@ export function ensureInitialServerSocket(): void {
 }
 
 /**
- * 启动时尝试恢复登录会话（best-effort）。
- *
- * @param router - 应用路由实例。
- * @returns 无返回值。
+ * Try to restore session on startup (best-effort).
  */
 export async function tryRestoreSession(router: Router): Promise<void> {
   const socket = currentServerSocket.value.trim();
@@ -45,38 +40,40 @@ export async function tryRestoreSession(router: Router): Promise<void> {
   try {
     await serverInfoStore.refresh();
   } catch {
-    // 忽略 server-info 刷新失败：在 mock/protocol 模式下会话恢复仍可能成功。
+    // Ignore server-info refresh failures in mock/protocol mode.
   }
 
-  try {
-    if (IS_STORE_MOCK) {
-      const required = MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
-      const st = getMockPluginsState(socket);
-      const missing = required.filter((id) => !(st[id]?.enabled && st[id]?.status === "ok"));
-      if (missing.length > 0) {
-        setMissingRequiredPlugins(missing);
-        if (router.currentRoute.value.path !== "/required-setup") void router.replace("/required-setup");
-        return;
-      }
-    } else {
-      const requiredIds = serverInfoStore.info.value?.requiredPlugins ?? [];
-      if (Array.isArray(requiredIds) && requiredIds.length > 0) {
-        const installed = await getPluginManagerPort().listInstalled(socket);
-        const ok = new Set(
-          installed
-            .filter((p) => Boolean(p.enabled) && p.status === "ok" && Boolean(p.currentVersion))
-            .map((p) => p.pluginId),
-        );
-        const missing = requiredIds.map((x) => String(x).trim()).filter(Boolean).filter((id) => !ok.has(id));
+  if (!MOCK_DISABLE_REQUIRED_GATE) {
+    try {
+      if (IS_STORE_MOCK) {
+        const required = MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
+        const st = getMockPluginsState(socket);
+        const missing = required.filter((id) => !(st[id]?.enabled && st[id]?.status === "ok"));
         if (missing.length > 0) {
           setMissingRequiredPlugins(missing);
           if (router.currentRoute.value.path !== "/required-setup") void router.replace("/required-setup");
           return;
         }
+      } else {
+        const requiredIds = serverInfoStore.info.value?.requiredPlugins ?? [];
+        if (Array.isArray(requiredIds) && requiredIds.length > 0) {
+          const installed = await getPluginManagerPort().listInstalled(socket);
+          const ok = new Set(
+            installed
+              .filter((p) => Boolean(p.enabled) && p.status === "ok" && Boolean(p.currentVersion))
+              .map((p) => p.pluginId),
+          );
+          const missing = requiredIds.map((x) => String(x).trim()).filter(Boolean).filter((id) => !ok.has(id));
+          if (missing.length > 0) {
+            setMissingRequiredPlugins(missing);
+            if (router.currentRoute.value.path !== "/required-setup") void router.replace("/required-setup");
+            return;
+          }
+        }
       }
+    } catch {
+      // Ignore required-gate check failures during restore (best-effort).
     }
-  } catch {
-    // 若 required-gate 校验失败，仍允许继续尝试恢复会话；必要时由服务端再次强制。
   }
 
   const session = readAuthSession(socket);
@@ -104,7 +101,6 @@ export async function tryRestoreSession(router: Router): Promise<void> {
       setCurrentUser({ id: "", username: "", email: "", description: "" });
       return;
     }
-    // 其他错误：保持在登录页，允许用户手动重试。
+    // Keep login page on other errors and let user retry manually.
   }
 }
-
