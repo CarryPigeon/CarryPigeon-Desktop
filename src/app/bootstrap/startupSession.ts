@@ -29,6 +29,9 @@ export function ensureInitialServerSocket(): void {
 
 /**
  * Try to restore session on startup (best-effort).
+ *
+ * @param router - Vue Router instance used for redirects during startup flow.
+ * @returns A promise that resolves when the restore attempt completes (best-effort; may early-return).
  */
 export async function tryRestoreSession(router: Router): Promise<void> {
   const socket = currentServerSocket.value.trim();

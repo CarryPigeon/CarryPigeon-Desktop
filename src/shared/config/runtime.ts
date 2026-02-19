@@ -69,6 +69,8 @@ export const USE_MOCK_TRANSPORT = IS_PROTOCOL_MOCK;
 /**
  * In mock mode, disable required-plugin gate by default for local testing.
  * Set `VITE_MOCK_DISABLE_REQUIRED_GATE=false` to re-enable gate checks.
+ * 
+ * @constant
  */
 export const MOCK_DISABLE_REQUIRED_GATE =
   IS_MOCK_ENABLED &&
