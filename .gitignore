@@ -30,3 +30,4 @@ dist-ssr
 
 /src-tauri/config
 /src-tauri/config.json
+.env
