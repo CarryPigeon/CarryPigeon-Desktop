@@ -7,7 +7,7 @@
  *   并携带 `missing_plugins`。
  */
 
-import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
+import { MOCK_DISABLE_REQUIRED_GATE, MOCK_LATENCY_MS } from "@/shared/config/runtime";
 import { sleep } from "@/shared/mock/sleep";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
@@ -27,14 +27,16 @@ export function createMockAuthServicePort(serverSocket: string): AuthServicePort
       void code;
       await sleep(MOCK_LATENCY_MS);
 
-      const required = MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
-      const state = getMockPluginsState(serverSocket);
-      const missing = required.filter((id) => !(state[id]?.enabled && state[id]?.status === "ok"));
-      if (missing.length > 0) {
-        throw new AuthRequiredPluginMissingError({
-          reason: "required_plugin_missing",
-          missing_plugins: missing,
-        });
+      if (!MOCK_DISABLE_REQUIRED_GATE) {
+        const required = MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
+        const state = getMockPluginsState(serverSocket);
+        const missing = required.filter((id) => !(state[id]?.enabled && state[id]?.status === "ok"));
+        if (missing.length > 0) {
+          throw new AuthRequiredPluginMissingError({
+            reason: "required_plugin_missing",
+            missing_plugins: missing,
+          });
+        }
       }
 
       return {
