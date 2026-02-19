@@ -1,6 +1,6 @@
 [package]
 name = "carrypigeon-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Tauri App"
 authors = ["Shirasawa <3489840593@qq.com>"]
 edition = "2024"
