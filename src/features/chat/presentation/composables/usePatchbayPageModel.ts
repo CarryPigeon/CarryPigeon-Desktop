@@ -7,6 +7,18 @@
 import { computed, proxyRefs, ref, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { createLogger } from "@/shared/utils/logger";
+import { currentChatUserId } from "@/features/chat/data/account-session";
+import {
+  chatConnectionDetail,
+  chatConnectionPillState,
+  retryChatConnection,
+} from "@/features/chat/data/server-workspace";
+import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
+import type { DeleteChatMessageOutcome, MessageFlowCapabilities } from "@/features/chat/message-flow/api-types";
+import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
+import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
+import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
+import type { RoomSessionCapabilities } from "@/features/chat/room-session/api-types";
 import { useChannelNavigation } from "./useChannelNavigation";
 import { useSignalViewport } from "./useSignalViewport";
 import { usePatchbayLifecycle } from "./usePatchbayLifecycle";
@@ -21,11 +33,8 @@ import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "./useChannelRailModel";
 import { useMembersRailModel } from "./useMembersRailModel";
 import { useChatCenterModel } from "./useChatCenterModel";
-import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
-import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
-import type { DeleteChatMessageOutcome } from "@/features/chat/message-flow/contracts";
 import {
   createPatchbayChannelDialogsSection,
   createPatchbayChannelSettingsMenuSection,
@@ -41,9 +50,26 @@ import {
   type PatchbayServerRailModel,
 } from "./patchbayPageSections";
 
-const roomSessionCapabilities = getRoomSessionCapabilities();
-const messageFlowCapabilities = getMessageFlowCapabilities();
+type PatchbayPageFeatureDeps = {
+  roomSession: RoomSessionCapabilities;
+  messageFlow: MessageFlowCapabilities;
+  roomGovernance: RoomGovernanceCapabilities;
+};
 
+function resolvePatchbayPageFeatureDeps(): PatchbayPageFeatureDeps {
+  return {
+    roomSession: getRoomSessionCapabilities(),
+    messageFlow: getMessageFlowCapabilities(),
+    roomGovernance: getRoomGovernanceCapabilities(),
+  };
+}
+
+/**
+ * MainPage 最终消费的页面模型。
+ *
+ * 这里故意按 UI section 分组，而不是把几十个 `ref/computed/action`
+ * 平铺导出给页面模板。
+ */
 type PatchbayPageRawModel = {
   flashMessage: Ref<string>;
   serverRail: PatchbayServerRailModel;
@@ -59,14 +85,23 @@ type PatchbayPageRawModel = {
 
 export type PatchbayPageModel = ShallowUnwrapRef<PatchbayPageRawModel>;
 
+/**
+ * Patchbay 主页面 composition root。
+ *
+ * 阅读建议：
+ * 1. 先看这里依赖了哪些 capability；
+ * 2. 再看 workspace / section model / lifecycle 各自怎么组装；
+ * 3. 最后才回到具体组件。
+ */
 export function usePatchbayPageModel(): PatchbayPageModel {
   const router = useRouter();
   const route = useRoute();
   const logger = createLogger("MainPage");
-  const roomDirectory = roomSessionCapabilities.directory;
-  const currentSession = roomSessionCapabilities.currentChannel;
-  const currentChannelMessageFlow = messageFlowCapabilities.currentChannel;
-  const messageComposer = messageFlowCapabilities.composer;
+  const { roomSession, messageFlow, roomGovernance } = resolvePatchbayPageFeatureDeps();
+  const roomDirectory = roomSession.directory;
+  const currentSession = roomSession.currentChannel;
+  const currentChannelMessageFlow = messageFlow.currentChannel;
+  const messageComposer = messageFlow.composer;
   const roomDirectorySnapshot = useObservedCapabilitySnapshot(roomDirectory);
   const currentSessionSnapshot = useObservedCapabilitySnapshot(currentSession);
   const messageTimelineSnapshot = useObservedCapabilitySnapshot(currentChannelMessageFlow);
@@ -100,9 +135,23 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
     sendComposerMessage: messageComposer.sendMessage,
     ensureChatReady: currentSession.ensureReady,
-    onAsyncError: logAsyncError,
   });
   const { goPlugins, handleInstallHint } = usePluginNavigation(router, missingRequiredCount);
+
+  function runServerSwitch(serverSocket: string): void {
+    runAsyncTask(
+      handleSwitchServer(serverSocket).then((outcome) => {
+        if (!outcome.ok) logAsyncError("chat_switch_server_rejected", outcome.error);
+        return outcome;
+      }),
+      "chat_switch_server_failed",
+    );
+  }
+
+  async function bootstrapWorkspace(): Promise<void> {
+    const outcome = await bootstrapCurrentWorkspace();
+    if (!outcome.ok) logAsyncError("chat_patchbay_bootstrap_rejected", outcome.error);
+  }
 
   function handleQuickSwitcherRouteSelect(path: string): void {
     void router.push(path);
@@ -125,7 +174,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   }
 
   function handleQuickSwitcherServerSelect(serverSocket: string): void {
-    handleSwitchServer(serverSocket);
+    runServerSwitch(serverSocket);
   }
 
   function handleQuickSwitcherChannelDiscoverFocus(channelName: string): void {
@@ -133,6 +182,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   }
 
   const channelRail = useChannelRailModel({
+    directory: roomDirectory,
+    currentSession,
     socket,
     serverId,
     missingRequiredCount,
@@ -140,9 +191,12 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openRequiredSetup: handleOpenRequiredSetup,
     openCreateChannel: () => setShowCreateChannel(true),
     openChannelInfo,
+    applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
   });
 
-  const membersRail = useMembersRailModel();
+  const membersRail = useMembersRailModel({
+    members: roomGovernance.currentChannel.members,
+  });
 
   const {
     signalPaneRef,
@@ -222,6 +276,14 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   });
 
   const chatCenter = useChatCenterModel({
+    currentSession,
+    currentTimeline: currentChannelMessageFlow,
+    messageComposer,
+    lookupChannel: messageFlow.forChannel,
+    currentUserId,
+    connectionDetail: chatConnectionDetail,
+    connectionPillState: chatConnectionPillState,
+    retryConnection: retryChatConnection,
     domainRegistryView,
     onLoadMoreMessages: handleLoadMoreMessages,
     onReplyShortcut: handleReplyShortcut,
@@ -273,7 +335,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     route,
     router,
     flashMessage,
-    bootstrap: bootstrapCurrentWorkspace,
+    bootstrap: bootstrapWorkspace,
     signalPaneRef,
     maybeReportReadState,
     onKeydown,
@@ -285,10 +347,15 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     },
   });
 
+  /**
+   * 下半段只做 section model 装配：
+   * - 上半段先把跨 feature 协调、局部 capability、页面交互逻辑收拢；
+   * - 这里再把它们投影给 layout/components 直接消费。
+   */
   const serverRail = createPatchbayServerRailSection({
     racks: serverRacks,
     activeSocket: socket,
-    handleSwitchServer,
+    handleSwitchServer: runServerSwitch,
     handleOpenServers,
     handleOpenSettings,
     goPlugins,

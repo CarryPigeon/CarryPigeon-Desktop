@@ -7,9 +7,9 @@
  * - 继续对外提供稳定的聚合状态形状，避免影响装配层。
  */
 
-import { createChatGovernanceState } from "./chatGovernanceState";
-import { createChatMessageFlowState } from "./chatMessageFlowState";
-import { createChatSessionState } from "./chatSessionState";
+import { createChatMessageFlowState } from "@/features/chat/message-flow/presentation/runtime/messageFlowState";
+import { createChatGovernanceState } from "@/features/chat/room-governance/presentation/runtime/governanceState";
+import { createChatSessionState } from "@/features/chat/room-session/presentation/runtime/sessionState";
 
 /**
  * 创建 chat 实时 Store 的状态容器。

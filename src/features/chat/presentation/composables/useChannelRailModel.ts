@@ -5,17 +5,15 @@
  */
 
 import { computed, proxyRefs, type ComputedRef, type Ref, type ShallowUnwrapRef, type WritableComputedRef } from "vue";
-import { getRoomGovernanceCapabilities, type ApplyJoinChannelOutcome } from "@/features/chat/room-governance/api";
-import {
-  getRoomSessionCapabilities,
-  type ChannelSelectionOutcome,
-  type CurrentChannelSessionSnapshot,
-  type RoomSessionDirectorySnapshot,
-} from "@/features/chat/room-session/api";
+import type { ApplyJoinChannelOutcome } from "@/features/chat/room-governance/api-types";
+import type {
+  ChannelSelectionOutcome,
+  CurrentChannelSessionCapabilities,
+  CurrentChannelSessionSnapshot,
+  RoomSessionDirectoryCapabilities,
+  RoomSessionDirectorySnapshot,
+} from "@/features/chat/room-session/api-types";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
-
-const roomGovernanceCapabilities = getRoomGovernanceCapabilities();
-const roomSessionCapabilities = getRoomSessionCapabilities();
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChannelRailRawModel = {
@@ -38,6 +36,8 @@ type ChannelRailRawModel = {
 export type ChannelRailModel = ShallowUnwrapRef<ChannelRailRawModel>;
 
 export type UseChannelRailModelDeps = {
+  directory: RoomSessionDirectoryCapabilities;
+  currentSession: CurrentChannelSessionCapabilities;
   socket: RefLike<string>;
   serverId: RefLike<string>;
   missingRequiredCount: RefLike<number>;
@@ -45,13 +45,12 @@ export type UseChannelRailModelDeps = {
   openRequiredSetup(): void;
   openCreateChannel(): void;
   openChannelInfo(channelId: string): void;
+  applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
 };
 
 export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailModel {
-  const directory = roomSessionCapabilities.directory;
-  const currentSession = roomSessionCapabilities.currentChannel;
-  const directorySnapshot = useObservedCapabilitySnapshot(directory);
-  const currentSessionSnapshot = useObservedCapabilitySnapshot(currentSession);
+  const directorySnapshot = useObservedCapabilitySnapshot(deps.directory);
+  const currentSessionSnapshot = useObservedCapabilitySnapshot(deps.currentSession);
 
   const rawModel: ChannelRailRawModel = {
     socket: computed(() => deps.socket.value),
@@ -59,28 +58,26 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     missingRequiredCount: computed(() => deps.missingRequiredCount.value),
     channelSearch: computed({
       get: () => directorySnapshot.value.searchQuery,
-      set: directory.setSearchQuery,
+      set: deps.directory.setSearchQuery,
     }),
     channelTab: computed({
       get: () => directorySnapshot.value.activeTab,
-      set: directory.setActiveTab,
+      set: deps.directory.setActiveTab,
     }),
     channels: computed(() => directorySnapshot.value.visibleChannels),
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
     setChannelSearch(value: string): void {
-      directory.setSearchQuery(value);
+      deps.directory.setSearchQuery(value);
     },
     setChannelTab(value: "joined" | "discover"): void {
-      directory.setActiveTab(value);
+      deps.directory.setActiveTab(value);
     },
     openPlugins: deps.openPlugins,
     openRequiredSetup: deps.openRequiredSetup,
     openCreateChannel: deps.openCreateChannel,
     openChannelInfo: deps.openChannelInfo,
-    selectChannel: currentSession.selectChannel,
-    applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome> {
-      return roomGovernanceCapabilities.forChannel(channelId).applyJoin();
-    },
+    selectChannel: deps.currentSession.selectChannel,
+    applyJoin: deps.applyJoin,
   };
   return proxyRefs(rawModel);
 }

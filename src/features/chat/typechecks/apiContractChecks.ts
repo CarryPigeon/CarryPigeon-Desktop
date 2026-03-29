@@ -6,24 +6,24 @@
  * - chat 根入口至少满足 `ChatCapabilities` 公共能力契约。
  */
 
-import { createChatCapabilities } from "@/features/chat/api";
-import type { ChatCapabilities } from "@/features/chat/api-types";
+import { createChatCapabilities } from "@/features/chat/public/api";
+import type { ChatCapabilities } from "@/features/chat/public/api-types";
 import type { ReadableCapability } from "@/shared/types/capabilities";
 import {
   createMessageFlowCapabilities,
   getMessageFlowCapabilities,
-  type MessageFlowCapabilities,
 } from "@/features/chat/message-flow/api";
+import type { MessageFlowCapabilities } from "@/features/chat/message-flow/api-types";
 import {
   createRoomGovernanceCapabilities,
   getRoomGovernanceCapabilities,
-  type RoomGovernanceCapabilities,
 } from "@/features/chat/room-governance/api";
+import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import {
   createRoomSessionCapabilities,
   getRoomSessionCapabilities,
-  type RoomSessionCapabilities,
 } from "@/features/chat/room-session/api";
+import type { RoomSessionCapabilities } from "@/features/chat/room-session/api-types";
 
 // 只要任一 API 缺失必需字段/函数，typecheck 会在这里失败。
 export const roomSessionCapabilitiesContractCheck: RoomSessionCapabilities = createRoomSessionCapabilities();

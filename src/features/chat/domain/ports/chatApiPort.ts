@@ -4,8 +4,8 @@
  *
  * 说明：
  * - 该端口刻意保持“协议无关”：可由 HTTP 实现、内存 Mock 实现，或通过原生桥接实现。
- * - transport wire / snake_case 字段必须在 data 层被吸收，不得穿透到该端口。
- * - 该端口用于 chat feature 内部（domain/usecase/di/data）依赖倒置；跨 feature 请使用 `@/features/chat/api`。
+ * - transport wire / snake_case 字段必须在 outbound adapter 层被吸收，不得穿透到该端口。
+ * - 该端口用于 chat feature 内部（domain/usecase/composition/adapters）依赖倒置；跨 feature 请使用 `@/features/chat/public/api`。
  */
 
 import type {
@@ -27,7 +27,7 @@ import type {
  *
  * 说明：
  * - 该端口描述“请求-响应”类能力（与事件流 `ChatEventsPort` 相对）；
- * - 具体实现位于 data 层（HTTP/Mock/原生桥接等）。
+ * - 具体实现位于 outbound adapter 层（HTTP/Mock/原生桥接等）。
  */
 export type ChatApiPort = {
   listChannels(serverSocket: string, accessToken: string): Promise<ChatChannelRecord[]>;

@@ -24,6 +24,13 @@ import type {
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 
 export type ChatCoreApiPort = {
+  /**
+   * 这组端口是 chat runtime 对“核心消息域”的最小依赖。
+   *
+   * 理解方式：
+   * - room-session 和 message-flow 共同依赖这里的大部分能力；
+   * - governance 子域只依赖 `ChatGovernanceApiPort`。
+   */
   listChannels(serverSocket: string, accessToken: string): Promise<ChatChannelRecord[]>;
   getUnreads(serverSocket: string, accessToken: string): Promise<ChatUnreadState[]>;
   listChannelMessages(
@@ -94,6 +101,9 @@ export type ChatGovernanceApiPort = {
 export type ChatApiPort = ChatCoreApiPort & ChatGovernanceApiPort;
 
 export type ChatEventsPort = {
+  /**
+   * 建立事件流连接，并持续把 envelope 推给上层 runtime。
+   */
   connect(
     serverSocket: string,
     accessToken: string,
@@ -103,12 +113,40 @@ export type ChatEventsPort = {
 };
 
 export type ChatRuntimeScopePort = {
+  /**
+   * 读取当前 chat runtime 绑定的 server socket。
+   *
+   * 说明：
+   * - 这是 room-session / message-flow / governance 三个运行时共享的上下文边界。
+   */
   getActiveServerSocket(): string;
+  /**
+   * 读取当前作用域版本号。
+   *
+   * 用途：
+   * - 当切服或重置发生时递增；
+   * - 让异步请求在返回时能判断自己是否已过期。
+   */
   getActiveScopeVersion(): number;
+  /**
+   * 读取当前 socket 与可用 token。
+   *
+   * 约定：
+   * - 若 socket/token 不可用，返回空字符串；
+   * - 由上层动作决定如何把“缺失权限”映射为 outcome。
+   */
   getSocketAndValidToken(): Promise<[string, string]>;
 };
 
 export type ChatReadStateReporterPort = {
+  /**
+   * 这组接口定义“本地读时间推进 + 限流上报”的标准协议。
+   *
+   * 谁会用它：
+   * - room-session 的频道切换
+   * - signal viewport 的滚动到底行为
+   * - composer 发送成功后的本地读进度推进
+   */
   advanceLocalReadTime(cid: string, nowMs: number): number;
   canReportNow(cid: string, nowMs: number, minIntervalMs?: number): boolean;
   reportIfAllowed(

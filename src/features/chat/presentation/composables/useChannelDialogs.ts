@@ -4,7 +4,7 @@
  */
 
 import { ref, type ComputedRef, type Ref } from "vue";
-import type { ChannelSelectionOutcome } from "@/features/chat/room-session/api";
+import type { ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
