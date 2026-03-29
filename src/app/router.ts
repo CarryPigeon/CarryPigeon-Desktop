@@ -17,7 +17,7 @@ import {
   ChannelMembersPage,
   ChatMainPage,
   JoinApplicationsPage,
-} from "@/features/chat/routes";
+} from "@/features/chat/public/routes";
 import { DomainCatalogPage, PluginCenterPage, PluginDetailPage } from "@/features/plugins/routes";
 import { ServerManagerPage } from "@/features/server-connection/routes";
 import { SettingsPage } from "@/features/settings/routes";

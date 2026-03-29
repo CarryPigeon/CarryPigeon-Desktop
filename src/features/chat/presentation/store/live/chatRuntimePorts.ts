@@ -9,13 +9,13 @@ export type {
   ChatSessionConnectionRuntimePort,
   ChatSessionRuntimePort,
   ChatSessionStateSlice,
-} from "./chatSessionRuntimePorts";
+} from "@/features/chat/room-session/presentation/runtime/sessionRuntimePorts";
 export type {
   ChatMessageFlowRuntimePort,
   ChatMessageFlowStateSlice,
   ChatMessageTimelinePort,
-} from "./chatMessageFlowRuntimePorts";
+} from "@/features/chat/message-flow/presentation/runtime/messageFlowRuntimePorts";
 export type {
   ChatGovernanceRuntimePort,
   ChatGovernanceStateSlice,
-} from "./chatGovernanceRuntimePorts";
+} from "@/features/chat/room-governance/presentation/runtime/governanceRuntimePorts";

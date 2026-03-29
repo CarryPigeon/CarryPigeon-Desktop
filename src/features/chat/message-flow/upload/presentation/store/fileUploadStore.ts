@@ -5,7 +5,7 @@
 
 import { reactive, ref } from "vue";
 import { getFileServicePort } from "@/features/chat/message-flow/upload/di/upload.di";
-import { getActiveChatServerSocket } from "@/features/chat/integration/serverWorkspace";
+import { getActiveChatServerSocket } from "@/features/chat/data/server-workspace";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
 import type { FileUploadResult } from "@/shared/file-transfer/types";

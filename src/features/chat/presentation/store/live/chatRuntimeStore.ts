@@ -33,6 +33,12 @@ export type ChatRuntimeStoreDeps = {
  * @returns ChatRuntimeStore。
  */
 export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeStore {
+  /**
+   * `assembleChatStoreRuntime()` 是 chat 运行时的真实装配点：
+   * - 先拿到共享 state；
+   * - 再拿到 session/message-flow/governance 三组运行时；
+   * - 最后由本文件投影成历史兼容的聚合 store 形状。
+   */
   const {
     state,
     sessionSharedContext,
@@ -65,6 +71,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeS
   watch(
     () => sessionSharedContext.scope.getActiveServerSocket(),
     () => {
+      // server workspace 变化时，由 session 子域负责清理当前频道与连接期状态。
       session.resetForServerChange();
     },
   );

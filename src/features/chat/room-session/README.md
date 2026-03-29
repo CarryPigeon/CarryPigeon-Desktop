@@ -19,14 +19,25 @@
 
 ### 当前模块
 
-- `presentation/store/sessionStoreApi.ts`：对外暴露 room-session 公开状态与动作。
-- `application/ensureReady.ts`、`channelData.ts`、`channelViewActions.ts`：首屏就绪、频道数据读取与当前频道视图编排。
-- `application/ports.ts`：room-session 应用层依赖的最小输出端口。
-- `application/wsManager.ts`、`pollingFallback.ts`、`resumeFailedCatchUp.ts`：连接、降级轮询与恢复补拉。
-- `application/readStateReporter.ts`、`readStateEventRouter.ts`、`resetState.ts`：读状态推进、事件同步与切服重置。
-- `internal.ts`：room-session 内部装配出口，桥接 application 能力给 chat runtime 组合层使用。
+- `domain/contracts.ts`：room-session 持有的频道与频道切换结果语义。
+- `presentation/store-access/sessionStoreAccess.ts`：room-session presentation 层内部使用的 store 访问面。
+- `presentation/runtime/sessionState.ts`：room-session 自身持有的响应式状态容器与派生视图。
+- `presentation/runtime/sessionStatePorts.ts`：把 session 状态容器适配成 application 可消费的显式状态写口/投影口。
+- `presentation/runtime/sessionRuntimePorts.ts`：room-session runtime 对外契约与状态切片类型。
+- `presentation/runtime/sessionSharedContext.ts`：session / message-flow / governance 共享的 scope、目录刷新与读状态上下文。
+- `presentation/runtime/sessionConnectionRuntime.ts`：只负责连接生命周期、WS/polling 与 catch-up。
+- `presentation/runtime/sessionRuntime.ts`：聚合连接子系统与频道视图动作，形成 room-session 公开 runtime。
+- `capability-source.ts`：子域内部 capability source，负责把 runtime store-access 适配为稳定 capability。
+- `application/usecases/*`：会话用例编排（`ensureReady`、`channelData`、`channelViewActions`、`resetState`）。
+- `application/services/*`：可复用会话服务（`wsManager`、`pollingFallback`、`readStateReporter`）。
+- `application/event-handlers/readStateEventRouter.ts`：`read_state.updated` 事件路由与本地状态同步。
+- `application/recovery/resumeFailedCatchUp.ts`：`resume.failed` 后的最小补拉恢复策略。
+- `application/ports/sessionPorts.ts`：room-session 应用层依赖的最小输出端口。
+- `internal.ts`：room-session 内部装配出口，桥接 application 能力给 chat application/runtime 装配根使用。
 
 ### 说明
 
 - 跨子域 WS 事件路由已提升到 `chat/presentation/store/live/chatEventRouter.ts`。
 - `room-session` 只处理会话与读状态相关流程。
+- 第二阶段后，`contracts` 已进入 `domain/`，子域 capability 通过 `capability-source.ts` 组装，`store-access` 仅保留为 presentation/runtime 内部适配层。
+- 第三阶段后，`application/` 再细分为 `usecases/services/event-handlers/recovery/ports`，降低“平铺文件夹”下的职责混杂。

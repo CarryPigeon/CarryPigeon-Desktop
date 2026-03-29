@@ -1,17 +1,26 @@
 /**
  * @fileoverview chat WS 事件路由器（事件 -> 子域处理器）。
- * @description chat/presentation｜展示层状态（store）：chat event router。
+ * @description
+ * chat 根运行时的跨子域事件集成器。
+ *
+ * 约束：
+ * - 根层只编排事件分发；
+ * - timeline/unread/read-state 的具体状态写口必须先在子域 runtime 适配成 projection port，
+ *   再注入到这里，避免根层直接操作裸 Vue/ref/reactive 容器。
  */
 
-import type { Ref } from "vue";
 import type { ChatMessageRecord } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
-import type { ChatMessage } from "@/features/chat/message-flow/contracts";
+import type { ChatMessage } from "@/features/chat/message-flow/api-types";
+import type {
+  ChannelUnreadProjectionPort,
+  MessageTimelineStatePort,
+} from "@/features/chat/message-flow/application/ports";
 import type { ChatChannelProjection } from "@/features/chat/presentation/events/windowMessageEvents";
-import type { ChatChannel } from "@/features/chat/room-session/contracts";
+import type { RoomSessionStatePort } from "@/features/chat/room-session/application/ports/sessionPorts";
 import { createMessageEventRouter } from "@/features/chat/message-flow/internal";
-import { createGovernanceEventRouter } from "@/features/chat/room-governance/internal";
 import { createReadStateEventRouter } from "@/features/chat/room-session/internal";
+import { createChatGovernanceEventRouter } from "./chatGovernanceEventRouter";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -20,12 +29,20 @@ type LoggerLike = {
 export type ChatWsEventRouterDeps = {
   logger: LoggerLike;
   getServerSocket: () => string;
-  getCurrentChannelId: () => string;
   getCurrentUserId: () => string;
-  channelsRef: Ref<ChatChannel[]>;
-  messagesByChannel: Record<string, ChatMessage[]>;
-  lastReadTimeMsByChannel: Record<string, number>;
-  lastReadMidByChannel: Record<string, string>;
+  timelineState: Pick<
+    MessageTimelineStatePort,
+    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage"
+  >;
+  unreadProjection: ChannelUnreadProjectionPort;
+  readStateProjection: Pick<
+    RoomSessionStatePort,
+    | "readLastReadTimeMs"
+    | "readLastReadMessageId"
+    | "writeLastReadTimeMs"
+    | "writeLastReadMessageId"
+    | "markChannelReadLocally"
+  >;
   refreshChannels: () => Promise<void>;
   refreshChannelLatestPage: (cid: string) => Promise<void>;
   refreshMembersRail: (cid: string) => Promise<void>;
@@ -35,8 +52,8 @@ export type ChatWsEventRouterDeps = {
 };
 
 export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
-  const routeGovernanceEvent = createGovernanceEventRouter({
-    getCurrentChannelId: deps.getCurrentChannelId,
+  const routeGovernanceEvent = createChatGovernanceEventRouter({
+    getCurrentChannelId: deps.timelineState.readCurrentChannelId,
     refreshChannels: deps.refreshChannels,
     refreshChannelLatestPage: deps.refreshChannelLatestPage,
     refreshMembersRail: deps.refreshMembersRail,
@@ -44,19 +61,18 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
   });
 
   const routeMessageEvent = createMessageEventRouter({
-    getServerSocket: deps.getServerSocket,
-    getCurrentChannelId: deps.getCurrentChannelId,
-    channelsRef: deps.channelsRef,
-    messagesByChannel: deps.messagesByChannel,
+    scope: {
+      getActiveServerSocket: deps.getServerSocket,
+    },
+    timelineState: deps.timelineState,
+    unreadProjection: deps.unreadProjection,
     mapWireMessage: deps.mapWireMessage,
     compareMessages: deps.compareMessages,
   });
 
   const routeReadStateEvent = createReadStateEventRouter({
     getCurrentUserId: deps.getCurrentUserId,
-    channelsRef: deps.channelsRef,
-    lastReadTimeMsByChannel: deps.lastReadTimeMsByChannel,
-    lastReadMidByChannel: deps.lastReadMidByChannel,
+    state: deps.readStateProjection,
   });
 
   return function handleWsEvent(env: ChatEventEnvelope): void {

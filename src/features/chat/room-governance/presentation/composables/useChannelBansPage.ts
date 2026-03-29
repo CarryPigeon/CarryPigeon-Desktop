@@ -6,7 +6,8 @@
 import { computed, ref, watch, type ComputedRef, type Ref, type WritableComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { getRoomGovernanceCapabilities, type ChannelBan, type ChannelMember } from "@/features/chat/room-governance/api";
+import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
+import type { ChannelBan, ChannelMember } from "@/features/chat/room-governance/api-types";
 import { useChannelScopedRefresh } from "@/features/chat/presentation/composables/useChannelScopedRefresh";
 import { useGovernanceChannelPageRoute } from "./useGovernanceChannelPageRoute";
 import { useGovernancePageState } from "./useGovernancePageState";

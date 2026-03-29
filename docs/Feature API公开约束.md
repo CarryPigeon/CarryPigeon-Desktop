@@ -28,6 +28,7 @@
 
 - `src/features/<feature>/api.ts` 是跨 feature 唯一公共值入口。
 - `src/features/<feature>/api-types.ts` 是跨 feature 唯一公共类型入口。
+- `domain` 可以是内部语义源，但不是跨 feature 的公共值入口。
 - 跨 feature 禁止依赖内部深路径；只允许依赖 `api.ts`、`api-types.ts`、`routes.ts`、`styles.ts` 等明确公共入口。
 
 ### 2.2 公开模式
@@ -99,7 +100,38 @@ wire dto -> data -> domain/application -> capability/view snapshot -> external c
 - `application` / `usecase` 负责业务语义编排与模型转化。
 - `api.ts` 不得把 DTO 直通到其他 feature。
 
-## 3.4 状态公开协议
+## 3.4 分层依赖补充约束
+
+### 3.4.1 application 公开给上层的只能是 port 语义
+
+- `application` 向 `presentation` / `composition` 暴露的交互点必须是 capability、query port、mutation port、gateway port。
+- `application` 禁止把 `Ref<T>`、`computed`、`reactive` 或裸状态容器升级成上层契约。
+- `presentation` 若需要响应式实现，必须在本层 runtime store 适配，不得把 Vue 语义回灌到 usecase。
+
+### 3.4.2 presentation 禁止把 domain contract 当作公共入口
+
+- `presentation` 不得通过 `*/domain/contracts.ts` 充当跨子域、跨 feature 的主契约源。
+- 页面模型、组件、bridge 与上层组合优先依赖：
+  - `public/api-types.ts`
+  - 子域 `api.ts` 导出的 capability 类型
+  - `presentation/contracts.ts`
+- `domain/contracts.ts` 只作为内部语义模型，不作为 UI 边界协议。
+
+### 3.4.3 composition 禁止借道 presentation 持有核心端口
+
+- `composition` 所需的 gateway / runtime / state port，必须来自 `application/ports/*` 或 `composition/contracts/*`。
+- 禁止通过 `presentation/*` 中的类型别名定义核心依赖方向。
+- 若某端口当前只存在于 `presentation/store/*`，应先上提为显式 port，再由 `presentation` 消费。
+
+### 3.4.4 UI 错误公开必须来自 outcome 映射
+
+- `presentation` 不能手写领域错误对象后再向外传播。
+- UI 错误必须来自：
+  - `Outcome.error`
+  - `mapXxxOutcomeToUiError(...)`
+- `api.ts` / `api-types.ts` 不得为 UI 临时文案暴露未建模错误结构。
+
+## 3.5 状态公开协议
 
 跨边界状态读取必须使用 plain snapshot 协议：
 
@@ -112,6 +144,7 @@ wire dto -> data -> domain/application -> capability/view snapshot -> external c
 - snapshot 必须是 plain data，不含 Vue 响应式对象。
 - observer 建立后应立即推送一次当前快照。
 - 写能力必须通过显式命令方法暴露，不允许调用方拿到内部可写状态句柄。
+- 跨层状态写入必须走命名 mutation 能力，而不是暴露内部对象给调用方直接改字段。
 
 推荐的子 capability 形态：
 
@@ -125,7 +158,7 @@ type MessageComposerCapabilities = {
 };
 ```
 
-## 3.5 局部 capability 协议
+## 3.6 局部 capability 协议
 
 当某一组能力天然依赖上下文时，应优先返回局部 capability，而不是让每个方法重复接受上下文参数。
 
@@ -145,7 +178,7 @@ type MessageComposerCapabilities = {
 - 上下文被显式绑定，能力面更小。
 - 更符合 object-capability 的“先拿到局部权能，再执行动作”模型。
 
-## 3.6 运行时 ownership 协议
+## 3.7 运行时 ownership 协议
 
 feature 级运行时公开默认采用 lease：
 
@@ -204,8 +237,8 @@ export function getChatCapabilities(): ChatCapabilities {
 复杂 feature 应提供 `typechecks/apiContractChecks.ts`：
 
 ```ts
-import { createChatCapabilities } from "@/features/chat/api";
-import type { ChatCapabilities } from "@/features/chat/api-types";
+import { createChatCapabilities } from "@/features/chat/public/api";
+import type { ChatCapabilities } from "@/features/chat/public/api-types";
 
 export const chatApiContractCheck: ChatCapabilities = createChatCapabilities();
 ```
@@ -217,6 +250,9 @@ export const chatApiContractCheck: ChatCapabilities = createChatCapabilities();
 - `api.ts` 是否直接导出 `data/di/presentation/live`。
 - `api.ts` 是否导出组件或内部容器。
 - 是否仍存在跨 feature 深路径 import。
+- `application` 是否重新出现 `vue`、`Ref`、`computed`、`watch`。
+- `presentation` 是否重新深依赖 `*/domain/contracts.ts` 作为页面契约。
+- `composition` 是否重新经由 `presentation/*` 定义核心 port。
 
 ### 6.3 PR 检查清单
 
@@ -229,6 +265,7 @@ export const chatApiContractCheck: ChatCapabilities = createChatCapabilities();
 5. 是否应该进一步收敛为 `forServer()` 或其他局部 capability？
 6. 是否存在 DTO / transport payload / snake_case 协议字段直接穿透到公共契约？
 7. 是否同步更新了 `api-types.ts` 与 `typechecks/apiContractChecks.ts`？
+8. 是否把状态读写收敛为显式 port / mutation capability，而不是把响应式容器直接交给 usecase？
 
 ## 7. 迁移规则
 
@@ -253,3 +290,6 @@ export const chatApiContractCheck: ChatCapabilities = createChatCapabilities();
 7. 把 wire DTO / transport payload 直接暴露给其他 feature。
 8. 子域 `api.ts` 直接包裹 `presentation/store/*` 或 `data/*`，没有中间的 application/state facade。
 9. `snake_case` runtime contract 穿透到 `api-types.ts`、`contracts/*` 或跨 feature capability。
+10. `application` 向上层泄漏 Vue `Ref`、`computed` 或裸状态容器。
+11. `presentation` 以 `*/domain/contracts.ts` 充当组件和页面模型的公共契约源。
+12. `composition` 通过 `presentation/*` 拿 gateway / runtime port 类型，导致依赖方向反转。

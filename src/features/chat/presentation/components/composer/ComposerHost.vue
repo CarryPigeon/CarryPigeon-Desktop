@@ -7,7 +7,7 @@
 import { computed, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import DomainSelector from "./DomainSelector.vue";
-import type { ComposerSubmitPayload } from "@/features/chat/message-flow/contracts";
+import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-types";
 
 const props = defineProps<{
   domainId: string;

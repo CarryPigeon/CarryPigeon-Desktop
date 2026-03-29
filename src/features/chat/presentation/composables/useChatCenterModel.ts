@@ -5,29 +5,27 @@
  */
 
 import { computed, proxyRefs, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
-import { currentChatUserId } from "@/features/chat/integration/accountSession";
-import {
+import type {
   chatConnectionDetail,
   chatConnectionPillState,
-  retryChatConnection,
-} from "@/features/chat/integration/serverWorkspace";
-import {
-  getRoomSessionCapabilities,
-  type CurrentChannelSessionSnapshot,
-} from "@/features/chat/room-session/api";
-import {
-  getMessageFlowCapabilities,
-  type ChatMessage,
-  type ComposerSubmitPayload,
-  type MessageComposerSnapshot,
-  type MessageTimelineSnapshot,
-} from "@/features/chat/message-flow/api";
+} from "@/features/chat/data/server-workspace";
+import { createMessageActionError } from "@/features/chat/message-flow/application/outcomes/messageActionOutcome";
+import type {
+  ChannelMessageLookupCapabilities,
+  ChatMessage,
+  ComposerSubmitPayload,
+  MessageComposerCapabilities,
+  MessageComposerSnapshot,
+  MessageTimelineCapabilities,
+  MessageTimelineSnapshot,
+} from "@/features/chat/message-flow/api-types";
+import type {
+  CurrentChannelSessionCapabilities,
+  CurrentChannelSessionSnapshot,
+} from "@/features/chat/room-session/api-types";
 import type { ServerWorkspaceConnectionOutcome } from "@/features/server-connection/api-types";
 import { isMessageAfterReadMarker } from "@/features/chat/presentation/utils/readMarker";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
-
-const roomSessionCapabilities = getRoomSessionCapabilities();
-const messageFlowCapabilities = getMessageFlowCapabilities();
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 
@@ -79,6 +77,14 @@ type ChatCenterRawModel = {
 export type ChatCenterModel = ShallowUnwrapRef<ChatCenterRawModel>;
 
 export type UseChatCenterModelDeps = {
+  currentSession: CurrentChannelSessionCapabilities;
+  currentTimeline: MessageTimelineCapabilities;
+  messageComposer: MessageComposerCapabilities;
+  lookupChannel(channelId: string): ChannelMessageLookupCapabilities;
+  currentUserId: RefLike<string>;
+  connectionDetail: typeof chatConnectionDetail;
+  connectionPillState: typeof chatConnectionPillState;
+  retryConnection(): Promise<ServerWorkspaceConnectionOutcome>;
   domainRegistryView: RefLike<unknown>;
   onLoadMoreMessages(): void | Promise<void>;
   onReplyShortcut(messageId: string): void;
@@ -87,12 +93,9 @@ export type UseChatCenterModelDeps = {
 };
 
 export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterModel {
-  const currentSession = roomSessionCapabilities.currentChannel;
-  const currentChannelMessageFlow = messageFlowCapabilities.currentChannel;
-  const messageComposer = messageFlowCapabilities.composer;
-  const currentSessionSnapshot = useObservedCapabilitySnapshot(currentSession);
-  const messageTimelineSnapshot = useObservedCapabilitySnapshot(currentChannelMessageFlow);
-  const messageComposerSnapshot = useObservedCapabilitySnapshot(messageComposer);
+  const currentSessionSnapshot = useObservedCapabilitySnapshot(deps.currentSession);
+  const messageTimelineSnapshot = useObservedCapabilitySnapshot(deps.currentTimeline);
+  const messageComposerSnapshot = useObservedCapabilitySnapshot(deps.messageComposer);
   const domainRegistryStore = computed<DomainRegistryStoreLike>(() => deps.domainRegistryView.value as DomainRegistryStoreLike);
 
   const activePluginComposer = computed(() => {
@@ -112,6 +115,13 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     for (const d of messageComposerSnapshot.value.availableDomains) out.push({ id: d.id, label: d.label, colorVar: d.colorVar });
     return out;
   });
+
+  function findCurrentTimelineMessage(messageId: string): ChatMessage | null {
+    for (const message of messageTimelineSnapshot.value.currentMessages) {
+      if (message.id === messageId) return message;
+    }
+    return null;
+  }
 
   const messageRows = computed<MessageRow[]>(() => {
     const list = messageTimelineSnapshot.value.currentMessages;
@@ -136,53 +146,51 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   const replyPreview = computed<{ title: string; snippet: string }>(() => {
     const id = messageComposerSnapshot.value.replyToMessageId;
     if (!id) return { title: "", snippet: "" };
-    const msg = currentChannelMessageFlow.findMessageById(id);
+    const msg = findCurrentTimelineMessage(id);
     if (!msg) return { title: "Reply", snippet: "Message not found" };
     const snippet = msg.kind === "core_text" ? msg.text : msg.preview;
     return { title: `Reply → ${msg.from.name}`, snippet };
   });
 
-  const currentUserId = computed(() => currentChatUserId.value || "u-1");
+  const currentUserId = computed(() => deps.currentUserId.value || "u-1");
 
   function fmtTime(ms: number): string {
     return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
   function formatReplyMiniText(channelId: string, replyToId: string): string {
-    const r = messageFlowCapabilities.forChannel(channelId).findMessageById(replyToId);
+    const r = deps.lookupChannel(channelId).findMessageById(replyToId);
     if (!r) return "—";
     const snippet = r.kind === "core_text" ? r.text : r.preview;
     return `${r.from.name}: ${snippet}`;
   }
 
   function setDomainId(v: string): void {
-    messageComposer.setActiveDomainId(v);
+    deps.messageComposer.setActiveDomainId(v);
   }
 
   function setDraft(v: string): void {
-    messageComposer.setDraft(v);
+    deps.messageComposer.setDraft(v);
   }
 
   function handleCancelReply(): void {
-    messageComposer.cancelReply();
+    deps.messageComposer.cancelReply();
   }
 
   function handleFileUploaded(result: { fileId: string; shareKey: string }): void {
-    messageComposer.appendAttachmentShareKey(result.shareKey);
+    deps.messageComposer.appendAttachmentShareKey(result.shareKey);
   }
 
   function handleFileUploadError(error: string): void {
-    messageComposer.setActionError({
-      code: "send_failed",
-      message: error,
-      retryable: true,
-    });
+    deps.messageComposer.setActionError(
+      createMessageActionError("send_failed", "Send failed.", error),
+    );
   }
 
   function handleSend(payload?: ComposerSubmitPayload): void {
-    void messageComposer.sendMessage(payload).then((outcome) => {
+    void deps.messageComposer.sendMessage(payload).then((outcome) => {
       if (outcome.ok) return;
-      messageComposer.setActionError(outcome.error);
+      deps.messageComposer.setActionError(outcome.error);
     });
   }
 
@@ -216,9 +224,9 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   const rawModel: ChatCenterRawModel = {
-    connectionDetail: chatConnectionDetail,
-    connectionPillState: chatConnectionPillState,
-    retryConnection: retryChatConnection,
+    connectionDetail: deps.connectionDetail,
+    connectionPillState: deps.connectionPillState,
+    retryConnection: deps.retryConnection,
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
     currentChannelHasMore: computed(() => messageTimelineSnapshot.value.hasMoreHistory),
     loadingMoreMessages: computed(() => messageTimelineSnapshot.value.isLoadingHistory),

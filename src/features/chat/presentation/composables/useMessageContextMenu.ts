@@ -4,7 +4,7 @@
  */
 
 import { ref } from "vue";
-import type { DeleteChatMessageOutcome } from "@/features/chat/message-flow/contracts";
+import type { DeleteChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
 
 export type MessageContextAction = "copy" | "reply" | "delete" | "forward";
