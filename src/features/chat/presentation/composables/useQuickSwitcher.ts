@@ -4,7 +4,7 @@
  */
 
 import { computed, watch, type ComputedRef, type Ref } from "vue";
-import type { ChannelSelectionOutcome } from "@/features/chat/room-session/api";
+import type { ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
 import type { QuickSwitcherItem } from "@/features/chat/presentation/types/quickSwitcher";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
 import {

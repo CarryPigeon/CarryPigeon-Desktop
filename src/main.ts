@@ -16,7 +16,7 @@ import App from "./App.vue";
 import { router } from "./app/router";
 import { i18n } from "./app/i18n";
 import "tdesign-vue-next/es/style/index.css";
-import "@/features/chat/styles";
+import "@/features/chat/public/styles";
 import { getStoredTheme, setTheme } from "@/shared/utils/theme";
 import { routeIfSubWindow } from "@/app/bootstrap/subWindowRouting";
 import { registerUserProfileBridge } from "@/app/bootstrap/userProfileBridge";

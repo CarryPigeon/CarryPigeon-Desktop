@@ -4,9 +4,9 @@
  */
 
 import { computed, reactive, ref } from "vue";
-import { currentChatUser, currentChatUsername } from "@/features/chat/integration/accountSession";
-import { getAvailableChatMessageDomains } from "@/features/chat/integration/pluginRuntime";
-import { chatCurrentServerSocket } from "@/features/chat/integration/serverWorkspace";
+import { currentChatUser, currentChatUsername } from "@/features/chat/data/account-session";
+import { getAvailableChatMessageDomains } from "@/features/chat/data/plugin-runtime";
+import { chatCurrentServerSocket } from "@/features/chat/data/server-workspace";
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
@@ -14,9 +14,8 @@ import type {
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
   SendChatMessageOutcome,
-} from "@/features/chat/message-flow/contracts";
-import type { ChatChannel } from "@/features/chat/room-session/contracts";
-import type { ChannelSelectionOutcome } from "@/features/chat/room-session/contracts";
+} from "@/features/chat/message-flow/api-types";
+import type { ChatChannel, ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
 import type {
   ApplyJoinChannelOutcome,
   ChannelApplication,
@@ -35,7 +34,7 @@ import type {
   SetChannelBanOutcome,
   UpdateChannelMetaOutcome,
   DecideChannelApplicationOutcome,
-} from "@/features/chat/room-governance/contracts";
+} from "@/features/chat/room-governance/api-types";
 import type { ChatRuntimeStore } from "@/features/chat/presentation/store/chatStoreTypes";
 
 /**

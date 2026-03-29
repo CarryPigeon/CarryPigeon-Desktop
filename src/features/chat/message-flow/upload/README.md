@@ -6,6 +6,11 @@
 通用传输能力（端口/类型/HTTP/用例）已下沉到 `shared/file-transfer`。
 消息语义与文件消息渲染已迁移到 `chat/message-flow/message`。
 
+说明：
+
+- `upload/` 现在是 `message-flow` 内部支持包，而不是独立 capability 根入口；
+- 上层应通过 `message-flow` 或具体 presentation 组件/状态接入上传流程，而不是再为 `upload/` 维持一层子公开 API。
+
 ## 职责边界
 
 做什么：

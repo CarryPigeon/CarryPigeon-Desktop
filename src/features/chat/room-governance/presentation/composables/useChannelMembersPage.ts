@@ -6,8 +6,9 @@
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { currentChatUserId } from "@/features/chat/integration/accountSession";
-import { getRoomGovernanceCapabilities, type ChannelMember } from "@/features/chat/room-governance/api";
+import { currentChatUserId } from "@/features/chat/data/account-session";
+import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
+import type { ChannelMember } from "@/features/chat/room-governance/api-types";
 import { useChannelScopedRefresh } from "@/features/chat/presentation/composables/useChannelScopedRefresh";
 import { useGovernanceChannelPageRoute } from "./useGovernanceChannelPageRoute";
 import { useGovernancePageState } from "./useGovernancePageState";

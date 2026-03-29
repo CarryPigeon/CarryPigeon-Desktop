@@ -6,18 +6,20 @@
 
 import { computed, proxyRefs } from "vue";
 import type { ComputedRef, ShallowUnwrapRef } from "vue";
-import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
+import type { RoomGovernanceMembersCapabilities, RoomGovernanceMembersSnapshot } from "@/features/chat/room-governance/api-types";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 
-const roomGovernanceCapabilities = getRoomGovernanceCapabilities();
-
 type MembersRailRawModel = {
-  members: ComputedRef<ReturnType<typeof roomGovernanceCapabilities.currentChannel.members.getSnapshot>>;
+  members: ComputedRef<RoomGovernanceMembersSnapshot>;
 };
 export type MembersRailModel = ShallowUnwrapRef<MembersRailRawModel>;
 
-export function useMembersRailModel(): MembersRailModel {
-  const membersSnapshot = useObservedCapabilitySnapshot(roomGovernanceCapabilities.currentChannel.members);
+export type UseMembersRailModelDeps = {
+  members: RoomGovernanceMembersCapabilities;
+};
+
+export function useMembersRailModel(deps: UseMembersRailModelDeps): MembersRailModel {
+  const membersSnapshot = useObservedCapabilitySnapshot(deps.members);
   const rawModel: MembersRailRawModel = {
     members: computed(() => membersSnapshot.value),
   };

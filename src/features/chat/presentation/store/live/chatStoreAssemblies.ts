@@ -4,12 +4,20 @@
  * 收敛 chat 实时 Store 的装配细节，避免最终 composition root 再次膨胀。
  */
 
+import { getCurrentChatUserId } from "@/features/chat/data/account-session";
+import { createMessageTimelineStatePort } from "@/features/chat/message-flow/presentation/runtime/messageFlowStatePorts";
+import { emitChannelProjectionChanged } from "@/features/chat/presentation/events/windowMessageEvents";
+import { createChatEventRouter } from "@/features/chat/presentation/store/live/chatEventRouter";
+import {
+  createSessionReadStateEventProjectionPort,
+  createSessionUnreadProjectionPort,
+} from "@/features/chat/room-session/presentation/runtime/sessionStatePorts";
 import type { ChatApiGateway, ChatEventsGateway } from "./chatGateway";
 import { createChatStoreState } from "./chatStoreState";
-import { createChatGovernanceRuntime } from "./chatGovernanceRuntime";
-import { createChatSessionRuntime } from "./chatSessionRuntime";
-import { createChatMessageFlowRuntime } from "./chatMessageFlowRuntime";
-import { createChatSessionSharedContext } from "./chatSessionSharedContext";
+import { createChatMessageFlowRuntime } from "@/features/chat/message-flow/presentation/runtime/messageFlowRuntime";
+import { createChatGovernanceRuntime } from "@/features/chat/room-governance/presentation/runtime/governanceRuntime";
+import { createChatSessionRuntime } from "@/features/chat/room-session/presentation/runtime/sessionRuntime";
+import { createChatSessionSharedContext } from "@/features/chat/room-session/presentation/runtime/sessionSharedContext";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -80,6 +88,36 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     scope: sessionSharedContext.scope,
   });
 
+  const timelineState = createMessageTimelineStatePort({
+    currentChannelId,
+    messagesByChannel: state.messagesByChannel,
+    nextCursorByChannel: state.nextCursorByChannel,
+    hasMoreByChannel: state.hasMoreByChannel,
+    loadingMoreByChannel: state.loadingMoreByChannel,
+  });
+  const unreadProjection = createSessionUnreadProjectionPort({
+    channelsRef,
+  });
+  const readStateProjection = createSessionReadStateEventProjectionPort({
+    channelsRef,
+    lastReadTimeMsByChannel,
+    lastReadMidByChannel,
+  });
+  const onWsEvent = createChatEventRouter({
+    logger: deps.logger,
+    getServerSocket: sessionSharedContext.scope.getActiveServerSocket,
+    getCurrentUserId: getCurrentChatUserId,
+    timelineState,
+    unreadProjection,
+    readStateProjection,
+    refreshChannels: governance.refreshChannels,
+    refreshChannelLatestPage: messageFlow.refreshChannelLatestPage,
+    refreshMembersRail: governance.refreshMembersRail,
+    emitChannelProjectionChanged,
+    mapWireMessage: messageFlow.mapWireMessage,
+    compareMessages: messageFlow.compareMessages,
+  });
+
   const session = createChatSessionRuntime({
     events: deps.events,
     logger: deps.logger,
@@ -102,6 +140,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     messageFlow,
     scope: sessionSharedContext.scope,
     readStateReporter: sessionSharedContext.readStateReporter,
+    onWsEvent,
   });
 
   return {

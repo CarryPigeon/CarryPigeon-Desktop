@@ -4,12 +4,12 @@
  */
 
 import { computed, type ComputedRef, type Ref } from "vue";
-import type { ComposerSubmitPayload, SendChatMessageOutcome } from "@/features/chat/message-flow/contracts";
+import type { ComposerSubmitPayload, SendChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import {
   attachChatPluginHostBridge as attachPluginHostBridgeInternal,
   detachChatPluginHostBridge as detachPluginHostBridgeInternal,
   type PluginComposerPayload,
-} from "@/features/chat/integration/pluginRuntime";
+} from "@/features/chat/data/plugin-runtime";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 

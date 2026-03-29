@@ -3,17 +3,16 @@
  * @description chat｜展示层状态（store）：chatStoreTypes。
  * 该文件只保留 chat 内部 runtime store 组合契约；
  * 各子域自己的公开模型仍分别定义在：
- * - `room-session/contracts.ts`
- * - `message-flow/contracts.ts`
- * - `room-governance/contracts.ts`
+ * - `room-session/api-types.ts`
+ * - `message-flow/api-types.ts`
+ * - `room-governance/api-types.ts`
  *
  * 约定：
  * - 注释统一使用中文
  * - 日志输出统一使用英文（由调用方 logger 控制）
  */
 import type { Ref } from "vue";
-import type { ChatChannel } from "@/features/chat/room-session/contracts";
-import type { ChannelSelectionOutcome } from "@/features/chat/room-session/contracts";
+import type { ChatChannel, ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
@@ -21,7 +20,7 @@ import type {
   DeleteChatMessageOutcome,
   MessageDomain,
   SendChatMessageOutcome,
-} from "@/features/chat/message-flow/contracts";
+} from "@/features/chat/message-flow/api-types";
 import type {
   ApplyJoinChannelOutcome,
   ChannelApplication,
@@ -38,7 +37,7 @@ import type {
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
   UpdateChannelMetaOutcome,
-} from "@/features/chat/room-governance/contracts";
+} from "@/features/chat/room-governance/api-types";
 
 /**
  * room-session 内部 runtime store。

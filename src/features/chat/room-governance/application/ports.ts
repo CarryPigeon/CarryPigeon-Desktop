@@ -4,7 +4,7 @@
  */
 
 import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
-import type { GovernanceChannelSummary } from "@/features/chat/room-governance/contracts";
+import type { GovernanceChannelSummary } from "@/features/chat/room-governance/domain/contracts";
 
 /**
  * room-governance 应用层所需的最小 API 能力。

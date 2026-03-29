@@ -5,17 +5,19 @@
 
 import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import { useRouter, type Router } from "vue-router";
-import {
-  getRoomGovernanceCapabilities,
-  type ApplyJoinChannelOutcome,
-  type UpdateChannelMetaOutcome,
-} from "@/features/chat/room-governance/api";
-import type { ChatChannel } from "@/features/chat/room-session/contracts";
-import { getRoomSessionCapabilities, type ChannelSelectionOutcome } from "@/features/chat/room-session/api";
+import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
+import type {
+  ApplyJoinChannelOutcome,
+  UpdateChannelMetaOutcome,
+} from "@/features/chat/room-governance/api-types";
+import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
+import type {
+  ChannelSelectionOutcome,
+  ChatChannel,
+  RoomSessionDirectoryCapabilities,
+} from "@/features/chat/room-session/api-types";
+import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { useChannelInfoPageRoute } from "./useChannelInfoPageRoute";
-
-const roomGovernanceCapabilities = getRoomGovernanceCapabilities();
-const roomSessionCapabilities = getRoomSessionCapabilities();
 
 type ChannelMetaDraft = {
   name: string;
@@ -23,7 +25,7 @@ type ChannelMetaDraft = {
 };
 
 export type ChannelInfoPageDeps = {
-  findChannelById(channelId: string): ChatChannel | null;
+  directory: RoomSessionDirectoryCapabilities;
   requestJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   saveChannelMeta(channelId: string, draft: ChannelMetaDraft): Promise<UpdateChannelMetaOutcome>;
   mayEditChannelMeta(channel: ChatChannel | null): boolean;
@@ -55,11 +57,13 @@ export type ChannelInfoPageModel = {
 };
 
 function createDefaultChannelInfoPageDeps(router: Router): ChannelInfoPageDeps {
+  const roomGovernanceCapabilities = getRoomGovernanceCapabilities();
+  const roomSessionCapabilities = getRoomSessionCapabilities();
   const roomDirectory = roomSessionCapabilities.directory;
   const currentSession = roomSessionCapabilities.currentChannel;
 
   return {
-    findChannelById: roomDirectory.findChannelById,
+    directory: roomDirectory,
     requestJoin(channelId: string): Promise<ApplyJoinChannelOutcome> {
       return roomGovernanceCapabilities.forChannel(channelId).applyJoin();
     },
@@ -95,8 +99,16 @@ export function useChannelInfoPage(
   const router = useRouter();
   const pageDeps = deps ?? createDefaultChannelInfoPageDeps(router);
   const { channelId, requestedChannelName, requestedChannelBrief } = useChannelInfoPageRoute();
+  const directorySnapshot = useObservedCapabilitySnapshot(pageDeps.directory);
 
-  const channel = computed(() => pageDeps.findChannelById(channelId.value));
+  const channel = computed(() => {
+    const id = channelId.value;
+    if (!id) return null;
+    for (const item of directorySnapshot.value.allChannels) {
+      if (item.id === id) return item;
+    }
+    return null;
+  });
   const channelName = computed(() => channel.value?.name ?? requestedChannelName.value);
   const channelBrief = computed(() => channel.value?.brief ?? requestedChannelBrief.value);
 

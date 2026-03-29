@@ -7,7 +7,7 @@
 
 import type { ComputedRef, Ref } from "vue";
 import { useRouter } from "vue-router";
-import type { ChatChannel } from "@/features/chat/room-session/contracts";
+import type { ChatChannel } from "@/features/chat/room-session/api-types";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChannelListItem = ChatChannel;
