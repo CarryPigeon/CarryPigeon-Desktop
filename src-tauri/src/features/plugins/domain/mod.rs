@@ -5,3 +5,5 @@
 //! 约定：注释中文，日志英文（tracing）。
 // Domain layer for the plugins feature.
 // Keep this free of Tauri/IO dependencies where possible.
+pub mod ports;
+pub mod types;

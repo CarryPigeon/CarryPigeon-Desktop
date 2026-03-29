@@ -6,18 +6,28 @@
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { addRepoSource, createPluginContext, enabledRepoSources, removeRepoSource, repoSources, setRepoSourceEnabled } from "@/features/plugins/api";
+import {
+  addRepoSource,
+  enabledRepoSources,
+  removeRepoSource,
+  repoSources,
+  setRepoSourceEnabled,
+} from "@/features/plugins/internal/repoSourcesAccess";
 import ModuleDetailDrawer from "../components/ModuleDetailDrawer.vue";
 import PluginCenterFilterRail from "../components/PluginCenterFilterRail.vue";
 import PluginCenterGridHeader from "../components/PluginCenterGridHeader.vue";
 import PluginCenterCatalogGrid from "../components/PluginCenterCatalogGrid.vue";
-import type { PluginCatalogEntry } from "@/features/plugins/api";
-import { useCurrentServerContext } from "@/features/servers/api";
+import type { PluginCatalogEntryLike } from "@/features/plugins/domain/types/pluginTypes";
+import { resolveLatestPluginCatalogVersion } from "@/features/plugins/domain/types/pluginTypes";
+import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
+import { createPluginContext } from "@/features/plugins/presentation/composables/usePluginContext";
 import {
   type PluginCenterFilterKind,
   type PluginCenterSourceKind,
   usePluginCenterCatalogView,
 } from "@/features/plugins/presentation/composables/usePluginCenterCatalogView";
+import { runPluginTask } from "@/features/plugins/presentation/composables/usePluginTaskRunner";
+type PluginCatalogViewEntry = PluginCatalogEntryLike;
 
 const route = useRoute();
 const router = useRouter();
@@ -33,9 +43,12 @@ const repoNoteDraft = ref<string>("");
 const repoError = ref<string>("");
 const showRepoManager = ref<boolean>(false);
 
-const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = useCurrentServerContext();
+const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = usePluginsServerWorkspace();
 const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
-const { catalogStore, installStore, requiredIds, refreshCatalog, refreshInstalled } = createPluginContext({ socket: serverSocket, requiredPluginsDeclared });
+const { catalogStore, installStore, requiredIds, refreshCatalog, refreshInstalledAndRecheck } = createPluginContext({
+  socket: serverSocket,
+  requiredPluginsDeclared,
+});
 
 /**
  * 新增 Repo Source，并尽力刷新目录。
@@ -86,8 +99,9 @@ const { byId, filtered, hasUpdate } = usePluginCenterCatalogView({ filter, sourc
  *
  * @param plugin - 目标插件。
  */
-function handleCardInstall(plugin: PluginCatalogEntry): void {
-  void installStore.value.install(plugin, plugin.versions[0] || "");
+function handleCardInstall(plugin: PluginCatalogViewEntry): void {
+  const latest = resolveLatestPluginCatalogVersion(plugin);
+  runPluginTask(installStore.value.install(plugin, latest));
 }
 
 /**
@@ -95,8 +109,9 @@ function handleCardInstall(plugin: PluginCatalogEntry): void {
  *
  * @param plugin - 目标插件。
  */
-function handleCardUpdate(plugin: PluginCatalogEntry): void {
-  void installStore.value.updateToLatest(plugin, plugin.versions[0] || "");
+function handleCardUpdate(plugin: PluginCatalogViewEntry): void {
+  const latest = resolveLatestPluginCatalogVersion(plugin);
+  runPluginTask(installStore.value.updateToLatest(plugin, latest));
 }
 
 /**
@@ -105,7 +120,7 @@ function handleCardUpdate(plugin: PluginCatalogEntry): void {
  * @param pluginId - 插件 id。
  */
 function handleCardEnable(pluginId: string): void {
-  void installStore.value.enable(pluginId);
+  runPluginTask(installStore.value.enable(pluginId));
 }
 
 /**
@@ -114,7 +129,7 @@ function handleCardEnable(pluginId: string): void {
  * @param pluginId - 插件 id。
  */
 function handleCardDisable(pluginId: string): void {
-  void installStore.value.disable(pluginId);
+  runPluginTask(installStore.value.disable(pluginId));
 }
 
 /**
@@ -123,7 +138,7 @@ function handleCardDisable(pluginId: string): void {
  * @param pluginId - 插件 id。
  */
 function handleCardUninstall(pluginId: string): void {
-  void installStore.value.uninstall(pluginId);
+  runPluginTask(installStore.value.uninstall(pluginId));
 }
 
 /**
@@ -144,7 +159,7 @@ let queryTimer: number | null = null;
  *
  * @returns 选中的插件条目；为空则返回 `null`。
  */
-function computeSelectedPlugin(): PluginCatalogEntry | null {
+function computeSelectedPlugin(): PluginCatalogViewEntry | null {
   return byId.value[selectedId.value] ?? null;
 }
 
@@ -187,7 +202,7 @@ function closeDetail(): void {
 function handleDrawerInstall(version: string): void {
   const plugin = selectedPlugin.value;
   if (!plugin) return;
-  void installStore.value.install(plugin, version);
+  runPluginTask(installStore.value.install(plugin, version));
 }
 
 /**
@@ -198,7 +213,8 @@ function handleDrawerInstall(version: string): void {
 function handleDrawerUpdate(): void {
   const plugin = selectedPlugin.value;
   if (!plugin) return;
-  void installStore.value.updateToLatest(plugin, plugin.versions[0] || "");
+  const latest = resolveLatestPluginCatalogVersion(plugin);
+  runPluginTask(installStore.value.updateToLatest(plugin, latest));
 }
 
 /**
@@ -209,7 +225,7 @@ function handleDrawerUpdate(): void {
 function handleDrawerEnable(): void {
   const plugin = selectedPlugin.value;
   if (!plugin) return;
-  void installStore.value.enable(plugin.pluginId);
+  runPluginTask(installStore.value.enable(plugin.pluginId));
 }
 
 /**
@@ -220,7 +236,7 @@ function handleDrawerEnable(): void {
 function handleDrawerDisable(): void {
   const plugin = selectedPlugin.value;
   if (!plugin) return;
-  void installStore.value.disable(plugin.pluginId);
+  runPluginTask(installStore.value.disable(plugin.pluginId));
 }
 
 /**
@@ -232,7 +248,7 @@ function handleDrawerDisable(): void {
 function handleDrawerSwitchVersion(version: string): void {
   const plugin = selectedPlugin.value;
   if (!plugin) return;
-  void installStore.value.switchVersion(plugin.pluginId, version);
+  runPluginTask(installStore.value.switchVersion(plugin.pluginId, version));
 }
 
 /**
@@ -243,7 +259,7 @@ function handleDrawerSwitchVersion(version: string): void {
 function handleDrawerRollback(): void {
   const plugin = selectedPlugin.value;
   if (!plugin) return;
-  void installStore.value.rollback(plugin.pluginId);
+  runPluginTask(installStore.value.rollback(plugin.pluginId));
 }
 
 /**
@@ -258,8 +274,8 @@ function handleDrawerRollback(): void {
  */
 async function ensureData(): Promise<void> {
   if (!serverSocket.value) return;
-  await Promise.all([refreshServerInfo(), refreshCatalog(), refreshInstalled()]);
-  installStore.value.recheckRequired(requiredIds.value);
+  await Promise.all([refreshServerInfo(), refreshCatalog()]);
+  await refreshInstalledAndRecheck(requiredIds.value);
 }
 
 /**

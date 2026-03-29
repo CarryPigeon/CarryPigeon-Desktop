@@ -26,7 +26,8 @@ let provider: ServerTlsConfigProvider | null = null;
  *
  * 说明：
  * - 允许重复调用，后注册者覆盖前者；
- * - 推荐在 servers 模块初始化时注册（例如 serverList store 模块加载时）。
+ * - 推荐在 runtime bootstrap 阶段注册（例如 `startServerRackRuntime()`），
+ *   不建议依赖“模块加载即注册”的隐式副作用。
  *
  * @param next - provider 函数。
  */
@@ -47,4 +48,3 @@ export function getServerTlsConfig(serverSocket: string): ServerTlsConfig {
     return DEFAULT_TLS;
   }
 }
-

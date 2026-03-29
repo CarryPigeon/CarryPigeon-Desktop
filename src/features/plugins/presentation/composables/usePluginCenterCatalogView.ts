@@ -12,7 +12,11 @@
  */
 
 import { computed, type Ref } from "vue";
-import type { PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
+import {
+  resolveLatestPluginCatalogVersion,
+  type InstalledPluginStateLike,
+  type PluginCatalogEntryLike,
+} from "@/features/plugins/domain/types/pluginTypes";
 
 /**
  * 插件中心“状态筛选”枚举。
@@ -26,20 +30,18 @@ export type PluginCenterSourceKind = "all" | "server" | "repo";
 
 type RefLike<T> = { value: T };
 type ComputedLike<T> = { value: T };
+type PluginCatalogViewEntry = PluginCatalogEntryLike;
+type InstalledStateView = InstalledPluginStateLike;
 
 type CatalogStoreLike = {
-  catalog: RefLike<PluginCatalogEntry[]>;
-  byId: RefLike<Record<string, PluginCatalogEntry>>;
+  catalog: RefLike<readonly PluginCatalogViewEntry[]>;
+  byId: RefLike<Record<string, PluginCatalogViewEntry>>;
 };
 
 type InstallStoreLike = {
   installedById: Record<
     string,
-    | {
-        currentVersion?: string | null;
-        enabled?: boolean;
-        status?: string;
-      }
+    | InstalledStateView
     | null
     | undefined
   >;
@@ -96,7 +98,7 @@ export function usePluginCenterCatalogView(args: UsePluginCenterCatalogViewArgs)
   function hasUpdate(pluginId: string): boolean {
     const plugin = byId.value[pluginId];
     const installed = args.installStore.value.installedById[pluginId];
-    const latest = plugin?.versions?.[0] ?? "";
+    const latest = plugin ? resolveLatestPluginCatalogVersion(plugin) : "";
     const current = installed?.currentVersion ?? "";
     return Boolean(latest && current && latest !== current);
   }
@@ -107,7 +109,7 @@ export function usePluginCenterCatalogView(args: UsePluginCenterCatalogViewArgs)
    * @param p - 目录条目。
    * @returns 命中则为 `true`。
    */
-  function matchesSource(p: PluginCatalogEntry): boolean {
+  function matchesSource(p: PluginCatalogViewEntry): boolean {
     return args.source.value === "all" ? true : p.source === args.source.value;
   }
 
@@ -118,7 +120,7 @@ export function usePluginCenterCatalogView(args: UsePluginCenterCatalogViewArgs)
    * @param needle - 小写化后的搜索关键字。
    * @returns 命中则为 `true`。
    */
-  function matchesQuery(p: PluginCatalogEntry, needle: string): boolean {
+  function matchesQuery(p: PluginCatalogViewEntry, needle: string): boolean {
     if (!needle) return true;
 
     if (p.name.toLowerCase().includes(needle)) return true;
@@ -138,7 +140,7 @@ export function usePluginCenterCatalogView(args: UsePluginCenterCatalogViewArgs)
    * @param p - 目录条目。
    * @returns 命中则为 `true`。
    */
-  function matchesFilter(p: PluginCatalogEntry): boolean {
+  function matchesFilter(p: PluginCatalogViewEntry): boolean {
     const installed = args.installStore.value.installedById[p.pluginId] ?? null;
 
     if (args.filter.value === "all") return true;
@@ -153,10 +155,10 @@ export function usePluginCenterCatalogView(args: UsePluginCenterCatalogViewArgs)
   /**
    * 计算网格中展示的插件列表。
    */
-  const filtered = computed<PluginCatalogEntry[]>(() => {
+  const filtered = computed<PluginCatalogViewEntry[]>(() => {
     const needle = args.q.value.trim().toLowerCase();
     const items = args.catalogStore.value.catalog.value;
-    const out: PluginCatalogEntry[] = [];
+    const out: PluginCatalogViewEntry[] = [];
     for (const p of items) {
       if (!matchesSource(p)) continue;
       if (!matchesQuery(p, needle)) continue;

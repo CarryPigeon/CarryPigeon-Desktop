@@ -10,8 +10,9 @@
  */
 
 import { computed, type ComputedRef } from "vue";
-import { usePluginCatalogStore, usePluginInstallStore } from "@/features/plugins/presentation/store";
-import { dedupeAsyncByKey } from "@/shared/utils/asyncDedupe";
+import { usePluginCatalogStore } from "@/features/plugins/presentation/store/pluginCatalogStore";
+import { usePluginInstallStore } from "@/features/plugins/presentation/store/pluginInstallStore";
+import { dedupeRefreshBySocket } from "./refreshDedupe";
 
 /**
  * 插件上下文（按 socket 解析 store + 去重刷新编排）。
@@ -25,6 +26,7 @@ export type PluginContext = {
   requiredIds: ComputedRef<string[]>;
   refreshCatalog(): Promise<void>;
   refreshInstalled(): Promise<void>;
+  refreshInstalledAndRecheck(requiredIds: readonly string[]): Promise<void>;
 };
 
 type CreatePluginContextArgs = {
@@ -56,7 +58,7 @@ export function createPluginContext(args: CreatePluginContextArgs): PluginContex
     }
     const out: string[] = [];
     for (const p of catalogStore.value.catalog.value) {
-      if (p.source === "server" && p.required) out.push(p.pluginId);
+      if (p.required) out.push(p.pluginId);
     }
     return out;
   });
@@ -67,9 +69,7 @@ export function createPluginContext(args: CreatePluginContextArgs): PluginContex
    * @returns 无返回值。
    */
   async function refreshCatalog(): Promise<void> {
-    const s = socket.value;
-    if (!s) return;
-    await dedupeAsyncByKey(`pluginCatalog:refresh:${s}`, () => catalogStore.value.refresh());
+    await dedupeRefreshBySocket("pluginCatalog:refresh", socket.value, () => catalogStore.value.refresh());
   }
 
   /**
@@ -78,10 +78,19 @@ export function createPluginContext(args: CreatePluginContextArgs): PluginContex
    * @returns 无返回值。
    */
   async function refreshInstalled(): Promise<void> {
-    const s = socket.value;
-    if (!s) return;
-    await dedupeAsyncByKey(`pluginInstall:refresh:${s}`, () => installStore.value.refreshInstalled());
+    await dedupeRefreshBySocket("pluginInstall:refresh", socket.value, () => installStore.value.refreshInstalled());
   }
 
-  return { catalogStore, installStore, requiredIds, refreshCatalog, refreshInstalled };
+  /**
+   * 刷新已安装状态并立即按给定 required ids 重算缺失项。
+   *
+   * @param requiredIds - 需要校验的 required 插件 id 列表。
+   * @returns 无返回值。
+   */
+  async function refreshInstalledAndRecheck(requiredIds: readonly string[]): Promise<void> {
+    await refreshInstalled();
+    installStore.value.recheckRequired(requiredIds.map((x) => String(x).trim()).filter(Boolean));
+  }
+
+  return { catalogStore, installStore, requiredIds, refreshCatalog, refreshInstalled, refreshInstalledAndRecheck };
 }

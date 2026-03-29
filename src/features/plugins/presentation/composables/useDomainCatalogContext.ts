@@ -5,8 +5,8 @@
  */
 
 import { computed, type ComputedRef } from "vue";
-import { useDomainCatalogStore } from "@/features/plugins/presentation/store";
-import { dedupeAsyncByKey } from "@/shared/utils/asyncDedupe";
+import { useDomainCatalogStore } from "@/features/plugins/presentation/store/domainCatalogStore";
+import { dedupeRefreshBySocket } from "./refreshDedupe";
 
 /**
  * domain catalog 上下文（store + 去重刷新能力）。
@@ -31,9 +31,7 @@ export function createDomainCatalogContext(socket: ComputedRef<string>): DomainC
    * @returns 无返回值。
    */
   async function refreshDomainCatalog(): Promise<void> {
-    const s = socket.value;
-    if (!s) return;
-    await dedupeAsyncByKey(`domainCatalog:refresh:${s}`, () => domainCatalogStore.value.refresh());
+    await dedupeRefreshBySocket("domainCatalog:refresh", socket.value, () => domainCatalogStore.value.refresh());
   }
 
   return { domainCatalogStore, refreshDomainCatalog };

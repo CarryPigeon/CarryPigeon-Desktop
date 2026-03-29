@@ -17,6 +17,7 @@ import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import { NO_SERVER_KEY } from "@/shared/serverKey";
 import { getOrCreateServerScopedStore } from "@/shared/utils/scopedStoreCache";
 import { getDomainCatalogPort } from "@/features/plugins/di/plugins.di";
+import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 
 type DomainCatalogStore = {
   items: Ref<DomainCatalogItem[]>;
@@ -28,6 +29,38 @@ type DomainCatalogStore = {
 
 const logger = createLogger("domainCatalogStore");
 const stores = new Map<string, DomainCatalogStore>();
+let runtimeStarted = false;
+let stopRuntimeCleanup: (() => void) | null = null;
+
+/**
+ * 启动 domain-catalog 运行时（幂等）。
+ *
+ * 说明：
+ * - 显式注册 server-scope 清理回调；
+ * - 避免模块加载时产生副作用。
+ */
+export function startDomainCatalogRuntime(): void {
+  if (runtimeStarted) return;
+  runtimeStarted = true;
+  stopRuntimeCleanup = registerServerScopeCleanupHandler((event) => {
+    if (event.type === "all") {
+      stores.clear();
+      return;
+    }
+    stores.delete(event.key);
+  });
+}
+
+/**
+ * 停止 domain-catalog 运行时（best-effort）。
+ */
+export function stopDomainCatalogRuntime(): void {
+  if (!runtimeStarted) return;
+  runtimeStarted = false;
+  stopRuntimeCleanup?.();
+  stopRuntimeCleanup = null;
+  stores.clear();
+}
 
 /**
  * 获取（或创建）per-server 的 domain catalog store。
@@ -72,7 +105,7 @@ export function useDomainCatalogStore(serverSocket: string): DomainCatalogStore 
       loading.value = true;
       error.value = "";
       try {
-        items.value = await getDomainCatalogPort().fetch(key);
+        items.value = await getDomainCatalogPort().listCatalog(key);
       } catch (e) {
         logger.warn("Action: plugins_domain_catalog_fetch_failed", { key, error: String(e) });
         error.value = String(e);

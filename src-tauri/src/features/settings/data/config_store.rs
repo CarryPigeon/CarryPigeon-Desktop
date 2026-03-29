@@ -3,9 +3,91 @@
 //! 约定：注释中文，日志英文（tracing）。
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::Path;
+use std::any::TypeId;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
 
 const CONFIG_FILE: &str = "./config.json";
+
+fn config_write_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn config_temp_path(path: &Path) -> PathBuf {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    path.with_extension(format!("tmp-{}-{}", std::process::id(), stamp))
+}
+
+#[cfg(windows)]
+fn replace_file_windows(src: &Path, dst: &Path) -> std::io::Result<()> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+
+    unsafe extern "system" {
+        fn MoveFileExW(existing: *const u16, new: *const u16, flags: u32) -> i32;
+    }
+
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+
+    fn to_wide(value: &OsStr) -> Vec<u16> {
+        let mut wide: Vec<u16> = value.encode_wide().collect();
+        wide.push(0);
+        wide
+    }
+
+    let src_wide = to_wide(src.as_os_str());
+    let dst_wide = to_wide(dst.as_os_str());
+    let ok = unsafe {
+        MoveFileExW(
+            src_wide.as_ptr(),
+            dst_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if ok != 0 {
+        return Ok(());
+    }
+    Err(std::io::Error::last_os_error())
+}
+
+async fn atomic_write_config(path: &Path, payload: &str) -> anyhow::Result<()> {
+    let tmp = config_temp_path(path);
+    let mut file = tokio::fs::File::create(&tmp)
+        .await
+        .map_err(|error| anyhow::anyhow!("Failed to create temp config file: {}", error))?;
+    file.write_all(payload.as_bytes())
+        .await
+        .map_err(|error| anyhow::anyhow!("Failed to write temp config file: {}", error))?;
+    file.sync_all()
+        .await
+        .map_err(|error| anyhow::anyhow!("Failed to sync temp config file: {}", error))?;
+    drop(file);
+
+    if tokio::fs::rename(&tmp, path).await.is_ok() {
+        return Ok(());
+    }
+    #[cfg(windows)]
+    {
+        replace_file_windows(&tmp, path).map_err(|error| {
+            anyhow::anyhow!("Failed to replace config via MoveFileExW: {}", error)
+        })?;
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        Err(anyhow::anyhow!(
+            "Failed to rename temp config file to target: {}",
+            path.display()
+        ))
+    }
+}
 
 fn default_config_json() -> String {
     serde_json::to_string(&Config::default()).unwrap_or_else(|error| {
@@ -177,11 +259,12 @@ where
 /// - 返回提取后的值；缺失/非法时返回默认值。
 ///
 /// # 说明
-/// - 当前实现约定 `server_list` 的元素为字符串（历史格式）。若元素不是字符串，将返回默认值而不是 panic；
-/// - 若未来需要支持对象结构（`ServerConfig`），建议新增专用 API（例如 `get_server_config`）而不是复用该泛型函数。
+/// - 历史格式：`server_list` 元素为字符串（直接返回字符串值）；
+/// - 对象格式：按类型提取明确字段，`String -> server_socket`、`u32/u64 -> server_port`、
+///   `bool -> enabled/is_enabled/is_default/default`（若字段缺失则回退旧语义）。
 pub async fn get_server_config_value<T>(server_socket: String) -> T
 where
-    T: ConfigValueExtractor<T> + Default,
+    T: ConfigValueExtractor<T> + Default + 'static,
 {
     let config_str = get_config().await;
     let value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
@@ -193,7 +276,19 @@ where
         let list = map.get("server_list").and_then(|v| v.as_array());
         if let Some(list) = list {
             for item in list.iter() {
-                if item.as_str().map(|s| s.trim() == want).unwrap_or(false) {
+                let matched = item
+                    .as_object()
+                    .and_then(|obj| obj.get("server_socket"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim() == want)
+                    .unwrap_or(false)
+                    || item.as_str().map(|s| s.trim() == want).unwrap_or(false);
+                if matched {
+                    if let Some(obj) = item.as_object() {
+                        if let Some(extracted) = extract_server_object_value::<T>(obj) {
+                            return extracted;
+                        }
+                    }
                     return T::extract(item);
                 }
             }
@@ -203,6 +298,30 @@ where
         tracing::error!(action = "settings_config_invalid_json_object");
         T::default()
     }
+}
+
+fn extract_server_object_value<T>(obj: &serde_json::Map<String, Value>) -> Option<T>
+where
+    T: ConfigValueExtractor<T> + Default + 'static,
+{
+    if TypeId::of::<T>() == TypeId::of::<String>() {
+        return obj
+            .get("server_socket")
+            .or_else(|| obj.get("server_name"))
+            .map(T::extract);
+    }
+    if TypeId::of::<T>() == TypeId::of::<u32>() || TypeId::of::<T>() == TypeId::of::<u64>() {
+        return obj.get("server_port").map(T::extract);
+    }
+    if TypeId::of::<T>() == TypeId::of::<bool>() {
+        return obj
+            .get("enabled")
+            .or_else(|| obj.get("is_enabled"))
+            .or_else(|| obj.get("is_default"))
+            .or_else(|| obj.get("default"))
+            .map(T::extract);
+    }
+    None
 }
 
 /// 异步更新配置文件中的指定键值（写回 `config.json`）。
@@ -217,10 +336,11 @@ where
 /// # 说明
 /// - 若配置文件解析失败，会记录错误日志并放弃写入；
 /// - 该函数使用 pretty JSON 写回，便于人工排查与版本管理。
-pub async fn update_config<T>(key: String, value: T)
+pub async fn update_config<T>(key: String, value: T) -> anyhow::Result<()>
 where
     T: ConfigValueExtractor<T> + Default,
 {
+    let _guard = config_write_lock().lock().await;
     tracing::info!(action = "settings_config_updated", key = %key);
     let config_str = get_config().await;
     let mut config_value = serde_json::from_str(&config_str).unwrap_or_else(|e| {
@@ -234,19 +354,18 @@ where
             Ok(serialized) => serialized,
             Err(error) => {
                 tracing::error!(action = "settings_config_serialize_failed", error = %error);
-                return;
+                return Err(anyhow::anyhow!("Failed to serialize config: {}", error));
             }
         };
 
-        if let Err(error) = tokio::fs::write(config_file, data).await {
-            tracing::error!(
-                action = "settings_config_write_failed",
-                path = CONFIG_FILE,
-                error = %error
-            );
+        if let Err(error) = atomic_write_config(config_file, &data).await {
+            tracing::error!(action = "settings_config_write_failed", path = CONFIG_FILE, error = %error);
+            return Err(error);
         }
+        Ok(())
     } else {
         tracing::error!(action = "settings_config_invalid_json_object");
+        Err(anyhow::anyhow!("Invalid config JSON object"))
     }
 }
 
@@ -346,8 +465,8 @@ pub async fn get_server_config_bool(server_socket: String) -> bool {
 ///
 /// # 返回值
 /// 无返回值。
-pub async fn update_config_bool(key: String, value: bool) {
-    update_config::<bool>(key, value).await;
+pub async fn update_config_bool(key: String, value: bool) -> anyhow::Result<()> {
+    update_config::<bool>(key, value).await
 }
 
 /// 写入 u32 类型配置值（顶层字段）。
@@ -358,8 +477,8 @@ pub async fn update_config_bool(key: String, value: bool) {
 ///
 /// # 返回值
 /// 无返回值。
-pub async fn update_config_u32(key: String, value: u32) {
-    update_config::<u32>(key, value).await;
+pub async fn update_config_u32(key: String, value: u32) -> anyhow::Result<()> {
+    update_config::<u32>(key, value).await
 }
 
 /// 写入 u64 类型配置值（顶层字段）。
@@ -370,8 +489,8 @@ pub async fn update_config_u32(key: String, value: u32) {
 ///
 /// # 返回值
 /// 无返回值。
-pub async fn update_config_u64(key: String, value: u64) {
-    update_config::<u64>(key, value).await;
+pub async fn update_config_u64(key: String, value: u64) -> anyhow::Result<()> {
+    update_config::<u64>(key, value).await
 }
 
 /// 写入 string 类型配置值（顶层字段）。
@@ -382,6 +501,6 @@ pub async fn update_config_u64(key: String, value: u64) {
 ///
 /// # 返回值
 /// 无返回值。
-pub async fn update_config_string(key: String, value: String) {
-    update_config::<String>(key, value).await;
+pub async fn update_config_string(key: String, value: String) -> anyhow::Result<()> {
+    update_config::<String>(key, value).await
 }

@@ -6,17 +6,7 @@
 import { computed, ref, type Ref } from "vue";
 import { readJson, writeJson } from "@/shared/utils/localStore";
 import { KEY_REPO_SOURCES } from "@/shared/utils/storageKeys";
-
-/**
- * Repo 源定义（用于拉取 repo 插件目录）。
- */
-export type RepoSource = {
-  id: string;
-  baseUrl: string;
-  enabled: boolean;
-  note?: string;
-  addedAtMs: number;
-};
+import type { RepoSource } from "@/features/plugins/contracts/repoSource";
 
 type StoredRepoSources = {
   repos: RepoSource[];

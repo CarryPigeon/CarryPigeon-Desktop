@@ -12,6 +12,7 @@
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
+import type { DomainCatalogPort } from "@/features/plugins/domain/ports/DomainCatalogPort";
 import type {
   DomainCatalogItem,
   DomainConstraints,
@@ -97,3 +98,10 @@ export async function fetchServerDomainCatalog(serverSocket: string): Promise<Do
 
   return out;
 }
+
+/**
+ * HTTP 版本的 domain 目录端口实现。
+ */
+export const httpDomainCatalogPort: DomainCatalogPort = {
+  listCatalog: fetchServerDomainCatalog,
+};

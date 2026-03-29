@@ -16,6 +16,9 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
+pub use crate::features::plugins::domain::types::{
+    InstalledPluginState, PluginFetchResponse, PluginProvidesDomain, PluginRuntimeEntry,
+};
 
 mod api;
 mod download;
@@ -29,7 +32,9 @@ mod storage;
 mod tls;
 mod unpack;
 
-use api::{fetch_plugin_catalog, fetch_server_id};
+use api::{
+    fetch_plugin_catalog, fetch_server_id, fetch_server_id_with_client, get_cached_server_id,
+};
 use download::download_plugin_zip_bytes;
 use hash::{eq_hash_hex, sha256_hex};
 use origin::to_http_origin;
@@ -40,20 +45,6 @@ use state::{
 };
 use tls::build_server_client;
 use unpack::unpack_plugin_zip;
-
-/// 插件清单中声明的“提供 domain”条目。
-///
-/// # 说明
-/// - 该结构用于对齐前端插件中心的“domain 绑定/渲染”能力；
-/// - 序列化字段使用 `snake_case`，与 `plugin.json` 保持一致。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct PluginProvidesDomain {
-    /// domain id（例如 `Core:Text`）。
-    pub domain: String,
-    /// domain 协议版本（例如 `v1`）。
-    pub domain_version: String,
-}
 
 /// `plugin.json`（V1）清单结构。
 ///
@@ -87,52 +78,6 @@ pub struct PluginManifestV1 {
 
 // current.json/state.json 的结构体与读写逻辑已下沉到 `state` 子模块。
 
-/// 已安装插件的汇总状态（面向前端展示）。
-///
-/// # 说明
-/// - 该结构是“安装目录 + current.json + state.json”的汇总视图；
-/// - 序列化字段使用 `camelCase`，与前端 TS 类型保持一致。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InstalledPluginState {
-    /// 插件 id。
-    pub plugin_id: String,
-    /// 已安装版本列表（目录扫描结果）。
-    pub installed_versions: Vec<String>,
-    /// 当前选择版本（来自 current.json）。
-    pub current_version: Option<String>,
-    /// 是否启用（来自 current.json）。
-    pub enabled: bool,
-    /// 插件状态（例如 `"ok"`/`"failed"`）。
-    pub status: String, // "ok" | "failed"
-    /// 最近一次错误消息（来自 state.json）。
-    pub last_error: String,
-}
-
-/// 插件运行时入口信息（供前端动态 import）。
-///
-/// # 说明
-/// - 前端通过该结构拼装 `app://plugins/...` URL 并加载插件模块；
-/// - 序列化字段使用 `camelCase`，与前端 TS 类型保持一致。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PluginRuntimeEntry {
-    /// 服务端 id（由 `/api/server/id` 返回，用于本地隔离目录）。
-    pub server_id: String,
-    /// 插件 id。
-    pub plugin_id: String,
-    /// 插件版本。
-    pub version: String,
-    /// 入口相对路径（来自 plugin.json）。
-    pub entry: String,
-    /// 宿主最低版本要求（来自 plugin.json）。
-    pub min_host_version: String,
-    /// 权限列表（来自 plugin.json）。
-    pub permissions: Vec<String>,
-    /// 插件提供的 domain 列表（来自 plugin.json）。
-    pub provides_domains: Vec<PluginProvidesDomain>,
-}
-
 // 路径映射、JSON 读写、状态文件管理已下沉到子模块：`paths` / `json_io` / `state`。
 
 /// 列出某个服务端下本地已安装的插件状态列表。
@@ -155,8 +100,7 @@ pub async fn list_installed(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<Vec<InstalledPluginState>> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let base = base_plugins_dir().join(&server_id);
 
     let mut out: Vec<InstalledPluginState> = vec![];
@@ -197,8 +141,7 @@ pub async fn get_installed(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<Option<InstalledPluginState>> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let root = plugin_root_dir(&server_id, plugin_id)?;
     if tokio::fs::metadata(&root).await.is_err() {
         return Ok(None);
@@ -226,8 +169,7 @@ pub async fn get_runtime_entry(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<PluginRuntimeEntry> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let current = read_current(&server_id, plugin_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Plugin is not installed: {}", plugin_id))?;
@@ -253,8 +195,7 @@ pub async fn get_runtime_entry_for_version(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<PluginRuntimeEntry> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let v = version.trim();
     if v.is_empty() {
         return Err(anyhow::anyhow!("Missing version"));
@@ -326,7 +267,11 @@ pub async fn install_from_server_catalog(
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
     let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = if let Some(cached) = get_cached_server_id(&origin).await {
+        cached
+    } else {
+        fetch_server_id_with_client(&origin, &client).await?
+    };
     let catalog = fetch_plugin_catalog(&origin, &client).await?;
 
     let target = catalog
@@ -468,7 +413,11 @@ pub async fn install_from_url(
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
     let server_client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &server_client).await?;
+    let server_id = if let Some(cached) = get_cached_server_id(&origin).await {
+        cached
+    } else {
+        fetch_server_id_with_client(&origin, &server_client).await?
+    };
 
     let id = plugin_id.trim();
     if id.is_empty() {
@@ -581,8 +530,7 @@ pub async fn enable(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let mut current = read_current(&server_id, plugin_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Plugin is not installed: {}", plugin_id))?;
@@ -646,8 +594,7 @@ pub async fn set_failed(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let mut current = read_current(&server_id, plugin_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Plugin is not installed: {}", plugin_id))?;
@@ -685,8 +632,7 @@ pub async fn clear_error(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     write_state_file(
         &server_id,
         plugin_id,
@@ -699,7 +645,7 @@ pub async fn clear_error(
     build_installed_state(&server_id, plugin_id).await
 }
 
-pub use net_fetch::{PluginFetchResponse, network_fetch};
+pub use net_fetch::network_fetch;
 pub use storage::{storage_get, storage_set};
 
 /// 禁用已安装插件。
@@ -719,8 +665,7 @@ pub async fn disable(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let mut current = read_current(&server_id, plugin_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Plugin is not installed: {}", plugin_id))?;
@@ -752,8 +697,7 @@ pub async fn switch_version(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<InstalledPluginState> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let v = version.trim();
     if v.is_empty() {
         return Err(anyhow::anyhow!("Missing version"));
@@ -791,8 +735,7 @@ pub async fn uninstall(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<()> {
     let origin = to_http_origin(server_socket)?;
-    let client = build_server_client(&origin, tls_policy, tls_fingerprint).await?;
-    let server_id = fetch_server_id(&origin, &client).await?;
+    let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
     let root = plugin_root_dir(&server_id, plugin_id)?;
     match tokio::fs::remove_dir_all(&root).await {
         Ok(_) => Ok(()),

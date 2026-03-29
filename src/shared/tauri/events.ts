@@ -10,6 +10,7 @@ import { emit, listen, type Event, type UnlistenFn } from "@tauri-apps/api/event
 export const TAURI_EVENTS = {
   tcpMessage: "tcp-message",
   tcpFrame: "tcp-frame",
+  tcpState: "tcp-state",
   userProfileRequest: "user-profile-request",
   userProfileResponse: "user-profile-response",
 } as const;
@@ -22,6 +23,24 @@ export const TAURI_EVENTS = {
  * - `payload` 为 byte 数组（framed 或 deframed 由事件名决定）。
  */
 export type TcpMessageEvent = { server_socket: string; payload: number[] };
+
+/**
+ * TCP 连接生命周期事件载荷（Rust -> 前端）。
+ *
+ * 说明：
+ * - `state`：连接状态（connected/disconnected/error）；
+ * - `error`：当 `state=error` 时附带的错误摘要（可选）。
+ */
+export type TcpStateEvent = {
+  server_socket: string;
+  /**
+   * Rust 侧连接会话代际 id（同一 socket 每次重连都会变化）。
+   * 旧版本后端可能不提供该字段，因此前端按可选处理。
+   */
+  session_id?: number;
+  state: "connected" | "disconnected" | "error";
+  error?: string;
+};
 
 /**
  * user-profile 请求事件载荷（frontend -> frontend，经由 Tauri event bus）。
@@ -72,6 +91,18 @@ export function listenTcpFrame(
   handler: (event: Event<TcpMessageEvent>) => void,
 ): Promise<UnlistenFn> {
   return listen<TcpMessageEvent>(TAURI_EVENTS.tcpFrame, handler);
+}
+
+/**
+ * 监听 TCP 连接生命周期事件（connected/disconnected/error）。
+ *
+ * @param handler - 事件处理函数。
+ * @returns 取消监听函数（UnlistenFn）。
+ */
+export function listenTcpState(
+  handler: (event: Event<TcpStateEvent>) => void,
+): Promise<UnlistenFn> {
+  return listen<TcpStateEvent>(TAURI_EVENTS.tcpState, handler);
 }
 
 /**

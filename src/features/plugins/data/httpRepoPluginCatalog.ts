@@ -10,19 +10,14 @@
  * - 响应结构期望与 server catalog 兼容（至少包含 `plugins[]`）。
  */
 
-import type { PluginCatalogEntry, PluginDomainPort, PluginPermission } from "@/features/plugins/domain/types/pluginTypes";
+import type { RepoPluginCatalogPort } from "@/features/plugins/domain/ports/RepoPluginCatalogPort";
+import type { PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
 import { CARRY_PIGEON_ACCEPT_V1 } from "@/shared/net/http/apiHeaders";
+import { mapCatalogPluginEntry, type ApiCatalogPluginRecord } from "./pluginCatalogMappers";
+import { createRepoCatalogError } from "./repoCatalogError";
 
 type ApiCatalogResponse = {
-  plugins: Array<{
-    plugin_id: string;
-    name: string;
-    version: string;
-    required?: boolean;
-    permissions?: string[];
-    provides_domains?: Array<{ domain: string; domain_version: string }>;
-    download?: { url?: string; sha256?: string };
-  }>;
+  plugins: ApiCatalogPluginRecord[];
 };
 
 /**
@@ -35,37 +30,6 @@ function toRepoCatalogUrl(repoBase: string): string {
   const base = String(repoBase ?? "").trim().replace(/\/+$/u, "");
   if (!base) return "";
   return `${base}/plugins/catalog`;
-}
-
-/**
- * 将 domain 字符串映射为 UI 颜色 token（策略与 server catalog 一致）。
- *
- * @param domain - Domain 名称。
- * @returns Patchbay CSS 颜色变量之一。
- */
-function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] {
-  const d = domain.trim();
-  if (d.startsWith("Core:")) return "--cp-domain-core";
-  if (!d) return "--cp-domain-unknown";
-
-  let hash = 0;
-  for (let i = 0; i < d.length; i += 1) hash = (hash * 31 + d.charCodeAt(i)) >>> 0;
-  const lane = hash % 3;
-  if (lane === 0) return "--cp-domain-ext-a";
-  if (lane === 1) return "--cp-domain-ext-b";
-  return "--cp-domain-ext-c";
-}
-
-/**
- * 将 permission key 映射为 UI 权限描述。
- *
- * @param key - Permission key。
- * @returns 权限描述对象。
- */
-function mapPermission(key: string): PluginPermission {
-  const k = key.trim();
-  const risk: PluginPermission["risk"] = k === "network" ? "high" : "medium";
-  return { key: k, label: k, risk };
 }
 
 /**
@@ -82,39 +46,27 @@ export async function fetchRepoPluginCatalog(repoBase: string): Promise<PluginCa
     method: "GET",
     headers: { Accept: CARRY_PIGEON_ACCEPT_V1 },
   });
-  if (!res.ok) throw new Error(`Repo catalog request failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    throw createRepoCatalogError("repo_catalog_http_error", `Repo catalog request failed: HTTP ${res.status}`, {
+      status: res.status,
+      url,
+      repoBase,
+    });
+  }
   const raw = (await res.json()) as ApiCatalogResponse;
 
   const out: PluginCatalogEntry[] = [];
   for (const p of raw.plugins ?? []) {
-    const pluginId = String(p.plugin_id ?? "").trim();
-    if (!pluginId) continue;
-
-    const providesDomains: PluginDomainPort[] = [];
-    for (const d of p.provides_domains ?? []) {
-      const domain = String(d.domain ?? "").trim();
-      const domainVersion = String(d.domain_version ?? "").trim();
-      if (!domain) continue;
-      providesDomains.push({ id: domain, label: domain, version: domainVersion || "1.0.0", colorVar: mapDomainColorVar(domain) });
-    }
-
-    const permissions = (p.permissions ?? []).map((x) => mapPermission(String(x)));
-    const downloadUrl = String(p.download?.url ?? "").trim() || undefined;
-
-    out.push({
-      pluginId,
-      name: String(p.name ?? pluginId).trim() || pluginId,
-      tagline: "",
-      description: "",
-      source: "repo",
-      downloadUrl,
-      sha256: String(p.download?.sha256 ?? "").trim(),
-      required: false,
-      versions: [String(p.version ?? "").trim()].filter(Boolean),
-      providesDomains,
-      permissions,
-    });
+    const entry = mapCatalogPluginEntry(p, "repo", false);
+    if (entry) out.push(entry);
   }
 
   return out;
 }
+
+/**
+ * HTTP 版本的 Repo 目录端口实现。
+ */
+export const httpRepoPluginCatalogPort: RepoPluginCatalogPort = {
+  listCatalog: fetchRepoPluginCatalog,
+};

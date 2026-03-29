@@ -12,15 +12,25 @@
  * 插件编辑器（composer）提交给宿主的载荷格式。
  *
  * 说明：
- * - `domain/domain_version` 用于让宿主路由到正确的消息通道/协议处理；
+ * - `domain/domainVersion` 用于让宿主路由到正确的消息通道/协议处理；
  * - `data` 由具体 domain contract 定义（宿主仅透传，不做强校验）；
- * - `reply_to_mid` 用于回复链路（可选）。
+ * - `replyToMessageId` 用于回复链路（可选）。
  */
 export type PluginComposerPayload = {
   domain: string;
-  domain_version: string;
+  domainVersion: string;
   data: unknown;
-  reply_to_mid?: string;
+  replyToMessageId?: string;
+};
+
+/**
+ * 插件运行时对外声明的 domain contract。
+ */
+export type PluginRuntimeContract = {
+  domain: string;
+  domainVersion: string;
+  payloadSchema?: unknown;
+  constraints?: unknown;
 };
 
 /**
@@ -31,10 +41,10 @@ export type PluginComposerPayload = {
  * - 其中 `host.network` 为可选：只有在插件声明并通过宿主校验后才会注入。
  */
 export type PluginContext = {
-  server_socket: string;
-  server_id: string;
-  plugin_id: string;
-  plugin_version: string;
+  serverSocket: string;
+  serverId: string;
+  pluginId: string;
+  pluginVersion: string;
   cid: string;
   uid: string;
   lang: string;
@@ -57,4 +67,3 @@ export type PluginContext = {
     };
   };
 };
-

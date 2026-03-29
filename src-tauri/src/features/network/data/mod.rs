@@ -4,4 +4,5 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 pub mod http;
+pub mod http_client;
 pub mod tcp_real;

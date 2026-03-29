@@ -26,7 +26,7 @@
 
 ### 3) 文档化注释（结构化）
 
-- TS/JSDoc：导出的函数/类型优先使用结构化 JSDoc（`@param` / `@returns`），与 ESLint 规则保持一致。
+- TS/JSDoc：导出的函数/类型优先使用结构化 JSDoc（`@param` / `@returns`），与仓库注释规范保持一致。
 - Rustdoc：优先使用 `# 参数` / `# 返回值` / `# 说明`，并保持中文描述清晰可落地。
 
 ### 4) 冗余代码清理原则
@@ -34,7 +34,14 @@
 - 优先删除“重复实现同一语义”的代码（例如重复 refresh 编排、重复 localStorage key 字符串）。
 - 若暂时无法删除（存在调用方/兼容性），必须在注释中说明“为何保留 + 何时可删”。
 
+### 4.1) 语义命名与公开协议
 
+- 公开 capability、snapshot、outcome、error、lease、scope 的语义约束见：`docs/Feature语义规范.md`。
+- 公开 API 约束见：`docs/Feature API公开约束.md`。
+- 新增 public 方法前，必须先判断其属于：
+  - 查询：`read* / find* / list* / resolve* / is*`
+  - 命令：`set* / select* / activate* / refresh* / ensure* / send* / delete* / retry* / acquire*`
+- 禁止在 public snapshot 中继续放 `Set` / `Map` / 错误类实例 / Vue 响应式对象。
 
 ### 5) Tauri 命令统一标准（Rust）
 

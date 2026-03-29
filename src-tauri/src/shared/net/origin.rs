@@ -10,10 +10,45 @@ use anyhow::Context;
 
 /// 将 URL 端口格式化为 `:port`；若不存在端口则返回空字符串。
 pub(crate) fn port_suffix(u: &reqwest::Url) -> String {
-    match u.port() {
-        Some(p) => format!(":{}", p),
-        None => "".to_string(),
+    u.port().map(|p| format!(":{}", p)).unwrap_or_default()
+}
+
+/// 将 socket 输入映射为可解析的 URL 字符串（尚未归一化 host/port）。
+fn map_socket_to_url_candidate(raw: &str) -> String {
+    if let Some(rest) = raw.strip_prefix("ws://") {
+        return format!("http://{}", rest);
     }
+    if let Some(rest) = raw.strip_prefix("wss://") {
+        return format!("https://{}", rest);
+    }
+    if let Some(rest) = raw.strip_prefix("tcp://") {
+        return format!("http://{}", rest);
+    }
+    if let Some(rest) = raw.strip_prefix("tls://") {
+        return format!("https://{}", rest);
+    }
+    if let Some(rest) = raw.strip_prefix("tls-insecure://") {
+        return format!("https://{}", rest);
+    }
+    if let Some(rest) = raw.strip_prefix("tls-fp://") {
+        // `tls-fp://{fp}@host:port` -> `https://host:port`
+        let addr = rest.split_once('@').map(|x| x.1).unwrap_or(rest);
+        return format!("https://{}", addr);
+    }
+    if raw.starts_with("http://") || raw.starts_with("https://") {
+        return raw.to_string();
+    }
+    format!("https://{}", raw)
+}
+
+/// 将已解析 URL 归一化为 `scheme://host[:port]`。
+fn normalize_origin(url: &reqwest::Url) -> String {
+    format!(
+        "{}://{}{}",
+        url.scheme(),
+        url.host_str().unwrap_or_default(),
+        port_suffix(url)
+    )
 }
 
 /// 将 server socket 映射为 HTTP origin（`http(s)://host:port`）。
@@ -26,31 +61,8 @@ pub(crate) fn to_http_origin(server_socket: &str) -> anyhow::Result<String> {
         return Err(anyhow::anyhow!("Missing server socket"));
     }
 
-    let mapped = if let Some(rest) = raw.strip_prefix("ws://") {
-        format!("http://{}", rest)
-    } else if let Some(rest) = raw.strip_prefix("wss://") {
-        format!("https://{}", rest)
-    } else if let Some(rest) = raw.strip_prefix("tcp://") {
-        format!("http://{}", rest)
-    } else if let Some(rest) = raw.strip_prefix("tls://") {
-        format!("https://{}", rest)
-    } else if let Some(rest) = raw.strip_prefix("tls-insecure://") {
-        format!("https://{}", rest)
-    } else if let Some(rest) = raw.strip_prefix("tls-fp://") {
-        // `tls-fp://{fp}@host:port`
-        let addr = rest.split_once('@').map(|x| x.1).unwrap_or(rest);
-        format!("https://{}", addr)
-    } else if raw.starts_with("http://") || raw.starts_with("https://") {
-        raw.to_string()
-    } else {
-        format!("https://{}", raw)
-    };
+    let mapped = map_socket_to_url_candidate(raw);
 
     let u = reqwest::Url::parse(&mapped).context("Invalid server socket URL")?;
-    Ok(format!(
-        "{}://{}{}",
-        u.scheme(),
-        u.host_str().unwrap_or_default(),
-        port_suffix(&u)
-    ))
+    Ok(normalize_origin(&u))
 }

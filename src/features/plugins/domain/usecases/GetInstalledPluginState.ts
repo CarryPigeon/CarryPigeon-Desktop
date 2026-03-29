@@ -3,14 +3,14 @@
  * @description plugins｜用例：GetInstalledPluginState。
  */
 
-import type { PluginManagerPort } from "../ports/PluginManagerPort";
+import type { PluginInstallQueryPort } from "../ports/PluginInstallQueryPort";
 import type { InstalledPluginState } from "../types/pluginTypes";
 
 /**
  * 用例：获取已安装插件状态。
  */
 export class GetInstalledPluginState {
-  constructor(private readonly manager: PluginManagerPort) {}
+  constructor(private readonly queryPort: PluginInstallQueryPort) {}
 
   /**
    * 执行：查询指定插件在当前 server scope 下的安装状态。
@@ -20,6 +20,6 @@ export class GetInstalledPluginState {
    * @returns 插件安装状态；若未安装则为 `null`。
    */
   execute(serverSocket: string, pluginId: string): Promise<InstalledPluginState | null> {
-    return this.manager.getInstalledState(serverSocket, pluginId);
+    return this.queryPort.getInstalledState(serverSocket, pluginId);
   }
 }

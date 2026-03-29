@@ -2,9 +2,9 @@
  * @fileoverview TCP service provider（依赖倒置）。
  * @description
  * 背景：
- * - `src/shared/net/*` 不应直接依赖 `features/network/*`；
+ * - `src/shared/net/*` 不应直接依赖 `features/server-connection/connectivity/*`；
  * - 但部分基础设施（例如 TCP BaseAPI）需要“按 server socket 获取 TcpService 实例”；
- * - 通过 provider 注入的方式实现依赖倒置：network feature 注册 provider，shared 仅消费。
+ * - 通过 provider 注入的方式实现依赖倒置：server-connection/connectivity 注册 provider，shared 仅消费。
  */
 
 /**
@@ -12,7 +12,7 @@
  */
 export type TcpServiceLike = {
   send(serverSocket: string, payload: string): Promise<void>;
-  sendWithResponse(serverSocket: string, payload: string, onResponse: (raw: unknown) => void): Promise<void>;
+  sendWithResponse(serverSocket: string, payload: string): Promise<unknown>;
 };
 
 /**
@@ -23,7 +23,11 @@ export type TcpServiceProvider = (serverSocket: string) => TcpServiceLike | null
 let provider: TcpServiceProvider | null = null;
 
 /**
- * 注册 TcpService provider（由 network feature 调用）。
+ * 注册 TcpService provider（由 server-connection/connectivity 调用）。
+ *
+ * 说明：
+ * - 建议在 runtime bootstrap 阶段显式注册；
+ * - 停止 runtime 时应回收 provider（例如设为返回 `null`），避免脏引用。
  *
  * @param next - provider 函数。
  */
@@ -44,4 +48,3 @@ export function getTcpService(serverSocket: string): TcpServiceLike | null {
     return null;
   }
 }
-

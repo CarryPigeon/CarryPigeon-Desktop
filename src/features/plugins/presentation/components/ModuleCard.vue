@@ -6,15 +6,23 @@
 
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import type { InstalledPluginState, PluginCatalogEntry, PluginProgress } from "@/features/plugins/domain/types/pluginTypes";
+import { resolveLatestPluginCatalogVersion } from "@/features/plugins/domain/types/pluginTypes";
+import type {
+  InstalledPluginStateLike,
+  PluginCatalogEntryLike,
+  PluginProgress,
+} from "@/features/plugins/domain/types/pluginTypes";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import ModuleProgress from "./ModuleProgress.vue";
+type PluginCatalogViewEntry = PluginCatalogEntryLike;
+type InstalledStateView = InstalledPluginStateLike;
+type PluginProgressView = PluginProgress;
 
 const props = defineProps<{
-  plugin: PluginCatalogEntry;
-  installed: InstalledPluginState | null;
-  progress: PluginProgress | null;
+  plugin: PluginCatalogViewEntry;
+  installed: InstalledStateView | null;
+  progress: PluginProgressView | null;
   focused?: boolean;
   hasUpdate?: boolean;
   disabled?: boolean;
@@ -63,6 +71,24 @@ function computeIsFailed(): boolean {
 
 const isFailed = computed(computeIsFailed);
 
+/**
+ * 计算卡片展示的版本号。
+ *
+ * 规则：
+ * - 已安装时显示当前版本；
+ * - 未安装时显示目录中的最新版本。
+ *
+ * @returns 版本文本；缺失时返回 `"—"`。
+ */
+function computeDisplayVersion(): string {
+  const installed = String(props.installed?.currentVersion ?? "").trim();
+  if (installed) return installed;
+  const latest = resolveLatestPluginCatalogVersion(props.plugin);
+  return latest || "—";
+}
+
+const displayVersion = computed(computeDisplayVersion);
+
 const { t } = useI18n();
 
 /**
@@ -89,9 +115,7 @@ function domainColor(colorVar: string): string {
         <div class="cp-module-card__name">{{ props.plugin.name }}</div>
         <div class="cp-module-card__version">
           <span class="cp-module-card__versionLabel">v</span>
-          <span class="cp-module-card__versionValue">{{
-            props.installed?.currentVersion || props.plugin.versions[0] || "—"
-          }}</span>
+          <span class="cp-module-card__versionValue">{{ displayVersion }}</span>
         </div>
       </div>
       <div class="cp-module-card__badges">
