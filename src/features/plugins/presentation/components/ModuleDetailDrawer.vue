@@ -6,15 +6,21 @@
 
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import type { InstalledPluginState, PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
+import { resolveLatestPluginCatalogVersion } from "@/features/plugins/domain/types/pluginTypes";
+import type {
+  InstalledPluginStateLike,
+  PluginCatalogEntryLike,
+} from "@/features/plugins/domain/types/pluginTypes";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+type PluginCatalogViewEntry = PluginCatalogEntryLike;
+type InstalledStateView = InstalledPluginStateLike;
 
 const props = withDefaults(
   defineProps<{
     open: boolean;
-    plugin: PluginCatalogEntry | null;
-    installed: InstalledPluginState | null;
+    plugin: PluginCatalogViewEntry | null;
+    installed: InstalledStateView | null;
     hasUpdate?: boolean;
     disabled?: boolean;
     disabledReason?: string;
@@ -112,6 +118,19 @@ function computeDomainLabelsText(): string {
 }
 
 const domainLabelsText = computed(computeDomainLabelsText);
+
+/**
+ * 计算“安装”按钮默认使用的最新版本号。
+ *
+ * @returns 最新版本号；缺失时返回空字符串。
+ */
+function computeInstallLatestVersion(): string {
+  const plugin = props.plugin;
+  if (!plugin) return "";
+  return resolveLatestPluginCatalogVersion(plugin);
+}
+
+const installLatestVersion = computed(computeInstallLatestVersion);
 
 const { t } = useI18n();
 
@@ -236,7 +255,7 @@ function handleClose(): void {
           class="cp-drawer__btn primary"
           type="button"
           :disabled="locked"
-          @click="emit('install', props.plugin.versions[0] || '')"
+          @click="emit('install', installLatestVersion)"
         >
           {{ t("install") }}
         </button>

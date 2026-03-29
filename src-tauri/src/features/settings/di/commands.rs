@@ -1,8 +1,9 @@
 //! settings｜DI/命令入口：commands。
 //!
 //! 约定：注释中文，日志英文（tracing）。
+use crate::features::settings::data::config_store_port_adapter::ConfigStorePortAdapter;
 use crate::features::settings::usecases::config_usecases;
-use crate::shared::error::CommandResult;
+use crate::shared::error::{CommandResult, to_command_error};
 
 /// 获取应用配置文件的原始 JSON 字符串。
 ///
@@ -10,7 +11,9 @@ use crate::shared::error::CommandResult;
 /// 返回配置文件内容；若文件不存在会自动初始化为默认配置并返回默认值。
 #[tauri::command]
 pub async fn get_config() -> CommandResult<String> {
-    Ok(config_usecases::get_config().await)
+    config_usecases::get_config(ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_CONFIG_FAILED", e))
 }
 
 /// 读取 bool 类型配置值（顶层字段）。
@@ -22,7 +25,9 @@ pub async fn get_config() -> CommandResult<String> {
 /// 返回 bool；缺失/非法时返回默认值（false）。
 #[tauri::command]
 pub async fn get_config_bool(key: String) -> CommandResult<bool> {
-    Ok(config_usecases::get_config_bool(key).await)
+    config_usecases::get_config_bool(key, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_CONFIG_BOOL_FAILED", e))
 }
 
 /// 读取 u32 类型配置值（顶层字段）。
@@ -34,7 +39,9 @@ pub async fn get_config_bool(key: String) -> CommandResult<bool> {
 /// 返回 u32；缺失/非法时返回默认值（0）。
 #[tauri::command]
 pub async fn get_config_u32(key: String) -> CommandResult<u32> {
-    Ok(config_usecases::get_config_u32(key).await)
+    config_usecases::get_config_u32(key, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_CONFIG_U32_FAILED", e))
 }
 
 /// 读取 u64 类型配置值（顶层字段）。
@@ -46,7 +53,9 @@ pub async fn get_config_u32(key: String) -> CommandResult<u32> {
 /// 返回 u64；缺失/非法时返回默认值（0）。
 #[tauri::command]
 pub async fn get_config_u64(key: String) -> CommandResult<u64> {
-    Ok(config_usecases::get_config_u64(key).await)
+    config_usecases::get_config_u64(key, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_CONFIG_U64_FAILED", e))
 }
 
 /// 读取 string 类型配置值（顶层字段）。
@@ -58,7 +67,9 @@ pub async fn get_config_u64(key: String) -> CommandResult<u64> {
 /// 返回 string；缺失/非法时返回默认值（空字符串）。
 #[tauri::command]
 pub async fn get_config_string(key: String) -> CommandResult<String> {
-    Ok(config_usecases::get_config_string(key).await)
+    config_usecases::get_config_string(key, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_CONFIG_STRING_FAILED", e))
 }
 
 /// 读取与 server_socket 相关的 string 值（历史 API）。
@@ -70,7 +81,9 @@ pub async fn get_config_string(key: String) -> CommandResult<String> {
 /// 返回 string；缺失/非法时返回默认值（空字符串）。
 #[tauri::command]
 pub async fn get_server_config_string(server_socket: String) -> CommandResult<String> {
-    Ok(config_usecases::get_server_config_string(server_socket).await)
+    config_usecases::get_server_config_string(server_socket, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_SERVER_CONFIG_STRING_FAILED", e))
 }
 
 /// 读取与 server_socket 相关的 u32 值（历史 API）。
@@ -82,7 +95,9 @@ pub async fn get_server_config_string(server_socket: String) -> CommandResult<St
 /// 返回 u32；缺失/非法时返回默认值（0）。
 #[tauri::command]
 pub async fn get_server_config_u32(server_socket: String) -> CommandResult<u32> {
-    Ok(config_usecases::get_server_config_u32(server_socket).await)
+    config_usecases::get_server_config_u32(server_socket, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_SERVER_CONFIG_U32_FAILED", e))
 }
 
 /// 读取与 server_socket 相关的 u64 值（历史 API）。
@@ -94,7 +109,9 @@ pub async fn get_server_config_u32(server_socket: String) -> CommandResult<u32> 
 /// 返回 u64；缺失/非法时返回默认值（0）。
 #[tauri::command]
 pub async fn get_server_config_u64(server_socket: String) -> CommandResult<u64> {
-    Ok(config_usecases::get_server_config_u64(server_socket).await)
+    config_usecases::get_server_config_u64(server_socket, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_SERVER_CONFIG_U64_FAILED", e))
 }
 
 /// 读取与 server_socket 相关的 bool 值（历史 API）。
@@ -106,7 +123,9 @@ pub async fn get_server_config_u64(server_socket: String) -> CommandResult<u64> 
 /// 返回 bool；缺失/非法时返回默认值（false）。
 #[tauri::command]
 pub async fn get_server_config_bool(server_socket: String) -> CommandResult<bool> {
-    Ok(config_usecases::get_server_config_bool(server_socket).await)
+    config_usecases::get_server_config_bool(server_socket, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_GET_SERVER_CONFIG_BOOL_FAILED", e))
 }
 
 /// 写入 bool 类型配置值（顶层字段）。
@@ -119,8 +138,9 @@ pub async fn get_server_config_bool(server_socket: String) -> CommandResult<bool
 /// 无返回值。
 #[tauri::command]
 pub async fn update_config_bool(key: String, value: bool) -> CommandResult<()> {
-    config_usecases::update_config_bool(key, value).await;
-    Ok(())
+    config_usecases::update_config_bool(key, value, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_UPDATE_CONFIG_BOOL_FAILED", e))
 }
 
 /// 写入 u32 类型配置值（顶层字段）。
@@ -133,8 +153,9 @@ pub async fn update_config_bool(key: String, value: bool) -> CommandResult<()> {
 /// 无返回值。
 #[tauri::command]
 pub async fn update_config_u32(key: String, value: u32) -> CommandResult<()> {
-    config_usecases::update_config_u32(key, value).await;
-    Ok(())
+    config_usecases::update_config_u32(key, value, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_UPDATE_CONFIG_U32_FAILED", e))
 }
 
 /// 写入 u64 类型配置值（顶层字段）。
@@ -147,8 +168,9 @@ pub async fn update_config_u32(key: String, value: u32) -> CommandResult<()> {
 /// 无返回值。
 #[tauri::command]
 pub async fn update_config_u64(key: String, value: u64) -> CommandResult<()> {
-    config_usecases::update_config_u64(key, value).await;
-    Ok(())
+    config_usecases::update_config_u64(key, value, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_UPDATE_CONFIG_U64_FAILED", e))
 }
 
 /// 写入 string 类型配置值（顶层字段）。
@@ -161,6 +183,7 @@ pub async fn update_config_u64(key: String, value: u64) -> CommandResult<()> {
 /// 无返回值。
 #[tauri::command]
 pub async fn update_config_string(key: String, value: String) -> CommandResult<()> {
-    config_usecases::update_config_string(key, value).await;
-    Ok(())
+    config_usecases::update_config_string(key, value, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_UPDATE_CONFIG_STRING_FAILED", e))
 }

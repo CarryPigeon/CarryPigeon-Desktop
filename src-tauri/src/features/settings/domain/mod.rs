@@ -5,3 +5,4 @@
 //! 约定：注释中文，日志英文（tracing）。
 // Domain layer for the settings feature.
 // Keep this free of Tauri/IO dependencies.
+pub mod ports;

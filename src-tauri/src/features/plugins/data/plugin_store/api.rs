@@ -6,7 +6,12 @@
 
 use anyhow::Context;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::OnceLock;
+use tokio::sync::RwLock;
 
+use super::paths::base_plugins_dir;
+use super::tls::build_server_client;
 use crate::shared::net::headers::API_ACCEPT_V1;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -36,10 +41,57 @@ pub(super) struct ApiDownload {
     pub(super) sha256: String,
 }
 
-pub(super) async fn fetch_server_id(
-    origin: &str,
-    client: &reqwest::Client,
-) -> anyhow::Result<String> {
+type ServerIdCache = HashMap<String, String>;
+static SERVER_ID_CACHE: OnceLock<RwLock<ServerIdCache>> = OnceLock::new();
+
+fn server_id_cache() -> &'static RwLock<ServerIdCache> {
+    SERVER_ID_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn server_id_cache_file() -> std::path::PathBuf {
+    base_plugins_dir().join("server-id-cache.json")
+}
+
+async fn read_server_id_cache_file() -> ServerIdCache {
+    let path = server_id_cache_file();
+    let raw = match tokio::fs::read_to_string(&path).await {
+        Ok(v) => v,
+        Err(_) => return HashMap::new(),
+    };
+    serde_json::from_str::<ServerIdCache>(&raw).unwrap_or_default()
+}
+
+async fn persist_server_id_cache_file(cache: &ServerIdCache) {
+    let path = server_id_cache_file();
+    if let Some(parent) = path.parent() {
+        let _ = tokio::fs::create_dir_all(parent).await;
+    }
+    if let Ok(raw) = serde_json::to_string_pretty(cache) {
+        let _ = tokio::fs::write(path, raw).await;
+    }
+}
+
+pub(super) async fn get_cached_server_id(origin: &str) -> Option<String> {
+    let key = origin.trim().to_string();
+    if key.is_empty() {
+        return None;
+    }
+    if let Some(cached) = server_id_cache().read().await.get(&key).cloned() {
+        return Some(cached);
+    }
+    let file_cache = read_server_id_cache_file().await;
+    let cached = file_cache.get(&key).cloned();
+    if let Some(ref server_id) = cached {
+        server_id_cache()
+            .write()
+            .await
+            .insert(key, server_id.clone());
+    }
+    cached
+}
+
+async fn fetch_server_id_network(origin: &str, client: &reqwest::Client) -> anyhow::Result<String> {
+    let key = origin.trim().to_string();
     let url = format!("{}/api/server", origin);
     let res = client
         .get(url)
@@ -57,7 +109,39 @@ pub(super) async fn fetch_server_id(
     if id.is_empty() {
         return Err(anyhow::anyhow!("Missing server_id in /api/server response"));
     }
+
+    if !key.is_empty() {
+        server_id_cache()
+            .write()
+            .await
+            .insert(key.clone(), id.clone());
+        let mut file_cache = read_server_id_cache_file().await;
+        file_cache.insert(key, id.clone());
+        persist_server_id_cache_file(&file_cache).await;
+    }
     Ok(id)
+}
+
+pub(super) async fn fetch_server_id_with_client(
+    origin: &str,
+    client: &reqwest::Client,
+) -> anyhow::Result<String> {
+    if let Some(cached) = get_cached_server_id(origin).await {
+        return Ok(cached);
+    }
+    fetch_server_id_network(origin, client).await
+}
+
+pub(super) async fn fetch_server_id(
+    origin: &str,
+    tls_policy: Option<&str>,
+    tls_fingerprint: Option<&str>,
+) -> anyhow::Result<String> {
+    if let Some(cached) = get_cached_server_id(origin).await {
+        return Ok(cached);
+    }
+    let client = build_server_client(origin, tls_policy, tls_fingerprint).await?;
+    fetch_server_id_network(origin, &client).await
 }
 
 pub(super) async fn fetch_plugin_catalog(

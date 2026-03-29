@@ -4,14 +4,33 @@
  */
 
 import { selectByMockMode } from "@/shared/config/mockModeSelector";
-import { mockPluginManager } from "@/features/plugins/mock/mockPluginManager";
-import { hybridPluginManager } from "@/features/plugins/data/hybridPluginManager";
-import { protocolMockPluginManager } from "@/features/plugins/data/protocolMockPluginManager";
-import type { PluginManagerPort } from "../domain/ports/PluginManagerPort";
+import {
+  mockPluginInstallQueryAdapter,
+  mockPluginLifecycleCommandAdapter,
+} from "@/features/plugins/mock/mockPluginManager";
+import {
+  tauriPluginInstallQueryAdapter,
+  tauriPluginLifecycleCommandAdapter,
+} from "@/features/plugins/data/tauriPluginManager";
+import type { PluginInstallQueryPort } from "../domain/ports/PluginInstallQueryPort";
+import type { PluginLifecycleCommandPort } from "../domain/ports/PluginLifecycleCommandPort";
+import type { PluginCatalogPort } from "../domain/ports/PluginCatalogPort";
 import type { RepoPluginCatalogPort } from "../domain/ports/RepoPluginCatalogPort";
 import type { DomainCatalogPort } from "../domain/ports/DomainCatalogPort";
-import { repoPluginCatalogPort } from "../data/repoPluginCatalogPort";
-import { domainCatalogPort } from "../data/domainCatalogPort";
+import type {
+  PluginsRuntimeLifecycleAccess,
+  PluginsRuntimeStateAccess,
+  PluginsWorkspaceStateAccess,
+} from "../contracts/featureStateAccess";
+import { httpServerPluginCatalogPort } from "../data/httpPluginCatalog";
+import { mockPluginCatalogPort } from "../mock/mockPluginCatalogPort";
+import { httpRepoPluginCatalogPort } from "../data/httpRepoPluginCatalog";
+import { httpDomainCatalogPort } from "../data/httpDomainCatalog";
+import {
+  createPluginsRuntimeLifecycleAccess as createPluginsRuntimeLifecycleAccessAdapter,
+  createPluginsRuntimeStateAccess as createPluginsRuntimeStateAccessAdapter,
+  createPluginsWorkspaceStateAccess as createPluginsWorkspaceStateAccessAdapter,
+} from "../presentation/store/featureStateAccess";
 
 // 用例
 import { ListPluginCatalog } from "../domain/usecases/ListPluginCatalog";
@@ -20,36 +39,66 @@ import { GetInstalledPluginState } from "../domain/usecases/GetInstalledPluginSt
 import { InstallPlugin } from "../domain/usecases/InstallPlugin";
 import { SwitchPluginVersion } from "../domain/usecases/SwitchPluginVersion";
 import { EnablePlugin } from "../domain/usecases/EnablePlugin";
-import { DisablePlugin } from "../domain/usecases/DisablePlugin";
-import { UninstallPlugin } from "../domain/usecases/UninstallPlugin";
 import { ApplyPluginRuntimeOps } from "../domain/usecases/ApplyPluginRuntimeOps";
 
-let pluginManager: PluginManagerPort | null = null;
-let repoCatalog: RepoPluginCatalogPort | null = null;
-let domainCatalog: DomainCatalogPort | null = null;
+let pluginInstallQueryPort: PluginInstallQueryPort | null = null;
+let pluginLifecycleCommandPort: PluginLifecycleCommandPort | null = null;
+let pluginCatalogPort: PluginCatalogPort | null = null;
+let repoCatalogPort: RepoPluginCatalogPort | null = null;
+let domainCatalogPort: DomainCatalogPort | null = null;
+let pluginsRuntimeLifecycleAccess: PluginsRuntimeLifecycleAccess | null = null;
 
 // ============================================================================
 // Ports
 // ============================================================================
 
 /**
- * 获取单例 `PluginManagerPort`。
+ * 获取插件安装态查询端口（单例）。
  *
- * 选择规则：
- * - `USE_MOCK_TRANSPORT=true`：使用协议层 mock（模拟端到端协议但不依赖真实服务端）。
- * - `IS_STORE_MOCK=true`：使用内存 mock（用于 UI 预览/开发联调）。
- * - 其它情况：使用混合实现（通常为真实数据源）。
- *
- * @returns `PluginManagerPort` 实例。
+ * @returns `PluginInstallQueryPort` 实例。
  */
-export function getPluginManagerPort(): PluginManagerPort {
-  if (pluginManager) return pluginManager;
-  pluginManager = selectByMockMode<PluginManagerPort>({
-    off: () => hybridPluginManager,
-    store: () => mockPluginManager,
-    protocol: () => protocolMockPluginManager,
+export function getPluginInstallQueryPort(): PluginInstallQueryPort {
+  if (pluginInstallQueryPort) return pluginInstallQueryPort;
+  pluginInstallQueryPort = selectByMockMode<PluginInstallQueryPort>({
+    off: () => tauriPluginInstallQueryAdapter,
+    store: () => mockPluginInstallQueryAdapter,
+    protocol: () => mockPluginInstallQueryAdapter,
   });
-  return pluginManager;
+  return pluginInstallQueryPort;
+}
+
+/**
+ * 获取插件生命周期命令端口（单例）。
+ *
+ * @returns `PluginLifecycleCommandPort` 实例。
+ */
+export function getPluginLifecycleCommandPort(): PluginLifecycleCommandPort {
+  if (pluginLifecycleCommandPort) return pluginLifecycleCommandPort;
+  pluginLifecycleCommandPort = selectByMockMode<PluginLifecycleCommandPort>({
+    off: () => tauriPluginLifecycleCommandAdapter,
+    store: () => mockPluginLifecycleCommandAdapter,
+    protocol: () => mockPluginLifecycleCommandAdapter,
+  });
+  return pluginLifecycleCommandPort;
+}
+
+/**
+ * 获取插件目录查询端口（单例）。
+ *
+ * 说明：
+ * - 用于承载 catalog 的只读查询能力，避免与命令端口耦合；
+ * - `store` mock 模式使用独立 mock catalog 端口。
+ *
+ * @returns `PluginCatalogPort` 实例。
+ */
+export function getPluginCatalogPort(): PluginCatalogPort {
+  if (pluginCatalogPort) return pluginCatalogPort;
+  pluginCatalogPort = selectByMockMode<PluginCatalogPort>({
+    off: () => httpServerPluginCatalogPort,
+    protocol: () => httpServerPluginCatalogPort,
+    store: () => mockPluginCatalogPort,
+  });
+  return pluginCatalogPort;
 }
 
 /**
@@ -58,10 +107,10 @@ export function getPluginManagerPort(): PluginManagerPort {
  * @returns RepoPluginCatalogPort 实例。
  */
 export function getRepoPluginCatalogPort(): RepoPluginCatalogPort {
-  if (repoCatalog) return repoCatalog;
+  if (repoCatalogPort) return repoCatalogPort;
   // repo catalog 当前仅提供 HTTP fetch 实现；mock 模式下也允许请求（用于本地测试）。
-  repoCatalog = repoPluginCatalogPort;
-  return repoCatalog;
+  repoCatalogPort = httpRepoPluginCatalogPort;
+  return repoCatalogPort;
 }
 
 /**
@@ -70,9 +119,40 @@ export function getRepoPluginCatalogPort(): RepoPluginCatalogPort {
  * @returns DomainCatalogPort 实例。
  */
 export function getDomainCatalogPort(): DomainCatalogPort {
-  if (domainCatalog) return domainCatalog;
-  domainCatalog = domainCatalogPort;
-  return domainCatalog;
+  if (domainCatalogPort) return domainCatalogPort;
+  domainCatalogPort = httpDomainCatalogPort;
+  return domainCatalogPort;
+}
+
+/**
+ * 获取 plugins feature runtime 生命周期访问契约。
+ *
+ * @returns runtime 生命周期访问器。
+ */
+export function getPluginsRuntimeLifecycleAccess(): PluginsRuntimeLifecycleAccess {
+  if (pluginsRuntimeLifecycleAccess) return pluginsRuntimeLifecycleAccess;
+  pluginsRuntimeLifecycleAccess = createPluginsRuntimeLifecycleAccessAdapter();
+  return pluginsRuntimeLifecycleAccess;
+}
+
+/**
+ * 创建某个 server 作用域下的 workspace 状态访问器。
+ *
+ * @param serverSocket - 目标 server socket。
+ * @returns workspace 状态访问器。
+ */
+export function createPluginsWorkspaceStateAccess(serverSocket: string): PluginsWorkspaceStateAccess {
+  return createPluginsWorkspaceStateAccessAdapter(serverSocket);
+}
+
+/**
+ * 创建某个 server 作用域下的 runtime 状态访问器。
+ *
+ * @param serverSocket - 目标 server socket。
+ * @returns runtime 状态访问器。
+ */
+export function createPluginsRuntimeStateAccess(serverSocket: string): PluginsRuntimeStateAccess {
+  return createPluginsRuntimeStateAccessAdapter(serverSocket);
 }
 
 // ============================================================================
@@ -85,7 +165,7 @@ export function getDomainCatalogPort(): DomainCatalogPort {
  * @returns `ListPluginCatalog` 实例。
  */
 export function getListPluginCatalogUsecase(): ListPluginCatalog {
-  return new ListPluginCatalog(getPluginManagerPort());
+  return new ListPluginCatalog(getPluginCatalogPort());
 }
 
 /**
@@ -94,7 +174,7 @@ export function getListPluginCatalogUsecase(): ListPluginCatalog {
  * @returns `ListInstalledPlugins` 实例。
  */
 export function getListInstalledPluginsUsecase(): ListInstalledPlugins {
-  return new ListInstalledPlugins(getPluginManagerPort());
+  return new ListInstalledPlugins(getPluginInstallQueryPort());
 }
 
 /**
@@ -103,7 +183,7 @@ export function getListInstalledPluginsUsecase(): ListInstalledPlugins {
  * @returns `GetInstalledPluginState` 实例。
  */
 export function getGetInstalledPluginStateUsecase(): GetInstalledPluginState {
-  return new GetInstalledPluginState(getPluginManagerPort());
+  return new GetInstalledPluginState(getPluginInstallQueryPort());
 }
 
 /**
@@ -112,7 +192,7 @@ export function getGetInstalledPluginStateUsecase(): GetInstalledPluginState {
  * @returns `InstallPlugin` 实例。
  */
 export function getInstallPluginUsecase(): InstallPlugin {
-  return new InstallPlugin(getPluginManagerPort());
+  return new InstallPlugin(getPluginLifecycleCommandPort());
 }
 
 /**
@@ -121,7 +201,7 @@ export function getInstallPluginUsecase(): InstallPlugin {
  * @returns `SwitchPluginVersion` 实例。
  */
 export function getSwitchPluginVersionUsecase(): SwitchPluginVersion {
-  return new SwitchPluginVersion(getPluginManagerPort());
+  return new SwitchPluginVersion(getPluginLifecycleCommandPort());
 }
 
 /**
@@ -130,25 +210,7 @@ export function getSwitchPluginVersionUsecase(): SwitchPluginVersion {
  * @returns `EnablePlugin` 实例。
  */
 export function getEnablePluginUsecase(): EnablePlugin {
-  return new EnablePlugin(getPluginManagerPort());
-}
-
-/**
- * 获取 `DisablePlugin` 用例实例。
- *
- * @returns `DisablePlugin` 实例。
- */
-export function getDisablePluginUsecase(): DisablePlugin {
-  return new DisablePlugin(getPluginManagerPort());
-}
-
-/**
- * 获取 `UninstallPlugin` 用例实例。
- *
- * @returns `UninstallPlugin` 实例。
- */
-export function getUninstallPluginUsecase(): UninstallPlugin {
-  return new UninstallPlugin(getPluginManagerPort());
+  return new EnablePlugin(getPluginLifecycleCommandPort());
 }
 
 /**
@@ -160,5 +222,5 @@ export function getUninstallPluginUsecase(): UninstallPlugin {
 export function getApplyPluginRuntimeOpsUsecase(
   runtime: ConstructorParameters<typeof ApplyPluginRuntimeOps>[1],
 ): ApplyPluginRuntimeOps {
-  return new ApplyPluginRuntimeOps(getPluginManagerPort(), runtime);
+  return new ApplyPluginRuntimeOps(getPluginLifecycleCommandPort(), runtime);
 }

@@ -3,14 +3,14 @@
  * @description plugins｜用例：ListInstalledPlugins。
  */
 
-import type { PluginManagerPort } from "../ports/PluginManagerPort";
+import type { PluginInstallQueryPort } from "../ports/PluginInstallQueryPort";
 import type { InstalledPluginState } from "../types/pluginTypes";
 
 /**
  * 用例：列出已安装插件。
  */
 export class ListInstalledPlugins {
-  constructor(private readonly manager: PluginManagerPort) {}
+  constructor(private readonly queryPort: PluginInstallQueryPort) {}
 
   /**
    * 执行：列出当前 server scope 下所有已安装插件状态。
@@ -19,6 +19,6 @@ export class ListInstalledPlugins {
    * @returns 已安装插件状态列表。
    */
   execute(serverSocket: string): Promise<InstalledPluginState[]> {
-    return this.manager.listInstalled(serverSocket);
+    return this.queryPort.listInstalled(serverSocket);
   }
 }

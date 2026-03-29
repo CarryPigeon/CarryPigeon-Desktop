@@ -15,7 +15,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::features::network::init_tcp_service;
+use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -24,17 +24,18 @@ use crate::features::plugins::data::plugin_store;
 /// # 返回值
 /// 当 Builder 组装或初始化失败时返回错误。
 pub fn run() -> anyhow::Result<()> {
+    // Tauri Builder 组装
     tauri::Builder::default()
-        .register_uri_scheme_protocol("app", |_, req| match handle_app_scheme(req) {
-            Ok(res) => res,
-            Err(e) => {
-                tracing::warn!(action = "app_scheme_handler_failed", error = %e);
-                build_http_response(500, None, Vec::new())
-            }
-        })
+        // 注册自定义 scheme 处理器，安全地加载本地插件静态资源（如 JS/CSS），避免直接暴露文件系统路径。
+        .register_uri_scheme_protocol("app", |_, req| handle_app_scheme(req).unwrap_or_else(|e| {
+            tracing::warn!(action = "app_scheme_handler_failed", error = %e);
+            build_http_response(500, None, Vec::new())
+        }))
+        // 初始化应用（托盘、全局事件等）
         .setup(|app| {
-            init_tcp_service();
-
+            // 初始化 TCP 注册表服务（用于命令层注入）。
+            app.manage(TcpRegistryService::new());
+            // 获取默认窗口图标，作为托盘图标使用（确保应用资源中已设置默认图标）
             let tray_icon = app
                 .default_window_icon()
                 .cloned()
@@ -95,6 +96,7 @@ pub fn run() -> anyhow::Result<()> {
             }
         })
         .plugin(tauri_plugin_opener::init())
+        // 注册对外暴露的事件钩子
         .invoke_handler(tauri::generate_handler![
             // windows
             crate::features::windows::di::commands::to_chat_window_size,
@@ -102,8 +104,8 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::windows::di::commands::open_info_window,
             // network
             crate::features::network::di::commands::send_tcp_service,
-            crate::features::network::di::commands::listen_tcp_service,
             crate::features::network::di::commands::add_tcp_service,
+            crate::features::network::di::commands::remove_tcp_service,
             crate::features::network::di::commands::api_request_json,
             // db
             crate::shared::db::commands::db_init,

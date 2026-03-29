@@ -114,6 +114,17 @@
   gap: 10px;
 }
 
+.cp-rail__empty {
+  margin: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.26);
+  background: var(--cp-panel-muted);
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  line-height: 1.45;
+}
+
 /* 栏按钮：胶囊形导航按钮 */
 .cp-rail__btn {
   border: 1px solid var(--cp-border);
@@ -346,34 +357,6 @@
   line-height: 1.45;
 }
 
-/* 旧版频道按钮（保留用于后续重构对比） */
-.cp-channel {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  color: color-mix(in oklab, var(--cp-text) 82%, transparent);
-  border-radius: 16px;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* 旧版频道按钮：悬停态 */
-.cp-channel:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-highlight) 30%, var(--cp-border));
-}
-
-/* 旧版频道按钮：激活态 */
-.cp-channel[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: color-mix(in oklab, var(--cp-highlight) 10%, var(--cp-panel));
-}
-
 /* 频道端口点（使用 highlight 颜色） */
 .cp-channel__port {
   width: 10px;
@@ -551,13 +534,6 @@
   text-transform: uppercase;
   font-size: 12px;
   color: var(--cp-text-muted);
-}
-
-/* 顶部控制台提示文本 */
-.cp-topConsole__hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: color-mix(in oklab, var(--cp-text-muted) 82%, transparent);
 }
 
 .cp-topConsole__left {
@@ -848,15 +824,6 @@
   grid-template-columns: auto 1fr;
   gap: 10px;
   align-items: center;
-}
-
-/* 成员端口点 */
-.cp-member__port {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.62);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
 }
 
 /* 成员名称（省略） */

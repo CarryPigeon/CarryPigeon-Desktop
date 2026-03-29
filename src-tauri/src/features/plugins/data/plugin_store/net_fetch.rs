@@ -6,27 +6,9 @@
 //! - TLS 策略（自签/指纹）与服务端一致，以保证在受控环境下可用。
 
 use anyhow::Context;
-use serde::Serialize;
+use crate::features::plugins::domain::types::PluginFetchResponse;
 
 use super::{download::is_same_origin, origin::to_http_origin, tls::build_server_client};
-
-/// 插件侧受控网络请求的返回封包。
-///
-/// # 说明
-/// - 该结构会序列化返回给前端（Tauri command），用于插件 runtime 的 `network.fetch()` API。
-/// - `body_text` 为响应体文本（best-effort）；二进制内容可由上层按需约定编码。
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PluginFetchResponse {
-    /// 是否为 2xx 成功响应。
-    pub ok: bool,
-    /// HTTP 状态码。
-    pub status: u16,
-    /// 响应体文本（best-effort）。
-    pub body_text: String,
-    /// 响应头（已转换为字符串）。
-    pub headers: std::collections::HashMap<String, String>,
-}
 
 /// 以“同源限制”发起受控 HTTP 请求。
 ///

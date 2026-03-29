@@ -6,6 +6,26 @@
 import type { Router } from "vue-router";
 
 /**
+ * 提取各类 profile 相关子窗口共享的 query 字段。
+ */
+function buildCommonProfileQuery(searchParams: URLSearchParams): Record<string, string> {
+  return {
+    avatar: searchParams.get("avatar") ?? "",
+    name: searchParams.get("name") ?? "",
+    bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
+  };
+}
+
+function replaceSubWindowRoute(
+  router: Router,
+  path: string,
+  query: Record<string, string>,
+): boolean {
+  void router.replace({ path, query });
+  return true;
+}
+
+/**
  * 当当前 WebView 以“辅助窗口”启动时，将其路由到对应页面。
  *
  * @param router - 应用路由实例。
@@ -14,65 +34,34 @@ import type { Router } from "vue-router";
  */
 export function routeIfSubWindow(router: Router, searchParams: URLSearchParams): boolean {
   const windowType = searchParams.get("window");
-  const isSubWindow = Boolean(windowType);
   if (!windowType) return false;
+  const commonProfileQuery = buildCommonProfileQuery(searchParams);
 
-  if (windowType === "user-info-popover") {
-    void router.replace({
-      path: "/user-info-popover",
-      query: {
-        avatar: searchParams.get("avatar") ?? "",
-        name: searchParams.get("name") ?? "",
+  switch (windowType) {
+    case "user-info-popover":
+      return replaceSubWindowRoute(router, "/user-info-popover", {
+        ...commonProfileQuery,
         email: searchParams.get("email") ?? "",
-        bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
-      },
-    });
-    return true;
-  }
-
-  if (windowType === "channel-info-popover") {
-    void router.replace({
-      path: "/channel-info-popover",
-      query: {
-        avatar: searchParams.get("avatar") ?? "",
-        name: searchParams.get("name") ?? "",
-        bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
-      },
-    });
-    return true;
-  }
-
-  if (windowType === "channel-info") {
-    void router.replace({
-      path: "/channel-info",
-      query: {
-        avatar: searchParams.get("avatar") ?? "",
-        name: searchParams.get("name") ?? "",
-        bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
+      });
+    case "channel-info-popover":
+      return replaceSubWindowRoute(router, "/channel-info-popover", commonProfileQuery);
+    case "channel-info":
+      return replaceSubWindowRoute(router, "/channel-info", {
+        ...commonProfileQuery,
         owner: searchParams.get("owner") ?? "",
-      },
-    });
-    return true;
-  }
-
-  if (windowType === "user-profile") {
-    void router.replace({
-      path: "/user_info",
-      query: {
+      });
+    case "user-profile":
+      return replaceSubWindowRoute(router, "/user_info", {
+        ...commonProfileQuery,
         uid: searchParams.get("uid") ?? "",
-        avatar: searchParams.get("avatar") ?? "",
-        name: searchParams.get("name") ?? "",
         email: searchParams.get("email") ?? "",
-        bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
         sex: searchParams.get("sex") ?? "",
         birthday: searchParams.get("birthday") ?? "",
         avatar_id: searchParams.get("avatar_id") ?? "",
         editable: searchParams.get("editable") ?? "",
-      },
-    });
-    return true;
+      });
+    default:
+      // 未知 window 类型应回落为主窗口流程，避免误判为子窗口导致 bootstrap 缺失。
+      return false;
   }
-
-  return isSubWindow;
 }
-

@@ -1,59 +1,47 @@
 /**
- * @fileoverview settings.di.ts
- * @description settings｜依赖组装（DI）：settings.di。
+ * @fileoverview settings 依赖装配。
+ * @description
+ * 负责组装 settings feature 的存储端口与领域用例。
  */
 
 import { selectByMockMode } from "@/shared/config/mockModeSelector";
-import type { ConfigPort } from "../domain/ports/ConfigPort";
-import { localStorageConfigPort } from "../data/localStorageConfigPort";
-import { mockConfigPort } from "../mock/mockConfigPort";
-import { GetConfig } from "../domain/usecases/GetConfig";
+import type { SettingsPort } from "../domain/ports/SettingsPort";
+import { localStorageSettingsPort } from "../data/localStorageSettingsPort";
+import { mockSettingsPort } from "../mock/mockSettingsPort";
+import { GetSettings } from "../domain/usecases/GetSettings";
 import { SetTheme } from "../domain/usecases/SetTheme";
 
-let configPort: ConfigPort | null = null;
-
-// ============================================================================
-// Ports
-// ============================================================================
+let settingsPort: SettingsPort | null = null;
 
 /**
- * 获取单例 `ConfigPort`。
+ * 获取单例 `SettingsPort`。
  *
  * 说明：
- * - 主题（theme）强依赖持久化：即便在 mock 模式也倾向使用 localStorage，避免启动时出现“闪屏”（theme flash）。
- * - 如需在测试中替换为 mock，可在此处按需调整选择规则。
+ * - `off/protocol`：使用 localStorage 持久化，避免启动时出现“闪屏”（theme flash）。
+ * - `store`：使用 mock 配置源，便于 UI 预览与测试隔离。
  *
- * @returns `ConfigPort` 实例。
+ * @returns `SettingsPort` 实例。
  */
-export function getConfigPort(): ConfigPort {
-  if (configPort) return configPort;
-  // 协议层 mock 也保持主题持久化稳定（localStorage）。
-  configPort = selectByMockMode<ConfigPort>({
-    off: () => localStorageConfigPort,
-    store: () => mockConfigPort,
-    protocol: () => localStorageConfigPort,
+export function getSettingsPort(): SettingsPort {
+  if (settingsPort) return settingsPort;
+  settingsPort = selectByMockMode<SettingsPort>({
+    off: () => localStorageSettingsPort,
+    store: () => mockSettingsPort,
+    protocol: () => localStorageSettingsPort,
   });
-  return configPort;
+  return settingsPort;
 }
 
-// ============================================================================
-// 用例
-// ============================================================================
-
 /**
- * 获取 `GetConfig` 用例实例。
- *
- * @returns `GetConfig` 实例。
+ * 获取 `GetSettings` 用例实例。
  */
-export function getGetConfigUsecase(): GetConfig {
-  return new GetConfig(getConfigPort());
+export function getSettingsUseCase(): GetSettings {
+  return new GetSettings(getSettingsPort());
 }
 
 /**
  * 获取 `SetTheme` 用例实例。
- *
- * @returns `SetTheme` 实例。
  */
-export function getSetThemeUsecase(): SetTheme {
-  return new SetTheme(getConfigPort());
+export function getSetThemeUseCase(): SetTheme {
+  return new SetTheme(getSettingsPort());
 }

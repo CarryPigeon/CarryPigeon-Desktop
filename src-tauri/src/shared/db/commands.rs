@@ -1,13 +1,13 @@
 //! shared｜数据库：commands。
 //!
 //! 约定：注释中文，日志英文（tracing）。
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use sea_orm::{
     ConnectionTrait, DatabaseBackend, Statement, StatementBuilder, TransactionTrait, Value,
 };
-use tauri::command;
 
 use crate::shared::error::{CommandResult, command_error, to_command_error};
 
@@ -170,9 +170,11 @@ fn base_db_dir() -> PathBuf {
     root.join("data").join("db")
 }
 
-fn ensure_parent_dir(path: &Path) -> CommandResult<()> {
+async fn ensure_parent_dir(path: &Path) -> anyhow::Result<()> {
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", e))?;
+        tokio::fs::create_dir_all(dir)
+            .await
+            .with_context(|| format!("Failed to create db parent dir: {}", dir.display()))?;
     }
     Ok(())
 }
@@ -215,7 +217,7 @@ fn exec_result(result: &sea_orm::ExecResult) -> DbExecResult {
     }
 }
 
-#[command]
+#[tauri::command]
 /// 初始化（或连接）一个命名数据库，并按需执行迁移。
 ///
 /// # 参数
@@ -237,7 +239,9 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
         .path
         .map(PathBuf::from)
         .unwrap_or_else(|| default_db_path(&req.key));
-    ensure_parent_dir(&path)?;
+    ensure_parent_dir(&path)
+        .await
+        .map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", e))?;
     connect_named(&req.key, path)
         .await
         .map_err(|e| to_command_error("DB_CONNECT_FAILED", e))?;
@@ -246,7 +250,7 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
         .map_err(|e| to_command_error("DB_MIGRATE_FAILED", e))
 }
 
-#[command]
+#[tauri::command]
 /// 执行一条 SQL（非查询）。
 ///
 /// # 参数
@@ -268,7 +272,7 @@ pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
     Ok(exec_result(&result))
 }
 
-#[command]
+#[tauri::command]
 /// 执行一条查询 SQL，并按指定列名抽取结果。
 ///
 /// # 参数
@@ -311,7 +315,7 @@ pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
     })
 }
 
-#[command]
+#[tauri::command]
 /// 在同一事务内按序执行多条 SQL（非查询）。
 ///
 /// # 参数
@@ -346,7 +350,7 @@ pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbEx
     Ok(results)
 }
 
-#[command]
+#[tauri::command]
 /// 关闭并释放一个命名数据库连接（从注册表移除）。
 ///
 /// # 参数
@@ -367,7 +371,7 @@ pub async fn db_close(key: String) -> CommandResult<()> {
         .map_err(|e| to_command_error("DB_CLOSE_FAILED", e))
 }
 
-#[command]
+#[tauri::command]
 /// 移除一个命名数据库连接，并尝试删除对应的数据库文件。
 ///
 /// # 参数
@@ -390,13 +394,15 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
         .map_err(|e| to_command_error("DB_REMOVE_FAILED", e))?
         .unwrap_or_else(|| default_db_path(&key));
 
-    if path.exists() {
-        std::fs::remove_file(&path).map_err(|e| to_command_error("DB_FILE_REMOVE_FAILED", e))?;
+    if tokio::fs::metadata(&path).await.is_ok() {
+        tokio::fs::remove_file(&path)
+            .await
+            .map_err(|e| to_command_error("DB_FILE_REMOVE_FAILED", e))?;
     }
     Ok(())
 }
 
-#[command]
+#[tauri::command]
 /// 获取命名数据库对应的文件路径。
 ///
 /// # 参数
@@ -420,10 +426,8 @@ pub async fn db_path(key: String) -> CommandResult<String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-async fn get_entry_path(key: &str) -> CommandResult<PathBuf> {
-    let entry = get_entry(key)
-        .await
-        .map_err(|e| to_command_error("DB_ENTRY_LOOKUP_FAILED", e))?;
+async fn get_entry_path(key: &str) -> anyhow::Result<PathBuf> {
+    let entry = get_entry(key).await?;
     Ok(entry.path.clone())
 }
 
@@ -505,7 +509,7 @@ struct Migration {
     statements: Vec<&'static str>,
 }
 
-async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> CommandResult<()> {
+async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> anyhow::Result<()> {
     let stmt = RawStatement::new(
         r#"
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -519,11 +523,11 @@ async fn ensure_migrations_table(conn: &sea_orm::DatabaseConnection) -> CommandR
     );
     conn.execute(&stmt)
         .await
-        .map_err(|e| to_command_error("DB_MIGRATIONS_TABLE_ENSURE_FAILED", e))?;
+        .context("DB_MIGRATIONS_TABLE_ENSURE_FAILED")?;
     Ok(())
 }
 
-async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> CommandResult<Vec<i64>> {
+async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> anyhow::Result<Vec<i64>> {
     let stmt = RawStatement::new(
         "SELECT version FROM schema_migrations ORDER BY version ASC".to_string(),
         Vec::new(),
@@ -531,7 +535,7 @@ async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> CommandRe
     let rows = conn
         .query_all(&stmt)
         .await
-        .map_err(|e| to_command_error("DB_MIGRATIONS_FETCH_APPLIED_FAILED", e))?;
+        .context("DB_MIGRATIONS_FETCH_APPLIED_FAILED")?;
     let mut versions = Vec::with_capacity(rows.len());
     for row in rows.iter() {
         if let Ok(Some(v)) = row.try_get::<Option<i64>>("", "version") {
@@ -541,10 +545,10 @@ async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> CommandRe
     Ok(versions)
 }
 
-async fn run_migrations(key: &str, kind: Option<&str>) -> CommandResult<()> {
+async fn run_migrations(key: &str, kind: Option<&str>) -> anyhow::Result<()> {
     let db = get_db(key)
         .await
-        .map_err(|e| to_command_error("DB_MIGRATIONS_DB_GET_FAILED", e))?;
+        .context("DB_MIGRATIONS_DB_GET_FAILED")?;
     let conn = &db.connection;
     ensure_migrations_table(conn).await?;
     let applied = fetch_applied_versions(conn).await?;
@@ -570,12 +574,12 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> CommandResult<()> {
         let txn = conn
             .begin()
             .await
-            .map_err(|e| to_command_error("DB_MIGRATIONS_TXN_BEGIN_FAILED", e))?;
+            .context("DB_MIGRATIONS_TXN_BEGIN_FAILED")?;
         for statement in migration.statements.iter() {
             let stmt = RawStatement::new((*statement).to_string(), Vec::new());
             txn.execute(&stmt)
                 .await
-                .map_err(|e| to_command_error("DB_MIGRATIONS_STATEMENT_EXECUTE_FAILED", e))?;
+                .context("DB_MIGRATIONS_STATEMENT_EXECUTE_FAILED")?;
         }
         let insert_stmt = RawStatement::new(
             "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)"
@@ -588,10 +592,10 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> CommandResult<()> {
         );
         txn.execute(&insert_stmt)
             .await
-            .map_err(|e| to_command_error("DB_MIGRATIONS_RECORD_INSERT_FAILED", e))?;
+            .context("DB_MIGRATIONS_RECORD_INSERT_FAILED")?;
         txn.commit()
             .await
-            .map_err(|e| to_command_error("DB_MIGRATIONS_TXN_COMMIT_FAILED", e))?;
+            .context("DB_MIGRATIONS_TXN_COMMIT_FAILED")?;
     }
 
     Ok(())

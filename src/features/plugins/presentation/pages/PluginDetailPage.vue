@@ -8,8 +8,12 @@ import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import { createPluginContext, type PluginCatalogEntry } from "@/features/plugins/api";
-import { useCurrentServerContext } from "@/features/servers/api";
+import type { PluginCatalogEntryLike } from "@/features/plugins/domain/types/pluginTypes";
+import { resolveLatestPluginCatalogVersion } from "@/features/plugins/domain/types/pluginTypes";
+import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
+import { createPluginContext } from "@/features/plugins/presentation/composables/usePluginContext";
+import { runPluginTask } from "@/features/plugins/presentation/composables/usePluginTaskRunner";
+type PluginCatalogViewEntry = PluginCatalogEntryLike;
 
 const route = useRoute();
 const router = useRouter();
@@ -25,7 +29,7 @@ function computePluginId(): string {
 
 const pluginId = computed(computePluginId);
 
-const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = useCurrentServerContext();
+const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = usePluginsServerWorkspace();
 const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
 const { catalogStore, installStore, refreshCatalog, refreshInstalled } = createPluginContext({ socket: serverSocket, requiredPluginsDeclared });
 
@@ -34,7 +38,7 @@ const { catalogStore, installStore, refreshCatalog, refreshInstalled } = createP
  *
  * @returns 目录条目；未找到时返回 `null`。
  */
-function computePlugin(): PluginCatalogEntry | null {
+function computePlugin(): PluginCatalogViewEntry | null {
   return catalogStore.value.byId.value[pluginId.value] ?? null;
 }
 
@@ -57,10 +61,21 @@ const installed = computed(computeInstalled);
  * @returns 存在更新则为 `true`。
  */
 function computeHasUpdate(): boolean {
-  const latest = plugin.value?.versions?.[0] ?? "";
+  const latest = plugin.value ? resolveLatestPluginCatalogVersion(plugin.value) : "";
   const current = installed.value?.currentVersion ?? "";
   return Boolean(latest && current && latest !== current);
 }
+
+/**
+ * 计算“安装最新版本”动作使用的版本号。
+ *
+ * @returns 最新版本号；缺失时返回空字符串。
+ */
+function computeInstallLatestVersion(): string {
+  return plugin.value ? resolveLatestPluginCatalogVersion(plugin.value) : "";
+}
+
+const installLatestVersion = computed(computeInstallLatestVersion);
 
 const hasUpdate = computed(computeHasUpdate);
 
@@ -78,6 +93,25 @@ function computeDomainLabelsText(): string {
 }
 
 const domainLabelsText = computed(computeDomainLabelsText);
+
+function handleInstallLatest(): void {
+  const p = plugin.value;
+  const latest = installLatestVersion.value;
+  if (!p || !latest) return;
+  runPluginTask(installStore.value.install(p, latest));
+}
+
+function handleEnablePlugin(): void {
+  const p = plugin.value;
+  if (!p) return;
+  runPluginTask(installStore.value.enable(p.pluginId));
+}
+
+function handleDisablePlugin(): void {
+  const p = plugin.value;
+  if (!p) return;
+  runPluginTask(installStore.value.disable(p.pluginId));
+}
 
 /**
  * 确保详情页所需数据已就绪（server info + catalog + installed）。
@@ -194,7 +228,7 @@ onMounted(handleMounted);
           class="cp-plugin-detail__btn primary"
           type="button"
           :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-          @click="installStore.install(plugin, plugin.versions[0] || '')"
+          @click="handleInstallLatest"
         >
           Install latest
         </button>
@@ -203,11 +237,11 @@ onMounted(handleMounted);
           class="cp-plugin-detail__btn primary"
           type="button"
           :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-          @click="installStore.enable(plugin.pluginId)"
+          @click="handleEnablePlugin"
         >
           Enable
         </button>
-        <button v-else class="cp-plugin-detail__btn" type="button" :disabled="Boolean(serverSocket) && !Boolean(serverId)" @click="installStore.disable(plugin.pluginId)">
+        <button v-else class="cp-plugin-detail__btn" type="button" :disabled="Boolean(serverSocket) && !Boolean(serverId)" @click="handleDisablePlugin">
           Disable
         </button>
 

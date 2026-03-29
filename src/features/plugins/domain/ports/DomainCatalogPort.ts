@@ -19,6 +19,5 @@ export interface DomainCatalogPort {
    * @param serverSocket - 服务端 socket（用于推导 HTTP origin）。
    * @returns domain 目录条目列表。
    */
-  fetch(serverSocket: string): Promise<DomainCatalogItem[]>;
+  listCatalog(serverSocket: string): Promise<DomainCatalogItem[]>;
 }
-

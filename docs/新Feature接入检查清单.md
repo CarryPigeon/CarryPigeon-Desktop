@@ -2,6 +2,8 @@
 
 本文档用于给“新增一个 feature”提供可执行的最小清单，确保目录结构、依赖方向、mock 切换、跨 feature 协作边界都符合当前仓库规范。
 
+配套规范：`docs/Feature模块设计规范.md`
+
 ## 一、目录与文档
 
 - [ ] 新建 `src/features/<feature>/`。
@@ -64,8 +66,8 @@ const port = selectByMockMode({
 
 ## 八、提交前自检
 
-- [ ] `npm run lint`
-- [ ] `npx vue-tsc --noEmit`
+- [ ] `npm run typecheck`
+- [ ] `bash scripts/check-log-standards.sh`
+- [ ] `bash scripts/check-rust-standards.sh`
 - [ ] 手动验证三种运行模式：`off` / `store` / `protocol`
 - [ ] 检查 `docs/` 与 feature README 是否同步更新
-

@@ -1,81 +1,37 @@
 /**
  * @fileoverview Patchbay 生命周期编排（挂载/卸载）。
- * @description chat｜模块：usePatchbayLifecycle。
+ * @description chat｜presentation composable：收敛主页面启动链路与全局监听器生命周期。
  * 将 MainPage 中与“首屏初始化 + 全局监听器注册/清理”相关的逻辑集中在一起，减少页面文件体积，
  * 并统一生命周期副作用的入口，避免未来拆组件时遗漏清理。
  */
 
-import { onBeforeUnmount, onMounted, type ComputedRef, type Ref } from "vue";
+import { onBeforeUnmount, onMounted, type Ref } from "vue";
 import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 
 /**
  * Patchbay 生命周期编排参数。
  */
 export type PatchbayLifecycleArgs = {
-  /**
-   * 当前路由（用于读取 query 并清理 welcome 参数）。
-   */
+  // 路由上下文（welcome query 读取与清理）。
   route: RouteLocationNormalizedLoaded;
-  /**
-   * 路由实例（用于修改 query 或跳转）。
-   */
   router: Router;
-  /**
-   * 顶部闪现提示（UI 层）。
-   */
+
+  // 页面 UI 状态。
   flashMessage: Ref<string>;
-  /**
-   * 当前 server socket（已 trim）。
-   */
-  socket: ComputedRef<string>;
-  /**
-   * 将插件 host bridge 注入到 domain registry（避免循环依赖）。
-   */
-  attachPluginHostBridge: () => void;
-  /**
-   * 连接 server（通常为 `connectWithRetry`）。
-   */
-  connect: (socket: string) => Promise<void>;
-  /**
-   * 刷新与 server 绑定的 store（server-info/catalog/domain-catalog/installed）。
-   */
-  refreshStores: () => Promise<void>;
-  /**
-   * 当插件相关 store 刷新完成后的收尾动作（例如 recheckRequired）。
-   */
-  afterPluginStoresReady: () => void;
-  /**
-   * 确保插件运行时已加载（用于消息渲染/编辑器插件能力）。
-   */
-  ensurePluginRuntime: () => Promise<void>;
-  /**
-   * 确保聊天模块已准备就绪（频道/消息/成员）。
-   */
-  ensureChatReady: () => void | Promise<void>;
-  /**
-   * 消息面板容器 ref（用于首次滚动到底部）。
-   */
+  bootstrap(): Promise<void>;
+
+  // 视口同步。
   signalPaneRef: Ref<HTMLElement | null>;
-  /**
-   * 尝试上报当前阅读状态（best-effort）。
-   */
   maybeReportReadState: () => void;
-  /**
-   * 全局按键处理（Patchbay 窗口级别）。
-   */
+
+  // 全局监听器处理器。
   onKeydown: (e: KeyboardEvent) => void;
-  /**
-   * 窗口 focus 事件处理（用于刷新/上报等）。
-   */
   onWindowFocus: () => void;
-  /**
-   * document visibilitychange 事件处理（用于刷新/上报等）。
-   */
   onVisibilityChange: () => void;
-  /**
-   * 卸载时的额外清理（例如移除 host bridge）。
-   */
+
+  // 卸载清理与错误上报。
   dispose?: () => void;
+  onBootstrapError?: (error: unknown) => void;
 };
 
 /**
@@ -89,42 +45,41 @@ export function usePatchbayLifecycle(args: PatchbayLifecycleArgs): void {
     route,
     router,
     flashMessage,
-    socket,
-    attachPluginHostBridge,
-    connect,
-    refreshStores,
-    afterPluginStoresReady,
-    ensurePluginRuntime,
-    ensureChatReady,
+    bootstrap,
     signalPaneRef,
     maybeReportReadState,
     onKeydown,
     onWindowFocus,
     onVisibilityChange,
     dispose,
+    onBootstrapError,
   } = args;
 
-  onMounted(() => {
-    if (String(route.query.welcome ?? "") === "new") {
-      flashMessage.value = "Account created. Welcome.";
-      void router.replace({ query: {} });
-      window.setTimeout(() => {
-        flashMessage.value = "";
-      }, 2400);
-    }
+  function showWelcomeIfNeeded(): void {
+    if (String(route.query.welcome ?? "") !== "new") return;
+    flashMessage.value = "Account created. Welcome.";
+    void router.replace({ query: {} });
+    window.setTimeout(() => {
+      flashMessage.value = "";
+    }, 2400);
+  }
 
-    attachPluginHostBridge();
-    void connect(socket.value)
-      .then(refreshStores)
-      .then(afterPluginStoresReady)
-      .then(ensurePluginRuntime);
-    void ensureChatReady();
-
+  function scheduleInitialViewportSync(): void {
     window.setTimeout(() => {
       const el = signalPaneRef.value;
       if (el) el.scrollTop = el.scrollHeight;
       maybeReportReadState();
     }, 0);
+  }
+
+  onMounted(() => {
+    showWelcomeIfNeeded();
+
+    void bootstrap().catch((error) => {
+      onBootstrapError?.(error);
+    });
+
+    scheduleInitialViewportSync();
 
     window.addEventListener("keydown", onKeydown);
     window.addEventListener("focus", onWindowFocus);

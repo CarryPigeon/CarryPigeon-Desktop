@@ -35,6 +35,14 @@ export type AuthSession = {
   expiresAtMs?: number;
 };
 
+function scopeFromServerSocket(serverSocket: string): string {
+  return getServerScopeKey(serverSocket);
+}
+
+function scopedStorageKey(prefix: string, serverSocket: string): string {
+  return `${prefix}${scopeFromServerSocket(serverSocket)}`;
+}
+
 /**
  * 将字符串解析为有限数值。
  *
@@ -96,7 +104,7 @@ export function writeAppConfigRaw(raw: string): void {
  * @returns 存储的 token；缺失时返回空字符串。
  */
 export function readAuthToken(serverSocket: string): string {
-  const key = `${KEY_AUTH_TOKEN_PREFIX}${getServerScopeKey(serverSocket)}`;
+  const key = scopedStorageKey(KEY_AUTH_TOKEN_PREFIX, serverSocket);
   const session = readAuthSession(serverSocket);
   if (session?.accessToken) return session.accessToken;
   return localStorage.getItem(key) ?? "";
@@ -109,7 +117,7 @@ export function readAuthToken(serverSocket: string): string {
  * @param token - 要写入的 token（空字符串表示清空）。
  */
 export function writeAuthToken(serverSocket: string, token: string): void {
-  const scope = getServerScopeKey(serverSocket);
+  const scope = scopeFromServerSocket(serverSocket);
   if (!scope) return;
   const key = `${KEY_AUTH_TOKEN_PREFIX}${scope}`;
   const v = String(token ?? "").trim();
@@ -129,7 +137,7 @@ export function writeAuthToken(serverSocket: string, token: string): void {
  * @returns Session 对象；缺失/非法时返回 `null`。
  */
 export function readAuthSession(serverSocket: string): AuthSession | null {
-  const key = `${KEY_AUTH_SESSION_PREFIX}${getServerScopeKey(serverSocket)}`;
+  const key = scopedStorageKey(KEY_AUTH_SESSION_PREFIX, serverSocket);
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
@@ -159,7 +167,7 @@ export function readAuthSession(serverSocket: string): AuthSession | null {
  */
 export function writeAuthSession(serverSocket: string, session: AuthSession | null): void {
   const socket = serverSocket.trim();
-  const scope = getServerScopeKey(socket);
+  const scope = scopeFromServerSocket(socket);
   const key = `${KEY_AUTH_SESSION_PREFIX}${scope}`;
   if (!socket || !scope) return;
 
@@ -194,7 +202,7 @@ export function readRefreshToken(serverSocket: string): string {
  * @returns 最后 event id 字符串（缺失时为空字符串）。
  */
 export function readLastEventId(serverSocket: string): string {
-  const key = `${KEY_LAST_EVENT_ID_PREFIX}${getServerScopeKey(serverSocket)}`;
+  const key = scopedStorageKey(KEY_LAST_EVENT_ID_PREFIX, serverSocket);
   return localStorage.getItem(key) ?? "";
 }
 
@@ -205,7 +213,7 @@ export function readLastEventId(serverSocket: string): string {
  * @param eventId - event id 字符串（空字符串表示清空）。
  */
 export function writeLastEventId(serverSocket: string, eventId: string): void {
-  const scope = getServerScopeKey(serverSocket);
+  const scope = scopeFromServerSocket(serverSocket);
   if (!scope) return;
   const key = `${KEY_LAST_EVENT_ID_PREFIX}${scope}`;
   const v = String(eventId ?? "").trim();
@@ -245,7 +253,7 @@ export function clearAuthAndResumeStateForScope(scopeKey: string): void {
  * @returns 无返回值。
  */
 export function clearAuthAndResumeState(serverSocket: string): void {
-  const scope = getServerScopeKey(serverSocket);
+  const scope = scopeFromServerSocket(serverSocket);
   if (!scope) return;
   clearAuthAndResumeStateForScope(scope);
 }

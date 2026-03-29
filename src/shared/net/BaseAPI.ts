@@ -79,30 +79,21 @@ export abstract class BaseAPI {
       return;
     }
 
-    return new Promise<T>((resolve, reject) => {
-      void service
-        .sendWithResponse(socket, payload, (raw) => {
-          try {
-            const { code, data: responseData } = unwrapResponse(raw);
-            if (code !== undefined && code !== 200) {
-              reject(this.handleError(code));
-              return;
-            }
-            resolve(mapResponse(responseData));
-          } catch (e) {
-            this.logger.error("Action: network_response_mapping_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
-            reject(e);
-          }
-        })
-        .catch((e) => {
-          this.logger.error("Action: network_tcp_send_with_response_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
-          reject(e);
-        });
-    });
+    try {
+      const raw = await service.sendWithResponse(socket, payload);
+      const { code, data: responseData } = unwrapResponse(raw);
+      if (code !== undefined && code !== 200) {
+        throw this.handleError(code);
+      }
+      return mapResponse(responseData);
+    } catch (e) {
+      this.logger.error("Action: network_tcp_send_with_response_failed", { serverSocket: socket, route: normalizedRoute, error: String(e) });
+      throw e;
+    }
   }
 
   /**
-   * 处理来自服务端的错误码（当前仅记录日志）。
+   * 处理来自服务端的错误码（记录日志并派发统一协议错误事件）。
    *
    * @param code - 错误码（协议约定）。
    */

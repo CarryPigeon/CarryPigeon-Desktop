@@ -16,3 +16,20 @@ pub struct TcpMessageEvent {
     /// 原始 TCP 字节载荷。
     pub payload: Vec<u8>,
 }
+
+/// 前端事件总线的 TCP 连接生命周期事件载荷。
+///
+/// # 说明
+/// - `state`：连接状态（connected/disconnected/error）；
+/// - `error`：当状态为 error 时附带错误摘要（可选）。
+#[derive(Clone, Debug, Serialize)]
+pub struct TcpStateEvent {
+    /// 服务器 socket 地址（用于前端按 server scope 归因）。
+    pub server_socket: String,
+    /// TCP 会话代际 id（同一 server_socket 下每次 add/reconnect 都会递增）。
+    pub session_id: u64,
+    /// 连接状态。
+    pub state: String,
+    /// 错误摘要（仅在 error 状态下可选）。
+    pub error: Option<String>,
+}

@@ -20,8 +20,8 @@ VITE_MOCK_SERVER_SOCKET=mock://handshake
 
 ## 3. 关键行为矩阵（核心结论）
 
-- `auth/user/chat/files/servers`：`protocol` 下走真实 adapter + 协议 mock transport。
-- `network`：`store/protocol` 下不走真实 TCP。
+- `account/chat/files/server-connection`：`protocol` 下走真实 adapter + 协议 mock transport。
+- `server-connection/connectivity`：`store/protocol` 下不走真实 TCP。
 - `plugins manager`：`protocol` 下 catalog 走 HTTP 协议 mock；生命周期走 mock manager。
 - `plugins runtime`：`store/protocol` 下默认禁用动态加载（避免误触桌面 runtime 依赖）。
 
@@ -33,8 +33,9 @@ VITE_MOCK_SERVER_SOCKET=mock://handshake
 
 ## 5. 提交前最小自检
 
-- `npm run lint`
-- `npx vue-tsc --noEmit`
+- `npm run typecheck`
+- `bash scripts/check-log-standards.sh`
+- `bash scripts/check-rust-standards.sh`
 - 手动验证 `off / store / protocol` 三模式关键流程
 
 ## 6. 深入文档

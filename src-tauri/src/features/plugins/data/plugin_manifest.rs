@@ -3,31 +3,7 @@
 //! 约定：注释中文，日志英文（tracing）。
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-
-/// 插件清单条目（静态配置）。
-///
-/// # 说明
-/// - 该结构用于描述插件包的元信息与校验值；
-/// - 主要用于本地预览/测试与离线场景的清单管理。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PluginManifest {
-    /// 插件名称（人类可读）。
-    pub name: String,
-    /// 插件版本号。
-    pub version: String,
-    /// 插件描述（可选）。
-    pub description: Option<String>,
-    /// 作者信息（可选）。
-    pub author: Option<String>,
-    /// 许可证信息（可选）。
-    pub license: Option<String>,
-    /// 插件主页/来源 URL。
-    pub url: String,
-    /// 前端资源的 SHA-256（hex）。
-    pub frontend_sha256: String,
-    /// 后端资源的 SHA-256（hex）。
-    pub backend_sha256: String,
-}
+use crate::features::plugins::domain::types::PluginManifest;
 
 /// 插件清单文件路径（历史约定）。
 const PLUGIN_CONFIG: &str = "./plugins.json";

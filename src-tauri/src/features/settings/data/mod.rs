@@ -4,3 +4,4 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 pub mod config_store;
+pub mod config_store_port_adapter;

@@ -19,6 +19,5 @@ export interface RepoPluginCatalogPort {
    * @param repoBase - Repo base URL（例如 `https://repo.example.com`）。
    * @returns 插件目录条目列表（source=`repo`）。
    */
-  fetch(repoBase: string): Promise<PluginCatalogEntry[]>;
+  listCatalog(repoBase: string): Promise<PluginCatalogEntry[]>;
 }
-

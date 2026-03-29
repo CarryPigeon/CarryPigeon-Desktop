@@ -9,7 +9,14 @@
  */
 
 import ModuleCard from "./ModuleCard.vue";
-import type { InstalledPluginState, PluginCatalogEntry, PluginProgress } from "@/features/plugins/domain/types/pluginTypes";
+import type {
+  InstalledPluginStateLike,
+  PluginCatalogEntryLike,
+  PluginProgress,
+} from "@/features/plugins/domain/types/pluginTypes";
+type PluginCatalogViewEntry = PluginCatalogEntryLike;
+type InstalledStateView = InstalledPluginStateLike;
+type PluginProgressView = PluginProgress;
 
 type Props = {
   /**
@@ -31,15 +38,15 @@ type Props = {
   /**
    * 当前要渲染的插件列表（通常为已过滤后的目录）。
    */
-  plugins: PluginCatalogEntry[];
+  plugins: readonly PluginCatalogViewEntry[];
   /**
    * 已安装状态映射（pluginId → state）。
    */
-  installedById: Record<string, InstalledPluginState | undefined>;
+  installedById: Readonly<Record<string, InstalledStateView | undefined>>;
   /**
    * 安装/更新进度映射（pluginId → progress）。
    */
-  progressById: Record<string, PluginProgress | null | undefined>;
+  progressById: Readonly<Record<string, PluginProgressView | null | undefined>>;
   /**
    * 当前抽屉选中的 pluginId（用于高亮）。
    */
@@ -57,8 +64,8 @@ type Props = {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  install: [plugin: PluginCatalogEntry];
-  update: [plugin: PluginCatalogEntry];
+  install: [plugin: PluginCatalogViewEntry];
+  update: [plugin: PluginCatalogViewEntry];
   enable: [pluginId: string];
   disable: [pluginId: string];
   uninstall: [pluginId: string];

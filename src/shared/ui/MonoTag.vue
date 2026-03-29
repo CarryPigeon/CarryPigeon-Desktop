@@ -28,6 +28,7 @@ function computeDisplay(): string {
 }
 
 const display = computed(computeDisplay);
+const isCopyEnabled = computed(() => props.copyable && display.value.length > 0);
 
 /**
  * 复制铭牌值到剪贴板（best-effort）。
@@ -37,9 +38,8 @@ const display = computed(computeDisplay);
  * @returns 无返回值。
  */
 async function handleCopy(): Promise<void> {
-  if (!props.copyable) return;
+  if (!isCopyEnabled.value) return;
   const text = display.value;
-  if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
   } catch {
@@ -53,9 +53,11 @@ async function handleCopy(): Promise<void> {
   <!-- 区块：<button> -->
   <button
     class="mono-tag"
-    :class="{ copyable: props.copyable }"
+    :class="{ copyable: isCopyEnabled }"
     type="button"
     :title="props.title || display"
+    :disabled="!isCopyEnabled"
+    :aria-disabled="!isCopyEnabled"
     @click="handleCopy"
   >
     <span class="mono-tag__text">{{ display || "—" }}</span>
@@ -94,6 +96,10 @@ async function handleCopy(): Promise<void> {
     background: var(--cp-hover-bg);
     border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
   }
+}
+
+.mono-tag:disabled {
+  opacity: 1;
 }
 
 /* 选择器：`.mono-tag__text`｜用途：等宽文本内容（截断） */

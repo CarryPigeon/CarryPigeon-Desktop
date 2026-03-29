@@ -2,9 +2,10 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
-use tauri::{AppHandle, Emitter};
+use std::sync::Arc;
 
-use crate::features::network::domain::types::TcpMessageEvent;
+use crate::features::network::domain::ports::tcp_event_sink::TcpEventSink;
+use crate::features::network::domain::types::{TcpMessageEvent, TcpStateEvent};
 
 /// Mock TCP 的运行模式。
 ///
@@ -48,7 +49,7 @@ impl MockTcpService {
     /// 启动 mock 服务，并按 mode 发送必要的模拟事件。
     ///
     /// # 参数
-    /// - `app`：Tauri 应用句柄，用于向前端 emit 事件。
+    /// - `event_sink`：事件分发端口。
     /// - `server_socket`：逻辑 server_socket（事件中透传给前端用于路由）。
     ///
     /// # 返回值
@@ -57,7 +58,12 @@ impl MockTcpService {
     /// # 说明
     /// - 该函数是幂等的：重复调用不会重复发送事件；
     /// - 当前仅 `HandshakeOk` 会发送握手完成事件，其它模式不发事件。
-    pub fn start(&mut self, app: AppHandle, server_socket: String) {
+    pub fn start(
+        &mut self,
+        event_sink: Arc<dyn TcpEventSink>,
+        server_socket: String,
+        session_id: u64,
+    ) {
         if self.started {
             return;
         }
@@ -66,6 +72,13 @@ impl MockTcpService {
         if !matches!(self.mode, MockTcpMode::HandshakeOk) {
             return;
         }
+
+        event_sink.emit_state(TcpStateEvent {
+            server_socket: server_socket.clone(),
+            session_id,
+            state: "connected".to_string(),
+            error: None,
+        });
 
         // 发送一个“明文 JSON”的握手完成通知（按 Netty 2B length-prefix 封帧）。
         // 前端会先尝试 AES 解密失败，然后 fallback 为 UTF-8 明文解析握手。
@@ -80,26 +93,16 @@ impl MockTcpService {
             framed.extend_from_slice(&payload[..len as usize]);
 
             // 旧事件（带 length-prefix 封帧后的 raw bytes）。
-            if let Err(e) = app.emit(
-                "tcp-message",
-                TcpMessageEvent {
-                    server_socket: server_socket.clone(),
-                    payload: framed,
-                },
-            ) {
-                tracing::warn!(action = "network_tcp_mock_emit_message_failed", error = ?e);
-            }
+            event_sink.emit_message(TcpMessageEvent {
+                server_socket: server_socket.clone(),
+                payload: framed,
+            });
 
             // 新事件（仅 payload，去掉 length-prefix；由 Rust 侧 deframe 后统一投递）。
-            if let Err(e) = app.emit(
-                "tcp-frame",
-                TcpMessageEvent {
-                    server_socket,
-                    payload: payload[..len as usize].to_vec(),
-                },
-            ) {
-                tracing::warn!(action = "network_tcp_mock_emit_frame_failed", error = ?e);
-            }
+            event_sink.emit_frame(TcpMessageEvent {
+                server_socket,
+                payload: payload[..len as usize].to_vec(),
+            });
         });
     }
 
@@ -113,9 +116,14 @@ impl MockTcpService {
     /// - `Err(anyhow::Error)`：模拟发送失败原因。
     pub async fn send(&mut self, _data: Vec<u8>) -> anyhow::Result<()> {
         match self.mode {
-            MockTcpMode::NoServer => Ok(()),
+            MockTcpMode::NoServer => Err(anyhow::anyhow!("Mock TCP: no server available")),
             MockTcpMode::ConnectFailed => Err(anyhow::anyhow!("Mock TCP: connect failed")),
             MockTcpMode::HandshakeOk => Ok(()),
         }
+    }
+
+    /// 关闭 mock service（no-op）。
+    pub async fn close(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }

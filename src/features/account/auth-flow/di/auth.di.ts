@@ -1,0 +1,126 @@
+/**
+ * @fileoverview 认证模块依赖注入入口（auth.di.ts）。
+ * @description account/auth-flow 的 composition root（邮件验证码 + 会话认证）。
+ *
+ * 选择规则：
+ * - mock 模式为 `"store"` 时：使用确定性的内存实现，便于 UI 预览。
+ * - 其他模式：使用基于 HTTP 的实现（真实服务端或 protocol-mock transport）。
+ */
+
+import { selectByMockMode } from "@/shared/config/mockModeSelector";
+import type { AuthServicePort } from "../domain/ports/AuthServicePort";
+import type { EmailServicePort } from "../domain/ports/EmailServicePort";
+import { createHttpAuthServicePort } from "../data/httpAuthServicePort";
+import { createHttpEmailServicePort } from "../data/httpEmailServicePort";
+import { createMockAuthServicePort } from "../mock/mockAuthServicePort";
+import { createMockEmailServicePort } from "../mock/mockEmailServicePort";
+import { createMockRequiredGatePort } from "../mock/mockRequiredGatePort";
+import { LoginWithEmailCode } from "../domain/usecases/LoginWithEmailCode";
+import { SendVerificationCode } from "../domain/usecases/SendVerificationCode";
+import { RefreshToken } from "../domain/usecases/RefreshToken";
+import { TokenLogin } from "../domain/usecases/TokenLogin";
+import { RevokeToken } from "../domain/usecases/RevokeToken";
+import { CheckRequiredGate } from "../domain/usecases/CheckRequiredGate";
+import type { RequiredGatePort } from "../domain/ports/RequiredGatePort";
+import { requiredGatePort } from "../data/requiredGatePort";
+
+/**
+ * 获取指定服务器 Socket 地址对应的 `EmailServicePort` 实现。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns EmailServicePort 实例。
+ */
+export function getEmailServicePort(serverSocket: string): EmailServicePort {
+  return selectByMockMode<EmailServicePort>({
+    off: () => createHttpEmailServicePort(serverSocket),
+    store: () => createMockEmailServicePort(serverSocket),
+    protocol: () => createHttpEmailServicePort(serverSocket),
+  });
+}
+
+/**
+ * 获取指定服务器 Socket 地址对应的 `AuthServicePort` 实现。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns AuthServicePort 实例。
+ */
+export function getAuthServicePort(serverSocket: string): AuthServicePort {
+  return selectByMockMode<AuthServicePort>({
+    off: () => createHttpAuthServicePort(serverSocket),
+    store: () => createMockAuthServicePort(serverSocket),
+    protocol: () => createHttpAuthServicePort(serverSocket),
+  });
+}
+
+/**
+ * 获取 `LoginWithEmailCode` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns LoginWithEmailCode 用例实例。
+ */
+export function getLoginWithEmailCodeUsecase(serverSocket: string): LoginWithEmailCode {
+  return new LoginWithEmailCode(getAuthServicePort(serverSocket));
+}
+
+/**
+ * 获取 `SendVerificationCode` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns SendVerificationCode 用例实例。
+ */
+export function getSendVerificationCodeUsecase(serverSocket: string): SendVerificationCode {
+  return new SendVerificationCode(getEmailServicePort(serverSocket));
+}
+
+/**
+ * 获取 `RefreshToken` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns RefreshToken 用例实例。
+ */
+export function getRefreshTokenUsecase(serverSocket: string): RefreshToken {
+  return new RefreshToken(getAuthServicePort(serverSocket));
+}
+
+/**
+ * 获取 `TokenLogin` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns TokenLogin 用例实例。
+ */
+export function getTokenLoginUsecase(serverSocket: string): TokenLogin {
+  return new TokenLogin(getAuthServicePort(serverSocket));
+}
+
+/**
+ * 获取 `RevokeToken` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns RevokeToken 用例实例。
+ */
+export function getRevokeTokenUsecase(serverSocket: string): RevokeToken {
+  return new RevokeToken(getAuthServicePort(serverSocket));
+}
+
+/**
+ * 获取 `RequiredGatePort`（单例）。
+ *
+ * @returns RequiredGatePort 实例。
+ */
+export function getRequiredGatePort(): RequiredGatePort {
+  return selectByMockMode<RequiredGatePort>({
+    off: () => requiredGatePort,
+    store: () => createMockRequiredGatePort(),
+    protocol: () => requiredGatePort,
+  });
+}
+
+/**
+ * 获取 `CheckRequiredGate` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns CheckRequiredGate 用例实例。
+ */
+export function getCheckRequiredGateUsecase(serverSocket: string): CheckRequiredGate {
+  return new CheckRequiredGate(getRequiredGatePort(), serverSocket);
+}

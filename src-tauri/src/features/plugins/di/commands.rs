@@ -1,10 +1,13 @@
 //! plugins｜DI/命令入口：commands。
 //!
 //! 约定：注释中文，日志英文（tracing）。
-use crate::features::plugins::data::plugin_manager::PluginLoadResult;
-use crate::features::plugins::data::plugin_manifest::PluginManifest;
-use crate::features::plugins::data::plugin_store;
-use crate::features::plugins::data::plugin_store::{InstalledPluginState, PluginRuntimeEntry};
+use crate::features::plugins::data::plugin_ports::{
+    PluginInstallStorePortAdapter, PluginLoaderPortAdapter,
+};
+use crate::features::plugins::domain::types::{
+    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest,
+    PluginRuntimeEntry,
+};
 use crate::features::plugins::usecases::plugin_usecases;
 use crate::shared::error::{CommandResult, to_command_error};
 use std::collections::HashMap;
@@ -22,7 +25,7 @@ use std::collections::HashMap;
 /// 该命令主要用于调试/开发态：前端传入 manifest 后触发本地插件加载流程。
 #[tauri::command]
 pub async fn load_plugin(manifest: PluginManifest) -> CommandResult<PluginLoadResult> {
-    plugin_usecases::load_plugin(manifest)
+    plugin_usecases::load_plugin(manifest, PluginLoaderPortAdapter::shared())
         .await
         .map_err(|e| to_command_error("PLUGINS_LOAD_FAILED", e))
 }
@@ -34,7 +37,7 @@ pub async fn load_plugin(manifest: PluginManifest) -> CommandResult<PluginLoadRe
 /// - `Err(String)`：读取失败原因。
 #[tauri::command]
 pub async fn list_plugins() -> CommandResult<Vec<PluginManifest>> {
-    plugin_usecases::list_plugins()
+    plugin_usecases::list_plugins(PluginLoaderPortAdapter::shared())
         .await
         .map_err(|e| to_command_error("PLUGINS_LIST_FAILED", e))
 }
@@ -55,10 +58,11 @@ pub async fn plugins_list_installed(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<Vec<InstalledPluginState>> {
-    plugin_store::list_installed(
+    plugin_usecases::plugins_list_installed(
         &server_socket,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_LIST_INSTALLED_FAILED", e))
@@ -82,11 +86,12 @@ pub async fn plugins_get_installed_state(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<Option<InstalledPluginState>> {
-    plugin_store::get_installed(
+    plugin_usecases::plugins_get_installed_state(
         &server_socket,
         &plugin_id,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_GET_INSTALLED_STATE_FAILED", e))
@@ -109,11 +114,12 @@ pub async fn plugins_get_runtime_entry(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<PluginRuntimeEntry> {
-    plugin_store::get_runtime_entry(
+    plugin_usecases::plugins_get_runtime_entry(
         &server_socket,
         &plugin_id,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FAILED", e))
@@ -138,12 +144,13 @@ pub async fn plugins_get_runtime_entry_for_version(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<PluginRuntimeEntry> {
-    plugin_store::get_runtime_entry_for_version(
+    plugin_usecases::plugins_get_runtime_entry_for_version(
         &server_socket,
         &plugin_id,
         &version,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FOR_VERSION_FAILED", e))
@@ -168,12 +175,13 @@ pub async fn plugins_install_from_server_catalog(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::install_from_server_catalog(
+    plugin_usecases::plugins_install_from_server_catalog(
         &server_socket,
         &plugin_id,
         version.as_deref(),
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_SERVER_CATALOG_FAILED", e))
@@ -202,7 +210,7 @@ pub async fn plugins_install_from_url(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::install_from_url(
+    plugin_usecases::plugins_install_from_url(
         &server_socket,
         &plugin_id,
         &version,
@@ -210,6 +218,7 @@ pub async fn plugins_install_from_url(
         &sha256,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_URL_FAILED", e))
@@ -232,11 +241,12 @@ pub async fn plugins_enable(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::enable(
+    plugin_usecases::plugins_enable(
         &server_socket,
         &plugin_id,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_ENABLE_FAILED", e))
@@ -259,11 +269,12 @@ pub async fn plugins_disable(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::disable(
+    plugin_usecases::plugins_disable(
         &server_socket,
         &plugin_id,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_DISABLE_FAILED", e))
@@ -288,12 +299,13 @@ pub async fn plugins_switch_version(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::switch_version(
+    plugin_usecases::plugins_switch_version(
         &server_socket,
         &plugin_id,
         &version,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_SWITCH_VERSION_FAILED", e))
@@ -316,11 +328,12 @@ pub async fn plugins_uninstall(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<()> {
-    plugin_store::uninstall(
+    plugin_usecases::plugins_uninstall(
         &server_socket,
         &plugin_id,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_UNINSTALL_FAILED", e))
@@ -345,12 +358,13 @@ pub async fn plugins_set_failed(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::set_failed(
+    plugin_usecases::plugins_set_failed(
         &server_socket,
         &plugin_id,
         &message,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_SET_FAILED_STATE_FAILED", e))
@@ -373,11 +387,12 @@ pub async fn plugins_clear_error(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
-    plugin_store::clear_error(
+    plugin_usecases::plugins_clear_error(
         &server_socket,
         &plugin_id,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_CLEAR_ERROR_FAILED", e))
@@ -403,12 +418,13 @@ pub async fn plugins_storage_get(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<Option<serde_json::Value>> {
-    plugin_store::storage_get(
+    plugin_usecases::plugins_storage_get(
         &server_socket,
         &plugin_id,
         &key,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_STORAGE_GET_FAILED", e))
@@ -435,13 +451,14 @@ pub async fn plugins_storage_set(
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<()> {
-    plugin_store::storage_set(
+    plugin_usecases::plugins_storage_set(
         &server_socket,
         &plugin_id,
         &key,
         value,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_STORAGE_SET_FAILED", e))
@@ -469,8 +486,8 @@ pub async fn plugins_network_fetch(
     body: Option<String>,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
-) -> CommandResult<plugin_store::PluginFetchResponse> {
-    plugin_store::network_fetch(
+) -> CommandResult<PluginFetchResponse> {
+    plugin_usecases::plugins_network_fetch(
         &server_socket,
         &url,
         &method,
@@ -478,6 +495,7 @@ pub async fn plugins_network_fetch(
         body,
         tls_policy.as_deref(),
         tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
     )
     .await
     .map_err(|e| to_command_error("PLUGINS_NETWORK_FETCH_FAILED", e))
