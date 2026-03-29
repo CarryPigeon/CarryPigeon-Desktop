@@ -15,6 +15,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { readLastEventId, writeLastEventId } from "@/shared/utils/localState";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { connectProtocolMockChatWs } from "@/shared/mock/protocol/protocolMockTransport";
+import type { ChatWsEventWire } from "./wire/chatWireEvents";
 
 /**
  * WS 事件模块日志器。
@@ -26,12 +27,7 @@ const logger = createLogger("wsChatEvents");
  */
 export type WsEventEnvelope = {
   type: "event";
-  data: {
-    event_id: string;
-    event_type: string;
-    server_time: number;
-    payload: unknown;
-  };
+  data: ChatWsEventWire;
 };
 
 /**

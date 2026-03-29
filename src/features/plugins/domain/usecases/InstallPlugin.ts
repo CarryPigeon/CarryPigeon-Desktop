@@ -3,14 +3,14 @@
  * @description plugins｜用例：InstallPlugin。
  */
 
-import type { PluginManagerPort, PluginProgressHandler } from "../ports/PluginManagerPort";
+import type { PluginLifecycleCommandPort, PluginProgressHandler } from "../ports/PluginLifecycleCommandPort";
 import type { InstalledPluginState } from "../types/pluginTypes";
 
 /**
  * 用例：安装插件。
  */
 export class InstallPlugin {
-  constructor(private readonly manager: PluginManagerPort) {}
+  constructor(private readonly commandPort: PluginLifecycleCommandPort) {}
 
   /**
    * 执行：安装指定版本的插件。
@@ -27,6 +27,6 @@ export class InstallPlugin {
     version: string,
     onProgress?: PluginProgressHandler,
   ): Promise<InstalledPluginState> {
-    return this.manager.install(serverSocket, pluginId, version, onProgress);
+    return this.commandPort.install(serverSocket, pluginId, version, onProgress);
   }
 }

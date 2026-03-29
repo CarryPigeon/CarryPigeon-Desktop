@@ -4,182 +4,156 @@
 
 use anyhow::anyhow;
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use tauri::AppHandle;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
-use crate::features::network::data::tcp_real::TcpServiceReal;
-#[cfg(debug_assertions)]
-use crate::features::network::mock::tcp_mock::{MockTcpMode, MockTcpService};
+use crate::features::network::domain::ports::tcp_backend_factory_port::TcpBackendFactoryPort;
+use crate::features::network::domain::ports::tcp_backend_port::TcpBackendPort;
+use crate::features::network::domain::ports::tcp_event_sink::TcpEventSink;
+use crate::features::network::domain::types::TcpStateEvent;
 
-enum TcpBackend {
-    Real(TcpServiceReal),
-    #[cfg(debug_assertions)]
-    Mock(MockTcpService),
-}
+type SharedTcpBackend = Arc<Mutex<Box<dyn TcpBackendPort>>>;
 
-impl TcpBackend {
-    fn start(&mut self, app: AppHandle, server_socket: String) {
-        match self {
-            TcpBackend::Real(s) => s.start(app, server_socket),
-            #[cfg(debug_assertions)]
-            TcpBackend::Mock(s) => s.start(app, server_socket),
-        }
-    }
-
-    async fn send(&mut self, data: Vec<u8>) -> anyhow::Result<()> {
-        match self {
-            TcpBackend::Real(s) => s.send(data).await,
-            #[cfg(debug_assertions)]
-            TcpBackend::Mock(s) => s.send(data).await,
-        }
-    }
+struct TcpEntry {
+    backend: SharedTcpBackend,
+    session_id: u64,
 }
 
 #[derive(Default)]
 struct TcpRegistry {
-    map: HashMap<String, TcpBackend>,
+    map: HashMap<String, TcpEntry>,
 }
 
 type SharedTcpRegistry = Arc<RwLock<TcpRegistry>>;
 
-static TCP_REGISTRY: OnceLock<SharedTcpRegistry> = OnceLock::new();
-
-/// 初始化全局 TCP service 注册表。
-///
-/// # 返回值
-/// 无返回值。
-///
-/// # 说明
-/// - 该函数为 best-effort：重复调用不产生副作用；
-/// - 若未初始化，后续调用 `add_tcp_service/send_tcp_service/listen_tcp_service` 会返回错误。
-pub fn init_tcp_service() {
-    let _ = TCP_REGISTRY
-        .get_or_init(|| Arc::new(RwLock::new(TcpRegistry::default())))
-        .clone();
-}
-
-#[cfg(debug_assertions)]
-fn parse_mock_mode(socket: &str) -> MockTcpMode {
-    if socket.starts_with("mock://handshake") {
-        return MockTcpMode::HandshakeOk;
+async fn close_backend_best_effort(backend: &SharedTcpBackend) {
+    if let Ok(mut previous) = backend.try_lock() {
+        let _ = previous.close().await;
+        return;
     }
-    MockTcpMode::NoServer
+    let mut previous = backend.lock().await;
+    let _ = previous.close().await;
 }
 
-/// 为指定 server_socket 创建并注册一个 TCP backend（real 或 mock）。
-///
-/// # 参数
-/// - `app`：Tauri 应用句柄（用于 emit 收包事件）。
-/// - `server_socket`：逻辑 server_socket（作为 registry key）。
-/// - `socket`：实际连接地址（可能为 `mock://...`、`tcp://...`、`tls://...` 等）。
-///
-/// # 返回值
-/// - `Ok(())`：创建成功并已写入注册表。
-/// - `Err(anyhow::Error)`：创建失败原因（例如未初始化/连接失败等）。
-///
-/// # 说明
-/// - 当真实连接失败时，会降级为 mock backend（ConnectFailed），以保证 UI 可继续工作；
-/// - 创建完成后会立即调用 backend.start()（用于注册监听或发送 mock 首包）。
-pub async fn add_tcp_service(
-    app: AppHandle,
+fn emit_disconnected_event(
+    event_sink: &Arc<dyn TcpEventSink>,
     server_socket: String,
-    socket: String,
-) -> anyhow::Result<()> {
-    let registry = TCP_REGISTRY
-        .get()
-        .cloned()
-        .ok_or_else(|| anyhow!("TCP Service not initialized"))?;
-    let mut lock = registry.write().await;
+    session_id: u64,
+) {
+    event_sink.emit_state(TcpStateEvent {
+        server_socket,
+        session_id,
+        state: "disconnected".to_string(),
+        error: None,
+    });
+}
 
-    let mut backend = if socket.starts_with("mock://") {
-        #[cfg(debug_assertions)]
-        {
-            TcpBackend::Mock(MockTcpService::new(parse_mock_mode(&socket)))
+/// TCP 注册表服务（可注入状态对象）。
+#[derive(Clone)]
+pub struct TcpRegistryService {
+    registry: SharedTcpRegistry,
+    next_session_id: Arc<AtomicU64>,
+}
+
+impl Default for TcpRegistryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TcpRegistryService {
+    /// 创建 TCP 注册表服务实例。
+    pub fn new() -> Self {
+        Self {
+            registry: Arc::new(RwLock::new(TcpRegistry::default())),
+            next_session_id: Arc::new(AtomicU64::new(1)),
         }
-        #[cfg(not(debug_assertions))]
-        {
+    }
+
+    /// 为指定 server_socket 创建并注册一个 TCP backend（real 或 mock）。
+    ///
+    /// # 参数
+    /// - `backend_factory`：backend 工厂端口（由 DI 注入，负责 real/mock 策略）。
+    /// - `event_sink`：事件分发端口。
+    /// - `server_socket`：逻辑 server_socket（作为 registry key）。
+    /// - `socket`：实际连接地址（可能为 `mock://...`、`tcp://...`、`tls://...` 等）。
+    ///
+    /// # 返回值
+    /// - `Ok(())`：创建成功并已写入注册表。
+    /// - `Err(anyhow::Error)`：创建失败原因。
+    pub async fn add_tcp_service(
+        &self,
+        backend_factory: Arc<dyn TcpBackendFactoryPort>,
+        event_sink: Arc<dyn TcpEventSink>,
+        server_socket: String,
+        socket: String,
+    ) -> anyhow::Result<()> {
+        let session_id = self.next_session_id.fetch_add(1, Ordering::Relaxed);
+        let mut backend = backend_factory
+            .create_backend(&server_socket, socket)
+            .await?;
+
+        if !backend.start(Arc::clone(&event_sink), server_socket.clone(), session_id) {
             return Err(anyhow!(
-                "mock:// socket is only supported in debug builds (server_socket={})",
+                "TCP service cannot start listening for server_socket: {}",
                 server_socket
             ));
         }
-    } else {
-        match TcpServiceReal::connect(socket.clone()).await {
-            Ok(real) => TcpBackend::Real(real),
-            Err(err) => {
-                tracing::warn!(
-                    action = if cfg!(debug_assertions) {
-                        "network_tcp_connect_failed_fallback_mock"
-                    } else {
-                        "network_tcp_connect_failed"
-                    },
-                    socket = %socket,
-                    error = %err,
-                    "TCP connect failed",
-                );
-                #[cfg(debug_assertions)]
-                {
-                    TcpBackend::Mock(MockTcpService::new(MockTcpMode::ConnectFailed))
-                }
-                #[cfg(not(debug_assertions))]
-                {
-                    return Err(err);
-                }
-            }
+
+        let backend = Arc::new(Mutex::new(backend));
+        let mut lock = self.registry.write().await;
+        let replaced = lock.map.insert(
+            server_socket.clone(),
+            TcpEntry {
+                backend: Arc::clone(&backend),
+                session_id,
+            },
+        );
+        drop(lock);
+
+        if let Some(old) = replaced {
+            close_backend_best_effort(&old.backend).await;
+            emit_disconnected_event(&event_sink, server_socket, old.session_id);
         }
-    };
+        Ok(())
+    }
 
-    backend.start(app, server_socket.clone());
-    lock.map.insert(server_socket, backend);
-    Ok(())
-}
-
-/// 向指定 server_socket 对应的 TCP backend 发送数据。
-///
-/// # 参数
-/// - `server_socket`：逻辑 server_socket（用于查找 backend）。
-/// - `data`：要发送的 bytes。
-///
-/// # 返回值
-/// - `Ok(())`：发送成功。
-/// - `Err(anyhow::Error)`：发送失败原因。
-pub async fn send_tcp_service(server_socket: String, data: Vec<u8>) -> anyhow::Result<()> {
-    let registry = TCP_REGISTRY
-        .get()
-        .cloned()
-        .ok_or_else(|| anyhow!("TCP Service not initialized"))?;
-    let mut lock = registry.write().await;
-    let backend = lock
-        .map
-        .get_mut(&server_socket)
+    /// 向指定 server_socket 对应的 TCP backend 发送数据。
+    pub async fn send_tcp_service(
+        &self,
+        server_socket: String,
+        data: Vec<u8>,
+    ) -> anyhow::Result<()> {
+        let backend = {
+            let lock = self.registry.read().await;
+            lock.map
+                .get(&server_socket)
+                .map(|entry| Arc::clone(&entry.backend))
+        }
         .ok_or_else(|| anyhow!("TCP service not found for server_socket: {}", server_socket))?;
-    backend.send(data).await
-}
+        let mut backend = backend.lock().await;
+        backend.send(data).await
+    }
 
-/// 监听（或重启）指定 server_socket 的 TCP backend。
-///
-/// # 参数
-/// - `server_socket`：逻辑 server_socket（用于查找 backend）。
-/// - `app`：Tauri 应用句柄（用于 emit 收包事件）。
-///
-/// # 返回值
-/// - `Ok(())`：启动成功。
-/// - `Err(anyhow::Error)`：启动失败原因（例如服务未初始化/找不到 backend）。
-///
-/// # 说明
-/// 当前实现会调用 backend 的 `start`，用于注册监听或发送初始事件（mock）。
-pub async fn listen_tcp_service(server_socket: String, app: AppHandle) -> anyhow::Result<()> {
-    let registry = TCP_REGISTRY
-        .get()
-        .cloned()
-        .ok_or_else(|| anyhow!("TCP Service not initialized"))?;
-    let mut lock = registry.write().await;
-    let backend = lock
-        .map
-        .get_mut(&server_socket)
+    /// 移除并关闭指定 server_socket 的 TCP backend。
+    pub async fn remove_tcp_service(
+        &self,
+        server_socket: String,
+        event_sink: Arc<dyn TcpEventSink>,
+    ) -> anyhow::Result<()> {
+        let entry = {
+            let mut lock = self.registry.write().await;
+            lock.map.remove(&server_socket)
+        }
         .ok_or_else(|| anyhow!("TCP service not found for server_socket: {}", server_socket))?;
-    backend.start(app, server_socket);
-    Ok(())
+        let mut backend = entry.backend.lock().await;
+        let close_error = backend.close().await.err();
+        emit_disconnected_event(&event_sink, server_socket.clone(), entry.session_id);
+        if let Some(error) = close_error {
+            return Err(error);
+        }
+        Ok(())
+    }
 }

@@ -8,6 +8,7 @@
  */
 export const TAURI_COMMANDS = {
   addTcpService: "add_tcp_service",
+  removeTcpService: "remove_tcp_service",
   sendTcpService: "send_tcp_service",
   apiRequestJson: "api_request_json",
   dbInit: "db_init",

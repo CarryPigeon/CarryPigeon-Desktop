@@ -1,38 +1,92 @@
 /**
- * @fileoverview plugins Feature 对外公共 API（跨 Feature 访问边界）。
+ * @fileoverview plugins Feature 对外公共 API。
  * @description
- * 跨 Feature 协作（auth/chat/main 等）统一通过本文件访问 plugins 能力。
+ * 默认通过 object-capability 公开公共能力。
+ *
+ * 边界约定：
+ * - 跨 feature 运行时能力通过本文件导出；
+ * - 跨 feature 类型约束通过 `src/features/plugins/api-types.ts` 导出；
+ * - `plugins/presentation/*`、`plugins/di/*`、`plugins/data/*` 等路径均属于 feature 内部实现。
  */
 
-export {
-  addRepoSource,
-  enabledRepoSources,
-  removeRepoSource,
-  repoSources,
-  setRepoSourceEnabled,
-  useDomainCatalogStore,
-  useDomainRegistryStore,
-  usePluginCatalogStore,
-  usePluginInstallStore,
-  type RepoSource,
-} from "./presentation/store";
+import { startPluginsRuntime as startPluginsRuntimeInternal } from "./application/startPluginsRuntime";
+import { stopPluginsRuntime as stopPluginsRuntimeInternal } from "./application/stopPluginsRuntime";
+import { resolveLatestPluginCatalogVersion as resolveLatestPluginCatalogVersionInternal } from "./domain/types/pluginTypes";
+import { createRuntimeLeaseController } from "@/shared/utils/runtimeLease";
+import {
+  createPluginsWorkspaceCapabilities as createPluginsWorkspaceCapabilitiesInternal,
+  listInstalledPlugins as listInstalledPluginsInternal,
+  refreshDomainCatalog as refreshDomainCatalogInternal,
+} from "./internal/workspaceAccess";
+import {
+  attachPluginHostBridge as attachPluginHostBridgeInternal,
+  detachPluginHostBridge as detachPluginHostBridgeInternal,
+  ensurePluginRuntimeLoaded as ensurePluginRuntimeLoadedInternal,
+  getAvailableMessageDomains as getAvailableMessageDomainsInternal,
+  getPluginRuntimeCapabilities as getPluginRuntimeCapabilitiesInternal,
+  resolveDomainPluginHint as resolveDomainPluginHintInternal,
+} from "./internal/runtimeAccess";
+import type { PluginsCapabilities } from "./api-types";
 
-export {
-  createDomainCatalogContext,
-  type DomainCatalogContext,
-} from "./presentation/composables/useDomainCatalogContext";
+const pluginsRuntimeLeaseController = createRuntimeLeaseController({
+  start(): Promise<void> {
+    return Promise.resolve().then(() => {
+      startPluginsRuntimeInternal();
+    });
+  },
+  stop(): Promise<void> {
+    return stopPluginsRuntimeInternal();
+  },
+});
 
-export { createPluginContext, type PluginContext } from "./presentation/composables/usePluginContext";
+export function createPluginsCapabilities(): PluginsCapabilities {
+  return {
+    workspace: {
+      createCapabilities: createPluginsWorkspaceCapabilitiesInternal,
+    },
+    catalog: {
+      resolveLatestVersion: resolveLatestPluginCatalogVersionInternal,
+    },
+    runtime: {
+      acquireLease() {
+        return pluginsRuntimeLeaseController.acquireLease();
+      },
+    },
+    forServer(serverSocket) {
+      return {
+        listInstalledPlugins() {
+          return listInstalledPluginsInternal(serverSocket);
+        },
+        refreshDomainCatalog() {
+          return refreshDomainCatalogInternal(serverSocket);
+        },
+        ensureRuntimeLoaded() {
+          return ensurePluginRuntimeLoadedInternal(serverSocket);
+        },
+        getRuntimeCapabilities() {
+          return getPluginRuntimeCapabilitiesInternal(serverSocket);
+        },
+        attachHostBridge(bridge) {
+          attachPluginHostBridgeInternal(serverSocket, bridge);
+        },
+        detachHostBridge() {
+          detachPluginHostBridgeInternal(serverSocket);
+        },
+        getAvailableMessageDomains() {
+          return getAvailableMessageDomainsInternal(serverSocket);
+        },
+        resolveDomainPluginHint(domain) {
+          return resolveDomainPluginHintInternal(serverSocket, domain);
+        },
+      };
+    },
+  };
+}
 
-export {
-  getDomainCatalogPort,
-  getPluginManagerPort,
-  getRepoPluginCatalogPort,
-} from "./di/plugins.di";
+let pluginsCapabilitiesSingleton: PluginsCapabilities | null = null;
 
-export type {
-  PluginComposerPayload,
-  PluginContext as RuntimePluginContext,
-} from "./domain/types/pluginRuntimeTypes";
-
-export type { InstalledPluginState, PluginCatalogEntry, PluginProgress } from "./domain/types/pluginTypes";
+export function getPluginsCapabilities(): PluginsCapabilities {
+  if (pluginsCapabilitiesSingleton) return pluginsCapabilitiesSingleton;
+  pluginsCapabilitiesSingleton = createPluginsCapabilities();
+  return pluginsCapabilitiesSingleton;
+}

@@ -54,6 +54,40 @@ function toApiBaseUrl(serverSocket: string): string {
   return `${origin}/api`;
 }
 
+function buildRequestHeaders(args: {
+  apiVersion: number;
+  accessToken: string;
+  body: unknown;
+  extraHeaders?: Record<string, string>;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: buildCarryPigeonAcceptHeader(args.apiVersion),
+  };
+  if (args.accessToken) headers.Authorization = `Bearer ${args.accessToken}`;
+  if (args.body !== undefined) headers["Content-Type"] = "application/json; charset=utf-8";
+  if (args.extraHeaders) {
+    for (const [k, v] of Object.entries(args.extraHeaders)) headers[k] = v;
+  }
+  return headers;
+}
+
+function logAndBuildApiRequestError(args: {
+  transport: "mock" | "tauri" | "fetch";
+  method: string;
+  url: string;
+  envelope: ApiErrorEnvelope;
+}): ApiRequestError {
+  const err = new ApiRequestError(args.envelope);
+  logger.warn("Action: http_client_request_failed", {
+    transport: args.transport,
+    method: args.method,
+    url: args.url,
+    status: err.status,
+    reason: err.reason,
+  });
+  return err;
+}
+
 type TauriApiResponse = {
   ok: boolean;
   status: number;
@@ -220,14 +254,12 @@ export class HttpJsonClient {
     const normalizedPath = normalizeApiPath(path);
     const url = `${this.baseUrl}${normalizedPath}`;
 
-    const headers: Record<string, string> = {
-      Accept: buildCarryPigeonAcceptHeader(this.apiVersion),
-    };
-    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
-    if (body !== undefined) headers["Content-Type"] = "application/json; charset=utf-8";
-    if (extraHeaders) {
-      for (const [k, v] of Object.entries(extraHeaders)) headers[k] = v;
-    }
+    const headers = buildRequestHeaders({
+      apiVersion: this.apiVersion,
+      accessToken: this.accessToken,
+      body,
+      extraHeaders,
+    });
 
     if (USE_MOCK_TRANSPORT) {
       const res = await handleProtocolMockApiRequest({
@@ -238,9 +270,12 @@ export class HttpJsonClient {
         body,
       });
       if (!res.ok) {
-        const err = new ApiRequestError(res.error as ApiErrorEnvelope);
-        logger.warn("Action: http_client_request_failed", { transport: "mock", method, url, status: err.status, reason: err.reason });
-        throw err;
+        throw logAndBuildApiRequestError({
+          transport: "mock",
+          method,
+          url,
+          envelope: res.error as ApiErrorEnvelope,
+        });
       }
       if (res.status === 204) return undefined as T;
       return res.body as T;
@@ -250,9 +285,12 @@ export class HttpJsonClient {
       try {
         const tauriRes = await tauriRequestJson(this.serverSocket, method, normalizedPath, headers, body);
         if (!tauriRes.ok) {
-          const err = new ApiRequestError(tauriRes.error as ApiErrorEnvelope);
-          logger.warn("Action: http_client_request_failed", { transport: "tauri", method, url, status: err.status, reason: err.reason });
-          throw err;
+          throw logAndBuildApiRequestError({
+            transport: "tauri",
+            method,
+            url,
+            envelope: tauriRes.error as ApiErrorEnvelope,
+          });
         }
         if (tauriRes.status === 204) return undefined as T;
         return tauriRes.body as T;
@@ -271,7 +309,13 @@ export class HttpJsonClient {
 
     if (!res.ok) {
       const err = await toApiError(res);
-      logger.warn("Action: http_client_request_failed", { transport: "fetch", method, url, status: err.status, reason: err.reason });
+      logger.warn("Action: http_client_request_failed", {
+        transport: "fetch",
+        method,
+        url,
+        status: err.status,
+        reason: err.reason,
+      });
       throw err;
     }
 

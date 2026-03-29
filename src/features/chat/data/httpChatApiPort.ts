@@ -5,49 +5,61 @@
 
 import type { ChatApiPort } from "../domain/ports/chatApiPort";
 import type {
-  ChannelDto,
-  ChannelApplicationDto,
-  ChannelBanDto,
-  ChannelMemberDto,
-  ListMessagesResponseDto,
-  MessageDto,
-  ReadStateRequestDto,
-  SendMessageRequestDto,
-  UnreadItemDto,
-} from "../domain/types/chatWireDtos";
+  ChatChannelApplicationRecord,
+  ChatChannelBanRecord,
+  ChatChannelCreateInput,
+  ChatChannelMemberRecord,
+  ChatChannelPatchInput,
+  ChatChannelRecord,
+  ChatMessagePage,
+  ChatMessageRecord,
+  ChatReadStateInput,
+  ChatSendMessageInput,
+  ChatUnreadState,
+} from "../domain/types/chatApiModels";
 import {
   httpAddChannelAdmin,
   httpApplyJoinChannel,
   httpCreateChannel,
-  httpDeleteMessage,
   httpDeleteChannel,
   httpDeleteChannelBan,
+  httpDeleteMessage,
+  httpDecideChannelApplication,
   httpGetUnreads,
   httpKickChannelMember,
   httpListChannelApplications,
   httpListChannelBans,
-  httpListChannelMessages,
   httpListChannelMembers,
+  httpListChannelMessages,
   httpListChannels,
   httpPatchChannel,
   httpPutChannelBan,
   httpRemoveChannelAdmin,
-  httpDecideChannelApplication,
   httpSendChannelMessage,
   httpUpdateReadState,
 } from "./httpChatApi";
+import {
+  mapChatChannelApplicationWire,
+  mapChatChannelBanWire,
+  mapChatChannelCreateInput,
+  mapChatChannelMemberWire,
+  mapChatChannelPatchInput,
+  mapChatChannelWire,
+  mapChatMessagePageWire,
+  mapChatMessageWire,
+  mapChatReadStateInput,
+  mapChatSendMessageInput,
+  mapChatUnreadStateWire,
+} from "./wire/chatWireMappers";
 
-/**
- * HTTP-backed chat API port.
- *
- * @constant
- */
 export const httpChatApiPort: ChatApiPort = {
-  async listChannels(serverSocket: string, accessToken: string): Promise<ChannelDto[]> {
-    return (await httpListChannels(serverSocket, accessToken)) as unknown as ChannelDto[];
+  async listChannels(serverSocket: string, accessToken: string): Promise<ChatChannelRecord[]> {
+    const list = await httpListChannels(serverSocket, accessToken);
+    return list.map(mapChatChannelWire);
   },
-  async getUnreads(serverSocket: string, accessToken: string): Promise<UnreadItemDto[]> {
-    return (await httpGetUnreads(serverSocket, accessToken)) as unknown as UnreadItemDto[];
+  async getUnreads(serverSocket: string, accessToken: string): Promise<ChatUnreadState[]> {
+    const list = await httpGetUnreads(serverSocket, accessToken);
+    return list.map(mapChatUnreadStateWire);
   },
   async listChannelMessages(
     serverSocket: string,
@@ -55,17 +67,19 @@ export const httpChatApiPort: ChatApiPort = {
     cid: string,
     cursor?: string,
     limit?: number,
-  ): Promise<ListMessagesResponseDto> {
-    return (await httpListChannelMessages(serverSocket, accessToken, cid, cursor, limit ?? 50)) as unknown as ListMessagesResponseDto;
+  ): Promise<ChatMessagePage> {
+    const page = await httpListChannelMessages(serverSocket, accessToken, cid, cursor, limit ?? 50);
+    return mapChatMessagePageWire(page);
   },
   async sendChannelMessage(
     serverSocket: string,
     accessToken: string,
     cid: string,
-    req: SendMessageRequestDto,
+    req: ChatSendMessageInput,
     idempotencyKey?: string,
-  ): Promise<MessageDto> {
-    return (await httpSendChannelMessage(serverSocket, accessToken, cid, req, idempotencyKey)) as unknown as MessageDto;
+  ): Promise<ChatMessageRecord> {
+    const created = await httpSendChannelMessage(serverSocket, accessToken, cid, mapChatSendMessageInput(req), idempotencyKey);
+    return mapChatMessageWire(created);
   },
   async deleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
     return httpDeleteMessage(serverSocket, accessToken, mid);
@@ -74,9 +88,9 @@ export const httpChatApiPort: ChatApiPort = {
     serverSocket: string,
     accessToken: string,
     cid: string,
-    req: ReadStateRequestDto,
+    req: ChatReadStateInput,
   ): Promise<void> {
-    return httpUpdateReadState(serverSocket, accessToken, cid, req);
+    return httpUpdateReadState(serverSocket, accessToken, cid, mapChatReadStateInput(req));
   },
   async applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void> {
     return httpApplyJoinChannel(serverSocket, accessToken, cid, reason);
@@ -85,31 +99,28 @@ export const httpChatApiPort: ChatApiPort = {
     serverSocket: string,
     accessToken: string,
     cid: string,
-    patch: Partial<Pick<ChannelDto, "name" | "brief" | "avatar">>,
-  ): Promise<ChannelDto> {
-    return (await httpPatchChannel(serverSocket, accessToken, cid, patch)) as unknown as ChannelDto;
+    patch: ChatChannelPatchInput,
+  ): Promise<ChatChannelRecord> {
+    const next = await httpPatchChannel(serverSocket, accessToken, cid, mapChatChannelPatchInput(patch));
+    return mapChatChannelWire(next);
   },
-
-  async listChannelMembers(serverSocket: string, accessToken: string, cid: string): Promise<ChannelMemberDto[]> {
-    return (await httpListChannelMembers(serverSocket, accessToken, cid)) as unknown as ChannelMemberDto[];
+  async listChannelMembers(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelMemberRecord[]> {
+    const list = await httpListChannelMembers(serverSocket, accessToken, cid);
+    return list.map(mapChatChannelMemberWire);
   },
-
   async kickChannelMember(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
     return httpKickChannelMember(serverSocket, accessToken, cid, uid);
   },
-
   async addChannelAdmin(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
     return httpAddChannelAdmin(serverSocket, accessToken, cid, uid);
   },
-
   async removeChannelAdmin(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
     return httpRemoveChannelAdmin(serverSocket, accessToken, cid, uid);
   },
-
-  async listChannelApplications(serverSocket: string, accessToken: string, cid: string): Promise<ChannelApplicationDto[]> {
-    return (await httpListChannelApplications(serverSocket, accessToken, cid)) as unknown as ChannelApplicationDto[];
+  async listChannelApplications(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelApplicationRecord[]> {
+    const list = await httpListChannelApplications(serverSocket, accessToken, cid);
+    return list.map(mapChatChannelApplicationWire);
   },
-
   async decideChannelApplication(
     serverSocket: string,
     accessToken: string,
@@ -119,11 +130,10 @@ export const httpChatApiPort: ChatApiPort = {
   ): Promise<void> {
     return httpDecideChannelApplication(serverSocket, accessToken, cid, applicationId, decision);
   },
-
-  async listChannelBans(serverSocket: string, accessToken: string, cid: string): Promise<ChannelBanDto[]> {
-    return (await httpListChannelBans(serverSocket, accessToken, cid)) as unknown as ChannelBanDto[];
+  async listChannelBans(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelBanRecord[]> {
+    const list = await httpListChannelBans(serverSocket, accessToken, cid);
+    return list.map(mapChatChannelBanWire);
   },
-
   async putChannelBan(
     serverSocket: string,
     accessToken: string,
@@ -134,19 +144,17 @@ export const httpChatApiPort: ChatApiPort = {
   ): Promise<void> {
     return httpPutChannelBan(serverSocket, accessToken, cid, uid, until, reason);
   },
-
   async deleteChannelBan(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
     return httpDeleteChannelBan(serverSocket, accessToken, cid, uid);
   },
-
   async createChannel(
     serverSocket: string,
     accessToken: string,
-    req: Pick<ChannelDto, "name"> & Partial<Pick<ChannelDto, "brief" | "avatar">>,
-  ): Promise<ChannelDto> {
-    return (await httpCreateChannel(serverSocket, accessToken, req)) as unknown as ChannelDto;
+    req: ChatChannelCreateInput,
+  ): Promise<ChatChannelRecord> {
+    const created = await httpCreateChannel(serverSocket, accessToken, mapChatChannelCreateInput(req));
+    return mapChatChannelWire(created);
   },
-
   async deleteChannel(serverSocket: string, accessToken: string, cid: string): Promise<void> {
     return httpDeleteChannel(serverSocket, accessToken, cid);
   },

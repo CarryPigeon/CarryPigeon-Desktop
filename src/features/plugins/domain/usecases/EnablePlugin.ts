@@ -3,14 +3,14 @@
  * @description plugins｜用例：EnablePlugin。
  */
 
-import type { PluginManagerPort, PluginProgressHandler } from "../ports/PluginManagerPort";
+import type { PluginLifecycleCommandPort, PluginProgressHandler } from "../ports/PluginLifecycleCommandPort";
 import type { InstalledPluginState } from "../types/pluginTypes";
 
 /**
  * 用例：启用插件。
  */
 export class EnablePlugin {
-  constructor(private readonly manager: PluginManagerPort) {}
+  constructor(private readonly commandPort: PluginLifecycleCommandPort) {}
 
   /**
    * 执行：启用插件（必要时可能触发安装/切换版本等准备动作）。
@@ -25,6 +25,6 @@ export class EnablePlugin {
     pluginId: string,
     onProgress?: PluginProgressHandler,
   ): Promise<InstalledPluginState> {
-    return this.manager.enable(serverSocket, pluginId, onProgress);
+    return this.commandPort.enable(serverSocket, pluginId, onProgress);
   }
 }

@@ -3,14 +3,14 @@
  * @description plugins｜用例：SwitchPluginVersion。
  */
 
-import type { PluginManagerPort, PluginProgressHandler } from "../ports/PluginManagerPort";
+import type { PluginLifecycleCommandPort, PluginProgressHandler } from "../ports/PluginLifecycleCommandPort";
 import type { InstalledPluginState } from "../types/pluginTypes";
 
 /**
  * 用例：切换插件版本。
  */
 export class SwitchPluginVersion {
-  constructor(private readonly manager: PluginManagerPort) {}
+  constructor(private readonly commandPort: PluginLifecycleCommandPort) {}
 
   /**
    * 执行：切换插件到目标版本（通常会触发下载/校验/解压/切换 currentVersion 等流程）。
@@ -27,6 +27,6 @@ export class SwitchPluginVersion {
     version: string,
     onProgress?: PluginProgressHandler,
   ): Promise<InstalledPluginState> {
-    return this.manager.switchVersion(serverSocket, pluginId, version, onProgress);
+    return this.commandPort.switchVersion(serverSocket, pluginId, version, onProgress);
   }
 }

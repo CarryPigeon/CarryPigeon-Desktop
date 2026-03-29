@@ -2,84 +2,115 @@
 
 ## 定位
 
-plugins 负责“插件能力”的客户端侧全链路落地：从服务端获取插件目录（catalog），到下载/校验/解压安装，再到启用/禁用/切换版本，以及运行时动态加载（`app://plugins/...`）并注册 domain renderer/composer。
+`plugins` 负责客户端侧插件全链路：目录拉取、安装/启停/切换版本、运行时动态加载、以及 domain renderer/composer 注册。
 
-## 职责边界
+## 边界
 
 做什么：
 
-- 插件生命周期：安装、卸载、启用、禁用、切换版本、回滚（对齐 UI 的操作集合）。
-- 插件运行时：动态 import 插件模块，构建 host API（storage/network 等），并把插件提供的 domain 注册给宿主（chat）。
-- 插件目录：从服务端与可选 repo 源拉取 catalog，并进行合并与排序。
+- 插件目录（server catalog + repo catalog）聚合。
+- 插件生命周期命令（安装、启用、禁用、切换、卸载、回滚）。
+- 插件运行时加载与 host API（storage/network）注入。
+- domain registry 维护（供 `chat` 消费）。
 
 不做什么：
 
-- 不直接渲染聊天页面；插件只是提供 renderer/composer，具体渲染发生在 `chat`。
-- 不管理 server socket 的选择与 TLS 配置（由 `servers` 负责），但插件数据/安装路径通常按 server scope 隔离。
+- 不负责聊天 UI 渲染流程（`chat` 负责）。
+- 不负责 server socket/TLS 选择（`server-connection` 负责）。
 
-## 关键概念
+## 跨 Feature 入口（强约束）
 
-- **PluginManagerPort**：插件管理端口抽象（domain 层），向上暴露“目录/安装/启用”等能力。
-- **Catalog（目录）**：可安装插件清单（服务端 catalog + repo catalog 合并后的视图）。
-- **Installed State（已安装状态）**：某个 server scope 下当前已安装插件与启用状态。
-- **Domain Registry（domain 注册表）**：`domain -> renderer/composer/contract` 的索引，供 chat 渲染与输入挂载使用。
-- **权限（permissions）**：插件声明的能力开关（例如是否允许网络访问）；host API 会据此进行裁剪。
+- **跨 feature 只允许通过** `@/features/plugins/api`。
+- 跨 feature 类型约束只允许通过 `@/features/plugins/api-types`。
+- `@/features/plugins/api` 主入口为 `createPluginsCapabilities()` / `getPluginsCapabilities()` 返回的能力对象。
+- `plugins/internal/repoSourcesAccess.ts`、`plugins/internal/workspaceAccess.ts`、`plugins/internal/runtimeAccess.ts` 仅作为根入口的内部访问层，不应被跨 feature 直接引用。
+- `presentation/*`、`di/*`、`data/*`、`mock/*` 与 `domain/ports/*` 视为 feature 内部实现，不作为跨 feature 入口。
+- 跨 feature 不应依赖 Vue `Ref/ComputedRef` 形状；需要响应式适配时，应在消费方 feature 自己的 integration/composable 中完成。
 
-## 目录结构（约定）
+## 目录结构
 
-- `data/`：具体实现（HTTP/Tauri commands、运行时加载、repo catalog 等）。
-- `domain/`：领域模型、ports、用例（与 UI 无关）。
-- `di/`：依赖装配（选择 mock / tauri 实现）。
-- `presentation/`：页面、组件、store（与 UI 状态相关）。
-- `mock/`：脱离后端的 mock 实现。
+- `api.ts`：稳定公共能力入口（`create/getPluginsCapabilities`）。
+- `api-types.ts`：稳定公共类型入口。
+- `contracts/`：跨层共享但不等于“公共入口”的内部稳定契约。
+- `domain/`：领域模型、ports、usecases。
+- `data/`：HTTP/Tauri 适配器。
+- `di/`：依赖装配（mock/live）。
+- `presentation/`：页面、组件、store、runtime。
+- `mock/`：本地 mock。
 
-## 主要入口（导航）
+根入口拆分（内部实现）：
 
-- 页面：
-  - 插件中心：`src/features/plugins/presentation/pages/PluginCenterPage.vue`
-  - 插件详情：`src/features/plugins/presentation/pages/PluginDetailPage.vue`
-  - Domain 目录：`src/features/plugins/presentation/pages/DomainCatalogPage.vue`
-- 领域端口：`src/features/plugins/domain/ports/PluginManagerPort.ts`
-- 领域用例：`src/features/plugins/domain/usecases/`
-  - 运行时编排用例：`src/features/plugins/domain/usecases/ApplyPluginRuntimeOps.ts`
-- 运行时加载：`src/features/plugins/presentation/runtime/pluginRuntime.ts`
-- 展示层 store（按 server scope 缓存）：
-  - 目录：`src/features/plugins/presentation/store/pluginCatalogStore.ts`
-  - 安装状态：`src/features/plugins/presentation/store/pluginInstallStore.ts`
-  - 运行时注册表：`src/features/plugins/presentation/store/domainRegistryStore.ts`
-  - domain 目录：`src/features/plugins/presentation/store/domainCatalogStore.ts`
-  - repo 源：`src/features/plugins/presentation/store/repoSourcesStore.ts`
-- store 统一入口（跨 feature 推荐）：`src/features/plugins/presentation/store/index.ts`
+- `internal/repoSourcesAccess.ts`：repo source 管理访问层。
+- `internal/workspaceAccess.ts`：catalog / installed state 工作区访问层。
+- `internal/runtimeAccess.ts`：runtime view、host bridge 与 domain 查询访问层。
 
-## 关键流程（概览）
+## 运行时分层（当前）
 
-- 拉取目录（catalog）：
-  1) `usePluginCatalogStore(serverSocket).refresh()`
-  2) 通过 `PluginManagerPort.listCatalog(server)` 拉取服务端 catalog
-  3) 通过 `repoSourcesStore` 拉取 repo catalog（可选）
-  4) 合并去重、排序后写入 store（required 优先、按名称排序）
-- 安装插件：
-  1) UI 选择版本并调用 `InstallPlugin` 用例（经由 `PluginManagerPort.install`）
-  2) 后端/原生侧下载 zip、校验 sha256、解压到 per-server 的本地目录
-  3) 写入 installed/current/state 等状态文件
-  4) 刷新 installed list 并（可选）启用运行时
-- 启用/禁用与切换版本：
-  - 更新 installed state
-  - `DomainRegistryStore` 动态加载对应版本的运行时模块并注册 domains
+- `presentation/runtime/runtimeGateway.ts`：Tauri 命令调用。
+- `presentation/runtime/hostApiFactory.ts`：受控 host API 构造。
+- `presentation/runtime/moduleNormalizers.ts`：Raw DTO -> Model 规范化。
+- `presentation/runtime/pluginRuntime.ts`：运行时编排与模块加载。
 
-说明：
+## 关键流程
 
-- 展示层 `pluginInstallStore` 负责 UI 状态（busy/progress）与错误呈现；
-- 版本切换/回滚/运行时校验等编排逻辑已下沉到领域用例 `ApplyPluginRuntimeOps`，避免 store 过重。
+### 目录刷新
 
-## 与其他模块的协作
+1. `usePluginCatalogStore(serverSocket).refresh()` 拉取 server catalog。
+2. 从启用的 repo source 列表拉取 repo catalog（可选）。
+3. 合并、去重、排序后写入 catalog store。
 
-- `chat`：消费 `DomainRegistryStore` 提供的 renderer/composer，用于消息渲染与输入面板挂载。
-- `servers`：提供 server socket 与 server_id（用于插件隔离与安装目录划分；缺失时应阻断安装/启用）。
-- `shared/net/*`：HTTP 请求与鉴权头构建；插件网络权限通常由 host API 进行限制。
+### 生命周期命令
+
+1. UI 通过 `pluginInstallStore` 触发动作（install/updateToLatest/enable/disable/switchVersion/uninstall/rollback）。
+2. `install` 走 `commandPort.install/installFromUrl`；其余生命周期动作通过应用层编排 `ApplyPluginRuntimeOps`。
+3. 命令执行后刷新 installed state，并通知 runtime/registry 同步。
+
+### 安装态动作分层速查
+
+| 分层 | 文件 | 主要职责 |
+| --- | --- | --- |
+| 动作集合 | `presentation/store/pluginInstallActions.ts` | 聚合 install/update 与 lifecycle 两组动作，对 store 暴露稳定动作接口 |
+| 安装更新动作 | `presentation/store/pluginInstallInstallUpdateActions.ts` | `install` / `updateToLatest`，处理目录版本解析与下载来源 |
+| 生命周期动作 | `presentation/store/pluginInstallLifecycleActions.ts` | `switchVersion` / `rollback` / `enable` / `disable` / `uninstall` |
+| 通用执行器 | `presentation/store/pluginInstallOperationHelpers.ts` | busy gate、进度回调、失败回填、统一操作包装 |
+| 操作常量 | `presentation/store/pluginInstallOperations.ts` | 安装态动作常量与联合类型（单一字面量来源） |
+| 读模型与 required | `presentation/store/pluginInstallSelectors.ts` | `isInstalled/isEnabled/isFailed` 与 required 缺失重检 |
+| 共享类型 | `presentation/store/pluginInstallActionTypes.ts` | actions deps 与动作集合类型 |
+
+### runtime 装载
+
+1. `domainRegistryStore.ensureLoaded()` 读取已安装且启用的插件。
+2. 通过 runtime gateway 获取 entry 信息。
+3. 动态 import `app://plugins/...` 模块并规范化导出。
+4. 注册 domains（renderer/composer/contract）供 chat 消费。
+
+## 主要文件
+
+- API：`src/features/plugins/api.ts`
+- 公共类型：`src/features/plugins/api-types.ts`
+- 工作区控制器：`src/features/plugins/internal/workspaceAccess.ts`
+- 目录 store：`src/features/plugins/presentation/store/pluginCatalogStore.ts`
+- 安装态 store：`src/features/plugins/presentation/store/pluginInstallStore.ts`
+  - 操作编排 helper：`src/features/plugins/presentation/store/pluginInstallOperationHelpers.ts`
+  - 动作集合（聚合 install/update + lifecycle）：`src/features/plugins/presentation/store/pluginInstallActions.ts`
+  - install/update 动作：`src/features/plugins/presentation/store/pluginInstallInstallUpdateActions.ts`
+  - lifecycle 动作（switch/rollback/enable/disable/uninstall）：`src/features/plugins/presentation/store/pluginInstallLifecycleActions.ts`
+  - 动作共享类型：`src/features/plugins/presentation/store/pluginInstallActionTypes.ts`
+  - 操作常量：`src/features/plugins/presentation/store/pluginInstallOperations.ts`
+  - 安装态 selectors：`src/features/plugins/presentation/store/pluginInstallSelectors.ts`
+- 注册表 store：`src/features/plugins/presentation/store/domainRegistryStore.ts`
+- 运行时编排：`src/features/plugins/presentation/runtime/pluginRuntime.ts`
+
+## 公共 API 设计约定
+
+- `api.ts` 采用 object-capability：通过 `createPluginsCapabilities()` 组装最小公共能力面；`getPluginsCapabilities()` 用于可选的应用级访问器。
+- `api-types.ts` 只保留跨 feature 真正需要直接引用的稳定类型与 `PluginsCapabilities` 契约；控制器与快照等辅助类型优先从 capability 契约局部推导，而不是继续增加新的根公共类型名。
+- 工作区能力统一从 `capabilities.workspace.createCapabilities()` 获取；返回的是 plain capability，若消费方需要 `computed`/`watch`，应在自身 feature 内部做本地响应式适配。
+- server-scoped 能力统一通过 `capabilities.forServer(serverSocket)` 绑定上下文，避免在根公开面重复透传 `serverSocket`。
+- 运行时采用 `capabilities.runtime.acquireLease()`，而不是根级 `startRuntime()`。
+- 运行时只读查询统一使用 `capabilities.forServer(serverSocket).getRuntimeCapabilities()`，避免把普通查询函数命名成 Vue composable。
 
 ## 相关文档
 
-- `docs/tmp/prd-api-migration-matrix-v1.1-v1.0.md`
 - `docs/design/client/PLUGIN-INSTALL-UPDATE.md`
 - `docs/design/client/APP-URL-SPEC.md`

@@ -10,16 +10,16 @@
  * - `GET /api/domains/catalog` (`docs/api/11-HTTP端点清单（v1，标准版）.md`)
  */
 
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import { createDomainCatalogContext } from "@/features/plugins/api";
-import { useCurrentServerContext } from "@/features/servers/api";
+import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
+import { createDomainCatalogContext } from "@/features/plugins/presentation/composables/useDomainCatalogContext";
 
 const router = useRouter();
 const q = ref("");
 
-const { socket, serverId, refreshServerInfo } = useCurrentServerContext();
+const { socket, serverId, refreshServerInfo } = usePluginsServerWorkspace();
 const { domainCatalogStore, refreshDomainCatalog } = createDomainCatalogContext(socket);
 
 /**
@@ -44,29 +44,6 @@ function computeFiltered() {
 }
 
 const filtered = computed(computeFiltered);
-
-let queryTimer: number | null = null;
-
-/**
- * watch 源：搜索关键字。
- *
- * @returns 当前 query 字符串。
- */
-function watchQuery(): string {
-  return q.value;
-}
-
-/**
- * 对输入变化做 debounce，保持输入体验流畅。
- */
-function handleQueryChange(): void {
-  if (queryTimer) window.clearTimeout(queryTimer);
-  queryTimer = window.setTimeout(() => {
-    queryTimer = null;
-  }, 120);
-}
-
-watch(watchQuery, handleQueryChange);
 
 onMounted(() => {
   void refresh();

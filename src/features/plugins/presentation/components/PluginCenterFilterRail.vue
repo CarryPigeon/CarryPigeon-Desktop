@@ -14,7 +14,7 @@
  */
 
 import { useI18n } from "vue-i18n";
-import type { RepoSource } from "@/features/plugins/presentation/store";
+import type { RepoSource } from "@/features/plugins/contracts/repoSource";
 
 type FilterKind = "all" | "installed" | "enabled" | "failed" | "updates" | "required";
 type SourceKind = "all" | "server" | "repo";
@@ -24,7 +24,7 @@ const props = defineProps<{
   filter: FilterKind;
   source: SourceKind;
   enabledRepoCount: number;
-  repoSources: RepoSource[];
+  repoSources: readonly Readonly<RepoSource>[];
   showRepoManager: boolean;
   repoDraft: string;
   repoNoteDraft: string;

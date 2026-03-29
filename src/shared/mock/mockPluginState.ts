@@ -43,3 +43,13 @@ export function setMockPluginsState(serverSocket: string, next: MockPluginsState
   const key = `${MOCK_KEYS.pluginsStatePrefix}${serverSocket.trim()}`;
   writeJson(key, next);
 }
+
+/**
+ * 清除某个服务器下的 mock 插件状态。
+ *
+ * @param serverSocket - 服务器 Socket 地址（用于 localStorage 命名空间隔离）。
+ */
+export function clearMockPluginsState(serverSocket: string): void {
+  const key = `${MOCK_KEYS.pluginsStatePrefix}${serverSocket.trim()}`;
+  localStorage.removeItem(key);
+}

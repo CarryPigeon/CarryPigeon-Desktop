@@ -11,55 +11,14 @@
  */
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
-import type { PluginCatalogEntry, PluginDomainPort, PluginPermission } from "@/features/plugins/domain/types/pluginTypes";
+import type { PluginCatalogPort } from "@/features/plugins/domain/ports/PluginCatalogPort";
+import type { PluginCatalogEntry } from "@/features/plugins/domain/types/pluginTypes";
+import { mapCatalogPluginEntry, type ApiCatalogPluginRecord } from "./pluginCatalogMappers";
 
 type ApiCatalogResponse = {
   required_plugins?: string[];
-  plugins: Array<{
-    plugin_id: string;
-    name: string;
-    version: string;
-    required?: boolean;
-    permissions?: string[];
-    provides_domains?: Array<{ domain: string; domain_version: string }>;
-    download?: { url?: string; sha256?: string };
-  }>;
+  plugins: ApiCatalogPluginRecord[];
 };
-
-/**
- * 将 domain 字符串映射为 UI 颜色 token。
- *
- * 用途：
- * 即使服务端不提供“domain 颜色”相关 UI 元数据，也能保持插件中心的可读性与稳定视觉区分。
- *
- * @param domain - Domain 名称（例如 `Core:Text`）。
- * @returns Patchbay CSS 颜色变量之一。
- */
-function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] {
-  const d = domain.trim();
-  if (d.startsWith("Core:")) return "--cp-domain-core";
-  if (!d) return "--cp-domain-unknown";
-
-  // 扩展 domain 的通用映射：稳定但不绑定具体业务场景。
-  let hash = 0;
-  for (let i = 0; i < d.length; i += 1) hash = (hash * 31 + d.charCodeAt(i)) >>> 0;
-  const lane = hash % 3;
-  if (lane === 0) return "--cp-domain-ext-a";
-  if (lane === 1) return "--cp-domain-ext-b";
-  return "--cp-domain-ext-c";
-}
-
-/**
- * 将 permission key 映射为 UI 权限描述。
- *
- * @param key - Permission key 字符串。
- * @returns 权限描述对象。
- */
-function mapPermission(key: string): PluginPermission {
-  const k = key.trim();
-  const risk: PluginPermission["risk"] = k === "network" ? "high" : "medium";
-  return { key: k, label: k, risk };
-}
 
 /**
  * 拉取服务端插件目录并映射为 `PluginCatalogEntry[]`。
@@ -79,38 +38,16 @@ export async function fetchServerPluginCatalog(serverSocket: string): Promise<Pl
   const out: PluginCatalogEntry[] = [];
   for (const p of raw.plugins ?? []) {
     const pluginId = String(p.plugin_id ?? "").trim();
-    if (!pluginId) continue;
-
-    const providesDomains: PluginDomainPort[] = [];
-    for (const d of p.provides_domains ?? []) {
-      const domain = String(d.domain ?? "").trim();
-      const domainVersion = String(d.domain_version ?? "").trim();
-      if (!domain) continue;
-      providesDomains.push({
-        id: domain,
-        label: domain,
-        version: domainVersion || "1.0.0",
-        colorVar: mapDomainColorVar(domain),
-      });
-    }
-
-    const permissions = (p.permissions ?? []).map((x) => mapPermission(String(x)));
-    const downloadUrl = String(p.download?.url ?? "").trim() || undefined;
-
-    out.push({
-      pluginId,
-      name: String(p.name ?? pluginId).trim() || pluginId,
-      tagline: "",
-      description: "",
-      source: "server",
-      downloadUrl,
-      sha256: String(p.download?.sha256 ?? "").trim(),
-      required: Boolean(p.required) || required.has(pluginId),
-      versions: [String(p.version ?? "").trim()].filter(Boolean),
-      providesDomains,
-      permissions,
-    });
+    const entry = mapCatalogPluginEntry(p, "server", Boolean(p.required) || required.has(pluginId));
+    if (entry) out.push(entry);
   }
 
   return out;
 }
+
+/**
+ * HTTP 版本的服务端插件目录端口实现。
+ */
+export const httpServerPluginCatalogPort: PluginCatalogPort = {
+  listCatalog: fetchServerPluginCatalog,
+};

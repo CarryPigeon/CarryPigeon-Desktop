@@ -5,4 +5,5 @@
 //! 约定：注释中文，日志英文（tracing）。
 pub mod plugin_manager;
 pub mod plugin_manifest;
+pub mod plugin_ports;
 pub mod plugin_store;

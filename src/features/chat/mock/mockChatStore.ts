@@ -4,27 +4,59 @@
  */
 
 import { computed, reactive, ref } from "vue";
-import { usePluginCatalogStore, usePluginInstallStore } from "@/features/plugins/api";
-import { currentServerSocket } from "@/features/servers/api";
-import { currentUser } from "@/features/user/api";
+import { currentChatUser, currentChatUsername } from "@/features/chat/integration/accountSession";
+import { getAvailableChatMessageDomains } from "@/features/chat/integration/pluginRuntime";
+import { chatCurrentServerSocket } from "@/features/chat/integration/serverWorkspace";
 import type {
-  ChatChannel,
-  ChatMember,
   ChatMessage,
-  ChatStore,
+  ChatMessageActionErrorInfo,
   MessageDomain,
   ComposerSubmitPayload,
-  ChannelMember,
+  DeleteChatMessageOutcome,
+  SendChatMessageOutcome,
+} from "@/features/chat/message-flow/contracts";
+import type { ChatChannel } from "@/features/chat/room-session/contracts";
+import type { ChannelSelectionOutcome } from "@/features/chat/room-session/contracts";
+import type {
+  ApplyJoinChannelOutcome,
   ChannelApplication,
   ChannelBan,
-} from "../presentation/store/chatStoreTypes";
+  ChannelMember,
+  ChatMember,
+  CreateChannelOutcome,
+  DeleteChannelOutcome,
+  GovernanceCommandErrorCode,
+  GovernanceCommandErrorInfo,
+  GrantChannelAdminOutcome,
+  GovernanceChannelSummary,
+  KickChannelMemberOutcome,
+  RemoveChannelBanOutcome,
+  RevokeChannelAdminOutcome,
+  SetChannelBanOutcome,
+  UpdateChannelMetaOutcome,
+  DecideChannelApplicationOutcome,
+} from "@/features/chat/room-governance/contracts";
+import type { ChatRuntimeStore } from "@/features/chat/presentation/store/chatStoreTypes";
 
 /**
  * 创建 mock store 实现（纯内存）。
  *
- * @returns `ChatStore`。
+ * @returns `ChatRuntimeStore`。
  */
-export function createMockChatStore(): ChatStore {
+export function createMockChatStore(): ChatRuntimeStore {
+  function createGovernanceError(
+    code: GovernanceCommandErrorCode,
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): GovernanceCommandErrorInfo {
+    return {
+      code,
+      message,
+      retryable: code === "governance_action_failed",
+      details,
+    };
+  }
+
   const state = reactive({
     channels: [
       { id: "cid-ann", name: "Announcements", unread: 0, brief: "Patch notes and release signals.", joined: true, joinRequested: false },
@@ -94,6 +126,12 @@ export function createMockChatStore(): ChatStore {
       "cid-tech": Date.now(),
       "cid-lab": Date.now() - 1000 * 60 * 60,
     } as Record<string, number>,
+    lastReadMidByChannel: {
+      "cid-ann": "m-1",
+      "cid-prod": "m-3",
+      "cid-tech": "m-4",
+      "cid-lab": "m-5",
+    } as Record<string, string>,
   });
 
   const channelSearch = ref<string>("");
@@ -101,7 +139,7 @@ export function createMockChatStore(): ChatStore {
   const composerDraft = ref<string>("");
   const selectedDomainId = ref<string>("Core:Text");
   const replyToMessageId = ref<string>("");
-  const sendError = ref<string>("");
+  const messageActionError = ref<ChatMessageActionErrorInfo | null>(null);
   const currentChannelId = ref<string>("cid-prod");
   const sendAttempt = ref<number>(0);
 
@@ -127,6 +165,7 @@ export function createMockChatStore(): ChatStore {
   const currentChannelHasMore = computed(() => false);
   const loadingMoreMessages = computed(() => false);
   const currentChannelLastReadTimeMs = computed(() => state.lastReadTimeMsByChannel[currentChannelId.value] ?? 0);
+  const currentChannelLastReadMid = computed(() => state.lastReadMidByChannel[currentChannelId.value] ?? "");
 
   /**
    * 确保 mock chat store 已就绪。
@@ -146,23 +185,7 @@ export function createMockChatStore(): ChatStore {
    * @returns domain 列表。
    */
   function availableDomains(): MessageDomain[] {
-    const socket = currentServerSocket.value.trim();
-    const catalog = usePluginCatalogStore(socket).catalog.value;
-    const install = usePluginInstallStore(socket).installedById;
-
-    const enabledDomains: MessageDomain[] = [];
-    for (const p of catalog) {
-      const st = install[p.pluginId];
-      const ok = Boolean(st?.enabled) && st?.status === "ok";
-      if (!ok) continue;
-      for (const d of p.providesDomains) enabledDomains.push({ ...d, pluginIdHint: p.pluginId });
-    }
-
-    const core: MessageDomain = { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core", pluginIdHint: "core.text", version: "1.0.0" };
-    const unique = new Map<string, MessageDomain>();
-    unique.set(core.id, core);
-    for (const d of enabledDomains) unique.set(d.id, d);
-    return Array.from(unique.values());
+    return getAvailableChatMessageDomains(chatCurrentServerSocket.value.trim());
   }
 
   /**
@@ -184,14 +207,47 @@ export function createMockChatStore(): ChatStore {
    * 选择频道并清空未读计数。
    *
    * @param id - 目标频道 id。
-   * @returns `Promise<void>`。
+   * @returns 显式频道切换结果。
    */
-  async function selectChannel(id: string): Promise<void> {
-    currentChannelId.value = id;
-    for (const c of state.channels) {
-      if (c.id === id) c.unread = 0;
+  async function selectChannel(id: string): Promise<ChannelSelectionOutcome> {
+    const channelId = String(id ?? "").trim();
+    if (!channelId) {
+      return {
+        ok: false,
+        kind: "chat_channel_selection_rejected",
+        error: {
+          code: "missing_channel_id",
+          message: "Missing channel id.",
+          retryable: false,
+        },
+      };
     }
-    state.lastReadTimeMsByChannel[id] = Date.now();
+    const channel = state.channels.find((item) => item.id === channelId);
+    if (!channel) {
+      return {
+        ok: false,
+        kind: "chat_channel_selection_rejected",
+        error: {
+          code: "channel_not_found",
+          message: "Channel not found.",
+          retryable: false,
+          details: { channelId },
+        },
+      };
+    }
+
+    currentChannelId.value = channelId;
+    for (const c of state.channels) {
+      if (c.id === channelId) c.unread = 0;
+    }
+    state.lastReadTimeMsByChannel[channelId] = Date.now();
+    const list = state.messagesByChannel[channelId] ?? [];
+    state.lastReadMidByChannel[channelId] = list[list.length - 1]?.id ?? state.lastReadMidByChannel[channelId] ?? "";
+    return {
+      ok: true,
+      kind: "chat_channel_selected",
+      channelId,
+    };
   }
 
   /**
@@ -203,6 +259,8 @@ export function createMockChatStore(): ChatStore {
     const cid = currentChannelId.value.trim();
     if (!cid) return;
     state.lastReadTimeMsByChannel[cid] = Date.now();
+    const list = state.messagesByChannel[cid] ?? [];
+    state.lastReadMidByChannel[cid] = list[list.length - 1]?.id ?? state.lastReadMidByChannel[cid] ?? "";
   }
 
   /**
@@ -223,7 +281,7 @@ export function createMockChatStore(): ChatStore {
    * @param channelId - 目标频道 id。
    * @returns `Promise<void>`。
    */
-  async function applyJoin(channelId: string): Promise<void> {
+  async function applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome> {
     let target: ChatChannel | null = null;
     for (const x of state.channels) {
       if (x.id === channelId) {
@@ -231,7 +289,20 @@ export function createMockChatStore(): ChatStore {
         break;
       }
     }
-    if (!target || target.joined) return;
+    if (!target) {
+      return {
+        ok: false,
+        kind: "channel_join_applied_rejected",
+        error: createGovernanceError("missing_channel_id", "Channel not found.", { channelId }),
+      };
+    }
+    if (target.joined) {
+      return {
+        ok: true,
+        kind: "channel_join_applied",
+        channelId,
+      };
+    }
     target.joinRequested = true;
     window.setTimeout(() => {
       target!.joinRequested = false;
@@ -239,6 +310,11 @@ export function createMockChatStore(): ChatStore {
       channelTab.value = "joined";
       state.lastReadTimeMsByChannel[target!.id] = Date.now();
     }, 650);
+    return {
+      ok: true,
+      kind: "channel_join_applied",
+      channelId,
+    };
   }
 
   /**
@@ -248,12 +324,29 @@ export function createMockChatStore(): ChatStore {
    * @param patch - 部分更新字段。
    * @returns `Promise<void>`。
    */
-  async function updateChannelMeta(channelId: string, patch: Partial<Pick<ChatChannel, "name" | "brief">>): Promise<void> {
+  async function updateChannelMeta(
+    channelId: string,
+    patch: Partial<Pick<ChatChannel, "name" | "brief">>,
+  ): Promise<UpdateChannelMetaOutcome> {
+    let found = false;
     for (const c of state.channels) {
       if (c.id !== channelId) continue;
+      found = true;
       if (typeof patch.name === "string") c.name = patch.name.trim() || c.name;
       if (typeof patch.brief === "string") c.brief = patch.brief;
     }
+    if (!found) {
+      return {
+        ok: false,
+        kind: "channel_meta_updated_rejected",
+        error: createGovernanceError("missing_channel_id", "Channel not found.", { channelId }),
+      };
+    }
+    return {
+      ok: true,
+      kind: "channel_meta_updated",
+      channelId,
+    };
   }
 
   /**
@@ -264,7 +357,7 @@ export function createMockChatStore(): ChatStore {
    */
   function startReply(messageId: string): void {
     replyToMessageId.value = messageId;
-    sendError.value = "";
+    messageActionError.value = null;
   }
 
   /**
@@ -280,55 +373,107 @@ export function createMockChatStore(): ChatStore {
    * 从当前频道删除消息（mock 硬删除）。
    *
    * @param messageId - 目标消息 id。
-   * @returns `Promise<void>`。
+   * @returns 删除结果。
    */
-  async function deleteMessage(messageId: string): Promise<void> {
+  async function deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome> {
     const list = state.messagesByChannel[currentChannelId.value] ?? [];
     const idx = list.findIndex((m) => m.id === messageId);
-    if (idx >= 0) list.splice(idx, 1);
+    if (idx < 0) {
+      const error: ChatMessageActionErrorInfo = {
+        code: "delete_failed",
+        message: "Message not found.",
+        retryable: false,
+        details: { messageId },
+      };
+      messageActionError.value = error;
+      return {
+        ok: false,
+        kind: "chat_message_delete_rejected",
+        error,
+      };
+    }
+    list.splice(idx, 1);
+    messageActionError.value = null;
+    return {
+      ok: true,
+      kind: "chat_message_deleted",
+      messageId,
+    };
   }
 
   /**
    * 发送当前作曲器草稿消息（mock）。
    *
    * @param payload - 可选插件 payload（domain composer 提交）。
-   * @returns `Promise<void>`。
+   * @returns 发送结果。
    */
-  async function sendComposerMessage(payload?: ComposerSubmitPayload): Promise<void> {
+  async function sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome> {
     const uiDomain = selectedDomainId.value.trim();
     const isCoreText = uiDomain === "Core:Text";
     const text = composerDraft.value.trim();
-    if (!payload && isCoreText && !text) return;
+    if (!payload && isCoreText && !text) {
+      const error: ChatMessageActionErrorInfo = {
+        code: "missing_domain",
+        message: "Missing message payload.",
+        retryable: false,
+      };
+      messageActionError.value = error;
+      return {
+        ok: false,
+        kind: "chat_message_send_rejected",
+        error,
+      };
+    }
     if (!payload && !isCoreText) {
-      sendError.value = "This domain requires a plugin composer.";
-      return;
+      const error: ChatMessageActionErrorInfo = {
+        code: "plugin_composer_required",
+        message: "This domain requires a plugin composer.",
+        retryable: false,
+      };
+      messageActionError.value = error;
+      return {
+        ok: false,
+        kind: "chat_message_send_rejected",
+        error,
+      };
     }
 
     sendAttempt.value += 1;
     if (sendAttempt.value % 5 === 0) {
-      sendError.value = "Send failed (mock): link jitter. Draft kept — retry.";
-      return;
+      const error: ChatMessageActionErrorInfo = {
+        code: "send_failed",
+        message: "Send failed (mock): link jitter. Draft kept - retry.",
+        retryable: true,
+      };
+      messageActionError.value = error;
+      return {
+        ok: false,
+        kind: "chat_message_send_rejected",
+        error,
+      };
     }
-    sendError.value = "";
+    messageActionError.value = null;
 
     const now = Date.now();
     const list = state.messagesByChannel[currentChannelId.value] ?? (state.messagesByChannel[currentChannelId.value] = []);
-    const from = { id: String(currentUser.id || "u-1"), name: currentUser.username || "Operator" };
+    const from = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator" };
     const replyToId = replyToMessageId.value || undefined;
+    let createdMessage: ChatMessage;
 
     if (payload) {
-      list.push({
+      createdMessage = {
         id: `m-${now}`,
         kind: "domain_message",
         from,
         timeMs: now,
-        domain: { id: payload.domain, label: payload.domain, colorVar: "--cp-domain-ext-a", version: payload.domain_version },
-        preview: `UNPATCHED SIGNAL · ${payload.domain}@${payload.domain_version}`,
+        domain: { id: payload.domain, label: payload.domain, colorVar: "--cp-domain-ext-a", version: payload.domainVersion },
+        preview: `UNPATCHED SIGNAL · ${payload.domain}@${payload.domainVersion}`,
         data: payload.data,
         replyToId,
-      });
+      };
+      list.push(createdMessage);
     } else {
-      list.push({
+      createdMessage = {
         id: `m-${now}`,
         kind: "core_text",
         from,
@@ -336,12 +481,18 @@ export function createMockChatStore(): ChatStore {
         domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
         text,
         replyToId,
-      });
+      };
+      list.push(createdMessage);
       composerDraft.value = "";
     }
 
     replyToMessageId.value = "";
     state.lastReadTimeMsByChannel[currentChannelId.value] = now;
+    return {
+      ok: true,
+      kind: "chat_message_sent",
+      message: createdMessage,
+    };
   }
 
   // ============================================================================
@@ -371,9 +522,23 @@ export function createMockChatStore(): ChatStore {
    * @param uid - 用户 id。
    * @returns `Promise<void>`。
    */
-  async function kickMember(channelId: string, uid: string): Promise<void> {
+  async function kickMember(channelId: string, uid: string): Promise<KickChannelMemberOutcome> {
     void channelId;
+    const before = state.members.length;
     state.members = state.members.filter((m) => m.id !== uid);
+    if (state.members.length === before) {
+      return {
+        ok: false,
+        kind: "channel_member_kicked_rejected",
+        error: createGovernanceError("missing_user_id", "Member not found.", { channelId, uid }),
+      };
+    }
+    return {
+      ok: true,
+      kind: "channel_member_kicked",
+      channelId,
+      uid,
+    };
   }
 
   /**
@@ -383,13 +548,28 @@ export function createMockChatStore(): ChatStore {
    * @param uid - 用户 id。
    * @returns `Promise<void>`。
    */
-  async function setAdmin(channelId: string, uid: string): Promise<void> {
+  async function setAdmin(channelId: string, uid: string): Promise<GrantChannelAdminOutcome> {
     void channelId;
+    let updated = false;
     for (const m of state.members) {
       if (m.id === uid && m.role === "member") {
         m.role = "admin";
+        updated = true;
       }
     }
+    if (!updated) {
+      return {
+        ok: false,
+        kind: "channel_admin_granted_rejected",
+        error: createGovernanceError("missing_user_id", "Member not found or already elevated.", { channelId, uid }),
+      };
+    }
+    return {
+      ok: true,
+      kind: "channel_admin_granted",
+      channelId,
+      uid,
+    };
   }
 
   /**
@@ -399,13 +579,28 @@ export function createMockChatStore(): ChatStore {
    * @param uid - 用户 id。
    * @returns `Promise<void>`。
    */
-  async function removeAdmin(channelId: string, uid: string): Promise<void> {
+  async function removeAdmin(channelId: string, uid: string): Promise<RevokeChannelAdminOutcome> {
     void channelId;
+    let updated = false;
     for (const m of state.members) {
       if (m.id === uid && m.role === "admin") {
         m.role = "member";
+        updated = true;
       }
     }
+    if (!updated) {
+      return {
+        ok: false,
+        kind: "channel_admin_revoked_rejected",
+        error: createGovernanceError("missing_user_id", "Admin not found.", { channelId, uid }),
+      };
+    }
+    return {
+      ok: true,
+      kind: "channel_admin_revoked",
+      channelId,
+      uid,
+    };
   }
 
   /**
@@ -436,12 +631,23 @@ export function createMockChatStore(): ChatStore {
    * @param approved - 是否通过。
    * @returns `Promise<void>`。
    */
-  async function decideApplication(channelId: string, applicationId: string, approved: boolean): Promise<void> {
+  async function decideApplication(
+    channelId: string,
+    applicationId: string,
+    approved: boolean,
+  ): Promise<DecideChannelApplicationOutcome> {
     void channelId;
     void applicationId;
     if (approved) {
       state.members.push({ id: "u-new-1", name: "NewUser", role: "member" });
     }
+    return {
+      ok: true,
+      kind: "channel_application_decided",
+      channelId,
+      applicationId,
+      decision: approved ? "approve" : "reject",
+    };
   }
 
   /**
@@ -464,12 +670,15 @@ export function createMockChatStore(): ChatStore {
    * @param reason - 原因。
    * @returns `Promise<void>`。
    */
-  async function setBan(channelId: string, uid: string, until: number, reason: string): Promise<void> {
-    void channelId;
-    void uid;
-    void until;
+  async function setBan(channelId: string, uid: string, until: number, reason: string): Promise<SetChannelBanOutcome> {
     void reason;
-    return;
+    return {
+      ok: true,
+      kind: "channel_ban_upserted",
+      channelId,
+      uid,
+      until,
+    };
   }
 
   /**
@@ -479,10 +688,13 @@ export function createMockChatStore(): ChatStore {
    * @param uid - 用户 id。
    * @returns `Promise<void>`。
    */
-  async function removeBan(channelId: string, uid: string): Promise<void> {
-    void channelId;
-    void uid;
-    return;
+  async function removeBan(channelId: string, uid: string): Promise<RemoveChannelBanOutcome> {
+    return {
+      ok: true,
+      kind: "channel_ban_removed",
+      channelId,
+      uid,
+    };
   }
 
   /**
@@ -492,7 +704,14 @@ export function createMockChatStore(): ChatStore {
    * @param brief - 频道简介。
    * @returns `Promise<ChatChannel>`。
    */
-  async function createChannel(name: string, brief?: string): Promise<ChatChannel> {
+  async function createChannel(name: string, brief?: string): Promise<CreateChannelOutcome> {
+    if (!name.trim()) {
+      return {
+        ok: false,
+        kind: "channel_created_rejected",
+        error: createGovernanceError("missing_channel_name", "Channel name is required."),
+      };
+    }
     const newChannel: ChatChannel = {
       id: `cid-${Date.now()}`,
       name: name.trim(),
@@ -504,7 +723,12 @@ export function createMockChatStore(): ChatStore {
     state.channels.push(newChannel);
     state.messagesByChannel[newChannel.id] = [];
     state.lastReadTimeMsByChannel[newChannel.id] = Date.now();
-    return newChannel;
+    state.lastReadMidByChannel[newChannel.id] = "";
+    return {
+      ok: true,
+      kind: "channel_created",
+      channel: newChannel as GovernanceChannelSummary,
+    };
   }
 
   /**
@@ -513,13 +737,27 @@ export function createMockChatStore(): ChatStore {
    * @param channelId - 频道 id。
    * @returns `Promise<void>`。
    */
-  async function deleteChannel(channelId: string): Promise<void> {
+  async function deleteChannel(channelId: string): Promise<DeleteChannelOutcome> {
+    const existed = state.channels.some((c) => c.id === channelId);
+    if (!existed) {
+      return {
+        ok: false,
+        kind: "channel_deleted_rejected",
+        error: createGovernanceError("missing_channel_id", "Channel not found.", { channelId }),
+      };
+    }
     state.channels = state.channels.filter((c) => c.id !== channelId);
     delete state.messagesByChannel[channelId];
     delete state.lastReadTimeMsByChannel[channelId];
+    delete state.lastReadMidByChannel[channelId];
     if (currentChannelId.value === channelId) {
       currentChannelId.value = state.channels[0]?.id ?? "";
     }
+    return {
+      ok: true,
+      kind: "channel_deleted",
+      channelId,
+    };
   }
 
   return {
@@ -530,12 +768,13 @@ export function createMockChatStore(): ChatStore {
     composerDraft,
     selectedDomainId,
     replyToMessageId,
-    sendError,
+    messageActionError,
     currentChannelId,
     currentMessages,
     currentChannelHasMore,
     loadingMoreMessages,
     currentChannelLastReadTimeMs,
+    currentChannelLastReadMid,
     members,
     ensureChatReady,
     availableDomains,

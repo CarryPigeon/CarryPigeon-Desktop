@@ -2,14 +2,46 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
-use std::collections::BTreeMap;
-
-use anyhow::Context;
-use sha2::Digest;
-use tokio::net::TcpStream;
-
-use crate::features::network::di::commands::{ApiRequestJsonArgs, ApiRequestJsonResult};
+use crate::features::network::domain::ports::api_request_port::{
+    ApiHttpRequest, ApiHttpResponse, ApiHttpTlsPolicy, ApiRequestPort,
+};
 use crate::shared::net::origin::to_http_origin;
+
+/// `/api/*` JSON 请求参数（前端 -> Rust）。
+///
+/// # 说明
+/// - 该结构属于网络请求用例模型；
+/// - 仅允许请求 `/api/*` 路径（由用例层校验）。
+#[derive(Debug, Clone)]
+pub struct ApiJsonRequest {
+    /// 服务器 socket 地址（用于 TLS 策略与网络命名空间）。
+    pub server_socket: String,
+    /// HTTP method（例如 `GET` / `POST`）。
+    pub method: String,
+    /// API 路径（必须以 `/api/` 开头）。
+    pub path: String,
+    /// 请求头（可选）。
+    pub headers: Option<std::collections::BTreeMap<String, String>>,
+    /// JSON 请求体（可选）。
+    pub body: Option<serde_json::Value>,
+    /// TLS 策略（可选）。
+    pub tls_policy: Option<String>,
+    /// TLS 指纹（可选，SHA-256 hex）。
+    pub tls_fingerprint: Option<String>,
+}
+
+/// `/api/*` JSON 请求结果（Rust -> 前端）。
+#[derive(Debug, Clone)]
+pub struct ApiJsonResponse {
+    /// 是否为 2xx 成功响应。
+    pub ok: bool,
+    /// HTTP 状态码。
+    pub status: u16,
+    /// 成功响应体（JSON）。
+    pub body: Option<serde_json::Value>,
+    /// 错误响应体（JSON）。
+    pub error: Option<serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TlsPolicy {
@@ -26,184 +58,101 @@ fn parse_tls_policy(raw: Option<&str>) -> TlsPolicy {
     }
 }
 
-fn normalize_fingerprint(raw: &str) -> String {
-    raw.trim()
-        .to_ascii_lowercase()
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit())
-        .collect()
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(bytes);
-    hex::encode(hasher.finalize())
-}
-
-fn extract_host_port_from_origin(origin: &str) -> anyhow::Result<(String, u16)> {
-    let u = reqwest::Url::parse(origin).context("Invalid origin URL")?;
-    let host = u.host_str().unwrap_or_default().to_string();
-    if host.trim().is_empty() {
-        return Err(anyhow::anyhow!("Invalid origin host"));
+fn map_tls_policy(policy: TlsPolicy) -> ApiHttpTlsPolicy {
+    match policy {
+        TlsPolicy::Strict => ApiHttpTlsPolicy::Strict,
+        TlsPolicy::Insecure => ApiHttpTlsPolicy::Insecure,
+        TlsPolicy::TrustFingerprint => ApiHttpTlsPolicy::TrustFingerprint,
     }
-    let port = u
-        .port_or_known_default()
-        .ok_or_else(|| anyhow::anyhow!("Missing origin port"))?;
-    Ok((host, port))
 }
 
-async fn verify_https_fingerprint(origin: &str, expected_sha256: &str) -> anyhow::Result<()> {
-    let expected = normalize_fingerprint(expected_sha256);
-    if expected.len() != 64 {
-        return Err(anyhow::anyhow!(
-            "Invalid TLS fingerprint: expected SHA-256 (64 hex chars), got len={}",
-            expected.len()
-        ));
-    }
-
-    let (host, port) = extract_host_port_from_origin(origin)?;
-    let addr = format!("{}:{}", host, port);
-    let stream = TcpStream::connect(addr.clone())
-        .await
-        .with_context(|| format!("Failed to connect for TLS fingerprint check: {}", addr))?;
-
-    let mut builder = native_tls::TlsConnector::builder();
-    // We always allow invalid certs/hostnames here; fingerprint is the trust root.
-    builder.danger_accept_invalid_certs(true);
-    builder.danger_accept_invalid_hostnames(true);
-    let connector = tokio_native_tls::TlsConnector::from(builder.build()?);
-    let tls = connector
-        .connect(&host, stream)
-        .await
-        .map_err(|e| anyhow::anyhow!("TLS handshake failed (fingerprint check): {}", e))?;
-
-    let peer = tls
-        .get_ref()
-        .peer_certificate()
-        .map_err(|e| anyhow::anyhow!("Failed to read peer certificate: {}", e))?;
-    let Some(cert) = peer else {
-        return Err(anyhow::anyhow!(
-            "TLS fingerprint check failed: missing peer certificate"
-        ));
-    };
-    let der = cert
-        .to_der()
-        .map_err(|e| anyhow::anyhow!("Failed to export peer certificate DER: {}", e))?;
-    let actual = sha256_hex(&der);
-    if actual != expected {
-        return Err(anyhow::anyhow!(
-            "TLS fingerprint mismatch: expected={} actual={}",
-            expected,
-            actual
-        ));
-    }
-    Ok(())
-}
-
-fn build_reqwest_client(policy: TlsPolicy) -> anyhow::Result<reqwest::Client> {
-    let mut builder = reqwest::Client::builder();
-    if policy != TlsPolicy::Strict {
-        builder = builder
-            .danger_accept_invalid_certs(true)
-            .danger_accept_invalid_hostnames(true);
-    }
-    Ok(builder.build()?)
-}
-
-/// 执行 `/api/*` JSON 请求（Rust -> server），并返回结构化结果供前端使用。
-///
-/// # 参数
-/// - `args`：请求参数（server_socket/method/path/headers/body/tls_*）。
-///
-/// # 返回值
-/// - `Ok(ApiRequestJsonResult)`：请求结果（ok/status/body/error）。
-/// - `Err(anyhow::Error)`：请求失败原因（参数校验/TLS 校验/网络错误等）。
-///
-/// # 说明
-/// - 仅允许请求 `/api/*` 路径，并做基础的 `..` 防穿越校验；
-/// - 当 TLS 策略为指纹信任时，会在请求前先校验证书指纹；
-/// - 204 No Content 会返回空 body/error。
-pub async fn api_request_json(args: ApiRequestJsonArgs) -> anyhow::Result<ApiRequestJsonResult> {
-    let socket = args.server_socket.trim().to_string();
+fn normalize_server_socket(raw: &str) -> anyhow::Result<String> {
+    let socket = raw.trim().to_string();
     if socket.is_empty() {
         return Err(anyhow::anyhow!("Missing server_socket"));
     }
+    Ok(socket)
+}
 
-    let method = args.method.trim().to_uppercase();
+fn normalize_method(raw: &str) -> anyhow::Result<String> {
+    let method = raw.trim().to_uppercase();
     if method.is_empty() {
         return Err(anyhow::anyhow!("Missing method"));
     }
+    Ok(method)
+}
 
-    let path = args.path.trim().to_string();
+fn normalize_api_path(raw: &str) -> anyhow::Result<String> {
+    let path = raw.trim().to_string();
     if !path.starts_with("/api/") {
         return Err(anyhow::anyhow!("Invalid path: must start with /api/"));
     }
     if path.contains("..") {
         return Err(anyhow::anyhow!("Invalid path: contains '..'"));
     }
+    Ok(path)
+}
+
+fn to_api_json_response(response: ApiHttpResponse) -> ApiJsonResponse {
+    if response.ok {
+        return ApiJsonResponse {
+            ok: true,
+            status: response.status,
+            body: response.body,
+            error: None,
+        };
+    }
+    ApiJsonResponse {
+        ok: false,
+        status: response.status,
+        body: None,
+        error: response.body,
+    }
+}
+
+/// 执行 `/api/*` JSON 请求（Rust -> server），并返回结构化结果供前端使用。
+///
+/// # 参数
+/// - `args`：请求参数（server_socket/method/path/headers/body/tls_*）。
+/// - `api_request_port`：API 请求端口（由 DI 注入）。
+///
+/// # 返回值
+/// - `Ok(ApiJsonResponse)`：请求结果（ok/status/body/error）。
+/// - `Err(anyhow::Error)`：请求失败原因（参数校验/TLS 校验/网络错误等）。
+///
+/// # 说明
+/// - 仅允许请求 `/api/*` 路径，并做基础的 `..` 防穿越校验；
+/// - 当 TLS 策略为指纹信任时，会在请求前先校验证书指纹；
+/// - 204 No Content 会返回空 body/error。
+pub async fn api_request_json(
+    args: ApiJsonRequest,
+    api_request_port: &dyn ApiRequestPort,
+) -> anyhow::Result<ApiJsonResponse> {
+    let ApiJsonRequest {
+        server_socket,
+        method,
+        path,
+        headers,
+        body,
+        tls_policy,
+        tls_fingerprint,
+    } = args;
+
+    let socket = normalize_server_socket(&server_socket)?;
+    let method = normalize_method(&method)?;
+    let path = normalize_api_path(&path)?;
 
     let origin = to_http_origin(&socket)?;
     let url = format!("{}{}", origin, path);
-
-    let tls_policy = parse_tls_policy(args.tls_policy.as_deref());
-    if tls_policy == TlsPolicy::TrustFingerprint {
-        let fp = args.tls_fingerprint.as_deref().unwrap_or("");
-        verify_https_fingerprint(&origin, fp).await?;
-    }
-
-    let client = build_reqwest_client(tls_policy)?;
-    let mut req = client.request(method.parse()?, url);
-
-    let headers: BTreeMap<String, String> = args.headers.unwrap_or_default();
-    for (k, v) in headers {
-        if k.trim().is_empty() {
-            continue;
-        }
-        req = req.header(k, v);
-    }
-
-    if let Some(body) = args.body {
-        req = req.json(&body);
-    }
-
-    let res = req.send().await.context("Failed to send request")?;
-    let status = res.status().as_u16();
-    let ok = res.status().is_success();
-
-    if status == 204 {
-        return Ok(ApiRequestJsonResult {
-            ok,
-            status,
-            body: None,
-            error: None,
-        });
-    }
-
-    let bytes = res.bytes().await.context("Failed to read response body")?;
-    if bytes.is_empty() {
-        return Ok(ApiRequestJsonResult {
-            ok,
-            status,
-            body: None,
-            error: None,
-        });
-    }
-
-    let json: serde_json::Value =
-        serde_json::from_slice(&bytes).context("Failed to parse JSON response")?;
-    if ok {
-        Ok(ApiRequestJsonResult {
-            ok: true,
-            status,
-            body: Some(json),
-            error: None,
+    let response = api_request_port
+        .execute_json_request(ApiHttpRequest {
+            method,
+            url,
+            headers: headers.unwrap_or_default(),
+            body,
+            tls_policy: map_tls_policy(parse_tls_policy(tls_policy.as_deref())),
+            tls_fingerprint,
         })
-    } else {
-        Ok(ApiRequestJsonResult {
-            ok: false,
-            status,
-            body: None,
-            error: Some(json),
-        })
-    }
+        .await?;
+    Ok(to_api_json_response(response))
 }

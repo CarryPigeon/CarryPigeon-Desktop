@@ -5,3 +5,6 @@
 //! 约定：注释中文，日志英文（tracing）。
 
 pub mod commands;
+pub mod event_sink;
+pub mod models;
+pub mod tcp_backend_factory;

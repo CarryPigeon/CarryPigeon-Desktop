@@ -4,21 +4,17 @@
  */
 
 import type { ChatEventsClient, ChatEventsConnectOptions, ChatEventsPort } from "../domain/ports/chatEventsPort";
-import type { WsEventDto } from "../domain/types/chatWireEvents";
+import type { ChatEventEnvelope } from "../domain/types/chatEventModels";
 import { connectChatWs } from "./wsChatEvents";
+import { mapChatWsEventWire } from "./wire/chatWireMappers";
 
-/**
- * WS-backed chat events port.
- *
- * @constant
- */
 export const wsChatEventsPort: ChatEventsPort = {
   connect(
     serverSocket: string,
     accessToken: string,
-    onEvent: (evt: WsEventDto) => void,
+    onEvent: (evt: ChatEventEnvelope) => void,
     options?: ChatEventsConnectOptions,
   ): ChatEventsClient {
-    return connectChatWs(serverSocket, accessToken, (env) => onEvent(env.data), options);
+    return connectChatWs(serverSocket, accessToken, (env) => onEvent(mapChatWsEventWire(env.data)), options);
   },
 };

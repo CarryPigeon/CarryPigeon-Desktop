@@ -3,14 +3,14 @@
  * @description plugins｜用例：ListPluginCatalog。
  */
 
-import type { PluginManagerPort } from "../ports/PluginManagerPort";
+import type { PluginCatalogPort } from "../ports/PluginCatalogPort";
 import type { PluginCatalogEntry } from "../types/pluginTypes";
 
 /**
  * 用例：获取插件目录（catalog）。
  */
 export class ListPluginCatalog {
-  constructor(private readonly manager: PluginManagerPort) {}
+  constructor(private readonly catalogPort: PluginCatalogPort) {}
 
   /**
    * 执行：获取插件目录列表。
@@ -19,6 +19,6 @@ export class ListPluginCatalog {
    * @returns 插件目录条目列表。
    */
   execute(serverSocket: string): Promise<PluginCatalogEntry[]> {
-    return this.manager.listCatalog(serverSocket);
+    return this.catalogPort.listCatalog(serverSocket);
   }
 }

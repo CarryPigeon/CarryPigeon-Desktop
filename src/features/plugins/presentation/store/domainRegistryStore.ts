@@ -10,54 +10,31 @@
  */
 
 import { reactive, ref, type Ref } from "vue";
-import type { Component } from "vue";
-import { IS_STORE_MOCK, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { createLogger } from "@/shared/utils/logger";
-import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
-import { currentUser } from "@/features/user/api";
-import { getPluginManagerPort } from "@/features/plugins/api";
+import { normalizeServerKey } from "@/shared/serverKey";
+import type { DomainBinding, DomainRegistryHostBridge } from "@/features/plugins/contracts/domainRegistry";
+import { getPluginInstallQueryPort, getPluginLifecycleCommandPort } from "@/features/plugins/di/plugins.di";
 import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginTypes";
-import type { PluginComposerPayload, PluginContext } from "@/features/plugins/domain/types/pluginRuntimeTypes";
+import type { PluginContext } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 import {
-  createPluginNetworkApi,
-  createPluginStorageApi,
   getRuntimeEntry,
   getRuntimeEntryForVersion,
-  importPluginModule,
-  normalizePluginModule,
-  toAppPluginEntryUrl,
   type LoadedPluginModule,
 } from "@/features/plugins/presentation/runtime/pluginRuntime";
-
-/**
- * domain 与插件的绑定关系（domain -> renderer/composer/contract）。
- *
- * 说明：
- * - 该结构是 UI 侧“按 domain 查找组件”的关键索引；
- * - `renderer/composer/contract` 均为可选：插件可能只提供其中一种能力。
- */
-export type DomainBinding = {
-  pluginId: string;
-  pluginVersion: string;
-  domain: string;
-  domainVersion: string;
-  renderer?: Component;
-  composer?: Component;
-  contract?: unknown;
-};
-
-/**
- * DomainRegistryStore 的宿主桥接接口（由 chat/host 注入）。
- *
- * 说明：
- * - 该桥接用于避免 domainRegistryStore 直接依赖 chat store（防循环依赖）；
- * - `getCid` 用于动态获取当前频道 id；
- * - `sendMessage` 用于把插件 composer 的提交转发到宿主发送链路。
- */
-export type DomainRegistryHostBridge = {
-  getCid(): string;
-  sendMessage(payload: PluginComposerPayload): Promise<void>;
-};
+import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
+import {
+  clearPluginRuntimeStateSyncListeners,
+  notifyPluginRuntimeStateChanged,
+} from "./pluginRuntimeStateSync";
+import { registerPluginDomains, unregisterPluginDomains } from "./domainRegistryBindings";
+import { createDomainRegistryContextResolver } from "./domainRegistryContext";
+import {
+  createNoopLoadedPluginModule as createNoopRuntimeModule,
+  isPluginRuntimeLoadingDisabled,
+  loadPluginRuntimeModule,
+} from "./domainRegistryModuleLoader";
+import { createDomainRegistryReconciler } from "./domainRegistryReconciler";
 
 type DomainRegistryStore = {
   loadedById: Record<string, LoadedPluginModule>;
@@ -76,34 +53,66 @@ type DomainRegistryStore = {
 
 const logger = createLogger("domainRegistryStore");
 const stores = new Map<string, DomainRegistryStore>();
+let runtimeStarted = false;
+let stopRuntimeCleanup: (() => void) | null = null;
 
-/**
- * 是否禁用插件运行时动态加载。
- *
- * @returns 禁用则返回 `true`。
- */
-function isRuntimeLoadingDisabled(): boolean {
-  return IS_STORE_MOCK || USE_MOCK_TRANSPORT;
+async function disposeDomainRegistryStore(store: DomainRegistryStore): Promise<void> {
+  for (const pluginId of Object.keys(store.loadedById)) {
+    await store.disablePluginRuntime(pluginId);
+  }
+  store.setHostBridge(null);
 }
 
 /**
- * 创建“空能力”插件模块（用于降级路径）。
+ * 启动 domain-registry 运行时（幂等）。
  *
- * @param pluginId - 插件 id。
- * @param version - 插件版本。
- * @returns 最小可用的加载结果。
+ * 说明：
+ * - 显式注册 server-scope 清理回调；
+ * - 避免模块加载时产生副作用。
  */
-function createNoopLoadedPluginModule(pluginId: string, version: string): LoadedPluginModule {
-  return {
-    pluginId: String(pluginId ?? "").trim(),
-    version: String(version ?? "").trim() || "0.0.0",
-    manifest: null,
-    permissions: [],
-    providesDomains: [],
-    renderers: {},
-    composers: {},
-    contracts: [],
-  };
+export function startDomainRegistryRuntime(): void {
+  if (runtimeStarted) return;
+  runtimeStarted = true;
+  stopRuntimeCleanup = registerServerScopeCleanupHandler(async (event) => {
+    if (event.type === "all") {
+      clearPluginRuntimeStateSyncListeners();
+      const tasks: Promise<void>[] = [];
+      for (const [key, store] of stores.entries()) {
+        tasks.push(
+          disposeDomainRegistryStore(store).finally(() => {
+            stores.delete(key);
+          }),
+        );
+      }
+      await Promise.all(tasks);
+      return;
+    }
+    clearPluginRuntimeStateSyncListeners(event.key);
+    const store = stores.get(event.key);
+    if (!store) return;
+    await disposeDomainRegistryStore(store);
+    stores.delete(event.key);
+  });
+}
+
+/**
+ * 停止 domain-registry 运行时（best-effort）。
+ */
+export async function stopDomainRegistryRuntime(): Promise<void> {
+  if (!runtimeStarted) return;
+  runtimeStarted = false;
+  stopRuntimeCleanup?.();
+  stopRuntimeCleanup = null;
+  clearPluginRuntimeStateSyncListeners();
+  const tasks: Promise<void>[] = [];
+  for (const [key, store] of stores.entries()) {
+    tasks.push(
+      disposeDomainRegistryStore(store).finally(() => {
+        stores.delete(key);
+      }),
+    );
+  }
+  await Promise.all(tasks);
 }
 
 /**
@@ -125,7 +134,9 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
   const bindingByDomain = reactive<Record<string, DomainBinding>>({});
   const loading = ref(false);
   const error = ref("");
-  const runtimeLoadingDisabled = isRuntimeLoadingDisabled();
+  const runtimeLoadingDisabled = isPluginRuntimeLoadingDisabled();
+  const queryPort = getPluginInstallQueryPort();
+  const commandPort = getPluginLifecycleCommandPort();
 
   let hostBridge: DomainRegistryHostBridge | null = null;
 
@@ -135,83 +146,14 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
       mode: USE_MOCK_TRANSPORT ? "protocol" : "store",
     });
   }
-
-  /**
-   * 基于 runtime 条目构建插件上下文（PluginContext）。
-   *
-   * 约定：
-   * - `server_socket`：使用当前 store 的 key；当 key 为 `NO_SERVER_KEY` 时写入空字符串。
-   * - `cid`：通过 `hostBridge.getCid()` 动态获取，保证随频道切换实时更新。
-   *
-   * @param runtime - 插件 runtime 条目（包含 serverId/version 等）。
-   * @param plugin - 已加载的插件模块。
-   * @returns 插件上下文。
-   */
-  function buildPluginContext(runtime: PluginRuntimeEntry, plugin: LoadedPluginModule): PluginContext {
-    const socket = key === NO_SERVER_KEY ? "" : key;
-    const cid = String(hostBridge?.getCid() ?? "").trim();
-    const uid = String(currentUser.id ?? "").trim();
-    const lang = navigator.language || "en-US";
-
-    const permissions = new Set(plugin.permissions.map((x) => String(x).trim()).filter(Boolean));
-    const storage = createPluginStorageApi(socket, plugin.pluginId);
-    const network = permissions.has("network") ? createPluginNetworkApi(socket) : undefined;
-
-    return {
-      server_socket: socket,
-      server_id: runtime.serverId,
-      plugin_id: plugin.pluginId,
-      plugin_version: runtime.version,
-      cid,
-      uid,
-      lang,
-      host: {
-        async sendMessage(payload: PluginComposerPayload): Promise<void> {
-          const bridge = hostBridge;
-          if (!bridge) throw new Error("Host bridge not set: cannot send message");
-          await bridge.sendMessage(payload);
-        },
-        storage,
-        network,
-      },
-    };
-  }
-
-  /**
-   * 将插件模块声明的 domain 注册到绑定表中。
-   *
-   * @param plugin - 已加载的插件模块。
-   * @returns 无返回值。
-   */
-  function registerDomains(plugin: LoadedPluginModule): void {
-    for (const item of plugin.providesDomains) {
-      const domain = String(item.domain ?? "").trim();
-      const domainVersion = String(item.domainVersion ?? "").trim() || "1.0.0";
-      if (!domain) continue;
-      const binding: DomainBinding = {
-        pluginId: plugin.pluginId,
-        pluginVersion: plugin.version,
-        domain,
-        domainVersion,
-        renderer: plugin.renderers[domain],
-        composer: plugin.composers[domain],
-        contract: plugin.contracts.find((c) => String(c.domain ?? "").trim() === domain),
-      };
-      bindingByDomain[domain] = binding;
-    }
-  }
-
-  /**
-   * 反注册某个插件的全部 domain 绑定。
-   *
-   * @param pluginId - 插件 id。
-   * @returns 无返回值。
-   */
-  function unregisterPluginDomains(pluginId: string): void {
-    for (const k of Object.keys(bindingByDomain)) {
-      if (bindingByDomain[k]?.pluginId === pluginId) delete bindingByDomain[k];
-    }
-  }
+  const contextResolver = createDomainRegistryContextResolver({
+    serverKey: key,
+    runtimeLoadingDisabled,
+    runtimeById,
+    loadedById,
+    bindingByDomain,
+    getHostBridge: () => hostBridge,
+  });
 
   /**
    * 基于 runtime 条目加载插件模块。
@@ -220,9 +162,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * @returns 归一化后的插件模块。
    */
   async function loadFromRuntime(runtime: PluginRuntimeEntry): Promise<LoadedPluginModule> {
-    const entryUrl = toAppPluginEntryUrl(runtime);
-    const mod = await importPluginModule(entryUrl);
-    return normalizePluginModule(runtime.pluginId, runtime.version, runtime, mod);
+    return loadPluginRuntimeModule(runtime);
   }
 
   /**
@@ -237,7 +177,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
   async function tryLoadVersion(pluginId: string, version: string): Promise<LoadedPluginModule> {
     if (runtimeLoadingDisabled) {
       logger.warn("Action: plugins_runtime_validate_version_skipped", { key, pluginId, version });
-      return createNoopLoadedPluginModule(pluginId, version);
+      return createNoopRuntimeModule(pluginId, version);
     }
     const runtime = await getRuntimeEntryForVersion(key, pluginId, version);
     return loadFromRuntime(runtime);
@@ -256,18 +196,21 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
 
     const runtime = await getRuntimeEntry(key, id);
     const loaded = await loadFromRuntime(runtime);
-    const ctx = buildPluginContext(runtime, loaded);
+    const ctx = contextResolver.buildPluginContext(runtime, loaded);
 
     loadedById[id] = loaded;
     runtimeById[id] = runtime;
-    unregisterPluginDomains(id);
-    registerDomains(loaded);
+    unregisterPluginDomains(bindingByDomain, id);
+    registerPluginDomains(bindingByDomain, loaded);
 
     try {
       if (loaded.activate) await Promise.resolve(loaded.activate(ctx));
     } catch (e) {
       logger.error("Action: plugins_activate_failed", { key, pluginId: id, error: String(e) });
-      // 激活失败不应导致宿主 UI 崩溃；插件仍保持注册态，但可能不可用。
+      unregisterPluginDomains(bindingByDomain, id);
+      delete loadedById[id];
+      delete runtimeById[id];
+      throw e;
     }
   }
 
@@ -281,7 +224,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     const id = pluginId.trim();
     if (!id) return;
     const loaded = loadedById[id] ?? null;
-    unregisterPluginDomains(id);
+    unregisterPluginDomains(bindingByDomain, id);
     delete loadedById[id];
     delete runtimeById[id];
     if (!loaded?.deactivate) return;
@@ -296,19 +239,13 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * 获取某插件在“当前频道/用户选择”下的最新上下文。
    *
    * 注意：
-   * - 返回的 `cid` 在调用时从 `currentChannelId.value` 读取，确保拿到最新值。
+   * - 返回的 `cid` 在调用时从 `hostBridge.getCid()` 读取，确保拿到最新频道上下文。
    *
    * @param pluginId - 插件 id。
    * @returns 插件上下文；若插件未加载则返回 `null`。
    */
   function getContextForPlugin(pluginId: string): PluginContext | null {
-    if (runtimeLoadingDisabled) return null;
-    const id = pluginId.trim();
-    if (!id) return null;
-    const runtime = runtimeById[id] ?? null;
-    const loaded = loadedById[id] ?? null;
-    if (!runtime || !loaded) return null;
-    return buildPluginContext(runtime, loaded);
+    return contextResolver.getContextForPlugin(pluginId);
   }
 
   /**
@@ -318,17 +255,13 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    * @returns 插件上下文；若插件未加载则返回 `null`。
    */
   function getContextForDomain(domain: string): PluginContext | null {
-    const d = String(domain ?? "").trim();
-    if (!d) return null;
-    const binding = bindingByDomain[d] ?? null;
-    if (!binding) return null;
-    return getContextForPlugin(binding.pluginId);
+    return contextResolver.getContextForDomain(domain);
   }
 
   /**
    * 设置宿主桥接：用于插件发送消息与读取聊天上下文。
    *
-   * 说明：该方法放在展示层 store 内部，避免 plugin runtime registry 与 chat store facade 形成静态循环依赖。
+   * 说明：该方法放在展示层 store 内部，避免 plugin runtime registry 与 chat 聚合 store 形成静态循环依赖。
    *
    * @param bridge - 宿主桥接；传 `null` 表示解除绑定。
    * @returns 无返回值。
@@ -342,41 +275,21 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
    *
    * @returns 无返回值。
    */
-  async function ensureLoaded(): Promise<void> {
-    if (runtimeLoadingDisabled) return;
-    if (key === NO_SERVER_KEY) return;
-    loading.value = true;
-    error.value = "";
-    try {
-      const installed = await getPluginManagerPort().listInstalled(key);
-      for (const st of installed) {
-        if (!st.enabled || st.status !== "ok") continue;
-        if (!st.currentVersion) continue;
-        if (loadedById[st.pluginId]?.version === st.currentVersion) continue;
-        try {
-          await enablePluginRuntime(st.pluginId);
-        } catch (e) {
-          const msg = String(e) || "Runtime load failed";
-          logger.error("Action: plugins_runtime_load_failed_mark_failed", { key, pluginId: st.pluginId, error: msg });
-          try {
-            await getPluginManagerPort().setFailed(key, st.pluginId, msg);
-          } catch (se) {
-            logger.error("Action: plugins_mark_failed_state_failed", { key, pluginId: st.pluginId, error: String(se) });
-          }
-        }
-      }
-      for (const id of Object.keys(loadedById)) {
-        const st = installed.find((x) => x.pluginId === id);
-        const shouldBeOn = Boolean(st?.enabled && st?.status === "ok" && st?.currentVersion);
-        if (!shouldBeOn) await disablePluginRuntime(id);
-      }
-    } catch (e) {
-      error.value = String(e);
-      logger.error("Action: plugins_ensure_loaded_failed", { key, error: String(e) });
-    } finally {
-      loading.value = false;
-    }
-  }
+  const { ensureLoaded } = createDomainRegistryReconciler({
+    key,
+    runtimeLoadingDisabled,
+    loadedById,
+    loading,
+    error,
+    logger,
+    listInstalled: () => queryPort.listInstalled(key),
+    enablePluginRuntime,
+    disablePluginRuntime,
+    async markFailed(pluginId, message): Promise<void> {
+      await commandPort.setFailed(key, pluginId, message);
+    },
+    notifyRuntimeStateChanged: () => notifyPluginRuntimeStateChanged(key),
+  });
 
   const store: DomainRegistryStore = {
     loadedById,

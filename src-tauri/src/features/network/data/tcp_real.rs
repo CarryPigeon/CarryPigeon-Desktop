@@ -2,14 +2,18 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
-use sha2::Digest;
-use tauri::{AppHandle, Emitter};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
+use tokio::task::JoinHandle;
 use tokio_native_tls::TlsStream;
 
-use crate::features::network::domain::types::TcpMessageEvent;
+use crate::features::network::domain::ports::tcp_event_sink::TcpEventSink;
+use crate::features::network::domain::types::{TcpMessageEvent, TcpStateEvent};
+use crate::shared::net::tls_fingerprint::{
+    normalize_sha256_fingerprint, verify_der_sha256_fingerprint,
+};
 
 enum Transport {
     Plain,
@@ -29,6 +33,63 @@ enum TcpWriter {
     Tls(WriteHalf<TlsStream<TcpStream>>),
 }
 
+fn emit_tcp_state(
+    event_sink: &Arc<dyn TcpEventSink>,
+    server_socket: &str,
+    session_id: u64,
+    state: &str,
+    error: Option<String>,
+) {
+    event_sink.emit_state(TcpStateEvent {
+        server_socket: server_socket.to_string(),
+        session_id,
+        state: state.to_string(),
+        error,
+    });
+}
+
+fn emit_legacy_tcp_chunk(event_sink: &Arc<dyn TcpEventSink>, server_socket: &str, payload: Vec<u8>) {
+    event_sink.emit_message(TcpMessageEvent {
+        server_socket: server_socket.to_string(),
+        payload,
+    });
+}
+
+fn emit_tcp_frame_payload(event_sink: &Arc<dyn TcpEventSink>, server_socket: &str, payload: Vec<u8>) {
+    event_sink.emit_frame(TcpMessageEvent {
+        server_socket: server_socket.to_string(),
+        payload,
+    });
+}
+
+fn emit_deframed_payloads(event_sink: &Arc<dyn TcpEventSink>, server_socket: &str, acc: &mut Vec<u8>) {
+    loop {
+        if acc.len() < 2 {
+            break;
+        }
+
+        let len = u16::from_be_bytes([acc[0], acc[1]]) as usize;
+        if len == 0 {
+            // Consume header; ignore empty payload.
+            acc.drain(0..2);
+            continue;
+        }
+        // Hard limit: 10MB payload.
+        if len > 10_000_000 {
+            tracing::warn!(action = "network_tcp_frame_invalid_length", len);
+            acc.clear();
+            break;
+        }
+        if acc.len() < 2 + len {
+            break;
+        }
+
+        let payload = acc[2..2 + len].to_vec();
+        acc.drain(0..2 + len);
+        emit_tcp_frame_payload(event_sink, server_socket, payload);
+    }
+}
+
 /// 基于 tokio 的真实 TCP service（支持纯 TCP 与 TLS）。
 ///
 /// # 说明
@@ -37,6 +98,7 @@ enum TcpWriter {
 pub struct TcpServiceReal {
     reader: Option<TcpReader>,
     writer: TcpWriter,
+    read_task: Option<JoinHandle<()>>,
 }
 
 impl TcpServiceReal {
@@ -82,16 +144,33 @@ impl TcpServiceReal {
         Ok(Self {
             reader: Some(reader),
             writer,
+            read_task: None,
         })
     }
 
     /// 启动读取循环：将收到的数据通过 Tauri event 广播给前端。
-    pub fn start(&mut self, app: AppHandle, server_socket: String) {
+    ///
+    /// # 返回值
+    /// - `true`：读取任务成功启动。
+    /// - `false`：当前实例无法再次启动（例如 reader 已被消费）。
+    pub fn start(
+        &mut self,
+        event_sink: Arc<dyn TcpEventSink>,
+        server_socket: String,
+        session_id: u64,
+    ) -> bool {
+        // 防御式处理：若存在历史读任务，先中止，确保同一实例最多只有一个读循环。
+        if let Some(task) = self.read_task.take() {
+            task.abort();
+        }
+
         let Some(mut reader) = self.reader.take() else {
-            return;
+            return false;
         };
 
-        tokio::spawn(async move {
+        emit_tcp_state(&event_sink, &server_socket, session_id, "connected", None);
+
+        let task = tokio::spawn(async move {
             // Netty frame：2 字节无符号短整型长度前缀（大端），后跟 `length` 字节载荷。
             //
             // 注意：为向后兼容仍会发出原始 `tcp-message` 事件；
@@ -105,65 +184,36 @@ impl TcpServiceReal {
                 };
 
                 match read_result {
-                    Ok(0) => return,
+                    Ok(0) => {
+                        emit_tcp_state(&event_sink, &server_socket, session_id, "disconnected", None);
+                        return;
+                    }
                     Ok(n) => {
                         let chunk = buffer[..n].to_vec();
 
                         // Legacy: emit raw TCP chunk.
-                        if let Err(e) = app.emit(
-                            "tcp-message",
-                            TcpMessageEvent {
-                                server_socket: server_socket.clone(),
-                                payload: chunk.clone(),
-                            },
-                        ) {
-                            tracing::warn!(action = "network_tcp_emit_message_failed", error = ?e);
-                        }
+                        emit_legacy_tcp_chunk(&event_sink, &server_socket, chunk.clone());
 
                         // New: deframe and emit payload frames.
                         acc.extend_from_slice(&chunk);
-                        loop {
-                            if acc.len() < 2 {
-                                break;
-                            }
-
-                            let len = u16::from_be_bytes([acc[0], acc[1]]) as usize;
-                            if len == 0 {
-                                // Consume header; ignore empty payload.
-                                acc.drain(0..2);
-                                continue;
-                            }
-                            // Hard limit: 10MB payload.
-                            if len > 10_000_000 {
-                                tracing::warn!(action = "network_tcp_frame_invalid_length", len);
-                                acc.clear();
-                                break;
-                            }
-                            if acc.len() < 2 + len {
-                                break;
-                            }
-
-                            let payload = acc[2..2 + len].to_vec();
-                            acc.drain(0..2 + len);
-
-                            if let Err(e) = app.emit(
-                                "tcp-frame",
-                                TcpMessageEvent {
-                                    server_socket: server_socket.clone(),
-                                    payload,
-                                },
-                            ) {
-                                tracing::warn!(action = "network_tcp_emit_frame_failed", error = ?e);
-                            }
-                        }
+                        emit_deframed_payloads(&event_sink, &server_socket, &mut acc);
                     }
                     Err(e) => {
+                        emit_tcp_state(
+                            &event_sink,
+                            &server_socket,
+                            session_id,
+                            "error",
+                            Some(format!("{}", e)),
+                        );
                         tracing::warn!(action = "network_tcp_read_failed", error = ?e);
                         break;
                     }
                 }
             }
         });
+        self.read_task = Some(task);
+        true
     }
 
     /// 向已建立的 TCP 连接发送一段 bytes。
@@ -184,12 +234,34 @@ impl TcpServiceReal {
         };
         result.map_err(|e| anyhow::anyhow!("Failed to send TCP data: {}", e))
     }
+
+    /// 主动关闭当前连接并终止读取任务（best-effort）。
+    pub async fn close(&mut self) -> anyhow::Result<()> {
+        if let Some(task) = self.read_task.take() {
+            task.abort();
+            let _ = task.await;
+        }
+        let _ = self.reader.take();
+        let result = match &mut self.writer {
+            TcpWriter::Plain(w) => w.shutdown().await,
+            TcpWriter::Tls(w) => w.shutdown().await,
+        };
+        result.map_err(|e| anyhow::anyhow!("Failed to shutdown TCP writer: {}", e))
+    }
+
+    /// 当前读取任务是否仍在运行。
+    pub fn is_listening(&self) -> bool {
+        self.read_task
+            .as_ref()
+            .map(|task| !task.is_finished())
+            .unwrap_or(false)
+    }
 }
 
 fn parse_transport(raw: &str) -> (Transport, &str) {
     if let Some(rest) = raw.strip_prefix("tls-fp://") {
         if let Some((fp, addr)) = rest.split_once('@') {
-            let fp = normalize_fingerprint(fp);
+            let fp = normalize_sha256_fingerprint(fp);
             return (
                 Transport::Tls {
                     insecure: true,
@@ -232,32 +304,10 @@ fn parse_transport(raw: &str) -> (Transport, &str) {
     (Transport::Plain, raw)
 }
 
-fn normalize_fingerprint(raw: &str) -> String {
-    raw.trim()
-        .to_ascii_lowercase()
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit())
-        .collect()
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(bytes);
-    hex::encode(hasher.finalize())
-}
-
 fn verify_tls_fingerprint_sha256(
     tls: &tokio_native_tls::TlsStream<TcpStream>,
     expected_sha256: &str,
 ) -> anyhow::Result<()> {
-    let expected = normalize_fingerprint(expected_sha256);
-    if expected.len() != 64 {
-        return Err(anyhow::anyhow!(
-            "Invalid TLS fingerprint: expected SHA-256 (64 hex chars), got len={}",
-            expected.len()
-        ));
-    }
-
     let peer = tls
         .get_ref()
         .peer_certificate()
@@ -270,15 +320,7 @@ fn verify_tls_fingerprint_sha256(
     let der = cert
         .to_der()
         .map_err(|e| anyhow::anyhow!("Failed to export peer certificate DER: {}", e))?;
-    let actual = sha256_hex(&der);
-    if actual != expected {
-        return Err(anyhow::anyhow!(
-            "TLS fingerprint mismatch: expected={} actual={}",
-            expected,
-            actual
-        ));
-    }
-    Ok(())
+    verify_der_sha256_fingerprint(expected_sha256, &der)
 }
 
 fn extract_host(addr: &str) -> anyhow::Result<String> {

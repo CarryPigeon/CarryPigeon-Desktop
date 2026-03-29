@@ -8,7 +8,6 @@ use std::{
 };
 
 use anyhow::Context;
-use serde::Serialize;
 use sha2::Digest;
 use tokio::sync::Mutex;
 use wasmtime::{
@@ -16,7 +15,8 @@ use wasmtime::{
     component::{Component, Linker},
 };
 
-use crate::features::plugins::data::plugin_manifest::{PluginManifest, PluginManifestList};
+use crate::features::plugins::data::plugin_manifest::PluginManifestList;
+use crate::features::plugins::domain::types::{PluginLoadResult, PluginManifest};
 
 /// 已安装并可被运行的插件对象（包含清单与缓存资源）。
 ///
@@ -37,22 +37,6 @@ pub struct Plugin {
     pub frontend_html_bytes: Vec<u8>,
     /// 插件缓存目录路径。
     pub path: PathBuf,
-}
-
-/// 插件加载结果（返回给前端用于渲染/运行）。
-///
-/// # 说明
-/// - 返回字段使用 `camelCase`，便于与前端 TS 类型直接对齐；
-/// - 该结果不包含后端 wasm：后端由 Rust 侧直接运行。
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PluginLoadResult {
-    /// 前端 wasm 字节。
-    pub frontend_wasm: Vec<u8>,
-    /// 前端 JS 字节。
-    pub frontend_js: Vec<u8>,
-    /// 前端 HTML 字节（可能为空）。
-    pub frontend_html: Vec<u8>,
 }
 
 /// 插件管理器：负责插件缓存、加载与后端启动。
