@@ -16,12 +16,18 @@ export type ChatChannelRecord = {
   ownerUserId?: string;
 };
 
+/**
+ * chat 领域中的用户快照。
+ */
 export type ChatUserRecord = {
   id: string;
   nickname: string;
   avatar?: string;
 };
 
+/**
+ * 频道成员快照。
+ */
 export type ChatChannelMemberRecord = {
   userId: string;
   role: "owner" | "admin" | "member" | string;
@@ -30,6 +36,9 @@ export type ChatChannelMemberRecord = {
   joinTime: number;
 };
 
+/**
+ * 入群申请快照。
+ */
 export type ChatChannelApplicationRecord = {
   applicationId: string;
   channelId: string;
@@ -39,6 +48,9 @@ export type ChatChannelApplicationRecord = {
   status: "pending" | "approved" | "rejected" | string;
 };
 
+/**
+ * 频道封禁快照。
+ */
 export type ChatChannelBanRecord = {
   channelId: string;
   userId: string;
@@ -47,6 +59,13 @@ export type ChatChannelBanRecord = {
   createTime?: number;
 };
 
+/**
+ * 消息快照。
+ *
+ * 说明：
+ * - `data` 保留 domain payload 原始内容；
+ * - 具体展示投影由 message-flow 子域负责。
+ */
 export type ChatMessageRecord = {
   id: string;
   channelId: string;
@@ -60,12 +79,18 @@ export type ChatMessageRecord = {
   replyToMessageId?: string;
 };
 
+/**
+ * 消息分页结果。
+ */
 export type ChatMessagePage = {
   items: ChatMessageRecord[];
   nextCursor?: string;
   hasMore?: boolean;
 };
 
+/**
+ * 发送消息命令输入。
+ */
 export type ChatSendMessageInput = {
   domain: string;
   domainVersion: string;
@@ -73,23 +98,35 @@ export type ChatSendMessageInput = {
   replyToMessageId?: string;
 };
 
+/**
+ * 频道未读状态快照。
+ */
 export type ChatUnreadState = {
   channelId: string;
   unreadCount: number;
   lastReadTime: number;
 };
 
+/**
+ * 已读状态上报输入。
+ */
 export type ChatReadStateInput = {
   lastReadMessageId: string;
   lastReadTime: number;
 };
 
+/**
+ * 更新频道元信息的输入。
+ */
 export type ChatChannelPatchInput = {
   name?: string;
   brief?: string;
   avatar?: string;
 };
 
+/**
+ * 创建频道的输入。
+ */
 export type ChatChannelCreateInput = {
   name: string;
   brief?: string;

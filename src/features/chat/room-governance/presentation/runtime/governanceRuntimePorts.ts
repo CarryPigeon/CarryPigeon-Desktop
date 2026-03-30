@@ -4,7 +4,7 @@
  * 定义 room-governance runtime 的状态切片与对外契约。
  */
 
-import type { createChatStoreState } from "@/features/chat/presentation/store/live/chatStoreState";
+import type { createChatStoreState } from "@/features/chat/composition/store/createChatStoreState";
 import type {
   ApplyJoinChannelOutcome,
   ChannelApplication,
@@ -24,11 +24,17 @@ import type { ChatChannel } from "@/features/chat/room-session/api-types";
 
 type ChatStoreState = ReturnType<typeof createChatStoreState>;
 
+/**
+ * governance runtime 关心的根 store 状态切片。
+ */
 export type ChatGovernanceStateSlice = Pick<
   ChatStoreState,
   "channelsRef" | "currentChannelId" | "members" | "scopeVersion"
 >;
 
+/**
+ * governance runtime 对外端口。
+ */
 export type ChatGovernanceRuntimePort = {
   refreshChannels(): Promise<void>;
   refreshMembersRail(channelId: string): Promise<void>;

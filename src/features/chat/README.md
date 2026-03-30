@@ -30,13 +30,14 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
 ## 关键概念
 
 - **ChatApiPort / ChatEventsPort**：聊天 HTTP 与事件（WS）端口抽象（domain 层）。
-- **chat runtime assembly**：`application/runtime/createChatRuntime.ts` 是 chat 唯一的对象生命周期归口；ports、usecases、runtime gateway 与聚合 runtime 都在这里集中装配与缓存。
-- **chat usecase factory**：`application/runtime/createChatUsecases.ts` 只描述显式用例的创建方式，不承担全局缓存职责。
-- **workspace coordinator outcome**：`application/runtime/createChatWorkspaceCoordinator.ts` 把“切服 + 插件刷新 + session ready”链路建模成显式 `Outcome`，不再在组合层把 `server-connection` 的切服结果降级成 `boolean` 或 `void + onAsyncError`。
+- **chat runtime assembly**：`composition/createChatRuntime.ts` 是 chat 唯一的对象生命周期归口；ports、root services、runtime gateway 与聚合 runtime 都在这里集中装配与缓存。
+- **chat root services**：`composition/createChatRootServices.ts` 负责把 chat 根层远端动作收敛成 `core / governance / events` 三个根层业务服务，降低装配爆炸。
+- **chat runtime DI container**：`composition/createChatRuntimeContainer.ts` 收敛 ports、root services 与 gateways 的装配；`createChatRuntime.ts` 只保留 mock/live 选择与 runtime 切片导出。
+- **workspace coordinator outcome**：`composition/createChatWorkspaceCoordinator.ts` 把“切服 + 插件刷新 + session ready”链路建模成显式 `Outcome`，不再在组合层把 `server-connection` 的切服结果降级成 `boolean` 或 `void + onAsyncError`。
 - **ChannelSummary**：`shared-kernel/channelSummary.ts` 是 room-session / room-governance 共享的中立频道摘要契约，避免子域互相牵引。
-- **chat runtime store**：将“频道/消息/未读/成员/事件流”等状态拆分为多个可组合的模块，最终由聚合 store 对外提供能力。
+- **chat runtime aggregate store**：`composition/contracts/chatStoreTypes.ts` 中的 `ChatRuntimeAggregateStore` 仅表示 chat feature 内部完整聚合对象；真正给页面和子域消费的仍是 capability 与 subdomain slice。
 - **subdomain capability API**：`room-session/api.ts`、`message-flow/api.ts`、`room-governance/api.ts` 统一暴露 `create/get*Capabilities()`；页面层通过 capability 创建局部 view（directory/current-channel/timeline/composer），而不是消费模块级裸函数或直接拼接底层 store。
-- **chat runtime contracts**：`presentation/store/live/chatRuntimePorts.ts` 统一转发 `room-session/presentation/runtime/sessionRuntimePorts.ts`、`message-flow/presentation/runtime/messageFlowRuntimePorts.ts`、`room-governance/presentation/runtime/governanceRuntimePorts.ts` 与 `chatScopePort.ts`，根层只保留聚合转发。
+- **chat runtime contracts**：`composition/contracts/chatRuntimePorts.ts` 统一转发 `room-session/presentation/runtime/sessionRuntimePorts.ts`、`message-flow/presentation/runtime/messageFlowRuntimePorts.ts`、`room-governance/presentation/runtime/governanceRuntimePorts.ts` 与 `chatScopePort.ts`，根层只保留聚合转发。
 - **chat session shared context**：`room-session/presentation/runtime/sessionSharedContext.ts` 统一封装 socket/token/scope、频道目录刷新与读状态上报，作为各 runtime 共享的会话上下文适配层。
 - **session connection runtime**：`room-session/presentation/runtime/sessionConnectionRuntime.ts` 只负责 room-session 中的连接生命周期；外层 `room-session/presentation/runtime/sessionRuntime.ts` 负责把连接子系统与频道视图动作聚合为公开会话能力。
 - **domain 渲染**：
@@ -45,8 +46,9 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
 
 ## 目录结构
 
-- `domain/`：聊天领域的 ports/types/usecases（与 UI/传输无关的业务规则）。
-- `application/`：聊天应用层编排；`runtime/` 收敛装配根、usecase factory、gateway 组装与 workspace 协调流程，`ports/` 收敛应用层内部契约。
+- `domain/`：聊天领域的 ports/types（与 UI/传输无关的稳定业务语义）。
+- `application/`：仅在需要时保留根层应用编排；chat 当前已把根层装配收敛到 `composition/`，业务规则继续下沉到各子域 `domain/`。
+- `composition/`：chat 唯一装配层；负责实现选择、根 runtime 组装、跨子域接线、gateway/contracts/store runtime 装配与生命周期缓存。
 - `public/`：chat 对 app / 其他 feature 的唯一稳定公开边界。
 - `shared-kernel/`：供 room-session / room-governance 等子域共享的稳定核心语义。
 - `data/`：聊天对外基础设施适配层，承载 HTTP/WS 协议、account/server-connection/plugins 适配器。
@@ -63,7 +65,7 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
 - `room-governance/application/`：治理子域的非 UI 编排，继续细分为 `usecases/`、`mappers/`、`policies/`、`outcomes/` 与稳定 `ports.ts`。
 - `presentation/`：页面、组件、composables、store（UI 与状态）。
   - `store/live/`：实时 store 的内部实现目录，和上层公开 store/type 文件分层。
-  - `store/chatStoreTypes.ts`：仅保留 feature 内部 runtime store / slice 契约，不再作为公共模型源头。
+  - `store/chatStoreTypes.ts`：仅保留 feature 内部 aggregate store / runtime slice 契约，不再作为公共模型源头。
   - `room-session/presentation/runtime/sessionSharedContext.ts`：chat runtime 共享的会话上下文，隔离 scope/token/channel-data/read-state 等跨子域基础设施。
   - `room-session/presentation/runtime/sessionConnectionRuntime.ts`：session 子系统中的连接生命周期运行时，隔离 WS/polling/catch-up 等连接细节。
   - `components/layout/`：Patchbay 四栏骨架组件（server/channel/chat/member）。
@@ -80,26 +82,26 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
   - `composables/useChannelDialogs`：创建/删除频道弹窗状态与后续动作编排。
   - `composables/useChannelInfoPage`：频道信息页的 route 适配、加入状态与编辑流程编排。
   - `composables/useChannelInfoPageRoute`：频道信息页原始 route query 解析，和页面动作编排解耦。
-  - `application/runtime/createChatWorkspaceCoordinator`：收敛当前 workspace 的启动、切服、依赖刷新与插件桥接链路。
-  - `composables/usePatchbayWorkspace`：收敛 workspace 级读模型与跨 feature 协调（server/plugin/host-bridge），不承担完整页面装配。
-  - `composables/usePatchbayPageModel`：作为 MainPage 的页面装配根，负责把 workspace、子域 capability、导航、浮层、快捷键、生命周期和 layout model 组装成最终页面模型。
-  - `composables/patchbayPageSections`：承载 Patchbay 各局部 section 的局部模型类型与构造器，避免页面装配根再次膨胀成样板聚合点。
-  - `composables/useChannelRailModel` / `useMembersRailModel` / `useChatCenterModel`：把 layout 组件所需的 store 读取与交互动作下沉成 view-model；这些模型优先消费 room-session/message-flow/governance capability 创建的局部视图，而不是直接触碰原始 store 字段。
-  - `composables/usePatchbayHotkeys`：主窗口全局快捷键与浮层收拢逻辑。
-  - `composables/usePluginNavigation`：插件中心入口与安装提示跳转编排。
-  - `composables/usePluginHostBridge`：只负责 host bridge 注入/卸载生命周期，不再混入 domain registry 只读视图查询。
-  - `composables/asyncTaskRunner`：页面交互层统一异步异常兜底 helper。
-  - `composables/useChannelScopedRefresh`：频道管理子页面（members/applications/bans）通用“按频道+scope 刷新”。
-  - `room-governance/presentation/composables/`：治理子页面专属 page-composable 与共享 route 适配，避免 `.vue` 同时承担加载、权限和动作编排职责。
-  - `room-governance/presentation/composables/useGovernancePageState`：治理子页面共享的加载态、错误态与频道 id 守卫协议，避免成员/申请/封禁页重复维护页面级异步样板。
+  - `composition/createChatWorkspaceCoordinator`：收敛当前 workspace 的启动、切服、依赖刷新与插件桥接链路。
+  - `presentation/patchbay/page/usePatchbayWorkspace`：收敛 workspace 级读模型与跨 feature 协调（server/plugin/host-bridge），不承担完整页面装配。
+  - `presentation/patchbay/page/usePatchbayPageModel`：作为 MainPage 的页面装配根，负责把 workspace、子域 capability、导航、浮层、快捷键、生命周期和 layout model 组装成最终页面模型。
+  - `presentation/patchbay/page/patchbayPageSections`：承载 Patchbay 各局部 section 的局部模型类型与构造器，避免页面装配根再次膨胀成样板聚合点。
+  - `presentation/patchbay/view-models/useChannelRailModel` / `useMembersRailModel` / `useChatCenterModel`：把 layout 组件所需的 store 读取与交互动作下沉成 view-model；这些模型优先消费 room-session/message-flow/governance capability 创建的局部视图，而不是直接触碰原始 store 字段。
+  - `presentation/patchbay/interactions/usePatchbayHotkeys`：主窗口全局快捷键与浮层收拢逻辑。
+  - `presentation/patchbay/navigation/usePluginNavigation`：插件中心入口与安装提示跳转编排。
+  - `presentation/patchbay/page/usePluginHostBridge`：只负责 host bridge 注入/卸载生命周期，不再混入 domain registry 只读视图查询。
+  - `presentation/patchbay/interactions/asyncTaskRunner`：页面交互层统一异步异常兜底 helper。
+  - `presentation/shared/useChannelScopedRefresh`：频道管理子页面（members/applications/bans）通用“按频道+scope 刷新”。
+  - `room-governance/presentation/page-models/ + room-governance/presentation/page-support/`：治理子页面专属 page-composable 与共享 route 适配，避免 `.vue` 同时承担加载、权限和动作编排职责。
+  - `room-governance/presentation/page-models/ + room-governance/presentation/page-support/useGovernancePageState`：治理子页面共享的加载态、错误态与频道 id 守卫协议，避免成员/申请/封禁页重复维护页面级异步样板。
   - `room-governance/presentation/components/GovernancePageShell.vue`：治理子页面共享骨架，统一头部、返回、标题、加载态与错误态容器。
 - `mock/`：脱离后端的内存 mock store（用于 UI 预览/离线开发）。
 
 ## 主要入口（导航）
 
-- 页面入口：`src/features/chat/presentation/pages/MainPage.vue`
-- 频道信息 popover 视图：`src/features/chat/presentation/pages/ChannelInfoPopoverView.vue`
-- chat runtime 聚合 store：`src/features/chat/presentation/store/live/chatRuntimeStore.ts`
+- 页面入口：`src/features/chat/presentation/patchbay/page/MainPage.vue`
+- 频道信息 popover 视图：`src/features/chat/presentation/channel-info/ChannelInfoPopoverView.vue`
+- chat runtime aggregate store：`src/features/chat/composition/store/createChatRuntimeStore.ts`
 - room-session 会话编排子模块：`src/features/chat/room-session/presentation/runtime/`
 - message-flow 消息流子模块：`src/features/chat/message-flow/presentation/runtime/`
 - room-governance 管理页：`src/features/chat/room-governance/presentation/pages/`
@@ -108,7 +110,9 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
 - 领域 ports：
   - HTTP：`src/features/chat/domain/ports/chatApiPort.ts`
   - WS：`src/features/chat/domain/ports/chatEventsPort.ts`
-- 领域用例：`src/features/chat/domain/usecases/`
+- 根 root services：
+  - `src/features/chat/composition/chatRootServices.ts`
+  - `src/features/chat/composition/createChatRootServices.ts`
 - WS 适配器：`src/features/chat/data/chat-events/wsChatEvents.ts`
 - HTTP 适配器：`src/features/chat/data/chat-api/httpChatApi.ts`
 
@@ -122,17 +126,17 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
    看 chat 对外到底暴露了什么。这里决定“跨 feature 能怎么用 chat”。
 3. `src/features/chat/public/api-types.ts`
    看 chat 对外承诺了哪些稳定类型，尤其是 `session / messageFlow / governance` 三组 capability。
-4. `src/features/chat/application/runtime/createChatRuntime.ts`
-   看 chat 的 application/runtime 装配根。这里回答“整个 chat 是怎么被装起来的”。
-5. `src/features/chat/presentation/store/live/chatStoreAssemblies.ts`
+4. `src/features/chat/composition/createChatRuntime.ts`
+   看 chat 的 composition 装配根。这里回答“整个 chat 是怎么被装起来的”。
+5. `src/features/chat/composition/store/assembleChatStoreRuntime.ts`
    看聚合 runtime 如何拆成 `sessionSharedContext + governance + messageFlow + session`。
 6. 按子域深入：
    - `room-session/README.md`
    - `message-flow/README.md`
    - `room-governance/README.md`
 7. 最后再看页面：
-   - `presentation/composables/usePatchbayPageModel.ts`
-   - `presentation/pages/MainPage.vue`
+   - `presentation/patchbay/page/usePatchbayPageModel.ts`
+   - `presentation/patchbay/page/MainPage.vue`
 
 这样读会比“先从页面点进去再一路追函数”更容易建立结构感。
 
@@ -144,11 +148,11 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
   - `public/api.ts`
   - `public/api-types.ts`
 - 想看“整个 chat 怎么装起来”：
-  - `application/runtime/createChatRuntime.ts`
-  - `presentation/store/live/chatStoreAssemblies.ts`
+  - `composition/createChatRuntime.ts`
+  - `composition/store/assembleChatStoreRuntime.ts`
 - 想看“切服 / workspace 启动 / 插件桥接”：
-  - `application/runtime/createChatWorkspaceCoordinator.ts`
-  - `presentation/composables/usePatchbayWorkspace.ts`
+  - `composition/createChatWorkspaceCoordinator.ts`
+  - `presentation/patchbay/page/usePatchbayWorkspace.ts`
 - 想看“频道切换 / WS 接入 / catch-up / 读状态”：
   - `room-session/*`
 - 想看“消息列表 / 分页 / composer / domain 渲染 / 上传”：
@@ -156,14 +160,14 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
 - 想看“成员 / 管理员 / 申请 / 封禁 / 创建删除频道”：
   - `room-governance/*`
 - 想看“页面如何把这些能力组装成 UI”：
-  - `presentation/composables/usePatchbayPageModel.ts`
-  - `presentation/composables/useChannelRailModel.ts`
-  - `presentation/composables/useChatCenterModel.ts`
-  - `presentation/composables/useMembersRailModel.ts`
+  - `presentation/patchbay/page/usePatchbayPageModel.ts`
+  - `presentation/patchbay/view-models/useChannelRailModel.ts`
+  - `presentation/patchbay/view-models/useChatCenterModel.ts`
+  - `presentation/patchbay/view-models/useMembersRailModel.ts`
 - 想看“chat 和别的 feature 怎么接”：
-  - `data/server-workspace.ts`
-  - `data/plugin-access.ts`
-  - `data/plugin-runtime.ts`
+  - `data/server-workspace/chatServerWorkspaceAdapter.ts`
+  - `data/plugins/chatPluginAccess.ts`
+  - `data/plugins/chatPluginRuntime.ts`
   - `data/account-session.ts`
 
 ## 关键流程（概览）
@@ -179,11 +183,11 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
   3) 监听 `observeChannelProjectionChanged(...)`，仅在 `channelId` 与 `projection` 匹配时增量刷新
 - 发送消息：
   1) 由 composer 生成 payload（Core 或插件 composer）
-  2) 调用 `SendMessage` 用例
+  2) 调用 `MessageFlowApplicationService.sendComposerMessage(...)`
   3) 成功后更新本地时间线或等待 WS 回推
 - 未读/读状态：
-  - 拉取未读：`GetUnreads`
-  - 上报读状态：`UpdateReadState`（通常在频道切换/滚动到末尾时触发）
+  - 拉取未读：`ChatCoreApplicationService.getUnreads(...)`
+  - 上报读状态：`ChatCoreApplicationService.updateReadState(...)`（通常在频道切换/滚动到末尾时触发）
 
 ### 事件流主链（建议先读）
 

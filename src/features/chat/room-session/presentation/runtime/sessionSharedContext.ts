@@ -11,16 +11,22 @@
  * - 之所以单独抽出，是为了避免多个 runtime 重复持有 socket/token/scope 判断逻辑。
  */
 
-import type { ChatReadStateReporterPort } from "@/features/chat/application/ports/runtimePorts";
+import type { ChatReadStateReporterPort } from "@/features/chat/domain/ports/runtimePorts";
 import { readAuthToken } from "@/shared/utils/localState";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
-import { getActiveChatServerSocket } from "@/features/chat/data/server-workspace";
-import { createChannelData, createReadStateReporter } from "@/features/chat/room-session/internal";
-import type { ChatChannel } from "@/features/chat/room-session/api-types";
-import type { ChatApiGateway } from "@/features/chat/presentation/store/live/chatGateway";
-import type { ChatRuntimeScopePort } from "@/features/chat/presentation/store/live/chatScopePort";
+import { getActiveChatServerSocket } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+import { createReadStateReporter, RoomSessionCatalogApplicationService } from "@/features/chat/room-session/internal";
+import type { ChatApiGateway } from "@/features/chat/composition/contracts/chatGateway";
+import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import type { ChatSessionStateSlice } from "./sessionRuntimePorts";
+import {
+  createSessionDirectoryStatePort,
+  createSessionReadMarkerStatePort,
+} from "./sessionStateAdapters";
 
+/**
+ * 会话共享上下文装配依赖。
+ */
 export type ChatSessionSharedContextDeps = {
   api: ChatApiGateway;
   channelsRef: ChatSessionStateSlice["channelsRef"];
@@ -30,6 +36,9 @@ export type ChatSessionSharedContextDeps = {
   lastReadReportAtMsByChannel: ChatSessionStateSlice["lastReadReportAtMsByChannel"];
 };
 
+/**
+ * session / message-flow / governance 共享的会话上下文。
+ */
 export type ChatSessionSharedContext = {
   /**
    * 当前 chat runtime 的作用域上下文。
@@ -82,44 +91,14 @@ export function createChatSessionSharedContext(
   deps: ChatSessionSharedContextDeps,
 ): ChatSessionSharedContext {
   const scope = createChatRuntimeScope(deps.scopeVersion);
-  const directoryState = {
-    listChannels: () => deps.channelsRef.value,
-    findChannelById: (channelId: string) => deps.channelsRef.value.find((entry) => entry.id === channelId) ?? null,
-    replaceChannels: (channels: readonly ChatChannel[]) => {
-      deps.channelsRef.value = [...channels];
-    },
-    readUnreadCount: (channelId: string) => deps.channelsRef.value.find((entry) => entry.id === channelId)?.unread ?? 0,
-    markChannelReadLocally: (channelId: string) => {
-      const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
-      if (channel) channel.unread = 0;
-    },
-    incrementChannelUnread: (channelId: string, delta: number = 1) => {
-      const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
-      if (channel) channel.unread += delta;
-    },
-    clearChannelDirectory: () => {
-      deps.channelsRef.value = [];
-    },
-  };
-  const readMarkerState = {
-    readLastReadTimeMs: (channelId: string) => Number(deps.lastReadTimeMsByChannel[channelId] ?? 0),
-    writeLastReadTimeMs: (channelId: string, timeMs: number) => {
-      deps.lastReadTimeMsByChannel[channelId] = timeMs;
-    },
-    readLastReadMessageId: (channelId: string) => String(deps.lastReadMidByChannel[channelId] ?? ""),
-    writeLastReadMessageId: (channelId: string, messageId: string) => {
-      deps.lastReadMidByChannel[channelId] = messageId;
-    },
-    readLastReportAtMs: (channelId: string) => Number(deps.lastReadReportAtMsByChannel[channelId] ?? 0),
-    writeLastReportAtMs: (channelId: string, timeMs: number) => {
-      deps.lastReadReportAtMsByChannel[channelId] = timeMs;
-    },
-    clearAllReadMarkers: () => {
-      for (const key of Object.keys(deps.lastReadTimeMsByChannel)) delete deps.lastReadTimeMsByChannel[key];
-      for (const key of Object.keys(deps.lastReadMidByChannel)) delete deps.lastReadMidByChannel[key];
-      for (const key of Object.keys(deps.lastReadReportAtMsByChannel)) delete deps.lastReadReportAtMsByChannel[key];
-    },
-  };
+  const directoryState = createSessionDirectoryStatePort({
+    channelsRef: deps.channelsRef,
+  });
+  const readMarkerState = createSessionReadMarkerStatePort({
+    lastReadTimeMsByChannel: deps.lastReadTimeMsByChannel,
+    lastReadMidByChannel: deps.lastReadMidByChannel,
+    lastReadReportAtMsByChannel: deps.lastReadReportAtMsByChannel,
+  });
 
   const readStateReporter = createReadStateReporter({
     api: deps.api,
@@ -127,7 +106,11 @@ export function createChatSessionSharedContext(
     state: readMarkerState,
   });
 
-  const { refreshChannels } = createChannelData({
+  /**
+   * 目录刷新逻辑统一下沉到 application service，
+   * shared context 只负责把 scope 与状态端口装配进去。
+   */
+  const catalogApplicationService = new RoomSessionCatalogApplicationService({
     api: deps.api,
     scope,
     directoryState,
@@ -136,7 +119,7 @@ export function createChatSessionSharedContext(
 
   return {
     scope,
-    refreshChannels,
+    refreshChannels: () => catalogApplicationService.refreshChannels(),
     readStateReporter,
   };
 }

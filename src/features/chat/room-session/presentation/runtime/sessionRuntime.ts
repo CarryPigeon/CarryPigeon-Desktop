@@ -11,14 +11,14 @@
  * - 它只负责组合各类 session 子能力，不再直接承载 WS/polling/catch-up 的实现细节。
  */
 
-import type { ChatReadStateReporterPort } from "@/features/chat/application/ports/runtimePorts";
+import type { ChatReadStateReporterPort } from "@/features/chat/domain/ports/runtimePorts";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 import {
-  createChannelViewActions,
+  RoomSessionViewApplicationService,
   resetRoomSessionState,
 } from "@/features/chat/room-session/internal";
-import type { ChatEventsGateway } from "@/features/chat/presentation/store/live/chatGateway";
-import type { ChatRuntimeScopePort } from "@/features/chat/presentation/store/live/chatScopePort";
+import type { ChatEventsGateway } from "@/features/chat/composition/contracts/chatGateway";
+import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import type { ChatMessageFlowRuntimePort } from "@/features/chat/message-flow/presentation/runtime/messageFlowRuntimePorts";
 import type { ChatGovernanceRuntimePort } from "@/features/chat/room-governance/presentation/runtime/governanceRuntimePorts";
 import { createChatSessionConnectionRuntime } from "./sessionConnectionRuntime";
@@ -31,6 +31,9 @@ type LoggerLike = {
   warn(message: string, payload?: Record<string, unknown>): void;
 };
 
+/**
+ * room-session runtime 装配依赖。
+ */
 export type ChatSessionRuntimeDeps = {
   /**
    * 该依赖集合对应 room-session 需要的三类东西：
@@ -123,7 +126,11 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
   });
 
   // 频道切换、读状态推进属于“当前频道视图动作”，和底层连接生命周期拆开装配。
-  const channelViewActions = createChannelViewActions({
+  /**
+   * 频道级用户动作统一委托给 application service，
+   * runtime 只负责把跨子域依赖接好。
+   */
+  const viewApplicationService = new RoomSessionViewApplicationService({
     state: sessionState,
     loadChannelMessages: messageFlow.loadChannelMessages,
     refreshMembersRail: governance.refreshMembersRail,
@@ -147,6 +154,8 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
   return {
     ensureChatReady: connectionRuntime.ensureChatReady,
     resetForServerChange,
-    ...channelViewActions,
+    getMessageById: (channelId, messageId) => viewApplicationService.getMessageById(channelId, messageId),
+    selectChannel: (channelId) => viewApplicationService.selectChannel(channelId),
+    reportCurrentReadState: () => viewApplicationService.reportCurrentReadState(),
   };
 }

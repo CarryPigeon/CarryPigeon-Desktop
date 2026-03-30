@@ -58,6 +58,9 @@ function asSafeNumber(value: unknown): number {
   return Number.isFinite(next) ? Math.trunc(next) : 0;
 }
 
+/**
+ * 将用户 wire 模型映射为领域用户记录。
+ */
 export function mapChatUserWire(wire: ChatUserWire | undefined): ChatUserRecord | undefined {
   if (!wire) return undefined;
   const id = asTrimmedString(wire.uid);
@@ -70,6 +73,9 @@ export function mapChatUserWire(wire: ChatUserWire | undefined): ChatUserRecord 
   };
 }
 
+/**
+ * 将频道 wire 模型映射为领域频道记录。
+ */
 export function mapChatChannelWire(wire: ChatChannelWire): ChatChannelRecord {
   const id = asTrimmedString(wire.cid);
   return {
@@ -81,6 +87,9 @@ export function mapChatChannelWire(wire: ChatChannelWire): ChatChannelRecord {
   };
 }
 
+/**
+ * 将未读状态 wire 模型映射为领域未读状态。
+ */
 export function mapChatUnreadStateWire(wire: ChatUnreadStateWire): ChatUnreadState {
   return {
     channelId: asTrimmedString(wire.cid),
@@ -89,6 +98,9 @@ export function mapChatUnreadStateWire(wire: ChatUnreadStateWire): ChatUnreadSta
   };
 }
 
+/**
+ * 将消息 wire 模型映射为领域消息记录。
+ */
 export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   return {
     id: asTrimmedString(wire.mid),
@@ -104,6 +116,9 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   };
 }
 
+/**
+ * 将消息分页结果从 wire 结构映射为领域分页结构。
+ */
 export function mapChatMessagePageWire(wire: ChatMessagePageWire): ChatMessagePage {
   const items = Array.isArray(wire.items) ? wire.items.map(mapChatMessageWire) : [];
   return {
@@ -113,6 +128,9 @@ export function mapChatMessagePageWire(wire: ChatMessagePageWire): ChatMessagePa
   };
 }
 
+/**
+ * 将频道成员 wire 模型映射为领域成员记录。
+ */
 export function mapChatChannelMemberWire(wire: ChatChannelMemberWire): ChatChannelMemberRecord {
   return {
     userId: asTrimmedString(wire.uid),
@@ -123,6 +141,9 @@ export function mapChatChannelMemberWire(wire: ChatChannelMemberWire): ChatChann
   };
 }
 
+/**
+ * 将入群申请 wire 模型映射为领域申请记录。
+ */
 export function mapChatChannelApplicationWire(wire: ChatChannelApplicationWire): ChatChannelApplicationRecord {
   return {
     applicationId: asTrimmedString(wire.application_id),
@@ -134,6 +155,9 @@ export function mapChatChannelApplicationWire(wire: ChatChannelApplicationWire):
   };
 }
 
+/**
+ * 将封禁 wire 模型映射为领域封禁记录。
+ */
 export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanRecord {
   return {
     channelId: asTrimmedString(wire.cid),
@@ -144,6 +168,9 @@ export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanR
   };
 }
 
+/**
+ * 将领域发送消息输入转换为 wire 请求体。
+ */
 export function mapChatSendMessageInput(input: ChatSendMessageInput): ChatSendMessageWire {
   return {
     domain: asTrimmedString(input.domain),
@@ -153,6 +180,9 @@ export function mapChatSendMessageInput(input: ChatSendMessageInput): ChatSendMe
   };
 }
 
+/**
+ * 将领域已读状态输入转换为 wire 请求体。
+ */
 export function mapChatReadStateInput(input: ChatReadStateInput): ChatReadStateWire {
   return {
     last_read_mid: asTrimmedString(input.lastReadMessageId),
@@ -160,6 +190,9 @@ export function mapChatReadStateInput(input: ChatReadStateInput): ChatReadStateW
   };
 }
 
+/**
+ * 将频道更新输入裁剪为服务端接受的 wire patch。
+ */
 export function mapChatChannelPatchInput(input: ChatChannelPatchInput): Partial<Pick<ChatChannelWire, "name" | "brief" | "avatar">> {
   const output: Partial<Pick<ChatChannelWire, "name" | "brief" | "avatar">> = {};
   if (typeof input.name === "string") output.name = input.name.trim();
@@ -168,6 +201,9 @@ export function mapChatChannelPatchInput(input: ChatChannelPatchInput): Partial<
   return output;
 }
 
+/**
+ * 将创建频道输入转换为 wire 请求体。
+ */
 export function mapChatChannelCreateInput(
   input: ChatChannelCreateInput,
 ): Pick<ChatChannelWire, "name"> & Partial<Pick<ChatChannelWire, "brief" | "avatar">> {
@@ -208,6 +244,12 @@ function mapChannelChangedPayload(wire: ChatChannelChangedEventPayloadWire): Cha
   };
 }
 
+/**
+ * 将服务端 WS 事件从 wire envelope 转换为领域事件 envelope。
+ *
+ * 已知事件会被投影为判别联合；未知事件保持原始 `eventType` 与 `payload`，
+ * 以便上层在不破坏兼容性的前提下决定是否忽略或记录。
+ */
 export function mapChatWsEventWire(wire: ChatWsEventWire): ChatEventEnvelope {
   const base = {
     eventId: asTrimmedString(wire.event_id),

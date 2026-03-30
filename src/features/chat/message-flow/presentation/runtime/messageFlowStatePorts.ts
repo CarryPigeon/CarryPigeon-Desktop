@@ -9,9 +9,12 @@ import type { Ref } from "vue";
 import type {
   MessageComposerStatePort,
   MessageTimelineStatePort,
-} from "@/features/chat/message-flow/application/ports";
+} from "@/features/chat/message-flow/domain/ports";
 import type { ChatMessage, ChatMessageActionErrorInfo } from "@/features/chat/message-flow/api-types";
 
+/**
+ * 创建消息时间线状态端口所需的底层状态容器。
+ */
 export type CreateMessageTimelineStatePortDeps = {
   currentChannelId: Ref<string>;
   messagesByChannel: Record<string, ChatMessage[]>;
@@ -20,6 +23,9 @@ export type CreateMessageTimelineStatePortDeps = {
   loadingMoreByChannel: Record<string, boolean>;
 };
 
+/**
+ * 将 runtime 层消息时间线状态适配为 application 端口。
+ */
 export function createMessageTimelineStatePort(
   deps: CreateMessageTimelineStatePortDeps,
 ): MessageTimelineStatePort {
@@ -83,6 +89,9 @@ export function createMessageTimelineStatePort(
   };
 }
 
+/**
+ * 创建消息输入框状态端口所需的底层状态容器。
+ */
 export type CreateMessageComposerStatePortDeps = {
   selectedDomainId: Ref<string>;
   composerDraft: Ref<string>;
@@ -90,6 +99,9 @@ export type CreateMessageComposerStatePortDeps = {
   messageActionError: Ref<ChatMessageActionErrorInfo | null>;
 };
 
+/**
+ * 将 runtime 层输入框状态适配为 application 端口。
+ */
 export function createMessageComposerStatePort(
   deps: CreateMessageComposerStatePortDeps,
 ): MessageComposerStatePort {

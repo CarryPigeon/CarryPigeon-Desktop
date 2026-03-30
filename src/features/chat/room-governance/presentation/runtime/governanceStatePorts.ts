@@ -6,15 +6,21 @@
  */
 
 import type { Ref } from "vue";
-import type { GovernanceChannelCatalogPort } from "@/features/chat/room-governance/application/ports";
+import type { GovernanceChannelCatalogPort } from "@/features/chat/room-governance/domain/ports";
 import type { ChatMember } from "@/features/chat/room-governance/api-types";
 import type { ChatChannel } from "@/features/chat/room-session/api-types";
 
+/**
+ * 创建治理频道目录端口所需的状态容器。
+ */
 export type CreateGovernanceChannelCatalogPortDeps = {
   channelsRef: Ref<ChatChannel[]>;
   currentChannelId: Ref<string>;
 };
 
+/**
+ * 将治理相关频道目录状态适配为 application 端口。
+ */
 export function createGovernanceChannelCatalogPort(
   deps: CreateGovernanceChannelCatalogPortDeps,
 ): GovernanceChannelCatalogPort {
@@ -36,15 +42,24 @@ export function createGovernanceChannelCatalogPort(
   };
 }
 
+/**
+ * 治理成员侧栏局部状态端口。
+ */
 export type GovernanceMembersRailStatePort = {
   replaceMembers(members: readonly ChatMember[]): void;
   clearMembers(): void;
 };
 
+/**
+ * 创建治理成员侧栏状态端口所需的状态容器。
+ */
 export type CreateGovernanceMembersRailStatePortDeps = {
   members: Ref<ChatMember[]>;
 };
 
+/**
+ * 将成员侧栏状态适配为治理 runtime 可消费的局部端口。
+ */
 export function createGovernanceMembersRailStatePort(
   deps: CreateGovernanceMembersRailStatePortDeps,
 ): GovernanceMembersRailStatePort {

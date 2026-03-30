@@ -7,7 +7,7 @@
 ## 一、目录与文档
 
 - [ ] 新建 `src/features/<feature>/`。
-- [ ] 至少包含：`domain/`、`data/`、`di/`、`presentation/`（按需加 `mock/`、`test/`）。
+- [ ] 至少包含：`domain/`、`data/`、`composition/`、`presentation/`（按需加 `mock/`、`test/`）。
 - [ ] 新建 `src/features/<feature>/README.md`，写清：定位、边界、入口、关键流程。
 - [ ] 若需要跨 feature 调用，新增 `src/features/<feature>/api.ts` 作为唯一公共入口。
 
@@ -16,13 +16,13 @@
 - [ ] `domain/*` 不引入 Vue / Tauri / 浏览器 API。
 - [ ] `usecases/*` 仅依赖 `domain/types|errors|ports`。
 - [ ] `data/*` 实现 `domain/ports/*`。
-- [ ] `presentation/*` 通过 `di/*` 或公开 API 调用能力，不直接依赖别的 feature 内部路径。
+- [ ] `presentation/*` 通过 `composition/*` 或公开 API 调用能力，不直接依赖别的 feature 内部路径。
 
-## 三、DI 与 mock 切换
+## 三、Composition 与 mock 切换
 
 优先使用统一选择器：`src/shared/config/mockModeSelector.ts`。
 
-- [ ] 在 `di/*.ts` 中使用 `selectByMockMode`（off/store/protocol）。
+- [ ] 在 `composition/*.ts` 中使用 `selectByMockMode`，或统一在 composition 装配层读取等价全局配置（off/store/protocol）。
 - [ ] 仅区分“是否启用 mock”时使用 `selectByMockEnabled`。
 - [ ] 不在业务实现中直接读取 `import.meta.env`。
 
