@@ -5,8 +5,8 @@
 
 import { computed, reactive, ref } from "vue";
 import { currentChatUser, currentChatUsername } from "@/features/chat/data/account-session";
-import { getAvailableChatMessageDomains } from "@/features/chat/data/plugin-runtime";
-import { chatCurrentServerSocket } from "@/features/chat/data/server-workspace";
+import { getAvailableChatMessageDomains } from "@/features/chat/data/plugins/chatPluginRuntime";
+import { chatCurrentServerSocket } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
@@ -35,14 +35,14 @@ import type {
   UpdateChannelMetaOutcome,
   DecideChannelApplicationOutcome,
 } from "@/features/chat/room-governance/api-types";
-import type { ChatRuntimeStore } from "@/features/chat/presentation/store/chatStoreTypes";
+import type { ChatRuntimeAggregateStore } from "@/features/chat/composition/contracts/chatStoreTypes";
 
 /**
  * 创建 mock store 实现（纯内存）。
  *
- * @returns `ChatRuntimeStore`。
+ * @returns `ChatRuntimeAggregateStore`。
  */
-export function createMockChatStore(): ChatRuntimeStore {
+export function createMockChatStore(): ChatRuntimeAggregateStore {
   function createGovernanceError(
     code: GovernanceCommandErrorCode,
     message: string,

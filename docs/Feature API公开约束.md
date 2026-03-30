@@ -57,7 +57,7 @@
 
 ### 3.2 禁止导出
 
-- `di/*`
+- `composition/*`
 - `data/*`
 - `presentation/store/live/*`
 - UI 组件
@@ -247,7 +247,7 @@ export const chatApiContractCheck: ChatCapabilities = createChatCapabilities();
 
 边界脚本或 code review 必须检查：
 
-- `api.ts` 是否直接导出 `data/di/presentation/live`。
+- `api.ts` 是否直接导出 `data/composition/presentation/live`。
 - `api.ts` 是否导出组件或内部容器。
 - 是否仍存在跨 feature 深路径 import。
 - `application` 是否重新出现 `vue`、`Ref`、`computed`、`watch`。

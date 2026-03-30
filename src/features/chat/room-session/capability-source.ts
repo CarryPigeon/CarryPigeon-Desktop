@@ -30,6 +30,9 @@ import type {
   RoomSessionDirectorySnapshot,
 } from "./api-types";
 
+/**
+ * 在完整频道目录里按 id 查询频道。
+ */
 function findChannelById(channelId: string): ChatChannel | null {
   for (const channel of allChannels.value) {
     if (channel.id === channelId) return clonePlainData(channel);
@@ -37,6 +40,9 @@ function findChannelById(channelId: string): ChatChannel | null {
   return null;
 }
 
+/**
+ * 构造目录 capability 的只读快照。
+ */
 function getDirectorySnapshot(): RoomSessionDirectorySnapshot {
   return {
     allChannels: clonePlainData(allChannels.value),
@@ -48,6 +54,9 @@ function getDirectorySnapshot(): RoomSessionDirectorySnapshot {
 
 const observeDirectorySnapshot = createWatchedSnapshotObserver(getDirectorySnapshot);
 
+/**
+ * 构造当前频道会话快照。
+ */
 function getCurrentChannelSnapshot(): CurrentChannelSessionSnapshot {
   return {
     currentChannelId: currentChannelId.value,
@@ -60,18 +69,36 @@ const observeCurrentChannelSnapshot = createWatchedSnapshotObserver(getCurrentCh
 
 /**
  * 创建 room-session 子域内部 capability 源。
+ *
+ * capability-source 的职责是：
+ * - 向外提供稳定 object-capability；
+ * - 向内继续复用 runtime store-access；
+ * - 把 Vue watch 限制在内部边界，不泄漏到公共 API。
  */
 export function createRoomSessionCapabilitySource(): RoomSessionCapabilities {
   return {
     directory: {
       getSnapshot: getDirectorySnapshot,
       observeSnapshot: observeDirectorySnapshot,
+      /**
+       * 设置目录搜索关键字。
+       */
       setSearchQuery(value: string): void {
         channelSearch.value = value;
       },
+      /**
+       * 切换目录标签页。
+       */
       setActiveTab(value: "joined" | "discover"): void {
         channelTab.value = value;
       },
+      /**
+       * 强制进入 discover 标签，并填入指定频道名。
+       *
+       * 典型场景：
+       * - 用户点击“前往发现页”
+       * - 其他 feature 需要把某个频道名称作为搜索种子写入
+       */
       focusDiscoverChannel(channelName: string): void {
         channelTab.value = "discover";
         channelSearch.value = channelName;

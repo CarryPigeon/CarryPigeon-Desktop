@@ -20,6 +20,9 @@ export function compareMessageIdForReadOrder(a: string, b: string): number {
   }
 }
 
+/**
+ * 判断新的读标记是否应覆盖旧值。
+ */
 export function shouldAdvanceReadMarker(
   prevTimeMs: number,
   prevMid: string,
@@ -31,6 +34,9 @@ export function shouldAdvanceReadMarker(
   return compareMessageIdForReadOrder(nextMid, prevMid) >= 0;
 }
 
+/**
+ * 判断消息是否处于当前读标记之后。
+ */
 export function isMessageAfterReadMarker(
   messageTimeMs: number,
   messageId: string,

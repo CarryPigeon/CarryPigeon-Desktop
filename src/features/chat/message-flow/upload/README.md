@@ -32,8 +32,8 @@
 
 ## 主要入口（导航）
 
-- 展示层 store：`src/features/chat/message-flow/upload/presentation/store/fileUploadStore.ts`
-- DI 组装：`src/features/chat/message-flow/upload/di/upload.di.ts`
+- 展示层 store：`src/features/chat/message-flow/upload/presentation/runtime/fileUploadStore.ts`
+- DI 组装：`src/features/chat/message-flow/upload/composition/uploadServices.ts`
 - UI 组件：
   - 上传按钮：`src/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue`
   - 进度展示：`src/features/chat/message-flow/upload/presentation/components/UploadProgress.vue`

@@ -13,7 +13,7 @@ import UnknownDomainCard from "./UnknownDomainCard.vue";
 import {
   resolveMessageRenderModel,
   type MessageRendererRegistry,
-} from "@/features/chat/message-flow/message/application/messageRendererResolver";
+} from "@/features/chat/message-flow/message/domain/messageRendererResolver";
 import type { RenderableChatMessage } from "@/features/chat/message-flow/message/domain/messageModels";
 import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
 

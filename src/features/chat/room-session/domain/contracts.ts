@@ -15,6 +15,9 @@ import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummar
  */
 export type ChatChannel = ChannelSummary;
 
+/**
+ * 频道切换错误码。
+ */
 export type ChannelSelectionErrorCode =
   | "missing_channel_id"
   | "channel_not_found"

@@ -7,6 +7,9 @@
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
 import type { MessageDomainRef, RenderableChatMessage } from "../message/domain/messageModels";
 
+/**
+ * message-flow 对外暴露的消息域标识模型。
+ */
 export type MessageDomain = MessageDomainRef;
 
 /**
@@ -31,6 +34,9 @@ export type ComposerSubmitPayload = {
   replyToMessageId?: string;
 };
 
+/**
+ * message-flow 命令错误码。
+ */
 export type ChatMessageActionErrorCode =
   | "plugin_composer_required"
   | "not_signed_in"

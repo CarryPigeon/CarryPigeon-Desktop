@@ -10,17 +10,30 @@
 
 import type { ChatEventEnvelope } from "../types/chatEventModels";
 
+/**
+ * 事件流连接句柄。
+ *
+ * 生命周期语义：
+ * - `close` 结束当前租约；
+ * - `reauth` 在既有连接上刷新凭证，不改变调用方持有的 capability。
+ */
 export type ChatEventsClient = {
   close(): void;
   reauth(nextAccessToken: string): void;
 };
 
+/**
+ * 事件流连接选项。
+ */
 export type ChatEventsConnectOptions = {
   wsUrlOverride?: string;
   onResumeFailed?: (reason: string) => void;
   onAuthError?: (reason: string) => void;
 };
 
+/**
+ * chat 领域事件流端口。
+ */
 export type ChatEventsPort = {
   connect(
     serverSocket: string,

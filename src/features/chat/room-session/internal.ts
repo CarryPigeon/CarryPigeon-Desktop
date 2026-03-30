@@ -4,12 +4,12 @@
  * 为 chat application/runtime 装配根提供 room-session 子域的内部装配能力。
  */
 
-export { createResumeFailedCatchUp } from "./application/recovery/resumeFailedCatchUp";
-export { createChannelData } from "./application/usecases/channelData";
-export { createChannelViewActions } from "./application/usecases/channelViewActions";
-export { createEnsureReady } from "./application/usecases/ensureReady";
-export { createPollingFallback } from "./application/services/pollingFallback";
-export { createReadStateReporter } from "./application/services/readStateReporter";
-export { createReadStateEventRouter } from "./application/event-handlers/readStateEventRouter";
-export { createSessionWsManager } from "./application/services/wsManager";
-export { resetRoomSessionState } from "./application/usecases/resetState";
+export { createResumeFailedCatchUp } from "./domain/recovery/resumeFailedCatchUp";
+export { RoomSessionCatalogApplicationService } from "./domain/usecases/roomSessionCatalogService";
+export { RoomSessionViewApplicationService } from "./domain/usecases/roomSessionViewService";
+export { RoomSessionConnectionApplicationService } from "./domain/usecases/roomSessionConnectionService";
+export { createPollingFallback } from "./domain/services/pollingFallback";
+export { createReadStateReporter } from "./domain/services/readStateReporter";
+export { createReadStateEventRouter } from "./domain/event-handlers/readStateEventRouter";
+export { createSessionWsManager } from "./domain/services/wsManager";
+export { resetRoomSessionState } from "./domain/usecases/resetSessionState";

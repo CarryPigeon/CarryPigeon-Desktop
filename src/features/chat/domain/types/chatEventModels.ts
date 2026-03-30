@@ -9,16 +9,25 @@
 
 import type { ChatMessageRecord } from "./chatApiModels";
 
+/**
+ * 新消息创建事件。
+ */
 export type ChatMessageCreatedEvent = {
   channelId: string;
   message: ChatMessageRecord;
 };
 
+/**
+ * 消息删除事件。
+ */
 export type ChatMessageDeletedEvent = {
   channelId: string;
   messageId: string;
 };
 
+/**
+ * 已读状态更新事件。
+ */
 export type ChatReadStateUpdatedEvent = {
   channelId: string;
   userId: string;
@@ -26,13 +35,26 @@ export type ChatReadStateUpdatedEvent = {
   lastReadTime: number;
 };
 
+/**
+ * 单个频道元信息变化事件。
+ */
 export type ChatChannelChangedEvent = {
   channelId: string;
   scope?: string;
 };
 
+/**
+ * 多频道目录整体变化事件。
+ */
 export type ChatChannelsChangedEvent = Record<string, never>;
 
+/**
+ * chat 领域事件 envelope。
+ *
+ * 设计目标：
+ * - 已知事件使用判别联合承载强语义 payload；
+ * - 未知事件保留兜底分支，避免协议新增事件时直接打断现有客户端。
+ */
 export type ChatEventEnvelope =
   | {
       eventId: string;
