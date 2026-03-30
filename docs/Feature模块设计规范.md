@@ -18,11 +18,11 @@ src/features/<feature>/
   api.ts
   api-types.ts            # 若该 feature 需要跨 feature 暴露类型
   README.md
+  composition/            # 推荐：唯一装配层（实现选择、对象装配、生命周期缓存）
   routes.ts               # 若该 feature 提供页面入口
   application/            # 可选：编排层、跨子域协调逻辑
   contracts/              # 可选：子域之间共享的中立契约
   data/
-  di/
   domain/
   integration/            # 可选：对其他 feature 的受控适配层
   mock/
@@ -34,8 +34,8 @@ src/features/<feature>/
 依赖方向：
 
 ```text
-presentation -> di -> domain <- data
 presentation -> application -> domain <- data
+presentation -> composition -> domain <- data
 subfeature A -> contracts <- subfeature B
 feature internal -> integration -> other-feature/api
 ```
@@ -78,7 +78,7 @@ wire dto -> data adapter -> domain model -> application/usecase -> view snapshot
 - `presentation` 默认只消费 capability、view snapshot、页面模型，不直接消费 data adapter 返回值。
 - `api.ts`、`api-types.ts` 以及子域 `*/api.ts` 不应直接依赖 `presentation/store/*`、`data/*`；如需读取 UI 状态或底层 provider，应先经由 `application/*`、`integration/*` 或明确的 state facade 收敛。
 - 跨 feature 或子域公开的稳定 contract 一律使用领域语义命名；`snake_case`、transport payload 字段只能停留在 `data/wire/*`、协议 mapper 或边界 normalizer。
-- 当 `application/*` 需要读取 feature 内部 store/runtime 状态时，优先先定义 `contracts/*StateAccess` 一类访问契约，再由 `di/*` 组装具体 adapter；不要让 application 直接导入多个 `presentation/store/*` 进行拼接。
+- 当 `application/*` 需要读取 feature 内部 store/runtime 状态时，优先先定义 `contracts/*StateAccess` 一类访问契约，再由 `composition/*` 组装具体 adapter；不要让 application 直接导入多个 `presentation/store/*` 进行拼接。
 
 允许的例外：
 
@@ -112,7 +112,7 @@ wire dto -> data adapter -> domain model -> application/usecase -> view snapshot
 
 不应做的事：
 
-- 不直接导出 `di/*`、`data/*`、`presentation/store/live/*`。
+- 不直接导出 `composition/*`、`data/*`、`presentation/store/live/*`。
 - 不把“临时兼容导出”长期保留在公开面。
 
 公开模式（仓库级强约束）：
@@ -196,10 +196,10 @@ README 用语要求：
 
 常见命名：
 
-- `di/<feature>Runtime.ts`
-- `di/<feature>.di.ts`
-- `di/<feature>Ports.ts`
-- `di/<feature>Usecases.ts`
+- `composition/create<Feature>Runtime.ts`
+- `composition/<feature>.di.ts`
+- `composition/create<Feature>Ports.ts`
+- `composition/create<Feature>RootServices.ts`
 
 要求：
 
@@ -219,7 +219,7 @@ src/features/<feature>/
   application/
   contracts/
   data/
-  di/
+  composition/
   domain/
   integration/
   mock/
@@ -389,7 +389,7 @@ src/features/<feature>/
 
 - `chat/api.ts`：聚合公开入口
 - `chat/api-types.ts`：稳定公共类型出口
-- `chat/di/chatRuntime.ts`：唯一 composition root
+- `chat/composition/createChatRuntime.ts`：唯一 composition root
 - `chat/contracts/`：子域共享中立契约
 - `chat/room-session` / `message-flow` / `room-governance`：业务子域拆分
 - `chat/typechecks/`：编译期契约检查

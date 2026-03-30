@@ -6,16 +6,27 @@
  */
 
 import type { Ref } from "vue";
-import type { ChannelUnreadProjectionPort } from "@/features/chat/message-flow/application/ports";
-import type { RoomSessionStatePort } from "@/features/chat/room-session/application/ports/sessionPorts";
+import type { ChannelUnreadProjectionPort } from "@/features/chat/message-flow/domain/ports";
+import type {
+  RoomSessionStatePort,
+  SessionDirectoryStatePort,
+  SessionReadMarkerStatePort,
+} from "@/features/chat/room-session/domain/ports";
 import type { ChatMember } from "@/features/chat/room-governance/api-types";
 import type { ChatMessage, ChatMessageActionErrorInfo } from "@/features/chat/message-flow/api-types";
 import type { ChatChannel } from "@/features/chat/room-session/api-types";
+import {
+  createSessionDirectoryStatePort,
+  createSessionReadMarkerStatePort,
+} from "./sessionStateAdapters";
 
 function clearRecord(record: Record<string, unknown>): void {
   for (const key of Object.keys(record)) delete record[key];
 }
 
+/**
+ * 创建 room-session 状态端口所需的底层状态容器。
+ */
 export type CreateRoomSessionStatePortDeps = {
   channelsRef: Ref<ChatChannel[]>;
   currentChannelId: Ref<string>;
@@ -34,34 +45,23 @@ export type CreateRoomSessionStatePortDeps = {
   selectedDomainId: Ref<string>;
 };
 
+/**
+ * 将 room-session runtime 状态适配为 application 层状态端口。
+ */
 export function createRoomSessionStatePort(
   deps: CreateRoomSessionStatePortDeps,
 ): RoomSessionStatePort {
+  const directoryState = createSessionDirectoryStatePort({
+    channelsRef: deps.channelsRef,
+  });
+  const readMarkerState = createSessionReadMarkerStatePort({
+    lastReadTimeMsByChannel: deps.lastReadTimeMsByChannel,
+    lastReadMidByChannel: deps.lastReadMidByChannel,
+    lastReadReportAtMsByChannel: deps.lastReadReportAtMsByChannel,
+  });
+
   return {
-    listChannels(): readonly ChatChannel[] {
-      return deps.channelsRef.value;
-    },
-    findChannelById(channelId: string): Readonly<ChatChannel> | null {
-      return deps.channelsRef.value.find((entry) => entry.id === channelId) ?? null;
-    },
-    replaceChannels(channels: readonly ChatChannel[]): void {
-      deps.channelsRef.value = [...channels];
-    },
-    readUnreadCount(channelId: string): number {
-      return deps.channelsRef.value.find((entry) => entry.id === channelId)?.unread ?? 0;
-    },
-    markChannelReadLocally(channelId: string): void {
-      const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
-      if (channel) channel.unread = 0;
-    },
-    incrementChannelUnread(channelId: string, delta: number = 1): void {
-      const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
-      if (!channel) return;
-      channel.unread = Math.max(0, channel.unread + Math.max(0, Math.trunc(delta)));
-    },
-    clearChannelDirectory(): void {
-      deps.channelsRef.value = [];
-    },
+    ...directoryState,
     readCurrentChannelId(): string {
       return deps.currentChannelId.value.trim();
     },
@@ -84,29 +84,7 @@ export function createRoomSessionStatePort(
     clearAllMessageCaches(): void {
       clearRecord(deps.messagesByChannel);
     },
-    readLastReadTimeMs(channelId: string): number {
-      return Number(deps.lastReadTimeMsByChannel[channelId] ?? 0);
-    },
-    writeLastReadTimeMs(channelId: string, timeMs: number): void {
-      deps.lastReadTimeMsByChannel[channelId] = timeMs;
-    },
-    readLastReadMessageId(channelId: string): string {
-      return String(deps.lastReadMidByChannel[channelId] ?? "");
-    },
-    writeLastReadMessageId(channelId: string, messageId: string): void {
-      deps.lastReadMidByChannel[channelId] = messageId;
-    },
-    readLastReportAtMs(channelId: string): number {
-      return Number(deps.lastReadReportAtMsByChannel[channelId] ?? 0);
-    },
-    writeLastReportAtMs(channelId: string, timeMs: number): void {
-      deps.lastReadReportAtMsByChannel[channelId] = timeMs;
-    },
-    clearAllReadMarkers(): void {
-      clearRecord(deps.lastReadTimeMsByChannel);
-      clearRecord(deps.lastReadMidByChannel);
-      clearRecord(deps.lastReadReportAtMsByChannel);
-    },
+    ...readMarkerState,
     listMembers(): readonly ChatMember[] {
       return deps.members.value;
     },
@@ -132,28 +110,37 @@ export function createRoomSessionStatePort(
   };
 }
 
+/**
+ * 创建未读计数投影端口所需的状态容器。
+ */
 export type CreateSessionUnreadProjectionPortDeps = {
   channelsRef: Ref<ChatChannel[]>;
 };
 
+/**
+ * 创建仅负责未读投影的局部状态端口。
+ */
 export function createSessionUnreadProjectionPort(
   deps: CreateSessionUnreadProjectionPortDeps,
 ): ChannelUnreadProjectionPort {
-  return {
-    incrementChannelUnread(channelId: string, delta: number = 1): void {
-      const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
-      if (!channel) return;
-      channel.unread = Math.max(0, channel.unread + Math.max(0, Math.trunc(delta)));
-    },
-  };
+  const directoryState: Pick<SessionDirectoryStatePort, "incrementChannelUnread"> = createSessionDirectoryStatePort({
+    channelsRef: deps.channelsRef,
+  });
+  return directoryState;
 }
 
+/**
+ * 创建 `read_state.updated` 事件投影端口所需的状态容器。
+ */
 export type CreateSessionReadStateEventProjectionPortDeps = {
   channelsRef: Ref<ChatChannel[]>;
   lastReadTimeMsByChannel: Record<string, number>;
   lastReadMidByChannel: Record<string, string>;
 };
 
+/**
+ * 创建仅供 read-state 事件路由器使用的局部投影端口。
+ */
 export function createSessionReadStateEventProjectionPort(
   deps: CreateSessionReadStateEventProjectionPortDeps,
 ): Pick<
@@ -164,22 +151,22 @@ export function createSessionReadStateEventProjectionPort(
   | "writeLastReadMessageId"
   | "markChannelReadLocally"
 > {
+  const directoryState: Pick<SessionDirectoryStatePort, "markChannelReadLocally"> = createSessionDirectoryStatePort({
+    channelsRef: deps.channelsRef,
+  });
+  const readMarkerState: Pick<
+    SessionReadMarkerStatePort,
+    | "readLastReadTimeMs"
+    | "readLastReadMessageId"
+    | "writeLastReadTimeMs"
+    | "writeLastReadMessageId"
+  > = createSessionReadMarkerStatePort({
+    lastReadTimeMsByChannel: deps.lastReadTimeMsByChannel,
+    lastReadMidByChannel: deps.lastReadMidByChannel,
+    lastReadReportAtMsByChannel: {},
+  });
   return {
-    readLastReadTimeMs(channelId: string): number {
-      return Number(deps.lastReadTimeMsByChannel[channelId] ?? 0);
-    },
-    readLastReadMessageId(channelId: string): string {
-      return String(deps.lastReadMidByChannel[channelId] ?? "");
-    },
-    writeLastReadTimeMs(channelId: string, timeMs: number): void {
-      deps.lastReadTimeMsByChannel[channelId] = timeMs;
-    },
-    writeLastReadMessageId(channelId: string, messageId: string): void {
-      deps.lastReadMidByChannel[channelId] = messageId;
-    },
-    markChannelReadLocally(channelId: string): void {
-      const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
-      if (channel) channel.unread = 0;
-    },
+    ...readMarkerState,
+    ...directoryState,
   };
 }

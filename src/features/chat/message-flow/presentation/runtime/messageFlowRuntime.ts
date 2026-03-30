@@ -4,19 +4,17 @@
  * 聚合 message-flow 子域所需的分页、消息动作、composer 动作与 domain 视图能力。
  */
 
-import type { ChatReadStateReporterPort } from "@/features/chat/application/ports/runtimePorts";
-import { getAvailableChatMessageDomains, resolveChatDomainPluginHint } from "@/features/chat/data/plugin-runtime";
+import type { ChatReadStateReporterPort } from "@/features/chat/domain/ports/runtimePorts";
+import { getAvailableChatMessageDomains, resolveChatDomainPluginHint } from "@/features/chat/data/plugins/chatPluginRuntime";
 import {
   compareMessages,
   createAvailableDomains,
-  createComposerActions,
-  createMessageActions,
   createMessageMapper,
-  createMessagePaging,
+  MessageFlowApplicationService,
   mergeMessages,
 } from "@/features/chat/message-flow/internal";
-import type { ChatApiGateway } from "@/features/chat/presentation/store/live/chatGateway";
-import type { ChatRuntimeScopePort } from "@/features/chat/presentation/store/live/chatScopePort";
+import type { ChatApiGateway } from "@/features/chat/composition/contracts/chatGateway";
+import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import {
   createMessageComposerStatePort,
   createMessageTimelineStatePort,
@@ -26,6 +24,9 @@ import {
   ChatMessageFlowStateSlice,
 } from "./messageFlowRuntimePorts";
 
+/**
+ * message-flow runtime 装配依赖。
+ */
 export type ChatMessageFlowRuntimeDeps = {
   /**
    * 该依赖集合对应 message-flow 的三层关注点：
@@ -47,6 +48,12 @@ export type ChatMessageFlowRuntimeDeps = {
   scope: ChatRuntimeScopePort;
 };
 
+/**
+ * 创建 message-flow runtime。
+ *
+ * runtime 的职责是装配状态端口、application service 与外部 capability；
+ * 具体业务规则仍留在 application 层。
+ */
 export function createChatMessageFlowRuntime(
   deps: ChatMessageFlowRuntimeDeps,
 ): ChatMessageFlowRuntimePort {
@@ -81,13 +88,18 @@ export function createChatMessageFlowRuntime(
     messageActionError,
   });
 
-  // 分页只关心“如何取消息页并合并进 timeline”。
-  const paging = createMessagePaging({
+  /**
+   * message-flow runtime 不自己编写业务动作，
+   * 而是把状态端口与远端 gateway 交给 application service。
+   */
+  const applicationService = new MessageFlowApplicationService({
     api,
     mapWireMessage,
-    mergeMessages,
     scope,
     timelineState,
+    composerState,
+    mergeMessages,
+    readStateReporter,
   });
 
   // 可用 domain 列表来自 Core domain + plugin runtime 暴露的扩展 domain。
@@ -96,30 +108,16 @@ export function createChatMessageFlowRuntime(
     getAvailableMessageDomains: getAvailableChatMessageDomains,
   });
 
-  // 删除动作单独抽出，避免 composer 动作承担过多职责。
-  const { deleteMessage } = createMessageActions({
-    api,
-    scope,
-    timelineState,
-    composerState,
-  });
-
-  // composer 负责 draft / reply / send，不负责分页或治理。
-  const composerActions = createComposerActions({
-    api,
-    scope,
-    timelineState,
-    composerState,
-    mapWireMessage,
-    readStateReporter,
-  });
-
   return {
     availableDomains,
-    deleteMessage,
     mapWireMessage,
     compareMessages,
-    ...paging,
-    ...composerActions,
+    loadChannelMessages: (channelId) => applicationService.loadChannelMessages(channelId),
+    refreshChannelLatestPage: (channelId) => applicationService.refreshChannelLatestPage(channelId),
+    loadMoreMessages: () => applicationService.loadMoreMessages(),
+    deleteMessage: (messageId) => applicationService.deleteMessage(messageId),
+    startReply: (messageId) => applicationService.startReply(messageId),
+    cancelReply: () => applicationService.cancelReply(),
+    sendComposerMessage: (payload) => applicationService.sendComposerMessage(payload),
   };
 }

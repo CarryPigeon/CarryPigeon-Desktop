@@ -70,6 +70,9 @@ export type ChannelBan = {
   createTime: number;
 };
 
+/**
+ * room-governance 命令错误码。
+ */
 export type GovernanceCommandErrorCode =
   | "missing_channel_id"
   | "missing_user_id"
@@ -95,16 +98,46 @@ type GovernanceActionOutcome<TKind extends string, TPayload extends Record<strin
   | SuccessOutcome<TKind, TPayload>
   | FailureOutcome<`${TKind}_rejected`, GovernanceCommandErrorCode>;
 
+/**
+ * 申请加入频道结果。
+ */
 export type ApplyJoinChannelOutcome = GovernanceActionOutcome<"channel_join_applied", { channelId: string }>;
+/**
+ * 更新频道元信息结果。
+ */
 export type UpdateChannelMetaOutcome = GovernanceActionOutcome<"channel_meta_updated", { channelId: string }>;
+/**
+ * 创建频道结果。
+ */
 export type CreateChannelOutcome = GovernanceActionOutcome<"channel_created", { channel: GovernanceChannelSummary }>;
+/**
+ * 删除频道结果。
+ */
 export type DeleteChannelOutcome = GovernanceActionOutcome<"channel_deleted", { channelId: string }>;
+/**
+ * 移除频道成员结果。
+ */
 export type KickChannelMemberOutcome = GovernanceActionOutcome<"channel_member_kicked", { channelId: string; uid: string }>;
+/**
+ * 授予频道管理员结果。
+ */
 export type GrantChannelAdminOutcome = GovernanceActionOutcome<"channel_admin_granted", { channelId: string; uid: string }>;
+/**
+ * 撤销频道管理员结果。
+ */
 export type RevokeChannelAdminOutcome = GovernanceActionOutcome<"channel_admin_revoked", { channelId: string; uid: string }>;
+/**
+ * 审批入群申请结果。
+ */
 export type DecideChannelApplicationOutcome = GovernanceActionOutcome<
   "channel_application_decided",
   { channelId: string; applicationId: string; decision: "approve" | "reject" }
 >;
+/**
+ * 设置频道封禁结果。
+ */
 export type SetChannelBanOutcome = GovernanceActionOutcome<"channel_ban_upserted", { channelId: string; uid: string; until: number }>;
+/**
+ * 解除频道封禁结果。
+ */
 export type RemoveChannelBanOutcome = GovernanceActionOutcome<"channel_ban_removed", { channelId: string; uid: string }>;

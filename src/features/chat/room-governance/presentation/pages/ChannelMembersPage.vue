@@ -7,7 +7,7 @@
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
-import { useChannelMembersPage } from "@/features/chat/room-governance/presentation/composables/useChannelMembersPage";
+import { useChannelMembersPage } from "@/features/chat/room-governance/presentation/page-models/useChannelMembersPage";
 
 const { t } = useI18n();
 const {

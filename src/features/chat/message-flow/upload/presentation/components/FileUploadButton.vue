@@ -6,7 +6,7 @@
 
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { uploadFile } from "@/features/chat/message-flow/upload/presentation/store/fileUploadStore";
+import { uploadFile } from "@/features/chat/message-flow/upload/presentation/runtime/fileUploadStore";
 
 const props = defineProps<{
   accept?: string;

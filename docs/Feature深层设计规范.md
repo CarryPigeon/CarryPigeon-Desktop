@@ -114,7 +114,7 @@ type ReadableCapability<T> = {
 要求：
 
 - feature 应存在明确 composition root。
-- `di` 负责装配 adapter、port、usecase、runtime。
+- `composition` 负责装配 adapter、port、usecase、runtime。
 - `usecases` 只依赖 `domain/ports` 与 `domain/types`。
 - `data` 负责实现 `domain/ports`。
 

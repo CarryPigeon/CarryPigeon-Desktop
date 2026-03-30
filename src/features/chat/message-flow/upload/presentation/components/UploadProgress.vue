@@ -5,7 +5,7 @@
  */
 
 import { useI18n } from "vue-i18n";
-import type { UploadTask } from "@/features/chat/message-flow/upload/presentation/store/fileUploadStore";
+import type { UploadTask } from "@/features/chat/message-flow/upload/presentation/runtime/fileUploadStore";
 
 const props = defineProps<{
   task: UploadTask;

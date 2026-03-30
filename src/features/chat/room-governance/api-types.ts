@@ -43,10 +43,22 @@ export type {
   UpdateChannelMetaOutcome,
 } from "./domain/contracts";
 
+/**
+ * 当前频道成员轨道快照。
+ */
 export type RoomGovernanceMembersSnapshot = readonly ChatMember[];
 
+/**
+ * 当前频道成员轨道 capability。
+ */
 export type RoomGovernanceMembersCapabilities = ReadableCapability<RoomGovernanceMembersSnapshot>;
 
+/**
+ * 指定频道治理 capability。
+ *
+ * 该 capability 只绑定单个频道上下文，调用方必须先通过 `forChannel`
+ * 获取局部能力，再执行治理命令。
+ */
 export type ChannelGovernanceCapabilities = {
   applyJoin(): Promise<ApplyJoinChannelOutcome>;
   updateMeta(patch: { name?: string; brief?: string }): Promise<UpdateChannelMetaOutcome>;
@@ -62,10 +74,16 @@ export type ChannelGovernanceCapabilities = {
   removeBan(uid: string): Promise<RemoveChannelBanOutcome>;
 };
 
+/**
+ * 当前频道治理 capability。
+ */
 export type CurrentChannelGovernanceCapabilities = {
   members: RoomGovernanceMembersCapabilities;
 };
 
+/**
+ * room-governance 子域对外 capability 聚合。
+ */
 export type RoomGovernanceCapabilities = {
   currentChannel: CurrentChannelGovernanceCapabilities;
   createChannel(name: string, brief?: string): Promise<CreateChannelOutcome>;

@@ -52,6 +52,14 @@ import {
   mapChatUnreadStateWire,
 } from "../protocol/chatWireMappers";
 
+/**
+ * chat HTTP API 端口实现。
+ *
+ * 职责边界：
+ * - 调用底层 HTTP transport；
+ * - 完成 wire model 与 domain model 的转换；
+ * - 不承载任何业务编排或 presentation 语义。
+ */
 export const httpChatApiPort: ChatApiPort = {
   async listChannels(serverSocket: string, accessToken: string): Promise<ChatChannelRecord[]> {
     const list = await httpListChannels(serverSocket, accessToken);

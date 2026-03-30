@@ -21,6 +21,11 @@
 - `presentation/`：页面、组件、store
 - `mock/`、`test/`：按需
 
+补充：
+
+- 新 feature 或正在重构的 feature，统一把“实现选择 + 对象装配 + 生命周期缓存”放进 `composition/`。
+- 旧的 `di/` 目录只允许作为存量过渡形态存在；`di/` 与 `composition/` 不应在同一 feature 内长期并存。
+
 约束：`presentation -> composition -> domain <- adapters`
 
 ## 3. Mock 模式

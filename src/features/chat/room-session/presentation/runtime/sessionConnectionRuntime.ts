@@ -17,14 +17,14 @@ import { onAuthSessionChanged, startAuthSessionAutoRefresh } from "@/shared/net/
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 import {
-  createEnsureReady,
   createPollingFallback,
   createResumeFailedCatchUp,
   createSessionWsManager,
+  RoomSessionConnectionApplicationService,
 } from "@/features/chat/room-session/internal";
-import { getChatTlsPolicy, getChatWsUrlOverride } from "@/features/chat/data/server-workspace";
-import type { ChatEventsGateway } from "@/features/chat/presentation/store/live/chatGateway";
-import type { ChatRuntimeScopePort } from "@/features/chat/presentation/store/live/chatScopePort";
+import { getChatTlsPolicy, getChatWsUrlOverride } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+import type { ChatEventsGateway } from "@/features/chat/composition/contracts/chatGateway";
+import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import type { ChatGovernanceRuntimePort } from "@/features/chat/room-governance/presentation/runtime/governanceRuntimePorts";
 import type { ChatMessageFlowRuntimePort } from "@/features/chat/message-flow/presentation/runtime/messageFlowRuntimePorts";
 import type {
@@ -38,6 +38,9 @@ type LoggerLike = {
   warn(message: string, payload?: Record<string, unknown>): void;
 };
 
+/**
+ * 会话连接 runtime 装配依赖。
+ */
 export type ChatSessionConnectionRuntimeDeps = {
   events: ChatEventsGateway;
   logger: LoggerLike;
@@ -52,6 +55,9 @@ export type ChatSessionConnectionRuntimeDeps = {
 const POLL_INTERVAL_MS = 8000;
 const CATCH_UP_PREFETCH_LIMIT = 5;
 
+/**
+ * 创建会话连接生命周期 runtime。
+ */
 export function createChatSessionConnectionRuntime(
   deps: ChatSessionConnectionRuntimeDeps,
 ): ChatSessionConnectionRuntimePort {
@@ -67,8 +73,6 @@ export function createChatSessionConnectionRuntime(
   } = deps;
 
   const wsManager = createSessionWsManager(events);
-  let stopAutoRefresh: (() => void) | null = null;
-  let stopSessionListener: (() => void) | null = null;
 
   const polling = createPollingFallback({
     intervalMs: POLL_INTERVAL_MS,
@@ -82,10 +86,7 @@ export function createChatSessionConnectionRuntime(
   function teardownConnectionLifecycle(): void {
     wsManager.close();
     polling.stop();
-    stopAutoRefresh?.();
-    stopSessionListener?.();
-    stopAutoRefresh = null;
-    stopSessionListener = null;
+    connectionApplicationService.teardownSessionHooks();
   }
 
   const catchUpAfterResumeFailed = createResumeFailedCatchUp({
@@ -100,7 +101,11 @@ export function createChatSessionConnectionRuntime(
     prefetchLimit: CATCH_UP_PREFETCH_LIMIT,
   });
 
-  const ensureChatReady = createEnsureReady({
+  /**
+   * 连接链路相关的 application 规则统一收束在一个对象里，
+   * runtime 自己不再持有 ensure-ready 细节。
+   */
+  const connectionApplicationService = new RoomSessionConnectionApplicationService({
     logger,
     getSocketAndValidToken: scope.getSocketAndValidToken,
     getActiveServerSocket: scope.getActiveServerSocket,
@@ -122,14 +127,6 @@ export function createChatSessionConnectionRuntime(
     },
     startAutoRefresh: startAuthSessionAutoRefresh,
     onAuthSessionChanged,
-    getStopAutoRefresh: () => stopAutoRefresh,
-    setStopAutoRefresh: (stopper) => {
-      stopAutoRefresh = stopper;
-    },
-    getStopSessionListener: () => stopSessionListener,
-    setStopSessionListener: (stopper) => {
-      stopSessionListener = stopper;
-    },
     onWsEvent,
     onResumeFailed: (socketKey, reason) => {
       void catchUpAfterResumeFailed(socketKey, reason);
@@ -137,7 +134,7 @@ export function createChatSessionConnectionRuntime(
   });
 
   return {
-    ensureChatReady,
+    ensureChatReady: () => connectionApplicationService.ensureChatReady(),
     teardownConnectionLifecycle,
   };
 }

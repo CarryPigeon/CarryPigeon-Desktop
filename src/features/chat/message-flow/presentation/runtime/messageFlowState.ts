@@ -8,6 +8,9 @@
 import { computed, reactive, ref, type Ref } from "vue";
 import type { ChatMessage, ChatMessageActionErrorInfo } from "@/features/chat/message-flow/api-types";
 
+/**
+ * 创建 message-flow 基础状态所需的依赖。
+ */
 export type CreateChatMessageFlowStateDeps = {
   currentChannelId: Ref<string>;
 };
