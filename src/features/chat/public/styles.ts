@@ -4,4 +4,4 @@
  * 仅供 app composition root 挂载聊天域的全局样式，避免从 app 直接依赖 `presentation/*` 内部路径。
  */
 
-import "../presentation/styles/patchbay.scss";
+import "../presentation/patchbay/styles/patchbay.scss";

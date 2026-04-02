@@ -1,41 +1,41 @@
 {
-  "name": "carrypigeon-desktop",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "pnpm": {},
-  "scripts": {
-    "dev": "vite",
-    "typecheck": "vue-tsc --noEmit",
-    "build": "npm run -s typecheck && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "lint": "npm run -s typecheck && npm run -s lint:logs:std && npm run -s lint:rust:std && npm run -s lint:feature:boundaries && npm run -s lint:docs",
-    "lint:feature:boundaries": "bash scripts/check-feature-boundaries.sh",
-    "lint:docs": "node scripts/check-markup-style-docs.mjs",
-    "lint:rust:std": "bash scripts/check-rust-standards.sh",
-    "lint:logs:std": "bash scripts/check-log-standards.sh"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.9.1",
-    "@tauri-apps/plugin-opener": "^2.5.3",
-    "crypto-js": "^4.2.0",
-    "tdesign-vue-next": "^1.18.0",
-    "vue": "^3.5.26"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.9.6",
-    "@tdesign-vue-next/auto-import-resolver": "^0.1.4",
-    "@types/crypto-js": "^4.2.2",
-    "@types/node": "^25.0.9",
-    "@vitejs/plugin-vue": "^6.0.3",
-    "sass": "^1.97.2",
-    "typescript": "~5.9.3",
-    "unplugin-auto-import": "^21.0.0",
-    "unplugin-vue-components": "^31.0.0",
-    "vite": "^7.3.1",
-    "vue-i18n": "^11.2.8",
-    "vue-router": "^4.6.4",
-    "vue-tsc": "^3.2.2"
-  }
+    "name": "carrypigeon-desktop",
+    "private": true,
+    "version": "0.1.0",
+    "type": "module",
+    "pnpm": {},
+    "scripts": {
+        "dev": "vite",
+        "typecheck": "vue-tsc --noEmit",
+        "build": "npm run -s typecheck && vite build",
+        "preview": "vite preview",
+        "tauri": "tauri",
+        "lint": "npm run -s typecheck && npm run -s lint:logs:std && npm run -s lint:rust:std && npm run -s lint:feature:boundaries && npm run -s lint:docs",
+        "lint:feature:boundaries": "bash scripts/check-feature-boundaries.sh",
+        "lint:docs": "node scripts/check-markup-style-docs.mjs",
+        "lint:rust:std": "bash scripts/check-rust-standards.sh",
+        "lint:logs:std": "bash scripts/check-log-standards.sh"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "^2.10.1",
+        "@tauri-apps/plugin-opener": "^2.5.3",
+        "crypto-js": "^4.2.0",
+        "tdesign-vue-next": "^1.18.0",
+        "vue": "^3.5.26"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2.9.6",
+        "@tdesign-vue-next/auto-import-resolver": "^0.1.4",
+        "@types/crypto-js": "^4.2.2",
+        "@types/node": "^25.0.9",
+        "@vitejs/plugin-vue": "^6.0.3",
+        "sass": "^1.97.2",
+        "typescript": "~5.9.3",
+        "unplugin-auto-import": "^21.0.0",
+        "unplugin-vue-components": "^31.0.0",
+        "vite": "^7.3.1",
+        "vue-i18n": "^11.2.8",
+        "vue-router": "^4.6.4",
+        "vue-tsc": "^3.2.2"
+    }
 }
