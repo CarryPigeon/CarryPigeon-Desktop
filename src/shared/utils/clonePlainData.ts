@@ -12,7 +12,12 @@
  */
 export function clonePlainData<T>(value: T): T {
   if (typeof structuredClone === "function") {
-    return structuredClone(value);
+    try {
+      return structuredClone(value);
+    } catch {
+      // If structuredClone fails (contains non-cloneable data), fall back to JSON method
+      return JSON.parse(JSON.stringify(value)) as T;
+    }
   }
   return JSON.parse(JSON.stringify(value)) as T;
 }
