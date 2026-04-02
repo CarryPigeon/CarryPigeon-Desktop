@@ -25,7 +25,13 @@ function redirectToRequiredSetup(router: Router): void {
 function collectMockMissingRequiredPluginIds(serverSocket: string): string[] {
   const required = MOCK_PLUGIN_CATALOG.filter((p) => p.required).map((p) => p.pluginId);
   const installedStateById = getMockPluginsState(serverSocket);
-  return required.filter((id) => !(installedStateById[id]?.enabled && installedStateById[id]?.status === "ok"));
+  return required.filter((id) => {
+    const state = installedStateById[id];
+    // 对于 mock catalog 中的 required 插件，如果没有存储状态，默认视为已启用且状态正常
+    if (!state) return false;
+    // 已有状态的情况下，才检查 enabled 和 status
+    return !(state.enabled && state.status === "ok");
+  });
 }
 
 async function ensureServerConnectivity(serverSocket: string): Promise<boolean> {
