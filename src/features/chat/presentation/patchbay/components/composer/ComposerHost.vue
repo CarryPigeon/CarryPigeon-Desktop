@@ -69,37 +69,32 @@ function handleSend(): void {
 }
 
 /**
- * 处理 Shift+Enter 键的触发，行为是换行
+ * 统一处理键盘事件
  *
  * @param _ - 当前输入值
  * @param event - 事件对象（包含 e 属性为原生事件）
  * @returns 无返回值。
  */
-function handleShiftEnter(_: string | number, event: { e: KeyboardEvent }): void {
-  if (!canSend.value) return;
-  // 保留 Shift+Enter 的默认行为（换行）
-  const { draft } = props;
-  const updatedDraft = draft.replace(/\n$/, "\n\n");
-  emit("update:draft", updatedDraft);
-}
+function handleKeydown(_: string | number, event: { e: KeyboardEvent }): void {
+  const { e } = event;
 
-/**
- * 处理 Enter 键的触发，行为是发送
- *
- * @param _ - 当前输入值
- * @param event - 事件对象（包含 e 属性为原生事件）
- * @returns 无返回值。
- */
-function handleEnter(_: string | number, event: { e: KeyboardEvent }): void {
-  if (!canSend.value) return; //确保不发送空信息
+  // 处理 Shift+Enter：换行
+  if (e.key === "Enter" && e.shiftKey) {
+    // 不阻止默认行为，允许 textarea 换行
+    return;
+  }
 
-  // 阻止默认行为（防止在 textarea 中添加换行符）
-  event.e.preventDefault();
-  event.e.stopPropagation();
+  // 处理 Enter：发送
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    e.stopPropagation();
 
-  handleSend();
-  // 清空输入框
-  emit("update:draft", "");
+    if (!canSend.value) return; //确保不发送空信息
+
+    handleSend();
+    // 清空输入框
+    emit("update:draft", "");
+  }
 }
 
 /**
@@ -184,8 +179,7 @@ function handleUpdateDraft(v: string): void {
         :disabled="props.domainId.trim() !== 'Core:Text' || Boolean(props.disabled) || Boolean(props.sending)"
         :placeholder="props.domainId.trim() === 'Core:Text' ? t('message_input_placeholder') : 'This message type uses a plugin composer'"
         :autosize="{ minRows: 2, maxRows: 6 }"
-        @keydown.enter="handleEnter"
-        @keydown.shift.enter="handleShiftEnter"
+        @keydown="handleKeydown"
         @update:modelValue="handleUpdateDraft"
       />
     </div>
