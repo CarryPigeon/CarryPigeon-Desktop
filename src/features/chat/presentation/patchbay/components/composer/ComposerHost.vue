@@ -75,7 +75,7 @@ function handleSend(): void {
  * @param event - 事件对象（包含 e 属性为原生事件）
  * @returns 无返回值。
  */
-function handleShiftEnter(_: string, event: { e: KeyboardEvent }): void {
+function handleShiftEnter(_: string | number, event: { e: KeyboardEvent }): void {
   if (!canSend.value) return;
   // 保留 Shift+Enter 的默认行为（换行）
   const { draft } = props;
@@ -90,7 +90,7 @@ function handleShiftEnter(_: string, event: { e: KeyboardEvent }): void {
  * @param event - 事件对象（包含 e 属性为原生事件）
  * @returns 无返回值。
  */
-function handleEnter(_: string, event: { e: KeyboardEvent }): void {
+function handleEnter(_: string | number, event: { e: KeyboardEvent }): void {
   if (!canSend.value) return; //确保不发送空信息
 
   // 阻止默认行为（防止在 textarea 中添加换行符）
