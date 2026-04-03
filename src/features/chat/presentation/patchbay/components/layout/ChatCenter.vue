@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
+import UserProfilePopover from "@/features/account/profile/presentation/components/UserProfilePopover.vue";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
@@ -139,7 +140,13 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         >
           <!-- 区块：头像列（仅 group-start 可见；预留空间用于对齐） -->
           <div class="cp-msg__avatar" :data-visible="isGroupStart">
-            <AvatarBadge :name="m.from.name" :size="28" />
+            <UserProfilePopover
+              :user-id="m.from.id"
+              :username="m.from.name"
+              trigger="hover"
+            >
+              <AvatarBadge :name="m.from.name" :size="28" />
+            </UserProfilePopover>
           </div>
           <!-- 区块：domain 色条列 -->
           <div class="cp-msg__strip">

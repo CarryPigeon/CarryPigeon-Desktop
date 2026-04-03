@@ -6,7 +6,7 @@
 import type { UserServicePort } from "../domain/ports/UserServicePort";
 import type { UpdateUserProfileInput } from "../domain/types/UserTypes";
 import type { UserMe, UserPublic } from "../domain/types/UserTypes";
-import { httpGetCurrentUser, httpGetUser, httpListUsers } from "./httpUserApi";
+import { httpGetCurrentUser, httpGetUser, httpListUsers, httpUploadBackgroundImage } from "./httpUserApi";
 import { ProfileMutationUnsupportedError } from "../domain/errors/ProfileMutationUnsupportedError";
 
 /**
@@ -35,6 +35,9 @@ export function createHttpUserServicePort(serverSocket: string): UserServicePort
     async updateUserProfile(input: UpdateUserProfileInput): Promise<void> {
       void input;
       throw new ProfileMutationUnsupportedError();
+    },
+    async updateUserBackgroundImage(accessToken: string, file: File): Promise<string> {
+      return httpUploadBackgroundImage(socket, accessToken, file);
     },
   };
 }

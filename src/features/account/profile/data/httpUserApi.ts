@@ -18,6 +18,7 @@ export type ApiUserMe = {
   email?: string;
   nickname?: string;
   avatar?: string;
+  backgroundUrl?: string;
 };
 
 /**
@@ -27,6 +28,16 @@ export type ApiUserPublic = {
   uid: string;
   nickname: string;
   avatar?: string;
+  email?: string;
+  bio?: string;
+  backgroundUrl?: string;
+};
+
+/**
+ * 上传背景图片响应。
+ */
+export type ApiUploadBackgroundResponse = {
+  backgroundUrl: string;
 };
 
 type ApiUsersBatchResponse = {
@@ -117,5 +128,33 @@ export async function httpListUsers(serverSocket: string, accessToken: string, i
     return Array.isArray(res?.items) ? res.items : [];
   } catch (e) {
     rethrowProfileError("list_users_failed", "List users failed", e);
+  }
+}
+
+/**
+ * 上传用户背景图片。
+ *
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param file - 图片文件。
+ * @returns 背景图片 URL。
+ */
+export async function httpUploadBackgroundImage(
+  serverSocket: string,
+  accessToken: string,
+  file: File,
+): Promise<string> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  try {
+    const formData = new FormData();
+    formData.append("background", file);
+    const res = await client.requestFormData<ApiUploadBackgroundResponse>(
+      "POST",
+      "/users/me/background",
+      formData,
+    );
+    return res.backgroundUrl;
+  } catch (e) {
+    rethrowProfileError("upload_background_failed", "Upload background image failed", e);
   }
 }

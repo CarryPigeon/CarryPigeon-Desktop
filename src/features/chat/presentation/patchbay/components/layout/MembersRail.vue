@@ -6,6 +6,7 @@
 
 import type { MembersRailModel } from "@/features/chat/presentation/patchbay/view-models/useMembersRailModel";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
+import UserProfilePopover from "@/features/account/profile/presentation/components/UserProfilePopover.vue";
 
 const props = defineProps<{
   model: MembersRailModel;
@@ -20,7 +21,13 @@ const props = defineProps<{
     <div v-if="props.model.members.length === 0" class="cp-rail__empty">No members in this channel.</div>
     <div v-else class="cp-memberList">
       <div v-for="u in props.model.members" :key="u.id" class="cp-member">
-        <AvatarBadge :name="u.name" :size="28" />
+        <UserProfilePopover
+          :user-id="u.id"
+          :username="u.name"
+          trigger="hover"
+        >
+          <AvatarBadge :name="u.name" :size="28" />
+        </UserProfilePopover>
         <div class="cp-member__meta">
           <div class="cp-member__name">{{ u.name }}</div>
           <div class="cp-member__role">{{ u.role }}</div>
