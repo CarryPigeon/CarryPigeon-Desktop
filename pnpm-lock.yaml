@@ -24,6 +24,9 @@ importers:
         specifier: ^3.5.26
         version: 3.5.31(typescript@5.9.3)
     devDependencies:
+      '@popperjs/core':
+        specifier: ^2.11.8
+        version: 2.11.8
       '@tauri-apps/cli':
         specifier: ^2.9.6
         version: 2.10.1

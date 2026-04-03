@@ -66,33 +66,33 @@ const {
         </div>
       </div>
     </template>
-
-    <!-- Add Ban Dialog -->
-    <t-dialog v-model:visible="addBanDialogVisible" :header="t('add_ban')" :footer="false">
-      <div class="cp-addBan">
-        <div class="cp-addBan__field">
-          <label class="cp-addBan__label">{{ t("select_user") }}</label>
-          <t-select v-model="selectedUid" :placeholder="t('select_user')">
-            <t-option v-for="m in bannableMembers" :key="m.uid" :value="m.uid" :label="m.nickname" />
-          </t-select>
-        </div>
-        <div class="cp-addBan__field">
-          <label class="cp-addBan__label">{{ t("ban_duration") }}</label>
-          <t-select v-model="banDuration">
-            <t-option v-for="d in durationOptions" :key="d.value" :value="d.value" :label="t(d.label)" />
-          </t-select>
-        </div>
-        <div class="cp-addBan__field">
-          <label class="cp-addBan__label">{{ t("ban_reason") }}</label>
-          <t-textarea v-model="banReason" :placeholder="t('ban_reason')" :autosize="{ minRows: 2, maxRows: 4 }" />
-        </div>
-        <div class="cp-addBan__actions">
-          <button class="cp-addBan__btn" type="button" @click="closeAddBanDialog">{{ t("cancel") }}</button>
-          <button class="cp-addBan__btn primary" type="button" :disabled="!canSubmitAddBan" @click="handleAddBan">{{ t("confirm") }}</button>
-        </div>
-      </div>
-    </t-dialog>
   </GovernancePageShell>
+
+  <!-- Add Ban Dialog -->
+  <t-dialog v-model:visible="addBanDialogVisible" :header="t('add_ban')" :footer="false">
+    <div class="cp-addBan">
+      <div class="cp-addBan__field">
+        <label class="cp-addBan__label">{{ t("select_user") }}</label>
+        <t-select v-model="selectedUid" :placeholder="t('select_user')">
+          <t-option v-for="m in bannableMembers" :key="m.uid" :value="m.uid" :label="m.nickname" />
+        </t-select>
+      </div>
+      <div class="cp-addBan__field">
+        <label class="cp-addBan__label">{{ t("ban_duration") }}</label>
+        <t-select v-model="banDuration">
+          <t-option v-for="d in durationOptions" :key="d.value" :value="d.value" :label="t(d.label)" />
+        </t-select>
+      </div>
+      <div class="cp-addBan__field">
+        <label class="cp-addBan__label">{{ t("ban_reason") }}</label>
+        <t-textarea v-model="banReason" :placeholder="t('ban_reason')" :autosize="{ minRows: 2, maxRows: 4 }" />
+      </div>
+      <div class="cp-addBan__actions">
+        <button class="cp-addBan__btn" type="button" @click="closeAddBanDialog">{{ t("cancel") }}</button>
+        <button class="cp-addBan__btn primary" type="button" :disabled="!canSubmitAddBan" @click="handleAddBan">{{ t("confirm") }}</button>
+      </div>
+    </div>
+  </t-dialog>
 </template>
 
 <style scoped lang="scss">
