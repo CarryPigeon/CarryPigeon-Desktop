@@ -11,6 +11,7 @@ export type UserMe = {
   email?: string;
   nickname?: string;
   avatar?: string;
+  backgroundUrl?: string;
 };
 
 /**
@@ -20,6 +21,9 @@ export type UserPublic = {
   uid: string;
   nickname: string;
   avatar?: string;
+  email?: string;
+  bio?: string;
+  backgroundUrl?: string;
 };
 
 /**

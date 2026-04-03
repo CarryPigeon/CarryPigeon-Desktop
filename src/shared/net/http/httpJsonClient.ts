@@ -325,6 +325,71 @@ export class HttpJsonClient {
     const json = await readJsonSafe(res);
     return json as T;
   }
+
+  /**
+   * 发起 FormData 请求（用于文件上传）并解析 JSON 响应。
+   *
+   * @param method - HTTP method。
+   * @param path - 以 `/` 开头的 API path。
+   * @param formData - FormData 对象。
+   * @returns JSON 响应值。
+   */
+  async requestFormData<T>(method: string, path: string, formData: FormData): Promise<T> {
+    if (!this.baseUrl) throw new Error("缺少 server base URL");
+    const normalizedPath = normalizeApiPath(path);
+    const url = `${this.baseUrl}${normalizedPath}`;
+
+    // For FormData, browser automatically sets Content-Type with boundary
+    const headers: Record<string, string> = {
+      Accept: buildCarryPigeonAcceptHeader(this.apiVersion),
+    };
+    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
+
+    if (USE_MOCK_TRANSPORT) {
+      const res = await handleProtocolMockApiRequest({
+        serverSocket: this.serverSocket,
+        method,
+        path: normalizedPath,
+        headers,
+        body: formData,
+      });
+      if (!res.ok) {
+        throw logAndBuildApiRequestError({
+          transport: "mock",
+          method,
+          url,
+          envelope: res.error as ApiErrorEnvelope,
+        });
+      }
+      if (res.status === 204) return undefined as T;
+      return res.body as T;
+    }
+
+    // Tauri 不支持传递 FormData 跨调用边界，所以直接走 fetch
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await toApiError(res);
+      logger.warn("Action: http_client_form_data_request_failed", {
+        transport: "fetch",
+        method,
+        url,
+        status: err.status,
+        reason: err.reason,
+      });
+      throw err;
+    }
+
+    // 204 No Content：对很多端点来说属于合法成功响应。
+    if (res.status === 204) return undefined as T;
+
+    const json = await readJsonSafe(res);
+    return json as T;
+  }
 }
 
 /**

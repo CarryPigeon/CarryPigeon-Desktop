@@ -24,6 +24,7 @@
         "vue": "^3.5.26"
     },
     "devDependencies": {
+        "@popperjs/core": "^2.11.8",
         "@tauri-apps/cli": "^2.9.6",
         "@tdesign-vue-next/auto-import-resolver": "^0.1.4",
         "@types/crypto-js": "^4.2.2",
