@@ -7,7 +7,7 @@
  * - 当前运行时 scope 访问。
  */
 
-import type { ChatEventsClient, ChatEventsConnectOptions } from "@/features/chat/domain/ports/chatEventsPort";
+import type { ChatEventsClient, ChatEventsConnectOptions } from "@/features/chat/domain/types/chatEventModels";
 import type {
   ChatChannelApplicationRecord,
   ChatChannelBanRecord,

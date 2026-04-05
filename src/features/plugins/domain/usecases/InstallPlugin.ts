@@ -3,8 +3,8 @@
  * @description plugins｜用例：InstallPlugin。
  */
 
-import type { PluginLifecycleCommandPort, PluginProgressHandler } from "../ports/PluginLifecycleCommandPort";
-import type { InstalledPluginState } from "../types/pluginTypes";
+import type { PluginLifecycleCommandPort } from "../ports/PluginLifecycleCommandPort";
+import type { InstalledPluginState, PluginProgressHandler } from "../types/pluginTypes";
 
 /**
  * 用例：安装插件。

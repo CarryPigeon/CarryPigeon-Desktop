@@ -257,3 +257,11 @@ export type PluginProgress = {
   percent: number;
   message: string;
 };
+
+/**
+ * 插件安装/切换进度回调。
+ *
+ * @param progress - 进度对象（stage/percent/message）。
+ * @returns 无返回值。
+ */
+export type PluginProgressHandler = (progress: PluginProgress) => void;

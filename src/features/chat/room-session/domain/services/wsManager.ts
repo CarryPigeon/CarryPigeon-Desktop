@@ -3,7 +3,7 @@
  * @description chat/room-session｜application：会话 WS 连接句柄管理器。
  */
 
-import type { ChatEventsClient, ChatEventsConnectOptions } from "@/features/chat/domain/ports/chatEventsPort";
+import type { ChatEventsClient, ChatEventsConnectOptions } from "@/features/chat/domain/types/chatEventModels";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 import type { SessionEventsPort } from "../ports";
 

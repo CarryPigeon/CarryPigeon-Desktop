@@ -65,16 +65,24 @@ export class RoomSessionViewApplicationService {
   /**
    * 切换到某个频道，并驱动必要的后续动作。
    *
-   * 顺序为：
-   * 1. 校验频道 id
-   * 2. 本地切换当前频道与清零未读
-   * 3. 拉取该频道消息
-   * 4. 异步刷新成员侧栏
-   * 5. 在条件满足时推进并上报读状态
+   * 执行顺序：
+   * 1. 校验频道 id 是否合法
+   * 2. 本地切换当前频道并清零未读数
+   * 3. 拉取该频道的消息历史
+   * 4. 异步刷新成员列表侧栏
+   * 5. 在条件满足时推进并上报已读状态到服务器
+   *
+   * 错误处理说明：
+   * - 所有预期内的业务失败都通过 Result 模式返回 { ok: false, error: ... }
+   * - 使用 try-catch 捕获 loadChannelMessages 可能抛出的异常，不向上抛出
+   * - 异常也会被包装成失败结果返回给调用方，由调用方处理上报
+   * - 不会静默吞错，也不会让异常逃逸导致 Promise  rejected
+   * - 拉取失败时会回滚未读数（恢复到切换前的状态）
    */
   async selectChannel(id: string): Promise<ChannelSelectionOutcome> {
     const cid = String(id).trim();
     if (!cid) {
+      // 空频道 id -> 直接返回业务失败结果，不静默吞错
       return {
         ok: false,
         kind: "chat_channel_selection_rejected",
@@ -83,6 +91,7 @@ export class RoomSessionViewApplicationService {
     }
     const channel = this.deps.state.findChannelById(cid);
     if (!channel) {
+      // 频道不存在 -> 返回业务失败结果，不静默吞错
       return {
         ok: false,
         kind: "chat_channel_selection_rejected",
@@ -97,6 +106,8 @@ export class RoomSessionViewApplicationService {
     try {
       await this.deps.loadChannelMessages(cid);
     } catch (error) {
+      // 拉取消息失败 -> 回滚未读数，返回失败结果给调用方处理
+      // 不吞错，也不向上抛异常，保证调用方能够收到失败信息并上报
       if (prevUnread > 0) this.deps.state.incrementChannelUnread(cid, prevUnread);
       return {
         ok: false,

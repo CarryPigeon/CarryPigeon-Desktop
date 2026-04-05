@@ -12,7 +12,7 @@
  * 不再关心底层究竟拆成多少个细粒度动作。
  */
 
-import type { ChatEventsClient, ChatEventsConnectOptions } from "@/features/chat/domain/ports/chatEventsPort";
+import type { ChatEventsClient, ChatEventsConnectOptions } from "@/features/chat/domain/types/chatEventModels";
 import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
 import type { ChatEventsPort } from "@/features/chat/domain/ports/chatEventsPort";
 import type {

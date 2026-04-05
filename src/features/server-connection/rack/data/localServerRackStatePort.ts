@@ -7,7 +7,8 @@ import { MOCK_SERVER_SOCKET } from "@/shared/config/runtime";
 import { selectByMockEnabled } from "@/shared/config/mockModeSelector";
 import { readJson, writeJson } from "@/shared/utils/localStore";
 import { MOCK_KEYS } from "@/shared/mock/mockKeys";
-import type { ServerRackStatePort, StoredServerRacksState } from "../domain/ports/ServerRackStatePort";
+import type { StoredServerRacksState } from "../domain/types/serverRackTypes";
+import type { ServerRackStatePort } from "../domain/ports/ServerRackStatePort";
 
 /**
  * localStorage 版本的 ServerRackStatePort。

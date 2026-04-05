@@ -2,27 +2,8 @@
  * @fileoverview WindowCommandsPort.ts
  * @description platform｜领域端口：WindowCommandsPort。
  */
-/**
- * 打开 popover 窗口的参数。
- */
-export type OpenPopoverWindowArgs = {
-  query: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
 
-/**
- * 打开信息窗口的参数。
- */
-export type OpenInfoWindowArgs = {
-  label: string;
-  title: string;
-  query: string;
-  width: number;
-  height: number;
-};
+import type { OpenPopoverWindowArgs, OpenInfoWindowArgs } from "../types/windowTypes";
 
 /**
  * 窗口命令端口（domain 层）。

@@ -4,9 +4,9 @@
 
 ## P0 当前执行
 
-- [ ] `chat`：把 `selectChannel` 从 `Promise<void>` 收敛为显式 `Outcome`，并同步消费方。
-- [ ] `chat`：检查频道切换相关页面/弹窗/quick-switcher 是否仍把业务失败静默吞掉。
-- [ ] `server-connection`：减少对低层 `connectivity/server-info` 子域入口的直接消费，优先统一走根 `workspace` capability。
+- [x] `chat`：把 `selectChannel` 从 `Promise<void>` 收敛为显式 `Outcome`，并同步消费方。
+- [x] `chat`：检查频道切换相关页面/弹窗/quick-switcher 是否仍把业务失败静默吞掉。
+- [x] `server-connection`：减少对低层 `connectivity/server-info` 子域入口的直接消费，优先统一走根 `workspace` capability。
 
 ## P1 下一轮
 
