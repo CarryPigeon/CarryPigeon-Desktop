@@ -21,10 +21,9 @@ import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createLogger } from "@/shared/utils/logger";
 import { buildTauriTlsArgs } from "@/shared/net/tls/tauriTlsArgs";
 import type { PluginInstallQueryPort } from "@/features/plugins/domain/ports/PluginInstallQueryPort";
-import type { PluginProgressHandler } from "@/features/plugins/domain/ports/PluginLifecycleCommandPort";
 import type { PluginLifecycleCommandPort } from "@/features/plugins/domain/ports/PluginLifecycleCommandPort";
 import { createPluginOperationError } from "@/features/plugins/domain/errors/PluginOperationError";
-import type { InstalledPluginState, PluginProgress } from "@/features/plugins/domain/types/pluginTypes";
+import type { InstalledPluginState, PluginProgress, PluginProgressHandler } from "@/features/plugins/domain/types/pluginTypes";
 
 type RustInstalledPluginState = {
   pluginId: string;

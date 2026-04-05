@@ -5,5 +5,6 @@
  */
 
 export { getOpenInfoWindowUsecase, getOpenPopoverWindowUsecase, getResizeChatWindowUsecase } from "./di/windows.di";
-export type { OpenInfoWindowArgs, OpenPopoverWindowArgs, WindowCommandsPort } from "./domain/ports/WindowCommandsPort";
+export type { OpenInfoWindowArgs, OpenPopoverWindowArgs } from "./domain/types/windowTypes";
+export type { WindowCommandsPort } from "./domain/ports/WindowCommandsPort";
 

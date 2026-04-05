@@ -103,8 +103,11 @@ export function useQuickSwitcher(deps: UseQuickSwitcherDeps) {
         if (channel && !channel.joined) {
           deps.onChannelDiscoverFocus(channel.name);
         } else {
+          // 对已加入频道直接执行切换，并做好错误处理
+          // 错误处理：既用 runAsyncTask 兜底异常，又主动检查业务结果，确保不会静默吞错
           runAsyncTask(
             deps.onChannelSelect(item.id).then((outcome) => {
+              // 主动检查业务结果，失败时上报错误，不静默吞掉
               if (!outcome.ok) deps.onAsyncError("chat_select_channel_from_quick_switcher_failed", outcome.error.message);
               return outcome;
             }),

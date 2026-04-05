@@ -2,7 +2,8 @@
  * @fileoverview OpenPopoverWindow.ts
  * @description platform｜用例：OpenPopoverWindow。
  */
-import type { OpenPopoverWindowArgs, WindowCommandsPort } from "../ports/WindowCommandsPort";
+import type { OpenPopoverWindowArgs } from "../types/windowTypes";
+import type { WindowCommandsPort } from "../ports/WindowCommandsPort";
 
 /**
  * 打开轻量 popover 窗口（例如用户/频道的快速信息弹窗）。

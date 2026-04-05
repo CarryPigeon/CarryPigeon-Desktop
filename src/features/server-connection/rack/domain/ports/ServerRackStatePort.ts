@@ -3,26 +3,7 @@
  * @description server-connection/rack｜领域端口：ServerRackStatePort。
  */
 
-/**
- * 服务器机架条目。
- */
-export type ServerRackRecord = {
-  id: string;
-  name: string;
-  serverSocket: string;
-  pinned: boolean;
-  note: string;
-  tlsPolicy: "strict" | "trust_fingerprint" | "insecure";
-  tlsFingerprint: string;
-  notifyMode: "notify" | "silent" | "none";
-};
-
-/**
- * 服务器机架持久化状态。
- */
-export type StoredServerRacksState = {
-  servers: ServerRackRecord[];
-};
+import type { StoredServerRacksState } from "../types/serverRackTypes";
 
 /**
  * 服务器机架状态持久化端口。

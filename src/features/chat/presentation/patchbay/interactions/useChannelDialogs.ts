@@ -44,9 +44,15 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
     showDeleteChannel.value = visible;
   }
 
+  /**
+   * 处理频道创建完成后的动作：自动切换到新创建的频道。
+   *
+   * 错误处理：主动检查业务结果，失败时上报错误，不静默吞掉。
+   */
   function handleChannelCreated(channel: ChannelLike): void {
     runAsyncTask(
       deps.selectChannel(channel.id).then((outcome) => {
+        // 检查业务结果，失败时上报错误，确保不会静默吞掉
         if (!outcome.ok) deps.onAsyncError("chat_select_created_channel_failed", outcome.error.message);
         return outcome;
       }),
@@ -63,11 +69,17 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
     deps.closeChannelMenu();
   }
 
+  /**
+   * 处理频道删除后的动作：自动切换到第一个剩余频道。
+   *
+   * 错误处理：主动检查业务结果，失败时上报错误，不静默吞掉。
+   */
   function handleChannelDeleted(): void {
     const remainingChannels = deps.channels.value;
     if (remainingChannels.length <= 0) return;
     runAsyncTask(
       deps.selectChannel(remainingChannels[0].id).then((outcome) => {
+        // 检查业务结果，失败时上报错误，确保不会静默吞掉
         if (!outcome.ok) deps.onAsyncError("chat_select_after_delete_failed", outcome.error.message);
         return outcome;
       }),

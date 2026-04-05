@@ -3,7 +3,8 @@
  * @description chat｜数据层实现：wsChatEventsPort。
  */
 
-import type { ChatEventsClient, ChatEventsConnectOptions, ChatEventsPort } from "../../domain/ports/chatEventsPort";
+import type { ChatEventsClient, ChatEventsConnectOptions } from "../../domain/types/chatEventModels";
+import type { ChatEventsPort } from "../../domain/ports/chatEventsPort";
 import type { ChatEventEnvelope } from "../../domain/types/chatEventModels";
 import { connectChatWs } from "./wsChatEvents";
 import { mapChatWsEventWire } from "../protocol/chatWireMappers";

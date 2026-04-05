@@ -3,15 +3,7 @@
  * @description plugins｜领域端口：插件生命周期命令（Command）。
  */
 
-import type { InstalledPluginState, PluginProgress } from "../types/pluginTypes";
-
-/**
- * 插件安装/切换进度回调。
- *
- * @param progress - 进度对象（stage/percent/message）。
- * @returns 无返回值。
- */
-export type PluginProgressHandler = (progress: PluginProgress) => void;
+import type { InstalledPluginState, PluginProgressHandler } from "../types/pluginTypes";
 
 /**
  * 插件生命周期命令端口（写能力）。

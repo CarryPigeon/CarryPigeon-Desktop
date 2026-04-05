@@ -196,6 +196,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openCreateChannel: () => setShowCreateChannel(true),
     openChannelInfo,
     applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
+    onAsyncError: logAsyncError,
   });
 
   const membersRail = useMembersRailModel({

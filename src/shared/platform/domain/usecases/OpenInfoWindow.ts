@@ -2,7 +2,8 @@
  * @fileoverview OpenInfoWindow.ts
  * @description platform｜用例：OpenInfoWindow。
  */
-import type { OpenInfoWindowArgs, WindowCommandsPort } from "../ports/WindowCommandsPort";
+import type { OpenInfoWindowArgs } from "../types/windowTypes";
+import type { WindowCommandsPort } from "../ports/WindowCommandsPort";
 
 /**
  * 打开通用的信息窗口（例如“关于/帮助/提示”）。

@@ -44,19 +44,7 @@ import type {
   ChatWsEventWire,
 } from "./chatWireEvents";
 
-function asTrimmedString(value: unknown): string {
-  return String(value ?? "").trim();
-}
-
-function asOptionalString(value: unknown): string | undefined {
-  const next = asTrimmedString(value);
-  return next || undefined;
-}
-
-function asSafeNumber(value: unknown): number {
-  const next = Number(value ?? 0);
-  return Number.isFinite(next) ? Math.trunc(next) : 0;
-}
+import { asTrimmedString, asOptionalString, asSafeNumber } from "@/shared/data/wireMapperUtils";
 
 /**
  * 将用户 wire 模型映射为领域用户记录。
