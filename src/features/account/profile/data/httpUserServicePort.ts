@@ -8,6 +8,7 @@ import type { UpdateUserProfileInput } from "../domain/types/UserTypes";
 import type { UserMe, UserPublic } from "../domain/types/UserTypes";
 import { httpGetCurrentUser, httpGetUser, httpListUsers, httpUploadBackgroundImage } from "./httpUserApi";
 import { ProfileMutationUnsupportedError } from "../domain/errors/ProfileMutationUnsupportedError";
+import { mapUserMeWire, mapUserPublicWire } from "./userWireMappers";
 
 /**
  * 创建 HTTP 版本的 UserServicePort。
@@ -19,13 +20,16 @@ export function createHttpUserServicePort(serverSocket: string): UserServicePort
   const socket = serverSocket.trim();
   return {
     async getMe(accessToken: string): Promise<UserMe> {
-      return httpGetCurrentUser(socket, accessToken);
+      const wire = await httpGetCurrentUser(socket, accessToken);
+      return mapUserMeWire(wire);
     },
     async getUser(accessToken: string, uid: string): Promise<UserPublic> {
-      return httpGetUser(socket, accessToken, uid);
+      const wire = await httpGetUser(socket, accessToken, uid);
+      return mapUserPublicWire(wire);
     },
     async listUsers(accessToken: string, ids: string[]): Promise<UserPublic[]> {
-      return httpListUsers(socket, accessToken, ids);
+      const wires = await httpListUsers(socket, accessToken, ids);
+      return wires.map(mapUserPublicWire);
     },
     async updateUserEmail(email: string, code: string): Promise<void> {
       void email;

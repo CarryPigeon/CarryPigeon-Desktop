@@ -5,7 +5,7 @@
 
 import { computed, ref } from "vue";
 import { getServerRackStatePort } from "@/features/server-connection/rack/di/rack.di";
-import type { ServerRackRecord, StoredServerRacksState } from "@/features/server-connection/rack/domain/ports/ServerRackStatePort";
+import type { ServerRackRecord, StoredServerRacksState } from "@/features/server-connection/rack/domain/types/serverRackTypes";
 import { currentServerSocket, setServerSocket } from "./currentServer";
 import { setServerTlsConfigProvider } from "@/shared/net/tls/serverTlsConfigProvider";
 

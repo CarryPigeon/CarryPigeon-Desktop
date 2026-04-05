@@ -7,7 +7,7 @@
  * 因为它承担的是“会话进入可运行状态”的完整编排责任。
  */
 
-import type { ChatEventsConnectOptions } from "@/features/chat/domain/ports/chatEventsPort";
+import type { ChatEventsConnectOptions } from "@/features/chat/domain/types/chatEventModels";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 import type { PollingFallbackController } from "../services/pollingFallback";
 import type { ChatSessionWsManager } from "../services/wsManager";

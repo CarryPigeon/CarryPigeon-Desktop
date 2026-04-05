@@ -4,11 +4,8 @@
  * Data-layer adapter that implements `WindowCommandsPort` by invoking Tauri commands.
  */
 import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
-import type {
-  OpenInfoWindowArgs,
-  OpenPopoverWindowArgs,
-  WindowCommandsPort,
-} from "../domain/ports/WindowCommandsPort";
+import type { OpenInfoWindowArgs, OpenPopoverWindowArgs } from "../domain/types/windowTypes";
+import type { WindowCommandsPort } from "../domain/ports/WindowCommandsPort";
 
 /**
  * WindowCommandsPort implementation backed by Tauri commands.

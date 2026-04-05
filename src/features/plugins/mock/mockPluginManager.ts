@@ -6,11 +6,10 @@
 import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
 import { getMockPluginsState, setMockPluginsState } from "@/shared/mock/mockPluginState";
 import { sleep } from "@/shared/mock/sleep";
-import type { PluginProgressHandler } from "@/features/plugins/domain/ports/PluginLifecycleCommandPort";
 import type { PluginLifecycleCommandPort } from "@/features/plugins/domain/ports/PluginLifecycleCommandPort";
 import type { PluginInstallQueryPort } from "@/features/plugins/domain/ports/PluginInstallQueryPort";
 import { createPluginOperationError } from "@/features/plugins/domain/errors/PluginOperationError";
-import type { InstalledPluginState } from "@/features/plugins/domain/types/pluginTypes";
+import type { InstalledPluginState, PluginProgressHandler } from "@/features/plugins/domain/types/pluginTypes";
 
 /**
  * 将持久化的 mock 状态转换为领域层的 installed state 结构。
