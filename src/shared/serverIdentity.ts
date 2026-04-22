@@ -17,8 +17,33 @@ import {
   KEY_LAST_EVENT_ID_PREFIX,
   KEY_SERVER_ID_BY_SOCKET,
 } from "@/shared/utils/storageKeys";
+import {
+  registerSecureChatCacheEntryHandler,
+  removeSecureChatCacheValueSync,
+  readSecureChatCacheValueSync,
+  setSecureChatCacheValueSync,
+  setSecureChatCacheValue,
+} from "@/shared/utils/chatSecureCache";
 
 type ServerIdBySocket = Record<string, string>;
+const serverIdBySocketCache = new Map<string, string>();
+
+registerSecureChatCacheEntryHandler((key, value) => {
+  if (key !== KEY_SERVER_ID_BY_SOCKET) return;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object") return;
+    serverIdBySocketCache.clear();
+    for (const [socket, serverId] of Object.entries(parsed as ServerIdBySocket)) {
+      const normalizedSocket = normalizeSocket(socket);
+      const normalizedServerId = normalizeServerId(serverId);
+      if (!normalizedSocket || !normalizedServerId) continue;
+      serverIdBySocketCache.set(normalizedSocket, normalizedServerId);
+    }
+  } catch {
+    // Ignore malformed persisted mapping.
+  }
+});
 
 /**
  * 从 localStorage 读取已持久化的 socket → server_id 映射表。
@@ -26,15 +51,11 @@ type ServerIdBySocket = Record<string, string>;
  * @returns 映射对象（缺失/非法时返回空对象）。
  */
 function safeReadMap(): ServerIdBySocket {
-  try {
-    const raw = localStorage.getItem(KEY_SERVER_ID_BY_SOCKET);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as ServerIdBySocket;
-  } catch {
-    return {};
+  const out: ServerIdBySocket = {};
+  for (const [socket, serverId] of serverIdBySocketCache.entries()) {
+    out[socket] = serverId;
   }
+  return out;
 }
 
 /**
@@ -44,12 +65,18 @@ function safeReadMap(): ServerIdBySocket {
  * @returns 无返回值。
  */
 function safeWriteMap(map: ServerIdBySocket): void {
-  try {
-    localStorage.setItem(KEY_SERVER_ID_BY_SOCKET, JSON.stringify(map));
-  } catch {
-    // 忽略存储失败（例如 quota/隐私模式）。
-  }
+  setSecureChatCacheValueSync(KEY_SERVER_ID_BY_SOCKET, JSON.stringify(map));
 }
+
+/**
+ * 清空内存中的 server_id 映射缓存。
+ *
+ * 主要用于全量安全缓存清理后的同步重置，避免旧映射继续影响 scope 推导。
+ */
+export function clearServerIdentityCache(): void {
+  serverIdBySocketCache.clear();
+}
+
 
 /**
  * 归一化 server socket 字符串。
@@ -80,8 +107,7 @@ function normalizeServerId(serverId: string): string {
 export function getKnownServerId(serverSocket: string): string {
   const socket = normalizeSocket(serverSocket);
   if (!socket) return "";
-  const map = safeReadMap();
-  return String(map[socket] ?? "").trim();
+  return String(serverIdBySocketCache.get(socket) ?? "").trim();
 }
 
 /**
@@ -110,15 +136,29 @@ function migrateKey(prefix: string, oldScope: string, newScope: string): void {
   if (!oldScope || !newScope || oldScope === newScope) return;
   const oldKey = `${prefix}${oldScope}`;
   const newKey = `${prefix}${newScope}`;
-  try {
-    const oldVal = localStorage.getItem(oldKey);
-    if (oldVal == null) return;
-    const newVal = localStorage.getItem(newKey);
-    if (newVal == null) localStorage.setItem(newKey, oldVal);
-    localStorage.removeItem(oldKey);
-  } catch {
-    // 忽略迁移失败（best-effort）。
+  const oldVal = localStorage.getItem(oldKey) || "";
+  if (!oldVal) return;
+  if (readSecureChatCacheValueSync(newKey)) {
+    removeSecureChatCacheValueSync(oldKey);
+    try {
+      localStorage.removeItem(oldKey);
+    } catch {
+      // 忽略迁移失败（best-effort）。
+    }
+    return;
   }
+  void setSecureChatCacheValue(newKey, oldVal)
+    .then(() => {
+      removeSecureChatCacheValueSync(oldKey);
+      try {
+        localStorage.removeItem(oldKey);
+      } catch {
+        // 忽略迁移失败（best-effort）。
+      }
+    })
+    .catch(() => {
+      // Secure write failed; keep legacy plaintext for a later retry.
+    });
 }
 
 /**
@@ -137,6 +177,7 @@ export function rememberServerId(serverSocket: string, serverId: string): void {
   const prev = String(map[socket] ?? "").trim();
   if (prev === sid) return;
   map[socket] = sid;
+  serverIdBySocketCache.set(socket, sid);
   safeWriteMap(map);
 
   // 尽力而为（best-effort）：迁移常见的 per-server key，避免 server_id 可用后用户“丢失”会话/断点续传状态。
@@ -159,5 +200,6 @@ export function forgetServerIdentity(serverSocket: string): void {
   const map = safeReadMap();
   if (!(socket in map)) return;
   delete map[socket];
+  serverIdBySocketCache.delete(socket);
   safeWriteMap(map);
 }

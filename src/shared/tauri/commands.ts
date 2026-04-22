@@ -19,6 +19,13 @@ export const TAURI_COMMANDS = {
   dbRemove: "db_remove",
   dbPath: "db_path",
 
+  chatCacheLoadAll: "chat_cache_load_all",
+  chatCacheGet: "chat_cache_get",
+  chatCachePut: "chat_cache_put",
+  chatCacheRemove: "chat_cache_remove",
+  chatCacheRemoveMany: "chat_cache_remove_many",
+  chatCacheClearAll: "chat_cache_clear_all",
+
   toChatWindowSize: "to_chat_window_size",
   openPopoverWindow: "open_popover_window",
   openInfoWindow: "open_info_window",
