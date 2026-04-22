@@ -5,8 +5,8 @@
 //! - 为避免把客户端变成开放代理，这里强制“同源限制”：只能访问当前 server origin；
 //! - TLS 策略（自签/指纹）与服务端一致，以保证在受控环境下可用。
 
-use anyhow::Context;
 use crate::features::plugins::domain::types::PluginFetchResponse;
+use anyhow::Context;
 
 use super::{download::is_same_origin, origin::to_http_origin, tls::build_server_client};
 

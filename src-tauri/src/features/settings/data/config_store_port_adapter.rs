@@ -52,18 +52,11 @@ impl ConfigStorePort for ConfigStorePortAdapter {
         Box::pin(async move { Ok(config_store::get_server_config_u64(server_socket).await) })
     }
 
-    fn get_server_config_bool<'a>(
-        &'a self,
-        server_socket: String,
-    ) -> ConfigStoreFuture<'a, bool> {
+    fn get_server_config_bool<'a>(&'a self, server_socket: String) -> ConfigStoreFuture<'a, bool> {
         Box::pin(async move { Ok(config_store::get_server_config_bool(server_socket).await) })
     }
 
-    fn update_config_bool<'a>(
-        &'a self,
-        key: String,
-        value: bool,
-    ) -> ConfigStoreFuture<'a, ()> {
+    fn update_config_bool<'a>(&'a self, key: String, value: bool) -> ConfigStoreFuture<'a, ()> {
         Box::pin(async move { config_store::update_config_bool(key, value).await })
     }
 
@@ -75,11 +68,7 @@ impl ConfigStorePort for ConfigStorePortAdapter {
         Box::pin(async move { config_store::update_config_u64(key, value).await })
     }
 
-    fn update_config_string<'a>(
-        &'a self,
-        key: String,
-        value: String,
-    ) -> ConfigStoreFuture<'a, ()> {
+    fn update_config_string<'a>(&'a self, key: String, value: String) -> ConfigStoreFuture<'a, ()> {
         Box::pin(async move { config_store::update_config_string(key, value).await })
     }
 }

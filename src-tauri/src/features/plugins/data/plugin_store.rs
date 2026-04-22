@@ -14,11 +14,11 @@
 
 use std::path::PathBuf;
 
-use anyhow::Context;
-use serde::{Deserialize, Serialize};
 pub use crate::features::plugins::domain::types::{
     InstalledPluginState, PluginFetchResponse, PluginProvidesDomain, PluginRuntimeEntry,
 };
+use anyhow::Context;
+use serde::{Deserialize, Serialize};
 
 mod api;
 mod download;
