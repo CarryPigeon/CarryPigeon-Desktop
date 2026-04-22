@@ -5,8 +5,7 @@ use crate::features::plugins::data::plugin_ports::{
     PluginInstallStorePortAdapter, PluginLoaderPortAdapter,
 };
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest,
-    PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest, PluginRuntimeEntry,
 };
 use crate::features::plugins::usecases::plugin_usecases;
 use crate::shared::error::{CommandResult, to_command_error};

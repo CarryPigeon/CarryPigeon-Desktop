@@ -48,21 +48,33 @@ fn emit_tcp_state(
     });
 }
 
-fn emit_legacy_tcp_chunk(event_sink: &Arc<dyn TcpEventSink>, server_socket: &str, payload: Vec<u8>) {
+fn emit_legacy_tcp_chunk(
+    event_sink: &Arc<dyn TcpEventSink>,
+    server_socket: &str,
+    payload: Vec<u8>,
+) {
     event_sink.emit_message(TcpMessageEvent {
         server_socket: server_socket.to_string(),
         payload,
     });
 }
 
-fn emit_tcp_frame_payload(event_sink: &Arc<dyn TcpEventSink>, server_socket: &str, payload: Vec<u8>) {
+fn emit_tcp_frame_payload(
+    event_sink: &Arc<dyn TcpEventSink>,
+    server_socket: &str,
+    payload: Vec<u8>,
+) {
     event_sink.emit_frame(TcpMessageEvent {
         server_socket: server_socket.to_string(),
         payload,
     });
 }
 
-fn emit_deframed_payloads(event_sink: &Arc<dyn TcpEventSink>, server_socket: &str, acc: &mut Vec<u8>) {
+fn emit_deframed_payloads(
+    event_sink: &Arc<dyn TcpEventSink>,
+    server_socket: &str,
+    acc: &mut Vec<u8>,
+) {
     loop {
         if acc.len() < 2 {
             break;
@@ -185,7 +197,13 @@ impl TcpServiceReal {
 
                 match read_result {
                     Ok(0) => {
-                        emit_tcp_state(&event_sink, &server_socket, session_id, "disconnected", None);
+                        emit_tcp_state(
+                            &event_sink,
+                            &server_socket,
+                            session_id,
+                            "disconnected",
+                            None,
+                        );
                         return;
                     }
                     Ok(n) => {

@@ -6,8 +6,7 @@ use std::collections::HashMap;
 use crate::features::plugins::domain::ports::plugin_install_store_port::PluginInstallStorePort;
 use crate::features::plugins::domain::ports::plugin_loader_port::PluginLoaderPort;
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest,
-    PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest, PluginRuntimeEntry,
 };
 
 /// 加载并返回插件前端运行所需资源（wasm/js/html）。
