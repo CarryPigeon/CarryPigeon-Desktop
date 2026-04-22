@@ -78,7 +78,9 @@ pub async fn get_server_config_string(
     server_socket: String,
     config_store_port: &dyn ConfigStorePort,
 ) -> anyhow::Result<String> {
-    config_store_port.get_server_config_string(server_socket).await
+    config_store_port
+        .get_server_config_string(server_socket)
+        .await
 }
 
 /// 读取与 server_socket 相关的 u32 值（历史 API）。
@@ -120,7 +122,9 @@ pub async fn get_server_config_bool(
     server_socket: String,
     config_store_port: &dyn ConfigStorePort,
 ) -> anyhow::Result<bool> {
-    config_store_port.get_server_config_bool(server_socket).await
+    config_store_port
+        .get_server_config_bool(server_socket)
+        .await
 }
 
 /// 写入 bool 类型配置值（顶层字段）。

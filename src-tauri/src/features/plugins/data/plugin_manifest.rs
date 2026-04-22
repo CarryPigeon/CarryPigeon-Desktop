@@ -1,9 +1,9 @@
 //! plugins｜数据层：plugin_manifest。
 //!
 //! 约定：注释中文，日志英文（tracing）。
+use crate::features::plugins::domain::types::PluginManifest;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use crate::features::plugins::domain::types::PluginManifest;
 
 /// 插件清单文件路径（历史约定）。
 const PLUGIN_CONFIG: &str = "./plugins.json";

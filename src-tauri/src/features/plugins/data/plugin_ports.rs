@@ -9,8 +9,7 @@ use crate::features::plugins::domain::ports::plugin_loader_port::{
     PluginLoaderFuture, PluginLoaderPort,
 };
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest,
-    PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest, PluginRuntimeEntry,
 };
 
 use super::plugin_manager::{list_installed_manifests, plugin_manager};
@@ -59,7 +58,9 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, Vec<InstalledPluginState>> {
-        Box::pin(async move { plugin_store::list_installed(server_socket, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::list_installed(server_socket, tls_policy, tls_fingerprint).await
+        })
     }
 
     fn get_installed_state<'a>(
@@ -69,7 +70,9 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, Option<InstalledPluginState>> {
-        Box::pin(async move { plugin_store::get_installed(server_socket, plugin_id, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::get_installed(server_socket, plugin_id, tls_policy, tls_fingerprint).await
+        })
     }
 
     fn get_runtime_entry<'a>(
@@ -79,7 +82,10 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, PluginRuntimeEntry> {
-        Box::pin(async move { plugin_store::get_runtime_entry(server_socket, plugin_id, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::get_runtime_entry(server_socket, plugin_id, tls_policy, tls_fingerprint)
+                .await
+        })
     }
 
     fn get_runtime_entry_for_version<'a>(
@@ -153,7 +159,9 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, InstalledPluginState> {
-        Box::pin(async move { plugin_store::enable(server_socket, plugin_id, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::enable(server_socket, plugin_id, tls_policy, tls_fingerprint).await
+        })
     }
 
     fn disable<'a>(
@@ -163,7 +171,9 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, InstalledPluginState> {
-        Box::pin(async move { plugin_store::disable(server_socket, plugin_id, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::disable(server_socket, plugin_id, tls_policy, tls_fingerprint).await
+        })
     }
 
     fn switch_version<'a>(
@@ -193,7 +203,9 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, ()> {
-        Box::pin(async move { plugin_store::uninstall(server_socket, plugin_id, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::uninstall(server_socket, plugin_id, tls_policy, tls_fingerprint).await
+        })
     }
 
     fn set_failed<'a>(
@@ -223,7 +235,9 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_policy: Option<&'a str>,
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, InstalledPluginState> {
-        Box::pin(async move { plugin_store::clear_error(server_socket, plugin_id, tls_policy, tls_fingerprint).await })
+        Box::pin(async move {
+            plugin_store::clear_error(server_socket, plugin_id, tls_policy, tls_fingerprint).await
+        })
     }
 
     fn storage_get<'a>(
@@ -235,7 +249,8 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         tls_fingerprint: Option<&'a str>,
     ) -> PluginInstallStoreFuture<'a, Option<serde_json::Value>> {
         Box::pin(async move {
-            plugin_store::storage_get(server_socket, plugin_id, key, tls_policy, tls_fingerprint).await
+            plugin_store::storage_get(server_socket, plugin_id, key, tls_policy, tls_fingerprint)
+                .await
         })
     }
 

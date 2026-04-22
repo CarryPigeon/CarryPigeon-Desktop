@@ -546,9 +546,7 @@ async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> anyhow::R
 }
 
 async fn run_migrations(key: &str, kind: Option<&str>) -> anyhow::Result<()> {
-    let db = get_db(key)
-        .await
-        .context("DB_MIGRATIONS_DB_GET_FAILED")?;
+    let db = get_db(key).await.context("DB_MIGRATIONS_DB_GET_FAILED")?;
     let conn = &db.connection;
     ensure_migrations_table(conn).await?;
     let applied = fetch_applied_versions(conn).await?;
