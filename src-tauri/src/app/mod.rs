@@ -115,6 +115,12 @@ pub fn run() -> anyhow::Result<()> {
             crate::shared::db::commands::db_close,
             crate::shared::db::commands::db_remove,
             crate::shared::db::commands::db_path,
+            crate::shared::chat_cache::commands::chat_cache_get,
+            crate::shared::chat_cache::commands::chat_cache_load_all,
+            crate::shared::chat_cache::commands::chat_cache_clear_all,
+            crate::shared::chat_cache::commands::chat_cache_put,
+            crate::shared::chat_cache::commands::chat_cache_remove,
+            crate::shared::chat_cache::commands::chat_cache_remove_many,
             // logs
             crate::shared::log::log_info,
             crate::shared::log::log_error,

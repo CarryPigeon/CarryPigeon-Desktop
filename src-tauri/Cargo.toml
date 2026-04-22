@@ -38,6 +38,8 @@ sea-orm = { version = "2.0.0-rc.22", features = [ "sqlx-sqlite", "runtime-tokio-
 
 # 错误处理
 anyhow = "1"
+aes-gcm = "0.10.3"
+keyring = "3.6.2"
 
 # 网络请求
 reqwest = { version = "0.12.24", features = ["json", "stream"] }
@@ -50,6 +52,7 @@ tokio-native-tls = "0.3.1"
 # wasm支持
 wasmtime = { version = "39.0.1", features = ["component-model"] }
 hex = "0.4.3"
+getrandom = "0.3.4"
 
 # zip 解压（插件包安装）
 zip = "0.6.6"
