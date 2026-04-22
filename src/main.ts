@@ -18,9 +18,11 @@ import { i18n } from "./app/i18n";
 import "tdesign-vue-next/es/style/index.css";
 import "@/features/chat/public/styles";
 import { getStoredTheme, setTheme } from "@/shared/utils/theme";
+import "@/shared/serverIdentity";
 import { routeIfSubWindow } from "@/app/bootstrap/subWindowRouting";
 import { registerUserProfileBridge } from "@/app/bootstrap/userProfileBridge";
 import { ensureInitialServerSelection, restoreStartupSession } from "@/app/processes/session/api";
+import { ensureSecureChatCacheReady } from "@/shared/utils/chatSecureCache";
 import { getAccountCapabilities } from "@/features/account/api";
 import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { getPluginsCapabilities } from "@/features/plugins/api";
@@ -86,6 +88,7 @@ function releaseMainWindowRuntimes(): void {
 window.addEventListener("beforeunload", releaseMainWindowRuntimes);
 
 async function bootstrap(): Promise<void> {
+  await ensureSecureChatCacheReady();
   let serverConnectionReady = false;
   if (!isSubWindow) {
     // Main window owns runtime startup and bridge registration.

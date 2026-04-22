@@ -13,10 +13,12 @@ import { IS_STORE_MOCK, MOCK_DISABLE_REQUIRED_GATE } from "@/shared/config/runti
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
 import { readAuthSession, writeAuthSession } from "@/shared/utils/localState";
+import { createLogger } from "@/shared/utils/logger";
 
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 const accountCapabilities = getAccountCapabilities();
 const authFlowCapabilities = getAuthFlowCapabilities();
+const logger = createLogger("appSessionProcess");
 
 function redirectToRequiredSetup(router: Router): void {
   if (router.currentRoute.value.path !== "/required-setup") void router.replace("/required-setup");
@@ -65,17 +67,24 @@ async function redirectIfRequiredSetupNeeded(router: Router, serverSocket: strin
 }
 
 async function restoreCurrentUserFromSession(router: Router, serverSocket: string): Promise<void> {
-  const session = readAuthSession(serverSocket);
+  const session = await readAuthSession(serverSocket);
   const accessToken = session?.accessToken ?? "";
   if (!accessToken.trim()) return;
 
   try {
     const nextCurrentUser = await accountCapabilities.forServer(serverSocket).syncCurrentUserSnapshot(accessToken);
     if (!session?.uid || session.uid !== nextCurrentUser.id) {
-      writeAuthSession(serverSocket, {
-        ...(session ?? { accessToken, refreshToken: "" }),
-        uid: nextCurrentUser.id,
-      });
+      try {
+        await writeAuthSession(serverSocket, {
+          ...(session ?? { accessToken, refreshToken: "" }),
+          uid: nextCurrentUser.id,
+        });
+      } catch (error) {
+        logger.warn("Action: app_session_auth_session_write_failed", {
+          serverSocket,
+          error: String(error),
+        });
+      }
     }
 
     if (router.currentRoute.value.path === "/") {
@@ -89,7 +98,14 @@ async function restoreCurrentUserFromSession(router: Router, serverSocket: strin
       status = (e as { status: number }).status;
     }
     if (status === 401 || status === 403) {
-      writeAuthSession(serverSocket, null);
+      try {
+        await writeAuthSession(serverSocket, null);
+      } catch (error) {
+        logger.warn("Action: app_session_auth_session_clear_failed", {
+          serverSocket,
+          error: String(error),
+        });
+      }
       accountCapabilities.currentUser.clearSnapshot();
       return;
     }

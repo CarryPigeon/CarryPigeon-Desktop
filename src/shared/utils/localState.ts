@@ -5,6 +5,12 @@
 
 import { getServerScopeKey } from "@/shared/serverIdentity";
 import {
+  removeSecureChatCacheValueSync,
+  removeSecureChatCacheValuesSync,
+  setSecureChatCacheValueSync,
+  readSecureChatCacheValueSync,
+} from "@/shared/utils/chatSecureCache";
+import {
   KEY_APP_CONFIG_RAW,
   KEY_AUTH_SESSION_PREFIX,
   KEY_AUTH_TOKEN_PREFIX,
@@ -107,7 +113,7 @@ export function readAuthToken(serverSocket: string): string {
   const key = scopedStorageKey(KEY_AUTH_TOKEN_PREFIX, serverSocket);
   const session = readAuthSession(serverSocket);
   if (session?.accessToken) return session.accessToken;
-  return localStorage.getItem(key) ?? "";
+  return readSecureChatCacheValueSync(key);
 }
 
 /**
@@ -122,10 +128,10 @@ export function writeAuthToken(serverSocket: string, token: string): void {
   const key = `${KEY_AUTH_TOKEN_PREFIX}${scope}`;
   const v = String(token ?? "").trim();
   if (!v) {
-    localStorage.removeItem(key);
+    removeSecureChatCacheValueSync(key);
     return;
   }
-  localStorage.setItem(key, v);
+  setSecureChatCacheValueSync(key, v);
 }
 
 /**
@@ -138,7 +144,7 @@ export function writeAuthToken(serverSocket: string, token: string): void {
  */
 export function readAuthSession(serverSocket: string): AuthSession | null {
   const key = scopedStorageKey(KEY_AUTH_SESSION_PREFIX, serverSocket);
-  const raw = localStorage.getItem(key);
+  const raw = readSecureChatCacheValueSync(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -172,7 +178,7 @@ export function writeAuthSession(serverSocket: string, session: AuthSession | nu
   if (!socket || !scope) return;
 
   if (!session) {
-    localStorage.removeItem(key);
+    removeSecureChatCacheValueSync(key);
     writeAuthToken(socket, "");
     return;
   }
@@ -181,7 +187,7 @@ export function writeAuthSession(serverSocket: string, session: AuthSession | nu
   const refreshToken = String(session.refreshToken ?? "").trim();
   const uid = typeof session.uid === "string" ? session.uid : undefined;
   const expiresAtMs = typeof session.expiresAtMs === "number" ? session.expiresAtMs : undefined;
-  localStorage.setItem(key, JSON.stringify({ accessToken, refreshToken, uid, expiresAtMs }));
+  setSecureChatCacheValueSync(key, JSON.stringify({ accessToken, refreshToken, uid, expiresAtMs }));
   writeAuthToken(socket, accessToken);
 }
 
@@ -203,7 +209,7 @@ export function readRefreshToken(serverSocket: string): string {
  */
 export function readLastEventId(serverSocket: string): string {
   const key = scopedStorageKey(KEY_LAST_EVENT_ID_PREFIX, serverSocket);
-  return localStorage.getItem(key) ?? "";
+  return readSecureChatCacheValueSync(key);
 }
 
 /**
@@ -218,10 +224,10 @@ export function writeLastEventId(serverSocket: string, eventId: string): void {
   const key = `${KEY_LAST_EVENT_ID_PREFIX}${scope}`;
   const v = String(eventId ?? "").trim();
   if (!v) {
-    localStorage.removeItem(key);
+    removeSecureChatCacheValueSync(key);
     return;
   }
-  localStorage.setItem(key, v);
+  setSecureChatCacheValueSync(key, v);
 }
 
 /**
@@ -237,9 +243,11 @@ export function writeLastEventId(serverSocket: string, eventId: string): void {
 export function clearAuthAndResumeStateForScope(scopeKey: string): void {
   const scope = String(scopeKey ?? "").trim();
   if (!scope) return;
-  localStorage.removeItem(`${KEY_AUTH_TOKEN_PREFIX}${scope}`);
-  localStorage.removeItem(`${KEY_AUTH_SESSION_PREFIX}${scope}`);
-  localStorage.removeItem(`${KEY_LAST_EVENT_ID_PREFIX}${scope}`);
+  removeSecureChatCacheValuesSync([
+    `${KEY_AUTH_TOKEN_PREFIX}${scope}`,
+    `${KEY_AUTH_SESSION_PREFIX}${scope}`,
+    `${KEY_LAST_EVENT_ID_PREFIX}${scope}`,
+  ]);
 }
 
 /**

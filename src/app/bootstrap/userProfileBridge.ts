@@ -8,6 +8,8 @@ import { listenUserProfileRequest, emitUserProfileResponse, type UserProfileRequ
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { getAccountCapabilities } from "@/features/account/api";
 import { readAuthSession, writeAuthSession } from "@/shared/utils/localState";
+import { clearSecureChatCacheAll } from "@/shared/utils/chatSecureCache";
+import { clearServerIdentityCache } from "@/shared/serverIdentity";
 
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 const accountCapabilities = getAccountCapabilities();
@@ -91,7 +93,9 @@ async function dispatchBridgeRequest(payload: UserProfileRequest, router: Router
           return;
         }
       }
+      await clearSecureChatCacheAll();
       writeAuthSession(socket, null);
+      clearServerIdentityCache();
       accountCapabilities.currentUser.clearSnapshot();
       serverConnectionCapabilities.workspace.selectSocket("");
       void router.replace("/");

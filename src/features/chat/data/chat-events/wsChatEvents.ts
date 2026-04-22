@@ -240,9 +240,9 @@ export function connectChatWs(
    *
    * @returns 无返回值。
    */
-  function sendAuth(): void {
+  async function sendAuth(): Promise<void> {
     const id = createRequestId();
-    const lastEventId = readLastEventId(socket);
+    const lastEventId = await readLastEventId(socket);
     const resume = lastEventId ? { last_event_id: lastEventId } : undefined;
     const msg = {
       type: "auth",
@@ -291,12 +291,13 @@ export function connectChatWs(
         return;
       }
 
-      const last = readLastEventId(socket).trim();
-      if (last && compareEventId(eid, last) <= 0) {
+      const last = readLastEventId(socket);
+      const trimmedLast = last.trim();
+      if (trimmedLast && compareEventId(eid, trimmedLast) <= 0) {
         logger.debug("Action: chat_ws_event_ignored_duplicate_or_out_of_order", {
           wsUrl,
           eid,
-          last,
+          last: trimmedLast,
           eventType: String(env.data?.event_type ?? "").trim(),
         });
         return;
@@ -369,7 +370,9 @@ export function connectChatWs(
 
     ws.addEventListener("open", () => {
       reconnectAttempt = 0;
-      sendAuth();
+      void sendAuth().catch((error) => {
+        logger.warn("Action: chat_ws_auth_failed_last_event_load_failed", { wsUrl, error: String(error) });
+      });
     });
 
     ws.addEventListener("message", handleMessage);
