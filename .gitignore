@@ -1,6 +1,7 @@
 # Logs
 logs
 *.log
+*.err
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -31,3 +32,12 @@ dist-ssr
 /src-tauri/config
 /src-tauri/config.json
 .env
+
+# Local tool/runtime artifacts
+.playwright-mcp/
+.sisyphus/
+data/db/*.db
+
+# Local workflow docs
+AGENTS.md
+CLAUDE.md
