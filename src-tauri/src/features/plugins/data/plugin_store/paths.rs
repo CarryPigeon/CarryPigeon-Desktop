@@ -6,6 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
+
 /// 获取插件存储根目录：`{repoRoot}/data/plugins`。
 ///
 /// 说明：
@@ -137,4 +139,121 @@ pub(super) fn resolve_app_plugins_path(
     ];
     let root = safe_join(&base, &segments)?;
     Ok(root.join(rel))
+}
+
+/// 解析 `app://plugins/...` 的本地文件并将最终结果收敛到版本目录的 canonical path。
+///
+/// 说明：
+/// - 先做纯路径拼接，再对版本目录与目标文件分别 canonicalize；
+/// - 若文件最终落点不在 canonical 版本目录下，直接拒绝。
+pub(super) fn resolve_app_plugins_canonical_file_path(
+    server_id: &str,
+    plugin_id: &str,
+    version: &str,
+    rel_path: &str,
+) -> anyhow::Result<PathBuf> {
+    let lexical_file = resolve_app_plugins_path(server_id, plugin_id, version, rel_path)?;
+    let version_dir = plugin_version_dir(server_id, plugin_id, version)?;
+    let canonical_root = version_dir.canonicalize().with_context(|| {
+        format!(
+            "Failed to canonicalize plugin version root: {}",
+            version_dir.display()
+        )
+    })?;
+    let canonical_file = lexical_file.canonicalize().with_context(|| {
+        format!("Failed to canonicalize plugin file: {}", lexical_file.display())
+    })?;
+
+    if !canonical_file.starts_with(&canonical_root) {
+        return Err(anyhow::anyhow!(
+            "Resolved plugin file escapes canonical root: {}",
+            canonical_file.display()
+        ));
+    }
+
+    Ok(canonical_file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_app_plugins_canonical_file_path;
+    use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct CwdGuard(PathBuf);
+
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            let _ = std::env::set_current_dir(&self.0);
+        }
+    }
+
+    fn cwd_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!(
+            "carrypigeon-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            stamp
+        ))
+    }
+
+    fn cleanup_dir(path: &PathBuf) {
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn create_dir_link(link: &PathBuf, target: &PathBuf) {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).expect("create symlink");
+        }
+        #[cfg(windows)]
+        {
+            let command = format!(
+                "New-Item -ItemType Junction -Path '{}' -Target '{}' | Out-Null",
+                link.display(),
+                target.display()
+            );
+            let status = std::process::Command::new("pwsh")
+                .args(["-NoProfile", "-Command", &command])
+                .status()
+                .expect("run junction command");
+            assert!(status.success(), "junction creation failed");
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_symlink_escape_when_serving_app_plugins() {
+        let _guard = cwd_lock().lock().expect("lock cwd");
+        let original_cwd = std::env::current_dir().expect("current dir");
+        let _cwd_guard = CwdGuard(original_cwd.clone());
+        let repo_root = unique_temp_dir("plugin-path-root");
+        let app_plugins = repo_root.join("data").join("plugins");
+        let version_root = app_plugins.join("server-a").join("plugin-a").join("1.0.0");
+        let outside = repo_root.join("outside");
+        std::fs::create_dir_all(&version_root).expect("create version root");
+        std::fs::create_dir_all(&outside).expect("create outside root");
+
+        let outside_file = outside.join("escape.js");
+        std::fs::write(&outside_file, b"export default 1;").expect("write outside file");
+        let alias_path = version_root.join("alias");
+        create_dir_link(&alias_path, &outside);
+
+        std::env::set_current_dir(&repo_root).expect("set cwd");
+        let err = resolve_app_plugins_canonical_file_path("server-a", "plugin-a", "1.0.0", "alias/escape.js")
+            .expect_err("symlink escape must be rejected");
+        assert!(err.to_string().contains("escapes canonical root"));
+
+        drop(_cwd_guard);
+        cleanup_dir(&repo_root);
+    }
 }

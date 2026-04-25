@@ -42,6 +42,7 @@ styles/
   - TypeScript/JSX：`*.ts`、`*.tsx`、`*.jsx`
   - 样式预处理：`*.scss`、`*.sass`、`*.less`、`*.styl`
   - 其他需要额外编译链路的文件类型（除非未来新增宿主支持并在文档中声明）
+- 解压后的目录树必须做 canonical root 校验，`..`、符号链接、重解析点或其他可逃逸宿主根目录的条目都要拒绝。
 
 允许（P0）：
 - 可执行 ESM：`*.js`/`*.mjs`
@@ -83,6 +84,7 @@ styles/
 约束（P0）：
 - 同一 `plugin_id` 在不同服务器可安装不同版本
 - 同一服务器下所有频道共享插件（由 server_id 维度决定）
+- 安装/更新时只接受来自已声明 catalog/source 的包，不能把任意下载 URL 当作可信来源。
 
 ---
 
@@ -135,6 +137,7 @@ app://plugins/<server_id>/<plugin_id>/<version>/<entry>
 ### 5.2 更新与回滚（与安装策略一致）
 - 更新：下载新版本 → 校验 sha256 → 解压到新 `<version>/` → 试加载/enable 成功后更新 `current.json`
 - 回滚：只需把 `current.json.version` 指回旧版本
+- 解压和试加载阶段都要再次做路径 containment 校验，避免通过软链接或嵌套目录把资源挂出插件根。
 
 ### 5.3 清理策略（P1）
 - 可按“保留最近 N 个版本/最近 N 天未使用版本”清理

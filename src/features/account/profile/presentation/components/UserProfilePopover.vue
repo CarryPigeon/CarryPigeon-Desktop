@@ -132,9 +132,11 @@ import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { createPopper, type Placement, type Options } from "@popperjs/core";
 import { useRouter } from "vue-router";
 import { MessagePlugin } from "tdesign-vue-next";
+import { createLogger } from "@/shared/utils/logger";
 import { getUserUsecase, getUserMutationPort } from "@/features/account/profile/di/user.di";
 import { currentServerSocket } from "@/features/server-connection/rack/presentation/store/currentServer";
 import { currentUser } from "@/features/account/current-user/presentation/store/userData";
+import { ensureValidAccessToken } from "@/shared/net/auth/api";
 
 import type { UserPublic } from "@/features/account/profile/domain/types/UserTypes";
 import type { UserProfilePopoverProps } from "./UserProfilePopover.props";
@@ -149,6 +151,7 @@ const props = withDefaults(defineProps<UserProfilePopoverProps>(), {
 });
 
 const router = useRouter();
+const logger = createLogger("userProfilePopover");
 
 // Refs
 const triggerRef = ref<HTMLElement | null>(null);
@@ -210,8 +213,7 @@ async function loadProfile() {
   error.value = null;
   try {
     const serverSocket = currentServerSocket.value;
-    // accessToken 需要从认证模块获取，这里简化处理
-    const accessToken = localStorage.getItem(`cp:token:${serverSocket}`);
+    const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
       throw new Error("Not connected to server");
     }
@@ -220,7 +222,9 @@ async function loadProfile() {
     profile.value = result;
     error.value = null;
   } catch (e) {
-    console.error("Failed to load user profile:", e);
+    logger.error("Action: auth_profile_load_failed", {
+      error: String(e),
+    });
     error.value = "加载失败";
   } finally {
     loading.value = false;
@@ -406,7 +410,9 @@ async function handleCopyEmail() {
     }, 2000);
   } catch (e) {
     MessagePlugin.error("复制失败");
-    console.error("Failed to copy:", e);
+    logger.error("Action: auth_profile_copy_failed", {
+      error: String(e),
+    });
   }
 }
 
@@ -446,7 +452,7 @@ async function handleFileChange(e: Event) {
 
   try {
     const serverSocket = currentServerSocket.value;
-    const accessToken = localStorage.getItem(`cp:token:${serverSocket}`);
+    const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
       MessagePlugin.error("未连接到服务器，请稍后重试");
       return;
@@ -472,7 +478,9 @@ async function handleFileChange(e: Event) {
     }
     MessagePlugin.success("背景图片更新成功");
   } catch (err) {
-    console.error("Failed to upload background:", err);
+    logger.error("Action: auth_profile_background_upload_failed", {
+      error: String(err),
+    });
     MessagePlugin.error("上传失败，请稍后重试");
   }
 

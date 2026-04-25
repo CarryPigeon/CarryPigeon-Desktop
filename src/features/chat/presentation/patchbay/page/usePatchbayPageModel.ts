@@ -121,7 +121,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const flashMessage = ref<string>("");
 
   function logAsyncError(action: string, error: unknown): void {
-    logger.error(`Action: ${action}`, { error: String(error) });
+    logger.error("Action: chat_patchbay_async_task_failed", {
+      action,
+      error: String(error),
+    });
   }
 
   const runAsyncTask = createAsyncTaskRunner(logAsyncError);
@@ -382,7 +385,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     x: menuX,
     y: menuY,
     close: closeMenu,
-    handleAction: handleMenuAction,
+    handleMenuCommand: handleMenuAction,
   });
 
   const channelSettingsMenu = createPatchbayChannelSettingsMenuSection({

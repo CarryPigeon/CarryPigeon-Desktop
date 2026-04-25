@@ -1,11 +1,74 @@
-name: Build and release Tauri App with pnpm
+name: Build, test, audit, and release Tauri App with pnpm
 on:
     push:
         branches: [master, release]
     workflow_dispatch:
 
 jobs:
+    quality-gates:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  toolchain: stable
+
+            - name: Install Linux dependencies
+              run: |
+                  sudo apt update
+                  sudo apt install libwebkit2gtk-4.1-dev \
+                    build-essential \
+                    curl \
+                    wget \
+                    file \
+                    libxdo-dev \
+                    libssl-dev \
+                    libayatana-appindicator3-dev \
+                    librsvg2-dev
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "lts/*"
+                  cache: "pnpm"
+
+            - name: Install frontend dependencies with pnpm
+              run: pnpm install --frozen-lockfile
+
+            - name: Install cargo-audit
+              run: cargo install --locked cargo-audit --version 0.22.1
+
+            - name: Install cargo-deny
+              run: cargo install --locked cargo-deny --version 0.19.4
+
+            - name: Run frontend lint checks
+              run: pnpm run lint
+
+            - name: Run frontend production build
+              run: pnpm run build
+
+            - name: Run Rust tests
+              run: cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
+
+            - name: Run cargo audit
+              run: cargo audit
+
+            - name: Run cargo deny
+              run: cargo deny check
+
     build-tauri:
+        needs: quality-gates
         permissions:
             contents: write
         strategy:
@@ -41,7 +104,7 @@ jobs:
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
               with:
-                  version: 10 # 请将此版本号改为你项目实际使用的版本
+                  version: 10
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -50,7 +113,7 @@ jobs:
                   cache: "pnpm"
 
             - name: Install frontend dependencies with pnpm
-              run: pnpm install
+              run: pnpm install --frozen-lockfile
 
             - name: Build and Release with Tauri Action
               uses: tauri-apps/tauri-action@v0

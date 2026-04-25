@@ -4,6 +4,7 @@ version = "0.1.1"
 description = "A Tauri App"
 authors = ["Shirasawa <3489840593@qq.com>"]
 edition = "2024"
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -28,6 +29,7 @@ tauri-plugin-opener = "2.5.2"
 # 日志输出
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+regex = "1.11.2"
 
 # json解析
 serde = "1.0.228"

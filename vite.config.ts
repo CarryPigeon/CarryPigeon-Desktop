@@ -18,6 +18,7 @@ export default defineConfig(async () => ({
     }),
     Components({
       globs: ["src/features/**/presentation/components/**/*.vue"],
+      dts: false,
       resolvers: [TDesignResolver({
         library: 'vue-next'
       })],

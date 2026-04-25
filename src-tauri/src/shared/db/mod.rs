@@ -185,8 +185,13 @@ pub async fn get_entry(key: &str) -> anyhow::Result<Arc<DbEntry>> {
 /// - `Err(anyhow::Error)`：当前实现通常不会返回错误（预留接口形态）。
 pub async fn close_db(key: &str) -> anyhow::Result<()> {
     let registry = init_db_registry();
-    let mut lock = registry.write().await;
-    lock.map.remove(key);
+    let entry = {
+        let mut lock = registry.write().await;
+        lock.map.remove(key)
+    };
+    if let Some(entry) = entry {
+        entry.db.connection.clone().close().await?;
+    }
     Ok(())
 }
 
@@ -201,8 +206,17 @@ pub async fn close_db(key: &str) -> anyhow::Result<()> {
 /// - `Err(anyhow::Error)`：当前实现通常不会返回错误（预留接口形态）。
 pub async fn remove_db(key: &str) -> anyhow::Result<Option<PathBuf>> {
     let registry = init_db_registry();
-    let mut lock = registry.write().await;
-    Ok(lock.map.remove(key).map(|entry| entry.path.clone()))
+    let entry = {
+        let mut lock = registry.write().await;
+        lock.map.remove(key)
+    };
+    if let Some(entry) = entry {
+        let path = entry.path.clone();
+        entry.db.connection.clone().close().await?;
+        Ok(Some(path))
+    } else {
+        Ok(None)
+    }
 }
 
 fn sqlite_url_for_path(path: &Path) -> String {

@@ -21,6 +21,10 @@ import { handleProtocolMockApiRequest } from "@/shared/mock/protocol/protocolMoc
 import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
 import { buildCarryPigeonAcceptHeader } from "@/shared/net/http/apiHeaders";
 import { getServerTlsConfig } from "@/shared/net/tls/serverTlsConfigProvider";
+import {
+  shouldRejectBearerAuthOverInsecureTls,
+  shouldUseTauriTlsTransport,
+} from "@/shared/net/tls/tlsPolicyGuards";
 
 const logger = createLogger("httpJsonClient");
 
@@ -60,6 +64,18 @@ function buildRequestHeaders(args: {
   body: unknown;
   extraHeaders?: Record<string, string>;
 }): Record<string, string> {
+  const forbiddenHeaders = collectForbiddenAuthHeaders(args.extraHeaders);
+  if (forbiddenHeaders.length > 0) {
+    throw new ApiRequestError({
+      error: {
+        status: 403,
+        reason: "auth_header_override_rejected",
+        message: "Authorization headers cannot be supplied through extraHeaders.",
+        details: { headers: forbiddenHeaders },
+      },
+    });
+  }
+
   const headers: Record<string, string> = {
     Accept: buildCarryPigeonAcceptHeader(args.apiVersion),
   };
@@ -69,6 +85,16 @@ function buildRequestHeaders(args: {
     for (const [k, v] of Object.entries(args.extraHeaders)) headers[k] = v;
   }
   return headers;
+}
+
+function collectForbiddenAuthHeaders(extraHeaders?: Record<string, string>): string[] {
+  if (!extraHeaders) return [];
+  const forbidden: string[] = [];
+  for (const key of Object.keys(extraHeaders)) {
+    const lower = key.trim().toLowerCase();
+    if (lower === "authorization" || lower === "proxy-authorization") forbidden.push(key);
+  }
+  return forbidden;
 }
 
 function logAndBuildApiRequestError(args: {
@@ -94,28 +120,6 @@ type TauriApiResponse = {
   body?: unknown;
   error?: unknown;
 };
-
-/**
- * 判断当前请求是否应走 Tauri(Rust) 侧 HTTP 客户端。
- *
- * 仅当用户选择的 TLS 策略无法由 WebView `fetch` 实现时才切换：
- * - 自签证书（insecure）
- * - 指纹信任（trust_fingerprint）
- *
- * @param serverSocket - 服务器 Socket 地址（用于读取 TLS 策略）。
- * @param url - 已构造完成的请求 URL。
- * @returns 当需要使用 Tauri 时返回 `true`。
- */
-function shouldUseTauriHttp(serverSocket: string, url: string): boolean {
-  try {
-    const u = new URL(url);
-    if (u.protocol !== "https:") return false;
-  } catch {
-    return false;
-  }
-  const tls = getServerTlsConfig(serverSocket);
-  return tls.tlsPolicy === "insecure" || tls.tlsPolicy === "trust_fingerprint";
-}
 
 /**
  * 通过 Tauri 执行 `/api/*` JSON 请求（遵循 TLS policy）。
@@ -261,6 +265,24 @@ export class HttpJsonClient {
       extraHeaders,
     });
 
+    const tls = getServerTlsConfig(this.serverSocket);
+    if (
+      shouldRejectBearerAuthOverInsecureTls({
+        tlsPolicy: tls.tlsPolicy,
+        hasBearerToken: Boolean(this.accessToken),
+        isProduction: import.meta.env.PROD,
+      })
+    ) {
+      throw new ApiRequestError({
+        error: {
+          status: 403,
+          reason: "tls_policy_rejected",
+          message: "Bearer requests require strict or trust_fingerprint TLS in release builds.",
+          details: { tlsPolicy: tls.tlsPolicy, transport: "fetch" },
+        },
+      });
+    }
+
     if (USE_MOCK_TRANSPORT) {
       const res = await handleProtocolMockApiRequest({
         serverSocket: this.serverSocket,
@@ -281,7 +303,7 @@ export class HttpJsonClient {
       return res.body as T;
     }
 
-    if (shouldUseTauriHttp(this.serverSocket, url)) {
+    if (shouldUseTauriTlsTransport({ tlsPolicy: tls.tlsPolicy, url })) {
       try {
         const tauriRes = await tauriRequestJson(this.serverSocket, method, normalizedPath, headers, body);
         if (!tauriRes.ok) {
@@ -298,6 +320,7 @@ export class HttpJsonClient {
         // 当 invoke 不可用（例如 Web 预览）或命令失败时，回退到 WebView fetch。
         // 对自签证书场景 fetch 仍可能失败，但可以保持行为一致性。
         logger.warn("Action: http_tauri_invoke_failed_fallback_to_fetch", { method, url, error: String(e) });
+        if (tls.tlsPolicy === "trust_fingerprint") throw e;
       }
     }
 
@@ -366,6 +389,23 @@ export class HttpJsonClient {
     }
 
     // Tauri 不支持传递 FormData 跨调用边界，所以直接走 fetch
+    const tls = getServerTlsConfig(this.serverSocket);
+    if (
+      shouldRejectBearerAuthOverInsecureTls({
+        tlsPolicy: tls.tlsPolicy,
+        hasBearerToken: Boolean(this.accessToken),
+        isProduction: import.meta.env.PROD,
+      })
+    ) {
+      throw new ApiRequestError({
+        error: {
+          status: 403,
+          reason: "tls_policy_rejected",
+          message: "Bearer requests require strict or trust_fingerprint TLS in release builds.",
+          details: { tlsPolicy: tls.tlsPolicy, transport: "fetch" },
+        },
+      });
+    }
     const res = await fetch(url, {
       method,
       headers,

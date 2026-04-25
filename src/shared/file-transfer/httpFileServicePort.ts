@@ -36,8 +36,13 @@ export const httpFileServicePort: FileServicePort = {
     };
   },
 
-  async performUpload(upload: UploadDescriptor, body: Blob | ArrayBuffer | Uint8Array): Promise<void> {
+  async performUpload(
+    serverSocket: string,
+    upload: UploadDescriptor,
+    body: Blob | ArrayBuffer | Uint8Array,
+  ): Promise<void> {
     await httpPerformFileUpload(
+      serverSocket,
       {
         method: upload.method,
         url: upload.url,

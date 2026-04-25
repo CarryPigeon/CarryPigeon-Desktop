@@ -757,3 +757,135 @@ pub fn resolve_app_plugins_path(
 ) -> anyhow::Result<PathBuf> {
     paths::resolve_app_plugins_path(server_id, plugin_id, version, rel_path)
 }
+
+/// 解析 `app://plugins/...` 的 canonical 文件路径（用于资源读取时的 containment 校验）。
+pub fn resolve_app_plugins_canonical_file_path(
+    server_id: &str,
+    plugin_id: &str,
+    version: &str,
+    rel_path: &str,
+) -> anyhow::Result<PathBuf> {
+    paths::resolve_app_plugins_canonical_file_path(server_id, plugin_id, version, rel_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{download::download_plugin_zip_bytes, *};
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::path::PathBuf;
+    use std::thread;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!(
+            "carrypigeon-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            stamp
+        ))
+    }
+
+    fn cleanup_dir(path: &PathBuf) {
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn spawn_zip_server(body: Vec<u8>) -> (reqwest::Url, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind test server");
+        let addr = listener.local_addr().expect("local addr");
+        let handle = thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(header.as_bytes());
+                let _ = stream.write_all(&body);
+                let _ = stream.flush();
+            }
+        });
+        (
+            reqwest::Url::parse(&format!("http://127.0.0.1:{}", addr.port()))
+                .expect("base url"),
+            handle,
+        )
+    }
+
+    fn build_plugin_zip_bytes() -> Vec<u8> {
+        use std::io::Write;
+        use zip::write::FileOptions;
+
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let options = FileOptions::default().unix_permissions(0o100644);
+        writer
+            .start_file("demo-plugin/plugin.json", options)
+            .expect("start file");
+        writer
+            .write_all(
+                br#"{"plugin_id":"demo-plugin","name":"Demo","version":"1.0.0","min_host_version":"1.0.0","description":null,"author":null,"license":null,"entry":"index.js","permissions":[],"provides_domains":[]}"#,
+            )
+            .expect("write manifest");
+        writer
+            .start_file("demo-plugin/index.js", options)
+            .expect("start entry");
+        writer.write_all(b"export default 1;").expect("write entry");
+        writer.finish().expect("finish zip").into_inner()
+    }
+
+    #[tokio::test]
+    async fn plugin_same_origin_install() {
+        let zip_bytes = build_plugin_zip_bytes();
+        let expected_hash = sha256_hex(&zip_bytes);
+        let (base_url, handle) = spawn_zip_server(zip_bytes.clone());
+        let download_url = reqwest::Url::parse(&format!("{}/plugin.zip", base_url))
+            .expect("same origin download url");
+        let client = reqwest::Client::new();
+
+        let downloaded = download_plugin_zip_bytes(&base_url, &client, download_url)
+            .await
+            .expect("same-origin download");
+        assert_eq!(downloaded, zip_bytes);
+        assert!(eq_hash_hex(&sha256_hex(&downloaded), &expected_hash));
+
+        let unpack_root = unique_temp_dir("plugin-unpack");
+        std::fs::create_dir_all(&unpack_root).expect("create unpack root");
+        unpack::unpack_plugin_zip(downloaded, unpack_root.clone())
+            .await
+            .expect("unpack zip");
+
+        let manifest = std::fs::read_to_string(unpack_root.join("plugin.json"))
+            .expect("manifest exists after unpack");
+        assert!(manifest.contains("\"plugin_id\":\"demo-plugin\""));
+
+        cleanup_dir(&unpack_root);
+        let _ = handle.join();
+    }
+
+    #[tokio::test]
+    async fn plugin_sha256() {
+        let zip_bytes = build_plugin_zip_bytes();
+        let hash = sha256_hex(&zip_bytes);
+        assert!(eq_hash_hex(&hash, &hash));
+    }
+
+    #[tokio::test]
+    async fn plugin_rejects_untrusted_cross_origin() {
+        let base = reqwest::Url::parse("http://127.0.0.1:18080/").expect("base url");
+        let download = reqwest::Url::parse("http://127.0.0.1:18081/plugin.zip")
+            .expect("download url");
+        let client = reqwest::Client::new();
+
+        let err = download_plugin_zip_bytes(&base, &client, download)
+            .await
+            .expect_err("cross-origin download should fail closed");
+        assert!(err
+            .to_string()
+            .contains("Cross-origin plugin download rejected by default"));
+    }
+}

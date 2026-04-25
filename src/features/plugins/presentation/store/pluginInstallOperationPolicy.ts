@@ -14,7 +14,6 @@ export type PluginInstallOperationPolicy = {
   concurrency: "busy-gate";
   recoverInstalledOnError: boolean;
   clearProgressAfterDone: boolean;
-  failureAction: string;
   createInitialProgress(pluginId: string): PluginProgress;
 };
 
@@ -25,49 +24,42 @@ const OPERATION_POLICY_BY_TYPE: Record<PluginInstallOperation, Omit<PluginInstal
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_install_failed",
     progress: { stage: "confirm", percent: 0, message: "Starting…" },
   },
   [PLUGIN_INSTALL_OPERATION.update]: {
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_update_failed",
     progress: { stage: "checking_updates", percent: 10, message: "Checking updates…" },
   },
   [PLUGIN_INSTALL_OPERATION.switchVersion]: {
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_switch_version_failed",
     progress: { stage: "switching", percent: 22, message: "Switching version…" },
   },
   [PLUGIN_INSTALL_OPERATION.rollback]: {
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_rollback_failed",
     progress: { stage: "rolling_back", percent: 18, message: "Rolling back…" },
   },
   [PLUGIN_INSTALL_OPERATION.enable]: {
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_enable_failed",
     progress: { stage: "enabling", percent: 18, message: "Enabling…" },
   },
   [PLUGIN_INSTALL_OPERATION.disable]: {
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_disable_failed",
     progress: { stage: "confirm", percent: 18, message: "Disabling…" },
   },
   [PLUGIN_INSTALL_OPERATION.uninstall]: {
     concurrency: "busy-gate",
     recoverInstalledOnError: true,
     clearProgressAfterDone: true,
-    failureAction: "plugins_uninstall_failed",
     progress: { stage: "confirm", percent: 22, message: "Uninstalling…" },
   },
 };
@@ -83,7 +75,6 @@ export function getPluginInstallOperationPolicy(
     concurrency: policy.concurrency,
     recoverInstalledOnError: policy.recoverInstalledOnError,
     clearProgressAfterDone: policy.clearProgressAfterDone,
-    failureAction: policy.failureAction,
     createInitialProgress(pluginId: string): PluginProgress {
       return {
         pluginId,

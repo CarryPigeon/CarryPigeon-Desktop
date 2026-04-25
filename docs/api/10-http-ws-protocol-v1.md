@@ -105,6 +105,8 @@ Content-Type: application/json; charset=utf-8
 
 - `access_token`：短期（建议 5–30 分钟），用于 HTTP `Authorization` 与 WS 会话绑定
 - `refresh_token`：长期（建议 7–30 天），仅用于换发 access token；服务端必须支持吊销与轮换
+- v1 只定义 `access_token` / `refresh_token` 这组 token 语义，旧的 `cp:token:*` 本地键值不属于协议内容，客户端迁移时应清理旧键但不要再依赖它们。
+- 发送 bearer token 的请求必须在实现层先通过 TLS 策略校验，`tlsPolicy = "insecure"` 时不得向生产/发布态端点发起 bearer 请求。
 
 ### 5.2 HTTP 鉴权方式
 
@@ -113,6 +115,10 @@ Content-Type: application/json; charset=utf-8
 ```
 Authorization: Bearer <access_token>
 ```
+
+实现约定：
+- 不要把 `Authorization`、`access_token`、`refresh_token` 写入普通日志或调试输出。
+- 若当前连接处于不安全 TLS 模式，客户端必须在发送前失败返回，而不是静默降级。
 
 ### 5.3 required gate 与登录的交互（关键）
 
