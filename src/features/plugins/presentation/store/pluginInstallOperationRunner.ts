@@ -38,7 +38,7 @@ export function createPluginInstallOperationRunner(
       recoverInstalledOnError: policy.recoverInstalledOnError,
       clearProgressAfterDone: policy.clearProgressAfterDone,
       onError: (error: unknown): void => {
-        deps.logger.error(`Action: ${policy.failureAction}`, {
+        deps.logger.error("Action: plugins_install_operation_failed", {
           key: deps.key,
           pluginId,
           operation: args.operation,

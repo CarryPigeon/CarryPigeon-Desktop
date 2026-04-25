@@ -7,7 +7,7 @@
 
 use std::{
     io::{Cursor, Read},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::Context;
@@ -74,10 +74,99 @@ fn is_forbidden_source_file(path: &str) -> bool {
         || lower.ends_with(".less")
 }
 
+#[cfg(windows)]
+fn is_windows_reparse_point(meta: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn is_windows_reparse_point(_meta: &std::fs::Metadata) -> bool {
+    false
+}
+
+fn is_zip_entry_symlink(file: &zip::read::ZipFile<'_>) -> bool {
+    file.unix_mode()
+        .map(|mode| mode & 0o170000 == 0o120000)
+        .unwrap_or(false)
+}
+
+fn ensure_write_target_is_safe(
+    canonical_root: &Path,
+    rel_name: &str,
+    is_dir: bool,
+) -> anyhow::Result<PathBuf> {
+    let mut out_path = canonical_root.to_path_buf();
+    let segments: Vec<&str> = rel_name.split('/').collect();
+
+    for (idx, segment) in segments.iter().enumerate() {
+        out_path.push(segment);
+
+        match std::fs::symlink_metadata(&out_path) {
+            Ok(meta) => {
+                let file_type = meta.file_type();
+                if std::fs::read_link(&out_path).is_ok() {
+                    return Err(anyhow::anyhow!("Symlink path rejected: {}", out_path.display()));
+                }
+                if file_type.is_symlink() || is_windows_reparse_point(&meta) {
+                    return Err(anyhow::anyhow!("Symlink path rejected: {}", out_path.display()));
+                }
+                let canonical = std::fs::canonicalize(&out_path).with_context(|| {
+                    format!("Failed to canonicalize path component: {}", out_path.display())
+                })?;
+                if !canonical.starts_with(canonical_root) {
+                    return Err(anyhow::anyhow!("Symlink path rejected: {}", out_path.display()));
+                }
+                if idx < segments.len() - 1 && !file_type.is_dir() {
+                    return Err(anyhow::anyhow!(
+                        "Path component is not a directory: {}",
+                        out_path.display()
+                    ));
+                }
+                if idx == segments.len() - 1 {
+                    if is_dir && !file_type.is_dir() {
+                        return Err(anyhow::anyhow!(
+                            "Directory entry conflicts with existing file: {}",
+                            out_path.display()
+                        ));
+                    }
+                    if !is_dir && file_type.is_dir() {
+                        return Err(anyhow::anyhow!(
+                            "File entry conflicts with existing directory: {}",
+                            out_path.display()
+                        ));
+                    }
+                }
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                if idx < segments.len() - 1 {
+                    continue;
+                }
+            }
+            Err(err) => return Err(err.into()),
+        }
+    }
+
+    Ok(out_path)
+}
+
 /// 将插件 zip 解压到目标目录（在 blocking 线程执行，避免阻塞 async runtime）。
 pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> anyhow::Result<()> {
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
         let mut archive = ZipArchive::new(Cursor::new(bytes)).context("Invalid zip archive")?;
+        let root_meta = std::fs::symlink_metadata(&write_root)
+            .with_context(|| format!("Failed to inspect write root: {}", write_root.display()))?;
+        if root_meta.file_type().is_symlink() {
+            return Err(anyhow::anyhow!(
+                "Plugin write root is a symlink: {}",
+                write_root.display()
+            ));
+        }
+        let canonical_root = write_root.canonicalize().with_context(|| {
+            format!("Failed to canonicalize plugin write root: {}", write_root.display())
+        })?;
 
         // 判断 zip 是否把所有内容包在单一根目录下（常见打包方式）。
         let mut names: Vec<String> = vec![];
@@ -103,6 +192,9 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
             if !is_zip_name_safe(&normalized) {
                 return Err(anyhow::anyhow!("Unsafe zip entry path: {}", normalized));
             }
+            if is_zip_entry_symlink(&file) {
+                return Err(anyhow::anyhow!("Symlink zip entry rejected: {}", normalized));
+            }
 
             let final_name = if let Some(prefix) = root_prefix.as_deref() {
                 strip_root_prefix(&normalized, prefix)
@@ -119,7 +211,7 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
                 ));
             }
 
-            let out_path = write_root.join(&final_name);
+            let out_path = ensure_write_target_is_safe(&canonical_root, &final_name, file.is_dir())?;
             if file.is_dir() {
                 std::fs::create_dir_all(&out_path)?;
                 continue;
@@ -143,4 +235,105 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
     .await
     .context("Zip unpack task failed")??;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unpack_plugin_zip;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!(
+            "carrypigeon-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            stamp
+        ))
+    }
+
+    fn build_symlink_zip_bytes() -> Vec<u8> {
+        use zip::write::FileOptions;
+
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let options = FileOptions::default().unix_permissions(0o120777);
+        writer
+            .add_symlink("demo-plugin/link", "/tmp/escape.js", options)
+            .expect("start symlink entry");
+        writer.finish().expect("finish zip").into_inner()
+    }
+
+    #[cfg(unix)]
+    fn build_nested_zip_bytes() -> Vec<u8> {
+        use zip::write::FileOptions;
+
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let options = FileOptions::default().unix_permissions(0o100644);
+        writer
+            .start_file("demo-plugin/linked/payload.js", options)
+            .expect("start file");
+        writer.write_all(b"export default 1;").expect("write file");
+        writer.finish().expect("finish zip").into_inner()
+    }
+
+    fn cleanup_dir(path: &PathBuf) {
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[cfg(unix)]
+    fn create_dir_link(link: &PathBuf, target: &PathBuf) {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).expect("create symlink");
+        }
+        #[cfg(windows)]
+        {
+            let command = format!(
+                "New-Item -ItemType Junction -Path '{}' -Target '{}' | Out-Null",
+                link.display(),
+                target.display()
+            );
+            let status = std::process::Command::new("pwsh")
+                .args(["-NoProfile", "-Command", &command])
+                .status()
+                .expect("run junction command");
+            assert!(status.success(), "junction creation failed");
+        }
+    }
+
+    #[tokio::test]
+    async fn plugin_rejects_symlink() {
+        let root = unique_temp_dir("plugin-symlink-zip");
+        std::fs::create_dir_all(&root).expect("create root");
+
+        let err = unpack_plugin_zip(build_symlink_zip_bytes(), root.clone())
+            .await
+            .expect_err("symlink zip entry must be rejected");
+        assert!(err.to_string().contains("Symlink zip entry rejected"));
+
+        cleanup_dir(&root);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn plugin_rejects_outside_canonical_root() {
+        let root = unique_temp_dir("plugin-symlink-traversal");
+        let linked_root = root.join("demo-plugin").join("linked");
+        let outside = unique_temp_dir("plugin-symlink-outside");
+        std::fs::create_dir_all(&outside).expect("create outside root");
+        std::fs::create_dir_all(linked_root.parent().expect("parent")).expect("create parent");
+        create_dir_link(&linked_root, &outside);
+
+        let err = unpack_plugin_zip(build_nested_zip_bytes(), root.clone())
+            .await
+            .expect_err("symlink traversal must be rejected");
+        assert!(err.to_string().contains("Symlink path rejected"));
+
+        cleanup_dir(&root);
+        cleanup_dir(&outside);
+    }
 }

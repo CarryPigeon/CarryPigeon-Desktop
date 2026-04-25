@@ -85,7 +85,8 @@ pub struct DbTransactionRequest {
 /// 初始化数据库连接的请求参数。
 ///
 /// # 说明
-/// - `path` 为空时会自动落到项目根目录下的默认路径（`data/db/{key}.db`）。
+/// - `key` 仅接受应用内管理的逻辑命名（如 `system` 或 `server_<sha256>`）。
+/// - `path` 由后端内部推导；若外部传入则直接拒绝。
 /// - `kind` 用于决定初始化迁移（system/server），详见 `run_migrations`。
 pub struct DbInitRequest {
     /// 数据库连接 key（逻辑命名）。
@@ -135,30 +136,56 @@ impl StatementBuilder for RawStatement {
     }
 }
 
-fn sanitize_key(key: &str) -> String {
-    let mut out = String::with_capacity(key.len());
-    for ch in key.chars() {
-        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-            out.push(ch);
-        } else {
-            out.push('_');
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ManagedDbKind {
+    System,
+    Server,
+}
+
+impl ManagedDbKind {
+    fn parse(raw: Option<&str>) -> CommandResult<Self> {
+        let kind = raw.map(str::trim).unwrap_or("").to_lowercase();
+        match kind.as_str() {
+            "system" => Ok(Self::System),
+            "server" => Ok(Self::Server),
+            _ => Err(command_error(
+                "DB_KIND_INVALID",
+                "kind must be either system or server",
+            )),
         }
     }
-    if out.is_empty() {
-        "default".to_string()
-    } else {
-        out
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::Server => "server",
+        }
     }
 }
 
-fn default_db_path(key: &str) -> PathBuf {
-    let safe = sanitize_key(key);
-    let mut base = base_db_dir();
-    base.push(format!("{}.db", safe));
-    base
+fn is_server_db_key(key: &str) -> bool {
+    let Some(hash) = key.strip_prefix("server_") else {
+        return false;
+    };
+    hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit())
 }
 
-fn base_db_dir() -> PathBuf {
+fn validate_managed_db_key(key: &str, kind: ManagedDbKind) -> CommandResult<()> {
+    let valid = match kind {
+        ManagedDbKind::System => key == "system",
+        ManagedDbKind::Server => is_server_db_key(key),
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(command_error(
+            "DB_KEY_INVALID",
+            format!("invalid {} db key", kind.as_str()),
+        ))
+    }
+}
+
+fn managed_db_root() -> PathBuf {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let parent = cwd
         .file_name()
@@ -168,6 +195,18 @@ fn base_db_dir() -> PathBuf {
         .flatten();
     let root = parent.unwrap_or(cwd);
     root.join("data").join("db")
+}
+
+fn managed_db_path(key: &str) -> PathBuf {
+    managed_db_root().join(format!("{key}.db"))
+}
+
+fn is_managed_db_path(path: &Path) -> bool {
+    let root = managed_db_root();
+    match (path.canonicalize(), root.canonicalize()) {
+        (Ok(path), Ok(root)) => path.starts_with(root),
+        _ => path.starts_with(root),
+    }
 }
 
 async fn ensure_parent_dir(path: &Path) -> anyhow::Result<()> {
@@ -235,17 +274,24 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
         return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
 
-    let path = req
-        .path
-        .map(PathBuf::from)
-        .unwrap_or_else(|| default_db_path(&req.key));
+    if req.path.is_some() {
+        return Err(command_error(
+            "DB_PATH_NOT_ALLOWED",
+            "database path is derived internally",
+        ));
+    }
+
+    let kind = ManagedDbKind::parse(req.kind.as_deref())?;
+    validate_managed_db_key(&req.key, kind)?;
+
+    let path = managed_db_path(&req.key);
     ensure_parent_dir(&path)
         .await
         .map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", e))?;
     connect_named(&req.key, path)
         .await
         .map_err(|e| to_command_error("DB_CONNECT_FAILED", e))?;
-    run_migrations(&req.key, req.kind.as_deref())
+    run_migrations(&req.key, kind)
         .await
         .map_err(|e| to_command_error("DB_MIGRATE_FAILED", e))
 }
@@ -389,10 +435,24 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
         return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
 
+    let kind = if key == "system" {
+        ManagedDbKind::System
+    } else {
+        ManagedDbKind::Server
+    };
+    validate_managed_db_key(&key, kind)?;
+
     let path = remove_db(&key)
         .await
         .map_err(|e| to_command_error("DB_REMOVE_FAILED", e))?
-        .unwrap_or_else(|| default_db_path(&key));
+        .unwrap_or_else(|| managed_db_path(&key));
+
+    if !is_managed_db_path(&path) {
+        return Err(command_error(
+            "DB_PATH_OUTSIDE_ROOT",
+            "database path must stay under the managed db root",
+        ));
+    }
 
     if tokio::fs::metadata(&path).await.is_ok() {
         tokio::fs::remove_file(&path)
@@ -419,9 +479,16 @@ pub async fn db_path(key: String) -> CommandResult<String> {
     if key.trim().is_empty() {
         return Err(command_error("DB_KEY_REQUIRED", "key is required"));
     }
+    let kind = if key == "system" {
+        ManagedDbKind::System
+    } else {
+        ManagedDbKind::Server
+    };
+    validate_managed_db_key(&key, kind)?;
+
     let path = match get_entry_path(&key).await {
         Ok(path) => path,
-        Err(_) => default_db_path(&key),
+        Err(_) => managed_db_path(&key),
     };
     Ok(path.to_string_lossy().to_string())
 }
@@ -545,21 +612,13 @@ async fn fetch_applied_versions(conn: &sea_orm::DatabaseConnection) -> anyhow::R
     Ok(versions)
 }
 
-async fn run_migrations(key: &str, kind: Option<&str>) -> anyhow::Result<()> {
+async fn run_migrations(key: &str, kind: ManagedDbKind) -> anyhow::Result<()> {
     let db = get_db(key).await.context("DB_MIGRATIONS_DB_GET_FAILED")?;
     let conn = &db.connection;
     ensure_migrations_table(conn).await?;
     let applied = fetch_applied_versions(conn).await?;
 
-    let kind = kind.map(|v| v.trim().to_lowercase()).unwrap_or_else(|| {
-        if key == "system" {
-            "system".to_string()
-        } else {
-            "server".to_string()
-        }
-    });
-
-    let migrations = if kind == "system" {
+    let migrations = if kind == ManagedDbKind::System {
         system_migrations()
     } else {
         server_migrations()
@@ -597,4 +656,125 @@ async fn run_migrations(key: &str, kind: Option<&str>) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+        TEST_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("test lock")
+    }
+
+    fn test_temp_dir() -> PathBuf {
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_millis();
+        std::env::temp_dir().join(format!("carrypigeon-db-test-{millis}"))
+    }
+
+    fn unique_server_key() -> String {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let hash = format!("{nanos:064x}");
+        format!("server_{hash}")
+    }
+
+    #[tokio::test]
+    async fn db_init_uses_managed_path_for_system_db() {
+        let _guard = test_lock();
+        let prev = std::env::current_dir().expect("cwd");
+        let dir = test_temp_dir();
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::env::set_current_dir(&dir).expect("set cwd");
+
+        db_init(DbInitRequest {
+            key: "system".to_string(),
+            path: None,
+            kind: Some("system".to_string()),
+        })
+        .await
+        .expect("init system db");
+
+        let expected = dir.join("data").join("db").join("system.db");
+        assert!(expected.exists(), "managed db file should be created");
+
+        db_remove("system".to_string()).await.expect("remove system db");
+        assert!(!expected.exists(), "managed db file should be removed");
+
+        std::env::set_current_dir(prev).expect("restore cwd");
+    }
+
+    #[tokio::test]
+    async fn db_init_rejects_custom_path_and_invalid_kind() {
+        let _guard = test_lock();
+        let prev = std::env::current_dir().expect("cwd");
+        let dir = test_temp_dir();
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::env::set_current_dir(&dir).expect("set cwd");
+
+        let custom_path = dir.join("escape.db").to_string_lossy().to_string();
+        let err = db_init(DbInitRequest {
+            key: "system".to_string(),
+            path: Some(custom_path),
+            kind: Some("system".to_string()),
+        })
+        .await
+        .expect_err("custom path must be rejected");
+        assert!(err.contains("DB_PATH_NOT_ALLOWED"));
+
+        let err = db_init(DbInitRequest {
+            key: "system".to_string(),
+            path: None,
+            kind: Some("admin".to_string()),
+        })
+        .await
+        .expect_err("invalid kind must be rejected");
+        assert!(err.contains("DB_KIND_INVALID"));
+
+        let err = db_init(DbInitRequest {
+            key: "server_bad".to_string(),
+            path: None,
+            kind: Some("server".to_string()),
+        })
+        .await
+        .expect_err("invalid server key must be rejected");
+        assert!(err.contains("DB_KEY_INVALID"));
+
+        std::env::set_current_dir(prev).expect("restore cwd");
+    }
+
+    #[tokio::test]
+    async fn db_remove_rejects_outside_root_registry_paths() {
+        let _guard = test_lock();
+        let prev = std::env::current_dir().expect("cwd");
+        let dir = test_temp_dir();
+        let outside = dir.join("outside-root");
+        std::fs::create_dir_all(&outside).expect("outside dir");
+        std::env::set_current_dir(&dir).expect("set cwd");
+
+        let key = unique_server_key();
+        let unsafe_path = outside.join("server.db");
+        connect_named(&key, unsafe_path.clone())
+            .await
+            .expect("connect unsafe db");
+
+        let err = db_remove(key.clone())
+            .await
+            .expect_err("outside-root db must be rejected");
+        assert!(err.contains("DB_PATH_OUTSIDE_ROOT"));
+        assert!(unsafe_path.exists(), "outside-root file must not be deleted");
+
+        std::env::set_current_dir(prev).expect("restore cwd");
+    }
 }

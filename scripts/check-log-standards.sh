@@ -2,14 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-FRONTEND_DIR="$ROOT_DIR/src"
+FRONTEND_DIR="src"
 
 cd "$ROOT_DIR"
 
 fail=0
 
 echo "[check-log-standards] 1/3 scanning direct console usage..."
-if rg -n "console\.(debug|info|warn|error|log)\(" "$FRONTEND_DIR" --glob '!src/shared/utils/logger.ts'; then
+if grep -RInE "console\.(debug|info|warn|error|log)\(" "$FRONTEND_DIR" --exclude='logger.ts'; then
   echo "[check-log-standards] ❌ direct console usage found; use createLogger(scope)"
   fail=1
 else
@@ -17,7 +17,7 @@ else
 fi
 
 echo "[check-log-standards] 2/3 scanning Action message format..."
-if rg --pcre2 -n "\b(?:tauriLog|(?:this\.)?logger|deps\.logger)\.(?:debug|info|warn|error)\(\s*['\"](?!Action:\s*[a-z0-9]+(?:_[a-z0-9]+)*['\"])" "$FRONTEND_DIR"; then
+if grep -RInE '(^|[^[:alnum:]_])(tauriLog|((this\.)?logger)|deps\.logger)\.(debug|info|warn|error)\(' "$FRONTEND_DIR" | grep -vE "Action:[[:space:]]*[a-z0-9]+(_[a-z0-9]+)*"; then
   echo "[check-log-standards] ❌ logger message must be: Action: <snake_case>"
   fail=1
 else
@@ -32,7 +32,7 @@ while IFS= read -r line; do
     echo "$line"
     action_prefix_failed=1
   fi
-done < <(rg --no-heading -n "Action:\s*[a-z0-9_]+" "$FRONTEND_DIR" -S)
+done < <(grep -RInE "Action:[[:space:]]*[a-z0-9_]+" "$FRONTEND_DIR")
 
 if [[ "$action_prefix_failed" -ne 0 ]]; then
   echo "[check-log-standards] ❌ Action must use layered prefix: <domain>_<subdomain>_..."

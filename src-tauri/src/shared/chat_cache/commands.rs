@@ -136,13 +136,13 @@ async fn db() -> Result<Arc<sea_orm::DatabaseConnection>> {
     Ok(conn)
 }
 
-fn master_key(create_if_missing: bool) -> Result<[u8; 32]> {
+fn master_key(create_if_missing: bool) -> Result<Option<[u8; 32]>> {
     let cell = CHAT_CACHE_MASTER_KEY.get_or_init(|| Mutex::new(None));
     if let Some(key) = *cell
         .lock()
         .map_err(|_| anyhow::anyhow!("Failed to lock chat cache master key"))?
     {
-        return Ok(key);
+        return Ok(Some(key));
     }
     let entry = Entry::new(SERVICE, ACCOUNT)?;
     match entry.get_password() {
@@ -154,9 +154,9 @@ fn master_key(create_if_missing: bool) -> Result<[u8; 32]> {
             if let Ok(mut guard) = cell.lock() {
                 *guard = Some(key);
             }
-            Ok(key)
+            Ok(Some(key))
         }
-        Err(_) if create_if_missing => {
+        Err(_err) if create_if_missing => {
             let mut key = [0u8; 32];
             getrandom::fill(&mut key)
                 .map_err(|_| anyhow::anyhow!("Failed to generate chat cache master key"))?;
@@ -166,10 +166,17 @@ fn master_key(create_if_missing: bool) -> Result<[u8; 32]> {
             if let Ok(mut guard) = cell.lock() {
                 *guard = Some(key);
             }
-            Ok(key)
+            Ok(Some(key))
         }
+        Err(err) if is_missing_master_key_error_message(&err.to_string()) => Ok(None),
         Err(err) => Err(err.into()),
     }
+}
+
+fn is_missing_master_key_error_message(message: &str) -> bool {
+    message.contains("not found")
+        || message.contains("NoEntry")
+        || message.contains("No matching entry found in secure storage")
 }
 
 fn clear_master_key_cache() {
@@ -258,7 +265,9 @@ pub async fn chat_cache_load_all() -> CommandResult<HashMap<String, String>> {
     if rows.is_empty() {
         return Ok(HashMap::new());
     }
-    let key_bytes = master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))?;
+    let Some(key_bytes) = master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))? else {
+        return Ok(HashMap::new());
+    };
     let mut out = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         let key = row
@@ -346,7 +355,9 @@ pub async fn chat_cache_get(key: String) -> CommandResult<Option<String>> {
     if nonce_hex.is_empty() || value_hex.is_empty() {
         return Ok(None);
     }
-    let key_bytes = master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))?;
+    let Some(key_bytes) = master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))? else {
+        return Ok(None);
+    };
     let value = decrypt_value(&key_bytes, &nonce_hex, &value_hex)
         .map_err(|e| to_command_error("CHAT_CACHE_DECRYPT_FAILED", e))?;
     Ok(Some(value))
@@ -364,7 +375,12 @@ pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
     if key.is_empty() {
         return Err(command_error("CHAT_CACHE_KEY_REQUIRED", "key is required"));
     }
-    let key_bytes = master_key(true).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))?;
+    let Some(key_bytes) = master_key(true).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))? else {
+        return Err(command_error(
+            "CHAT_CACHE_KEY_FAILED",
+            "secure storage master key is unavailable",
+        ));
+    };
     let (nonce_hex, value_hex) = encrypt_value(&key_bytes, &req.value)
         .map_err(|e| to_command_error("CHAT_CACHE_ENCRYPT_FAILED", e))?;
     let txn = conn
@@ -514,6 +530,71 @@ mod tests {
 
         let after = chat_cache_load_all().await.expect("load after clear");
         assert!(after.is_empty());
+
+        reset_test_state();
+        std::env::set_current_dir(prev).expect("restore cwd");
+    }
+
+    #[tokio::test]
+    async fn load_all_treats_missing_master_key_as_empty_cache() {
+        let _guard = test_lock();
+        let prev = std::env::current_dir().expect("cwd");
+        let dir = test_temp_dir();
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        reset_test_state();
+        std::env::set_current_dir(&dir).expect("set cwd");
+
+        chat_cache_put(ChatCachePutRequest {
+            key: "chat-cache-missing-key-test".to_string(),
+            value: "secret message".to_string(),
+        })
+        .await
+        .expect("put");
+
+        reset_test_state();
+        let loaded = chat_cache_load_all().await.expect("load after missing key");
+        assert!(loaded.is_empty());
+
+        chat_cache_put(ChatCachePutRequest {
+            key: "chat-cache-missing-key-test".to_string(),
+            value: "secret message 2".to_string(),
+        })
+        .await
+        .expect("put after missing key");
+
+        let loaded_after_recovery = chat_cache_load_all().await.expect("load after recovery");
+        assert_eq!(
+            loaded_after_recovery
+                .get("chat-cache-missing-key-test")
+                .map(String::as_str),
+            Some("secret message 2")
+        );
+
+        reset_test_state();
+        std::env::set_current_dir(prev).expect("restore cwd");
+    }
+
+    #[tokio::test]
+    async fn get_treats_missing_master_key_as_missing_value() {
+        let _guard = test_lock();
+        let prev = std::env::current_dir().expect("cwd");
+        let dir = test_temp_dir();
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        reset_test_state();
+        std::env::set_current_dir(&dir).expect("set cwd");
+
+        chat_cache_put(ChatCachePutRequest {
+            key: "chat-cache-missing-key-get-test".to_string(),
+            value: "secret message".to_string(),
+        })
+        .await
+        .expect("put");
+
+        reset_test_state();
+        let loaded = chat_cache_get("chat-cache-missing-key-get-test".to_string())
+            .await
+            .expect("get after missing key");
+        assert!(loaded.is_none());
 
         reset_test_state();
         std::env::set_current_dir(prev).expect("restore cwd");

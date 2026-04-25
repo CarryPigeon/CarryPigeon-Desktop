@@ -54,12 +54,14 @@ export function createTcpRequestResponseSender(deps: CreateTcpRequestResponseSen
         }
       };
 
-      const failAndCleanup = (error: unknown, actionMessage: string): void => {
+      const failAndCleanup = (error: unknown): void => {
         clearCallbackTimeout();
         if (requestContext.callbackId !== -1) {
           deps.callbackRegistry.remove(requestContext.callbackId);
         }
-        tauriLog.error(actionMessage, { error: String(error) });
+        tauriLog.error("Action: network_tcp_send_with_response_failed", {
+          error: String(error),
+        });
         settleReject(error);
       };
 
@@ -85,7 +87,10 @@ export function createTcpRequestResponseSender(deps: CreateTcpRequestResponseSen
       try {
         payload = JSON.parse(rawData) as Record<string, unknown>;
       } catch (error) {
-        failAndCleanup(error, "Action: network_tcp_send_with_response_payload_invalid_json");
+        tauriLog.error("Action: network_tcp_send_with_response_payload_invalid_json", {
+          error: String(error),
+        });
+        failAndCleanup(error);
         return;
       }
 
@@ -96,7 +101,7 @@ export function createTcpRequestResponseSender(deps: CreateTcpRequestResponseSen
           invokeTauri(TAURI_COMMANDS.sendTcpService, { serverSocket, data: Array.from(data) }),
         )
         .catch((error) => {
-          failAndCleanup(error, "Action: network_tcp_send_with_response_failed");
+          failAndCleanup(error);
         });
     });
   };

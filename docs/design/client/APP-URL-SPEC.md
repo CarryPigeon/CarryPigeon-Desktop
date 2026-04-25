@@ -11,6 +11,7 @@
 - Scheme：`app://`
 - 插件资源根：`app://plugins/`
 - URL 作为“资源定位符”，应与本地安装目录一一对应（见 `docs/design/client/PLUGIN-PACKAGE-STRUCTURE.md`）。
+- 宿主的 CSP baseline 需要保留 `app:` 以及当前服务器 origin 的加载能力，否则这些 URL 无法正常解析。
 
 标准形态：
 ```
@@ -22,6 +23,10 @@ app://plugins/<server_id>/<plugin_id>/<version>/<path>
 - `<plugin_id>`：插件唯一标识（来自 manifest）
 - `<version>`：插件版本（SemVer 字符串）
 - `<path>`：插件包内相对路径（例如 `index.js`、`assets/icon.png`）
+
+安全约定：
+- 该 URL 只描述本地已安装插件的资源定位，不承载远端下载语义。
+- 解析结果必须始终落在当前 `server_id/plugin_id/version` 根下，不能借助路径规范化逃逸到别的插件版本或宿主目录。
 
 ---
 
@@ -47,6 +52,7 @@ app://plugins/<server_id>/<plugin_id>/<version>/<path>
 `<path>` 必须是相对路径：
 - 不得以 `/` 开头
 - 不得包含协议前缀（如 `http:`、`app:`）
+- 不得包含会穿越目录边界的片段，解析后必须仍在插件版本根内。
 
 ### 3.2 路径分隔符
 - 插件包内路径分隔符统一使用 `/`（即使底层文件系统为 Windows）
@@ -89,6 +95,8 @@ app://plugins/<server_id>/<plugin_id>/<version>/<entry>
 
 ### 5.2 可选：宿主 API `getAssetUrl(relativePath)`
 宿主可提供 `getAssetUrl("assets/icon.png")`，返回对应 `app://...` URL（见 `docs/design/client/PLUGIN-PACKAGE-STRUCTURE.md`）。
+
+宿主返回的 URL 也必须通过同一 canonical root 校验，不能把插件资产指向别的 server 或未安装版本。
 
 ---
 

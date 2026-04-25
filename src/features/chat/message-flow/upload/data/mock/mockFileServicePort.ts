@@ -38,7 +38,12 @@ export const mockFileServicePort: FileServicePort = {
     };
   },
 
-  async performUpload(upload: UploadDescriptor, body: Blob | ArrayBuffer | Uint8Array): Promise<void> {
+  async performUpload(
+    serverSocket: string,
+    upload: UploadDescriptor,
+    body: Blob | ArrayBuffer | Uint8Array,
+  ): Promise<void> {
+    void serverSocket;
     void upload;
     void body;
     await sleep(MOCK_LATENCY_MS);

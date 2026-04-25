@@ -43,7 +43,7 @@ type PatchbayMessageContextMenuRawModel = {
   x: RefLike<number>;
   y: RefLike<number>;
   close(): void;
-  handleAction(action: "copy" | "reply" | "delete" | "forward"): void;
+  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -150,7 +150,7 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   x: RefLike<number>;
   y: RefLike<number>;
   close(): void;
-  handleAction(action: "copy" | "reply" | "delete" | "forward"): void;
+  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward"): void;
 };
 
 /**
@@ -164,7 +164,7 @@ export function createPatchbayMessageContextMenuSection(
     x: deps.x,
     y: deps.y,
     close: deps.close,
-    handleAction: deps.handleAction,
+    handleMenuCommand: deps.handleMenuCommand,
   });
 }
 

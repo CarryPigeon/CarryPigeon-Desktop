@@ -32,6 +32,9 @@
 - `request_id`：服务端生成的请求 id（用于链路追踪；可选但强烈建议）
 - `details`：可选扩展细节（字段错误、缺失插件列表等）
 
+实现约定：
+- `request_id` 可以进入结构化日志，但错误体里的敏感字段仍要保持脱敏，尤其是 token、凭证 header、文件上传凭据。
+
 ## 3. WS 错误结构（字段子集）
 
 WS `command.err` 的 `error` 字段应与 HTTP `error` 结构保持一致（可省略 `request_id`）：
