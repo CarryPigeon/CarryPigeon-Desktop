@@ -10,6 +10,7 @@ import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import { rememberServerId } from "@/shared/serverIdentity";
 import { getServerTlsConfig } from "@/shared/net/tls/serverTlsConfigProvider";
 import type { TlsPolicy } from "@/shared/net/tls/tlsTypes";
+import { assertValidTlsFingerprint } from "@/shared/net/tls/tlsPolicyGuards";
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 
 const logger = createLogger("tauriTcpConnector");
@@ -56,18 +57,6 @@ function isExplicitNativeTransport(serverSocket: string): boolean {
 }
 
 /**
- * 将 TLS 指纹归一化为紧凑的 hex 字符串（去分隔符、转小写）。
- *
- * @param raw - 原始指纹字符串。
- * @returns 归一化后的 hex（小写、无分隔符）。
- */
-function normalizeTlsFingerprint(raw: string): string {
-  const s = String(raw ?? "").trim().toLowerCase();
-  if (!s) return "";
-  return s.replace(/[^0-9a-f]/g, "");
-}
-
-/**
  * 从 racks store 中解析某个 server socket 的 TLS 策略与指纹配置。
  *
  * @param serverSocketKey - 服务器 Socket 地址（作为 rack key）。
@@ -75,7 +64,7 @@ function normalizeTlsFingerprint(raw: string): string {
  */
 function resolveTlsConfig(serverSocketKey: string): TlsConfig {
   const tls = getServerTlsConfig(serverSocketKey);
-  return { tlsPolicy: tls.tlsPolicy, tlsFingerprint: normalizeTlsFingerprint(tls.tlsFingerprint) };
+  return { tlsPolicy: tls.tlsPolicy, tlsFingerprint: tls.tlsFingerprint };
 }
 
 /**
@@ -97,8 +86,7 @@ function toNativeConnectSocket(serverSocketKey: string, tlsPolicy: TlsPolicy, tl
   if (isExplicitNativeTransport(raw)) return raw;
 
   if (tlsPolicy === "trust_fingerprint") {
-    const fp = normalizeTlsFingerprint(tlsFingerprint);
-    if (fp.length !== 64) throw new Error("TLS fingerprint missing/invalid: must be SHA-256 (64 hex chars)");
+    const fp = assertValidTlsFingerprint(tlsFingerprint);
     const prefix = raw.toLowerCase().startsWith("socket://") ? raw.slice("socket://".length) : raw;
     return `tls-fp://${fp}@${prefix}`;
   }

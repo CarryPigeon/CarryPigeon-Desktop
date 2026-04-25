@@ -109,12 +109,8 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::network::di::commands::api_request_json,
             // db
             crate::shared::db::commands::db_init,
-            crate::shared::db::commands::db_execute,
-            crate::shared::db::commands::db_query,
-            crate::shared::db::commands::db_transaction,
             crate::shared::db::commands::db_close,
             crate::shared::db::commands::db_remove,
-            crate::shared::db::commands::db_path,
             crate::shared::chat_cache::commands::chat_cache_get,
             crate::shared::chat_cache::commands::chat_cache_load_all,
             crate::shared::chat_cache::commands::chat_cache_clear_all,
@@ -312,8 +308,12 @@ fn handle_app_scheme(
         .collect::<Vec<String>>()
         .join("/");
 
-    let file_path =
-        plugin_store::resolve_app_plugins_path(&server_id, &plugin_id, &version, &rel_path)?;
+    let file_path = plugin_store::resolve_app_plugins_canonical_file_path(
+        &server_id,
+        &plugin_id,
+        &version,
+        &rel_path,
+    )?;
     let bytes = std::fs::read(&file_path)
         .with_context(|| format!("Failed to read plugin file: {}", file_path.display()))?;
 

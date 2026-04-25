@@ -30,10 +30,15 @@ export interface FileServicePort {
   /**
    * 使用 upload descriptor 执行实际上传（两段式上传的第二段）。
    *
+   * @param serverSocket - 服务器 Socket 地址，用于推导期望 origin。
    * @param upload - upload descriptor。
    * @param body - 二进制载荷（Blob/ArrayBuffer/Uint8Array）。
    */
-  performUpload(upload: UploadDescriptor, body: Blob | ArrayBuffer | Uint8Array): Promise<void>;
+  performUpload(
+    serverSocket: string,
+    upload: UploadDescriptor,
+    body: Blob | ArrayBuffer | Uint8Array,
+  ): Promise<void>;
 
   /**
    * 构建 share key 对应的绝对下载 URL。

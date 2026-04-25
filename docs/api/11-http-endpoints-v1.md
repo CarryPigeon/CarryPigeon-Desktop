@@ -43,6 +43,7 @@
 - `server_id`：服务端稳定 UUID（客户端用于插件安装与缓存隔离）
 - `required_plugins`：required gate 列表（P0）
 - `avatar`：服务端头像相对路径（不得包含域名；客户端按 `https://{server_host}/{avatar}` 拼接）
+- 所有返回的相对路径都应解析到当前已连接服务器的同源 origin，客户端不得把它们重定向到其他 host。
 
 ### 2.2 required gate 预检查（用于 Required 向导的 “Recheck”）
 
@@ -593,6 +594,8 @@
 - 上传完成后，文件如何被“绑定到消息”（生成文件类 domain 消息）由插件定义（PRD 4.7 / 5.1）。
 - `share_key` 为下载与分享的稳定标识；客户端应通过 `GET /api/files/download/{share_key}` 下载文件（见 9.2）。
 - `share_key="server_avatar"` 为保留值：固定用于下载服务端头像（即 `GET /api/files/download/server_avatar`）。
+- 上传凭证返回的 `upload.url` 必须与当前服务器 origin 同源；客户端在 dispatch 前要拒绝跨 origin 的上传目标。
+- `upload.headers` 与上传 token 属于敏感信息，不应记录到普通日志或错误上报中。
 
 ### 9.2 获取下载信息
 
@@ -600,6 +603,7 @@
 >
 > - `share_key` 由上传后返回
 > - 返回为文件二进制（`Content-Type` 为文件类型；建议带 `Content-Disposition`）
+> - 该 URL 只对当前服务器 origin 有效，客户端不得复用到其他服务器或代理 origin。
 
 - 方法：`GET /api/files/download/{share_key}`
 - 鉴权：按服务端策略：

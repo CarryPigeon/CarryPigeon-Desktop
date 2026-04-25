@@ -36,11 +36,10 @@ for feature_dir in "$FEATURES_DIR"/*; do
 
   TARGET_FEATURES+=("$feature_name")
 
-  import_pattern="(?:from|import)[[:space:]]+[\"']@/features/$feature_name/"
+  import_pattern="(from|import)[[:space:]]+[\"']@/features/$feature_name/"
   matches="$(
-    rg -n "$import_pattern" "${SEARCH_ROOTS[@]}" \
-      --glob "!src/features/$feature_name/**" \
-      --pcre2 \
+    grep -RInE "$import_pattern" "${SEARCH_ROOTS[@]}" \
+      | grep -v "^src/features/$feature_name/" \
       || true
   )"
 
@@ -50,7 +49,7 @@ for feature_dir in "$FEATURES_DIR"/*; do
   allowed_suffix_pattern="${allowed_suffix_pattern%|}"
   forbidden="$(
     printf '%s\n' "$matches" \
-      | rg -v "@/features/$feature_name/($allowed_suffix_pattern)([\"']|$)" \
+      | grep -vE "@/features/$feature_name/($allowed_suffix_pattern)([\"']|$)" \
       || true
   )"
 

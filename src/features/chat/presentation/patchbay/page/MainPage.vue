@@ -64,7 +64,7 @@ const page = usePatchbayPageModel();
       :x="page.messageContextMenu.x"
       :y="page.messageContextMenu.y"
       @close="page.messageContextMenu.close"
-      @action="page.messageContextMenu.handleAction"
+        @action="page.messageContextMenu.handleMenuCommand"
     />
 
     <ChannelSettingsMenu

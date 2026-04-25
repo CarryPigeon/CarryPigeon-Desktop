@@ -4,52 +4,9 @@
  */
 import { TAURI_COMMANDS } from "./commands";
 import { invokeTauri } from "./invokeClient";
+import { buildMessage, type LogMeta } from "./tauriLogCore";
 
-type LogMeta = Record<string, unknown>;
-
-/**
- * 将结构化元信息序列化为日志字符串片段。
- *
- * @param meta - 可选结构化元信息。
- * @returns 以空格开头的 JSON 字符串；当 meta 不存在时返回空字符串。
- */
-function formatMeta(meta?: LogMeta): string {
-  if (!meta) return "";
-  try {
-    return ` ${JSON.stringify(meta)}`;
-  } catch {
-    return " [meta_unserializable]";
-  }
-}
-
-/**
- * 将任意 message 归一化为 `Action: <snake_case>`。
- *
- * @param message - 原始日志消息。
- * @returns 归一化后的动作消息。
- */
-function normalizeActionMessage(message: string): string {
-  const trimmed = message.trim();
-  const noPrefix = trimmed.replace(/^Action:\s*/i, "");
-  const withWordBoundary = noPrefix.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
-  const snake = withWordBoundary
-    .replace(/[^a-zA-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .replace(/_+/g, "_")
-    .toLowerCase();
-  return `Action: ${snake || "unknown_action"}`;
-}
-
-/**
- * 组合规范化动作消息与结构化元信息。
- *
- * @param message - 原始日志消息。
- * @param meta - 可选结构化元信息。
- * @returns 最终写入 Rust 侧的日志文本。
- */
-function buildMessage(message: string, meta?: LogMeta): string {
-  return `${normalizeActionMessage(message)}${formatMeta(meta)}`;
-}
+export type { LogMeta } from "./tauriLogCore";
 
 /**
  * 尽力而为（best-effort）地调用 Rust 侧命令。

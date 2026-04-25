@@ -2,7 +2,7 @@
 //!
 //! 说明：
 //! - 同源下载需要继承“自签/指纹”TLS 策略，因此必须使用 `server_client`；
-//! - 跨域下载使用默认 client，避免把“放宽 TLS”扩大到不受控的域名。
+//! - 跨域插件包下载默认拒绝，避免把安装信任面扩大到不受控的域名。
 
 use anyhow::Context;
 
@@ -13,24 +13,25 @@ pub(super) fn is_same_origin(a: &reqwest::Url, b: &reqwest::Url) -> bool {
     a.scheme() == b.scheme() && a.host_str() == b.host_str() && port_suffix(a) == port_suffix(b)
 }
 
-/// 下载插件 zip 字节（同源使用 server client；跨域使用默认 client）。
+/// 下载插件 zip 字节（仅允许同源）。
 pub(super) async fn download_plugin_zip_bytes(
     base: &reqwest::Url,
     server_client: &reqwest::Client,
     download_url: reqwest::Url,
 ) -> anyhow::Result<Vec<u8>> {
-    Ok((if is_same_origin(&download_url, base) {
-        server_client.get(download_url)
-    } else {
-        reqwest::Client::new().get(download_url)
-    })
-    .send()
-    .await
-    .context("Failed to download plugin zip")?
-    .error_for_status()
-    .context("Plugin download returned an error status")?
-    .bytes()
-    .await
-    .context("Failed to read plugin zip bytes")?
-    .to_vec())
+    if !is_same_origin(&download_url, base) {
+        return Err(anyhow::anyhow!("Cross-origin plugin download rejected by default"));
+    }
+
+    Ok(server_client
+        .get(download_url)
+        .send()
+        .await
+        .context("Failed to download plugin zip")?
+        .error_for_status()
+        .context("Plugin download returned an error status")?
+        .bytes()
+        .await
+        .context("Failed to read plugin zip bytes")?
+        .to_vec())
 }

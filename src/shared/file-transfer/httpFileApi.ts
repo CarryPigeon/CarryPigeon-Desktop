@@ -13,6 +13,7 @@
 import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
+import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 
 /**
  * 请求文件上传的参数。
@@ -84,17 +85,19 @@ export async function httpRequestFileUpload(
  * @returns Promise<void>。
  */
 export async function httpPerformFileUpload(
+  serverSocket: string,
   upload: ApiUploadDescriptor,
   body: Blob | ArrayBuffer | Uint8Array,
 ): Promise<void> {
   if (USE_MOCK_TRANSPORT) {
+    void serverSocket;
     void upload;
     void body;
     return;
   }
   const method = String(upload?.method ?? "PUT").trim().toUpperCase() || "PUT";
-  const url = String(upload?.url ?? "").trim();
-  if (!url) throw new Error("Missing upload.url");
+  const url = resolveUploadUrl(serverSocket, upload?.url ?? "");
+  if (!url) throw new Error("Invalid upload.url");
 
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(upload?.headers ?? {})) headers[k] = String(v);
@@ -123,6 +126,30 @@ export async function httpPerformFileUpload(
     body: toFetchBody(body),
   });
   if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`);
+}
+
+/**
+ * 解析并约束 upload URL 到期望的 server origin。
+ *
+ * 规则：
+ * - 相对 URL 会确定性地解析为 `expectedOrigin` 下的绝对 URL；
+ * - 绝对 URL 只有在 origin 与 `expectedOrigin` 完全一致时才允许；
+ * - 其它情况一律拒绝。
+ *
+ * @param serverSocket - 服务端 socket，用于推导期望 origin。
+ * @param uploadUrl - 服务端返回的 upload URL。
+ * @returns 允许的绝对 URL；不符合约束时返回空字符串。
+ */
+export function resolveUploadUrl(serverSocket: string, uploadUrl: string): string {
+  const expectedOrigin = toHttpOrigin(serverSocket);
+  const rawUrl = String(uploadUrl ?? "").trim();
+  if (!expectedOrigin || !rawUrl) return "";
+  try {
+    const resolved = new URL(rawUrl, expectedOrigin);
+    return resolved.origin === expectedOrigin ? resolved.href : "";
+  } catch {
+    return "";
+  }
 }
 
 export { buildFileDownloadUrl };

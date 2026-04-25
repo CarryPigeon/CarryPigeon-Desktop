@@ -89,7 +89,7 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
     // 第 2 步：执行实际上传
     task.progress = 50;
     const buffer = await file.arrayBuffer();
-    await fileService.performUpload(result.upload, buffer);
+    await fileService.performUpload(socket, result.upload, buffer);
 
     task.progress = 100;
     task.status = "success";

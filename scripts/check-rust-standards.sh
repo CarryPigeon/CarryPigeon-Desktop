@@ -2,14 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TARGET_DIR="$ROOT_DIR/src-tauri/src"
+TARGET_DIR="src-tauri/src"
 
 cd "$ROOT_DIR"
 
 fail=0
 
 echo "[check-rust-standards] 1/7 scanning panic-prone patterns..."
-if rg -n "unwrap\(|expect\(|panic!|todo!|unimplemented!|println!|eprintln!|dbg!" "$TARGET_DIR"; then
+if grep -RInE "unwrap\(|expect\(|panic!|todo!|unimplemented!|println!|eprintln!|dbg!" "$TARGET_DIR"; then
   echo "[check-rust-standards] ❌ found forbidden patterns in Rust source"
   fail=1
 else
@@ -44,7 +44,7 @@ while IFS= read -r file; do
   ' "$file"; then
     command_style_failed=1
   fi
-done < <(rg --files "$TARGET_DIR" | rg '\.rs$')
+done < <(git ls-files "$TARGET_DIR" -- '*.rs')
 
 if [[ "$command_style_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ tauri command should use CommandResult<T>"
@@ -54,7 +54,7 @@ else
 fi
 
 echo "[check-rust-standards] 3/7 scanning bare Result<_, String> usage..."
-if rg -n "Result<[^\n>]+,\s*String>" "$TARGET_DIR" | rg -v "src-tauri/src/shared/error/mod.rs"; then
+if grep -RInE "Result<[^>]+,[[:space:]]*String>" "$TARGET_DIR" | grep -v "src-tauri/src/shared/error/mod.rs"; then
   echo "[check-rust-standards] ❌ found bare Result<_, String>; use anyhow::Result or CommandResult<T>"
   fail=1
 else
@@ -62,7 +62,7 @@ else
 fi
 
 echo "[check-rust-standards] 4/7 scanning generic plugin error code..."
-if rg -n "PLUGINS_COMMAND_FAILED" "$TARGET_DIR"; then
+if grep -RInE "PLUGINS_COMMAND_FAILED" "$TARGET_DIR"; then
   echo "[check-rust-standards] ❌ found generic plugin error code; use per-command code"
   fail=1
 else
@@ -108,7 +108,7 @@ while IFS= read -r file; do
   ' "$file"; then
     action_style_failed=1
   fi
-done < <(rg --files "$TARGET_DIR" | rg '\.rs$')
+done < <(git ls-files "$TARGET_DIR" -- '*.rs')
 
 if [[ "$action_style_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ tracing logs must include action field"
@@ -125,7 +125,7 @@ while IFS= read -r line; do
     echo "$line"
     action_prefix_failed=1
   fi
-done < <(rg --no-heading -n 'action\s*=\s*"[a-z0-9_]+"' "$TARGET_DIR")
+done < <(grep -RInE 'action[[:space:]]*=[[:space:]]*"[a-z0-9_]+' "$TARGET_DIR")
 
 if [[ "$action_prefix_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ tracing action should use layered prefix"

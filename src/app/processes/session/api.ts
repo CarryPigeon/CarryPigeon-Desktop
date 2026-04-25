@@ -80,7 +80,7 @@ async function restoreCurrentUserFromSession(router: Router, serverSocket: strin
           uid: nextCurrentUser.id,
         });
       } catch (error) {
-        logger.warn("Action: app_session_auth_session_write_failed", {
+        logger.warn("Action: auth_session_write_failed", {
           serverSocket,
           error: String(error),
         });
@@ -101,7 +101,7 @@ async function restoreCurrentUserFromSession(router: Router, serverSocket: strin
       try {
         await writeAuthSession(serverSocket, null);
       } catch (error) {
-        logger.warn("Action: app_session_auth_session_clear_failed", {
+        logger.warn("Action: auth_session_clear_failed", {
           serverSocket,
           error: String(error),
         });

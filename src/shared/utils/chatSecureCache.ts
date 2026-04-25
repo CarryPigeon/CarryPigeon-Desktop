@@ -10,6 +10,7 @@ import {
   KEY_LAST_EVENT_ID_PREFIX,
   KEY_SERVER_ID_BY_SOCKET,
 } from "@/shared/utils/storageKeys";
+import { createLogger } from "@/shared/utils/logger";
 
 type SecureChatCacheKey =
   | `${typeof KEY_AUTH_SESSION_PREFIX}${string}`
@@ -24,13 +25,7 @@ let readyPromise: Promise<void> | null = null;
 let ready = false;
 const trustedKeyReads = new Set<string>();
 const hydrationHandlers = new Set<SecureChatCacheEntryHandler>();
-
-function logSecureChatCacheFailure(action: string, key: string, error: unknown): void {
-  console.error(action, {
-    key,
-    error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
-  });
-}
+const logger = createLogger("chatSecureCache");
 
 function isTrustedSecureChatCacheKey(key: string): key is SecureChatCacheKey {
   return (
@@ -91,7 +86,7 @@ async function invokeSecureChatCacheCommand<T>(command: string, payload?: Record
       if (attempt === 0) continue;
     }
   }
-  console.error("Action: secure_chat_cache_command_failed", {
+  logger.error("Action: chat_secure_cache_command_failed", {
     command,
     key: typeof payload?.key === "string" ? payload.key : undefined,
     error: lastError instanceof Error ? lastError.message : String(lastError ?? "unknown_error"),
@@ -145,7 +140,10 @@ async function persistEntries(entries: Array<[string, string]>): Promise<Array<[
     const item = settled[i];
     if (item?.status === "rejected") {
       const entry = entries[i]!;
-      console.error("Action: secure_chat_cache_import_failed", { key: entry[0], error: String(item.reason) });
+      logger.error("Action: chat_secure_cache_import_failed", {
+        key: entry[0],
+        error: String(item.reason),
+      });
       failed.push(entry);
     }
   }
@@ -197,7 +195,7 @@ export async function ensureSecureChatCacheReady(): Promise<void> {
         }
       }
       if (failedImports.length > 0) {
-        console.error("Action: secure_chat_cache_import_partial_failure", {
+        logger.error("Action: chat_secure_cache_import_partial_failure", {
           failedKeys: failedImports.map(([key]) => key),
         });
       }
@@ -245,7 +243,10 @@ export function setSecureChatCacheValueSync(key: string, value: string): void {
   const next = String(value ?? "");
   cache.set(trustedKey, next);
   void persistSecureChatCachePut(trustedKey, next).catch((error) => {
-    logSecureChatCacheFailure("Action: secure_chat_cache_put_failed", trustedKey, error);
+    logger.error("Action: chat_secure_cache_put_failed", {
+      key: trustedKey,
+      error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
+    });
   });
 }
 
@@ -263,7 +264,10 @@ export function removeSecureChatCacheValueSync(key: string): void {
   const trustedKey = assertTrustedSecureChatCacheKey(key);
   cache.delete(trustedKey);
   void persistSecureChatCacheRemove(trustedKey).catch((error) => {
-    logSecureChatCacheFailure("Action: secure_chat_cache_remove_failed", trustedKey, error);
+    logger.error("Action: chat_secure_cache_remove_failed", {
+      key: trustedKey,
+      error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
+    });
   });
 }
 
@@ -281,7 +285,10 @@ export function removeSecureChatCacheValuesSync(keys: string[]): void {
   const trustedKeys = keys.map(assertTrustedSecureChatCacheKey);
   for (const key of trustedKeys) cache.delete(key);
   void persistSecureChatCacheRemoveMany(trustedKeys).catch((error) => {
-    logSecureChatCacheFailure("Action: secure_chat_cache_remove_many_failed", trustedKeys.join(","), error);
+    logger.error("Action: chat_secure_cache_remove_many_failed", {
+      key: trustedKeys.join(","),
+      error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
+    });
   });
 }
 
@@ -295,7 +302,10 @@ export async function clearSecureChatCacheAll(): Promise<void> {
   try {
     await persistSecureChatCacheClearAll();
   } catch (error) {
-    logSecureChatCacheFailure("Action: secure_chat_cache_clear_all_failed", "*", error);
+    logger.error("Action: chat_secure_cache_clear_all_failed", {
+      key: "*",
+      error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
+    });
   }
   clearLegacySecureChatCacheAll();
 }

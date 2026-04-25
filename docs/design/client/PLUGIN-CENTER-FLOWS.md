@@ -42,6 +42,7 @@
 - `status: "ok" | "disabled" | "failed"`
 - `lastError?`（enable 失败原因）
 - `installedFrom: "server" | "repo"`
+- 任一来源的包在安装前都必须先过 sha256 与 canonical root 校验，外部下载 URL 不能直接绕过 catalog/source 验证。
 
 ### 3.2 目录数据
 - **Server Catalog**：服务器返回的插件列表（含 required_plugins、download 信息）。
@@ -70,6 +71,7 @@
 - 下载来源（server/repo）与 sha256
 - 提供 domains 与 contracts（若有）
 - 最近错误（若 status=failed）
+- 下载来源说明里要保留当前 origin/source 信息，便于排查是否命中了错误的 catalog。
 
 ---
 
@@ -96,6 +98,7 @@
 - 下载失败：回到 `confirm`
 - sha256 不匹配：标记失败并删除本次下载产物，回到 `confirm`
 - 解压失败：删除本次解压目录，回到 `confirm`
+- 若下载包包含 symlink、路径穿越或逃逸出插件根的内容，也必须判失败并清理临时目录。
 
 安装完成后的策略：
 - **不强制自动启用**（由产品决定；P0 建议：对 required 插件安装后引导“启用”）
@@ -182,4 +185,3 @@ required 被认为“满足”的最小条件（建议）：
 2) 更新失败回滚：从 v1 更新到 v2，v2 enable 失败 → 自动回滚到 v1 且插件仍可用。  
 3) sha256 不匹配：安装失败并提示，且不会污染已安装版本。  
 4) 缺 server_id：插件中心不可用但核心聊天仍可用。  
-

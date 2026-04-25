@@ -21,7 +21,17 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self' app:",
+        "script-src": "'self' app: 'unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' app: data: blob: http: https:",
+        "font-src": "'self' data:",
+        "connect-src": "'self' http: https: ws: wss: app:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "frame-ancestors": "'none'"
+      }
     }
   },
   "bundle": {
