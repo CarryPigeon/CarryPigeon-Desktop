@@ -6,7 +6,7 @@
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { currentChatUserId } from "@/features/chat/data/account-session";
+import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import type { ChannelMember, RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import { useChannelScopedRefresh } from "@/features/chat/presentation/shared/useChannelScopedRefresh";

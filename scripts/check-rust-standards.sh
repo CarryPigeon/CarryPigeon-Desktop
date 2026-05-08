@@ -9,7 +9,49 @@ cd "$ROOT_DIR"
 fail=0
 
 echo "[check-rust-standards] 1/7 scanning panic-prone patterns..."
-if grep -RInE "unwrap\(|expect\(|panic!|todo!|unimplemented!|println!|eprintln!|dbg!" "$TARGET_DIR"; then
+panic_prone_failed=0
+while IFS= read -r file; do
+  if ! awk -v file="$file" '
+    function count_char(text, needle,    copy) {
+      copy = text;
+      return gsub(needle, "", copy);
+    }
+
+    BEGIN { pending_test_attr = 0; in_test_mod = 0; depth = 0; bad = 0 }
+    /#\[cfg\(test\)\]/ {
+      pending_test_attr = 1;
+      next;
+    }
+    {
+      if (pending_test_attr == 1 && $0 ~ /^[[:space:]]*mod[[:space:]]+tests[[:space:]]*\{/) {
+        in_test_mod = 1;
+        depth = count_char($0, "\\{") - count_char($0, "\\}");
+        pending_test_attr = 0;
+        next;
+      }
+      pending_test_attr = 0;
+
+      if (in_test_mod == 1) {
+        depth += count_char($0, "\\{") - count_char($0, "\\}");
+        if (depth <= 0) {
+          in_test_mod = 0;
+          depth = 0;
+        }
+        next;
+      }
+
+      if ($0 ~ /unwrap\(|expect\(|panic!|todo!|unimplemented!|println!|eprintln!|dbg!/) {
+        printf("%s:%d: %s\n", file, NR, $0);
+        bad = 1;
+      }
+    }
+    END { exit bad }
+  ' "$file"; then
+    panic_prone_failed=1
+  fi
+done < <(git ls-files "$TARGET_DIR" -- '*.rs')
+
+if [[ "$panic_prone_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ found forbidden patterns in Rust source"
   fail=1
 else
@@ -20,15 +62,20 @@ echo "[check-rust-standards] 2/7 scanning tauri command return style..."
 command_style_failed=0
 while IFS= read -r file; do
   if ! awk -v file="$file" '
-    BEGIN { in_command = 0; sig = ""; start = 0; bad = 0 }
+    BEGIN { in_command = 0; in_sig = 0; sig = ""; start = 0; bad = 0 }
     /#\[tauri::command\]/ {
       in_command = 1;
+      in_sig = 0;
       sig = "";
       start = NR;
       next;
     }
     {
       if (in_command == 1) {
+        if (in_sig == 0 && $0 !~ /(^|[[:space:]])(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]+/) {
+          next;
+        }
+        in_sig = 1;
         sig = sig " " $0;
         if ($0 ~ /\{/) {
           if (sig !~ /->[[:space:]]*CommandResult</) {
@@ -36,6 +83,7 @@ while IFS= read -r file; do
             bad = 1;
           }
           in_command = 0;
+          in_sig = 0;
           sig = "";
         }
       }
@@ -54,7 +102,7 @@ else
 fi
 
 echo "[check-rust-standards] 3/7 scanning bare Result<_, String> usage..."
-if grep -RInE "Result<[^>]+,[[:space:]]*String>" "$TARGET_DIR" | grep -v "src-tauri/src/shared/error/mod.rs"; then
+if grep -RInE "(^|[^A-Za-z0-9_])Result<[^>]+,[[:space:]]*String>" "$TARGET_DIR" | grep -v "src-tauri/src/shared/error/mod.rs"; then
   echo "[check-rust-standards] ❌ found bare Result<_, String>; use anyhow::Result or CommandResult<T>"
   fail=1
 else

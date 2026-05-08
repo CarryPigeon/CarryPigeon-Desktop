@@ -48,7 +48,6 @@ export async function importPluginModule(entryUrl: string): Promise<Record<strin
   // cache-bust：允许在 import 失败后重新加载同一版本。
   const bust = `t=${Date.now().toString(16)}`;
   const finalUrl = url.includes("?") ? `${url}&${bust}` : `${url}?${bust}`;
-  // @ts-ignore - Vite 对动态 URL import 会报错，这里显式忽略。
   return import(/* @vite-ignore */ finalUrl);
 }
 

@@ -7,6 +7,32 @@
 
 import { getSetThemeUseCase, getSettingsUseCase } from "../di/settings.di";
 import type { AppSettings, AppTheme } from "../domain/types/SettingsTypes";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
+import { invokeTauri } from "@/shared/tauri/invokeClient";
+
+export type GeneralPreferenceKey = "auto_login" | "auto_launch" | "close_to_tray" | "check_for_updates";
+
+export type BusinessPreferenceKey = "email_notifications" | "desktop_notifications";
+type BooleanPreferenceKey = GeneralPreferenceKey | BusinessPreferenceKey;
+
+export type GeneralPreferencesSnapshot = {
+  autoLogin: boolean;
+  autoLaunch: boolean;
+  closeToTray: boolean;
+  checkForUpdates: boolean;
+};
+
+const GENERAL_PREFERENCE_KEYS: readonly GeneralPreferenceKey[] = [
+  "auto_login",
+  "auto_launch",
+  "close_to_tray",
+  "check_for_updates",
+];
+
+const BUSINESS_PREFERENCE_KEYS: readonly BusinessPreferenceKey[] = [
+  "email_notifications",
+  "desktop_notifications",
+];
 
 /**
  * 读取当前应用设置快照。
@@ -18,6 +44,69 @@ export function readSettings(): Promise<AppSettings> {
 /**
  * 更新当前应用主题。
  */
-export function updateTheme(theme: AppTheme): Promise<void> {
-  return getSetThemeUseCase().execute(theme);
+export async function updateTheme(theme: AppTheme): Promise<void> {
+  await getSetThemeUseCase().execute(theme);
+  // Also persist to backend config for import/export consistency
+  try {
+    await invokeTauri<void>(TAURI_COMMANDS.settingsUpdateConfigString, { key: "theme", value: theme });
+  } catch {
+    // Theme is local-cache primary; backend persistence is best-effort
+  }
+}
+
+async function readConfigBool(key: BooleanPreferenceKey): Promise<boolean> {
+  return invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key });
+}
+
+async function updateConfigBool(key: BooleanPreferenceKey, value: boolean): Promise<void> {
+  await invokeTauri<void>(TAURI_COMMANDS.settingsUpdateConfigBool, { key, value });
+}
+
+export async function readGeneralPreferences(): Promise<GeneralPreferencesSnapshot> {
+  const [autoLogin, autoLaunch, closeToTray, checkForUpdates] = await Promise.all(
+    GENERAL_PREFERENCE_KEYS.map((key) => readConfigBool(key)),
+  );
+
+  return {
+    autoLogin,
+    autoLaunch,
+    closeToTray,
+    checkForUpdates,
+  };
+}
+
+export async function updateGeneralPreference(key: GeneralPreferenceKey, value: boolean): Promise<void> {
+  await updateConfigBool(key, value);
+}
+
+export type BusinessPreferencesSnapshot = {
+  emailNotifications: boolean;
+  desktopNotifications: boolean;
+};
+
+export async function readBusinessPreferences(): Promise<BusinessPreferencesSnapshot> {
+  const [emailNotifications, desktopNotifications] = await Promise.all(
+    BUSINESS_PREFERENCE_KEYS.map((key) => readConfigBool(key)),
+  );
+
+  return {
+    emailNotifications,
+    desktopNotifications,
+  };
+}
+
+export async function updateBusinessPreference(key: BusinessPreferenceKey, value: boolean): Promise<void> {
+  await updateConfigBool(key, value);
+}
+
+export async function exportSettingsEnvelope(): Promise<string> {
+  return invokeTauri<string>(TAURI_COMMANDS.settingsExportSettings);
+}
+
+export async function importSettingsEnvelope(raw: string): Promise<void> {
+  await invokeTauri<void>(TAURI_COMMANDS.settingsImportSettings, { raw });
+}
+
+export async function resetSettingsEnvelope(): Promise<void> {
+  await invokeTauri<void>(TAURI_COMMANDS.settingsResetSettings);
 }

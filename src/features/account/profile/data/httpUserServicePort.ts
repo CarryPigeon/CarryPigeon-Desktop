@@ -6,8 +6,15 @@
 import type { UserServicePort } from "../domain/ports/UserServicePort";
 import type { UpdateUserProfileInput } from "../domain/types/UserTypes";
 import type { UserMe, UserPublic } from "../domain/types/UserTypes";
-import { httpGetCurrentUser, httpGetUser, httpListUsers, httpUploadBackgroundImage } from "./httpUserApi";
-import { ProfileMutationUnsupportedError } from "../domain/errors/ProfileMutationUnsupportedError";
+import {
+  httpGetCurrentUser,
+  httpGetUser,
+  httpListUsers,
+  httpUpdateUserEmail,
+  httpUpdateUserProfile,
+  httpUploadBackgroundImage,
+} from "./httpUserApi";
+import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { mapUserMeWire, mapUserPublicWire } from "./userWireMappers";
 
 /**
@@ -32,13 +39,12 @@ export function createHttpUserServicePort(serverSocket: string): UserServicePort
       return wires.map(mapUserPublicWire);
     },
     async updateUserEmail(email: string, code: string): Promise<void> {
-      void email;
-      void code;
-      throw new ProfileMutationUnsupportedError();
+      const accessToken = await ensureValidAccessToken(socket);
+      await httpUpdateUserEmail(socket, accessToken, email, code);
     },
     async updateUserProfile(input: UpdateUserProfileInput): Promise<void> {
-      void input;
-      throw new ProfileMutationUnsupportedError();
+      const accessToken = await ensureValidAccessToken(socket);
+      await httpUpdateUserProfile(socket, accessToken, input);
     },
     async updateUserBackgroundImage(accessToken: string, file: File): Promise<string> {
       return httpUploadBackgroundImage(socket, accessToken, file);

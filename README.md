@@ -4,7 +4,7 @@ CarryPigeon 的桌面端（Tauri + Rust + Vue 3）。
 
 ## 文档
 
-- 文档索引：`docs/文档索引.md`
+- 文档总览：`docs/README.md`
 - 文档规范：`docs/文档规范.md`
 - 日志与注释规范：`docs/日志与注释规范.md`
 - 项目简介：`docs/项目简介.md`

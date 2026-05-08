@@ -95,11 +95,17 @@ fn normalize_transport_socket(socket: String, allow_mock: bool) -> anyhow::Resul
         .split_once("://")
         .map(|(scheme, _)| scheme)
         .unwrap_or("<missing>");
-    Err(tcp_scope_error(format!("Unsupported socket scheme: {}", scheme)))
+    Err(tcp_scope_error(format!(
+        "Unsupported socket scheme: {}",
+        scheme
+    )))
 }
 
 fn registered_backend_not_found(server_socket: &str) -> anyhow::Error {
-    tcp_scope_error(format!("TCP service not found for server_socket: {}", server_socket))
+    tcp_scope_error(format!(
+        "TCP service not found for server_socket: {}",
+        server_socket
+    ))
 }
 
 /// TCP 注册表服务（可注入状态对象）。
@@ -220,7 +226,9 @@ mod tests {
     use crate::features::network::domain::ports::tcp_backend_factory_port::{
         TcpBackendFactoryFuture, TcpBackendFactoryPort,
     };
-    use crate::features::network::domain::ports::tcp_backend_port::{TcpBackendFuture, TcpBackendPort};
+    use crate::features::network::domain::ports::tcp_backend_port::{
+        TcpBackendFuture, TcpBackendPort,
+    };
     use crate::features::network::domain::ports::tcp_event_sink::TcpEventSink;
     use crate::features::network::domain::types::{TcpMessageEvent, TcpStateEvent};
     use std::sync::Mutex as StdMutex;
@@ -263,7 +271,10 @@ mod tests {
         fn close<'a>(&'a mut self) -> TcpBackendFuture<'a, ()> {
             let state = Arc::clone(&self.state);
             Box::pin(async move {
-                state.lock().expect("test backend state poisoned").close_calls += 1;
+                state
+                    .lock()
+                    .expect("test backend state poisoned")
+                    .close_calls += 1;
                 Ok(())
             })
         }
@@ -297,15 +308,24 @@ mod tests {
 
     impl TcpEventSink for TestEventSink {
         fn emit_state(&self, event: TcpStateEvent) {
-            self.states.lock().expect("test sink state poisoned").push(event);
+            self.states
+                .lock()
+                .expect("test sink state poisoned")
+                .push(event);
         }
 
         fn emit_message(&self, event: TcpMessageEvent) {
-            self.messages.lock().expect("test sink state poisoned").push(event);
+            self.messages
+                .lock()
+                .expect("test sink state poisoned")
+                .push(event);
         }
 
         fn emit_frame(&self, event: TcpMessageEvent) {
-            self.frames.lock().expect("test sink state poisoned").push(event);
+            self.frames
+                .lock()
+                .expect("test sink state poisoned")
+                .push(event);
         }
     }
 
@@ -354,14 +374,23 @@ mod tests {
             .await
             .expect_err("unregistered send should fail");
         println!("send error: {}", send_err);
-        assert_eq!(send_err.to_string(), "[NETWORK_TCP_SCOPE_REJECTED] TCP service not found for server_socket: socket://missing");
+        assert_eq!(
+            send_err.to_string(),
+            "[NETWORK_TCP_SCOPE_REJECTED] TCP service not found for server_socket: socket://missing"
+        );
 
         let remove_err = service
-            .remove_tcp_service("socket://missing".to_string(), Arc::new(TestEventSink::default()))
+            .remove_tcp_service(
+                "socket://missing".to_string(),
+                Arc::new(TestEventSink::default()),
+            )
             .await
             .expect_err("unregistered remove should fail");
         println!("remove error: {}", remove_err);
-        assert_eq!(remove_err.to_string(), "[NETWORK_TCP_SCOPE_REJECTED] TCP service not found for server_socket: socket://missing");
+        assert_eq!(
+            remove_err.to_string(),
+            "[NETWORK_TCP_SCOPE_REJECTED] TCP service not found for server_socket: socket://missing"
+        );
     }
 
     #[test]
@@ -369,7 +398,10 @@ mod tests {
         let err = normalize_transport_socket("mock://handshake".to_string(), false)
             .expect_err("mock socket should be rejected when debug transport is disabled");
         println!("mock validation error: {}", err);
-        assert_eq!(err.to_string(), "[NETWORK_TCP_SCOPE_REJECTED] mock:// socket is only supported in debug builds.");
+        assert_eq!(
+            err.to_string(),
+            "[NETWORK_TCP_SCOPE_REJECTED] mock:// socket is only supported in debug builds."
+        );
     }
 
     #[test]
@@ -377,6 +409,9 @@ mod tests {
         let err = normalize_transport_socket("   ".to_string(), true)
             .expect_err("empty transport socket should be rejected");
         println!("empty transport socket error: {}", err);
-        assert_eq!(err.to_string(), "[NETWORK_TCP_SCOPE_REJECTED] Missing socket.");
+        assert_eq!(
+            err.to_string(),
+            "[NETWORK_TCP_SCOPE_REJECTED] Missing socket."
+        );
     }
 }

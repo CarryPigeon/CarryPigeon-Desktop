@@ -7,7 +7,7 @@ use sea_orm::ConnectionTrait;
 use sea_orm::{Database, DatabaseBackend, Statement, StatementBuilder, TransactionTrait, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::shared::error::{CommandResult, command_error, to_command_error};
@@ -76,7 +76,7 @@ fn chat_cache_path() -> PathBuf {
     base_db_dir().join("chat_cache.db")
 }
 
-async fn ensure_parent_dir(path: &PathBuf) -> Result<()> {
+async fn ensure_parent_dir(path: &Path) -> Result<()> {
     if let Some(dir) = path.parent() {
         tokio::fs::create_dir_all(dir)
             .await
@@ -180,10 +180,10 @@ fn is_missing_master_key_error_message(message: &str) -> bool {
 }
 
 fn clear_master_key_cache() {
-    if let Some(cell) = CHAT_CACHE_MASTER_KEY.get() {
-        if let Ok(mut guard) = cell.lock() {
-            *guard = None;
-        }
+    if let Some(cell) = CHAT_CACHE_MASTER_KEY.get()
+        && let Ok(mut guard) = cell.lock()
+    {
+        *guard = None;
     }
 }
 
@@ -224,7 +224,7 @@ fn decrypt_value(key_bytes: &[u8; 32], nonce_hex: &str, value_hex: &str) -> Resu
     let plaintext = cipher
         .decrypt(Nonce::from_slice(&nonce_bytes), value_bytes.as_ref())
         .map_err(|_| anyhow::anyhow!("Failed to decrypt chat cache value"))?;
-    Ok(String::from_utf8(plaintext).context("Invalid utf-8 chat cache value")?)
+    String::from_utf8(plaintext).context("Invalid utf-8 chat cache value")
 }
 
 async fn ensure_schema() -> Result<()> {
@@ -265,7 +265,9 @@ pub async fn chat_cache_load_all() -> CommandResult<HashMap<String, String>> {
     if rows.is_empty() {
         return Ok(HashMap::new());
     }
-    let Some(key_bytes) = master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))? else {
+    let Some(key_bytes) =
+        master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))?
+    else {
         return Ok(HashMap::new());
     };
     let mut out = HashMap::with_capacity(rows.len());
@@ -355,7 +357,9 @@ pub async fn chat_cache_get(key: String) -> CommandResult<Option<String>> {
     if nonce_hex.is_empty() || value_hex.is_empty() {
         return Ok(None);
     }
-    let Some(key_bytes) = master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))? else {
+    let Some(key_bytes) =
+        master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))?
+    else {
         return Ok(None);
     };
     let value = decrypt_value(&key_bytes, &nonce_hex, &value_hex)
@@ -375,7 +379,9 @@ pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
     if key.is_empty() {
         return Err(command_error("CHAT_CACHE_KEY_REQUIRED", "key is required"));
     }
-    let Some(key_bytes) = master_key(true).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))? else {
+    let Some(key_bytes) =
+        master_key(true).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", e))?
+    else {
         return Err(command_error(
             "CHAT_CACHE_KEY_FAILED",
             "secure storage master key is unavailable",

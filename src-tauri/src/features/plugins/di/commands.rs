@@ -5,13 +5,14 @@ use crate::features::plugins::data::plugin_ports::{
     PluginInstallStorePortAdapter, PluginLoaderPortAdapter,
 };
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest, PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest, PluginLoadResult,
+    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry,
 };
 use crate::features::plugins::usecases::plugin_usecases;
 use crate::shared::error::{CommandResult, to_command_error};
 use std::collections::HashMap;
 
-/// 加载并实例化一个插件（由 manifest 指定）。
+/// 加载并实例化一个插件（legacy 调试路径，由 manifest 指定）。
 ///
 /// # 参数
 /// - `manifest`：插件清单（包含 id/version/url/sha256 等）。
@@ -21,7 +22,9 @@ use std::collections::HashMap;
 /// - `Err(String)`：加载失败原因。
 ///
 /// # 说明
-/// 该命令主要用于调试/开发态：前端传入 manifest 后触发本地插件加载流程。
+/// 该命令主要用于调试/开发态：前端传入 manifest 后触发旧 wasm loader。
+/// 正式插件中心主链路使用 `plugins_install_*` + `plugins_get_runtime_entry*`
+/// 暴露 ESM 静态资源，不再依赖该命令。
 #[tauri::command]
 pub async fn load_plugin(manifest: PluginManifest) -> CommandResult<PluginLoadResult> {
     plugin_usecases::load_plugin(manifest, PluginLoaderPortAdapter::shared())
@@ -210,13 +213,15 @@ pub async fn plugins_install_from_url(
     tls_fingerprint: Option<String>,
 ) -> CommandResult<InstalledPluginState> {
     plugin_usecases::plugins_install_from_url(
-        &server_socket,
-        &plugin_id,
-        &version,
-        &url,
-        &sha256,
-        tls_policy.as_deref(),
-        tls_fingerprint.as_deref(),
+        PluginInstallFromUrlRequest {
+            server_socket: &server_socket,
+            plugin_id: &plugin_id,
+            version: &version,
+            url: &url,
+            sha256: &sha256,
+            tls_policy: tls_policy.as_deref(),
+            tls_fingerprint: tls_fingerprint.as_deref(),
+        },
         PluginInstallStorePortAdapter::shared(),
     )
     .await
@@ -487,13 +492,15 @@ pub async fn plugins_network_fetch(
     tls_fingerprint: Option<String>,
 ) -> CommandResult<PluginFetchResponse> {
     plugin_usecases::plugins_network_fetch(
-        &server_socket,
-        &url,
-        &method,
-        headers,
-        body,
-        tls_policy.as_deref(),
-        tls_fingerprint.as_deref(),
+        PluginNetworkFetchRequest {
+            server_socket: &server_socket,
+            url: &url,
+            method: &method,
+            headers,
+            body,
+            tls_policy: tls_policy.as_deref(),
+            tls_fingerprint: tls_fingerprint.as_deref(),
+        },
         PluginInstallStorePortAdapter::shared(),
     )
     .await

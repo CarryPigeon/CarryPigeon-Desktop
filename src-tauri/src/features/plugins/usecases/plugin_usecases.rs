@@ -1,12 +1,12 @@
 //! plugins｜用例层：plugin_usecases。
 //!
 //! 约定：注释中文，日志英文（tracing）。
-use std::collections::HashMap;
 
 use crate::features::plugins::domain::ports::plugin_install_store_port::PluginInstallStorePort;
 use crate::features::plugins::domain::ports::plugin_loader_port::PluginLoaderPort;
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest, PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest, PluginLoadResult,
+    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry,
 };
 
 /// 加载并返回插件前端运行所需资源（wasm/js/html）。
@@ -115,26 +115,10 @@ pub async fn plugins_install_from_server_catalog(
 
 /// 从指定 URL 安装插件。
 pub async fn plugins_install_from_url(
-    server_socket: &str,
-    plugin_id: &str,
-    version: &str,
-    url: &str,
-    sha256: &str,
-    tls_policy: Option<&str>,
-    tls_fingerprint: Option<&str>,
+    request: PluginInstallFromUrlRequest<'_>,
     plugin_store_port: &dyn PluginInstallStorePort,
 ) -> anyhow::Result<InstalledPluginState> {
-    plugin_store_port
-        .install_from_url(
-            server_socket,
-            plugin_id,
-            version,
-            url,
-            sha256,
-            tls_policy,
-            tls_fingerprint,
-        )
-        .await
+    plugin_store_port.install_from_url(request).await
 }
 
 /// 启用插件。
@@ -267,24 +251,8 @@ pub async fn plugins_storage_set(
 
 /// 以插件权限边界发起网络请求。
 pub async fn plugins_network_fetch(
-    server_socket: &str,
-    url: &str,
-    method: &str,
-    headers: HashMap<String, String>,
-    body: Option<String>,
-    tls_policy: Option<&str>,
-    tls_fingerprint: Option<&str>,
+    request: PluginNetworkFetchRequest<'_>,
     plugin_store_port: &dyn PluginInstallStorePort,
 ) -> anyhow::Result<PluginFetchResponse> {
-    plugin_store_port
-        .network_fetch(
-            server_socket,
-            url,
-            method,
-            headers,
-            body,
-            tls_policy,
-            tls_fingerprint,
-        )
-        .await
+    plugin_store_port.network_fetch(request).await
 }

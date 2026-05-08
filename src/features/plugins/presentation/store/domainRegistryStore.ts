@@ -22,6 +22,7 @@ import {
   getRuntimeEntryForVersion,
   type LoadedPluginModule,
 } from "@/features/plugins/presentation/runtime/pluginRuntime";
+import { assertPluginRuntimeHostCompatible } from "@/features/plugins/domain/policies/pluginHostCompatibility";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 import {
   clearPluginRuntimeStateSyncListeners,
@@ -180,6 +181,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
       return createNoopRuntimeModule(pluginId, version);
     }
     const runtime = await getRuntimeEntryForVersion(key, pluginId, version);
+    assertPluginRuntimeHostCompatible(runtime);
     return loadFromRuntime(runtime);
   }
 
@@ -195,6 +197,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     if (!id) return;
 
     const runtime = await getRuntimeEntry(key, id);
+    assertPluginRuntimeHostCompatible(runtime);
     const loaded = await loadFromRuntime(runtime);
     const ctx = contextResolver.buildPluginContext(runtime, loaded);
 

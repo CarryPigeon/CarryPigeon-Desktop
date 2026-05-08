@@ -23,6 +23,21 @@ export function readJson<T>(key: string, fallback: T): T {
 }
 
 /**
+ * 从 localStorage 读取字符串值。
+ *
+ * @param key - localStorage key。
+ * @param fallback - 当 key 缺失或读取失败时的返回值。
+ * @returns 存储的字符串值；不可用时返回 `fallback`。
+ */
+export function readString(key: string, fallback = ""): string {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * 将 JSON 值写入 localStorage。
  *
  * 存储错误会被刻意吞掉，以便在受限环境（配额超限、隐私模式等）下保持 UI 流程韧性。
@@ -34,6 +49,21 @@ export function readJson<T>(key: string, fallback: T): T {
 export function writeJson<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // 忽略存储失败（配额、隐私模式等）。
+  }
+}
+
+/**
+ * 将字符串值写入 localStorage。
+ *
+ * @param key - localStorage key。
+ * @param value - 要写入的字符串值。
+ * @returns 无返回值。
+ */
+export function writeString(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
   } catch {
     // 忽略存储失败（配额、隐私模式等）。
   }

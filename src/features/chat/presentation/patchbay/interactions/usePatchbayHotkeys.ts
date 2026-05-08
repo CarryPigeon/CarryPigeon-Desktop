@@ -14,13 +14,17 @@ export type UsePatchbayHotkeysDeps = {
   quickSwitcherOpen: RefLike<boolean>;
   menuOpen: RefLike<boolean>;
   showChannelMenu: RefLike<boolean>;
+  showCreateChatMenu: RefLike<boolean>;
   showCreateChannel: RefLike<boolean>;
+  showCreateFriendPrivateChat: RefLike<boolean>;
   showDeleteChannel: RefLike<boolean>;
   closeQuickSwitcher(): void;
   openQuickSwitcher(): void;
   closeMenu(): void;
   closeChannelMenu(): void;
+  closeCreateChatMenu(): void;
   setShowCreateChannel(visible: boolean): void;
+  setShowCreateFriendPrivateChat(visible: boolean): void;
   setShowDeleteChannel(visible: boolean): void;
   goPlugins(): void;
   openSettings(): void;
@@ -34,7 +38,9 @@ export function usePatchbayHotkeys(deps: UsePatchbayHotkeysDeps) {
     if (deps.quickSwitcherOpen.value) deps.closeQuickSwitcher();
     if (deps.menuOpen.value) deps.closeMenu();
     if (deps.showChannelMenu.value) deps.closeChannelMenu();
+    if (deps.showCreateChatMenu.value) deps.closeCreateChatMenu();
     if (deps.showCreateChannel.value) deps.setShowCreateChannel(false);
+    if (deps.showCreateFriendPrivateChat.value) deps.setShowCreateFriendPrivateChat(false);
     if (deps.showDeleteChannel.value) deps.setShowDeleteChannel(false);
   }
 

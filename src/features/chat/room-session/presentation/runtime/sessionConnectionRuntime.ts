@@ -22,7 +22,7 @@ import {
   createSessionWsManager,
   RoomSessionConnectionApplicationService,
 } from "@/features/chat/room-session/internal";
-import { getChatTlsPolicy, getChatWsUrlOverride } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+import { getChatTlsPolicy, getChatWsUrlOverride } from "@/features/chat/composition/serverWorkspaceAdapter";
 import type { ChatEventsGateway } from "@/features/chat/composition/contracts/chatGateway";
 import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import type { ChatGovernanceRuntimePort } from "@/features/chat/room-governance/presentation/runtime/governanceRuntimePorts";

@@ -14,6 +14,7 @@ PUBLIC_ENTRY_CANDIDATES=(
   "api-types"
   "routes"
   "styles"
+  "components"
 )
 
 declare -a TARGET_FEATURES=()

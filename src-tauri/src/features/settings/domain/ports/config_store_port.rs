@@ -7,6 +7,9 @@ pub type ConfigStoreFuture<'a, T> = Pin<Box<dyn Future<Output = anyhow::Result<T
 
 pub trait ConfigStorePort: Send + Sync {
     fn get_config<'a>(&'a self) -> ConfigStoreFuture<'a, String>;
+    fn export_settings<'a>(&'a self) -> ConfigStoreFuture<'a, String>;
+    fn import_settings<'a>(&'a self, raw: String) -> ConfigStoreFuture<'a, ()>;
+    fn reset_settings<'a>(&'a self) -> ConfigStoreFuture<'a, ()>;
     fn get_config_bool<'a>(&'a self, key: String) -> ConfigStoreFuture<'a, bool>;
     fn get_config_u32<'a>(&'a self, key: String) -> ConfigStoreFuture<'a, u32>;
     fn get_config_u64<'a>(&'a self, key: String) -> ConfigStoreFuture<'a, u64>;

@@ -7,6 +7,8 @@ import { MOCK_LATENCY_MS } from "@/shared/config/runtime";
 import { sleep } from "@/shared/mock/sleep";
 import type { SettingsPort } from "../domain/ports/SettingsPort";
 import { DEFAULT_APP_THEME, type AppSettings, type AppTheme } from "../domain/types/SettingsTypes";
+import { DEFAULT_APP_LOCALE, getStoredLocale } from "@/shared/utils/locale";
+import { setTheme as applyTheme } from "@/shared/utils/theme";
 
 let mockTheme: AppTheme = DEFAULT_APP_THEME;
 
@@ -18,11 +20,13 @@ export const mockSettingsPort: SettingsPort = {
     await sleep(MOCK_LATENCY_MS);
     return {
       theme: mockTheme,
+      locale: getStoredLocale() ?? DEFAULT_APP_LOCALE,
     };
   },
 
   async setTheme(theme: AppTheme): Promise<void> {
     await sleep(MOCK_LATENCY_MS);
     mockTheme = theme;
+    applyTheme(theme);
   },
 };

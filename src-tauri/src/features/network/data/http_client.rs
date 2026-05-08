@@ -2,7 +2,7 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
 use tokio::net::TcpStream;
@@ -11,6 +11,9 @@ use crate::features::network::domain::ports::api_request_port::{
     ApiHttpRequest, ApiHttpRequestFuture, ApiHttpResponse, ApiHttpTlsPolicy, ApiRequestPort,
 };
 use crate::shared::net::tls_fingerprint::verify_der_sha256_fingerprint;
+
+const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const API_RESPONSE_BODY_MAX_BYTES: u64 = 5 * 1024 * 1024;
 
 /// 基于 reqwest 的 API 请求适配器。
 #[derive(Debug, Default)]
@@ -74,7 +77,7 @@ async fn verify_https_fingerprint(url: &str, expected_sha256: &str) -> anyhow::R
 }
 
 fn build_reqwest_client(policy: ApiHttpTlsPolicy) -> anyhow::Result<reqwest::Client> {
-    let mut builder = reqwest::Client::builder();
+    let mut builder = reqwest::Client::builder().timeout(API_REQUEST_TIMEOUT);
     if policy != ApiHttpTlsPolicy::Strict {
         builder = builder
             .danger_accept_invalid_certs(true)
@@ -125,7 +128,14 @@ async fn execute_json_request_impl(args: ApiHttpRequest) -> anyhow::Result<ApiHt
         });
     }
 
+    if res.content_length().unwrap_or(0) > API_RESPONSE_BODY_MAX_BYTES {
+        return Err(anyhow::anyhow!("API response body is too large"));
+    }
+
     let bytes = res.bytes().await.context("Failed to read response body")?;
+    if bytes.len() as u64 > API_RESPONSE_BODY_MAX_BYTES {
+        return Err(anyhow::anyhow!("API response body is too large"));
+    }
     if bytes.is_empty() {
         return Ok(ApiHttpResponse {
             ok,

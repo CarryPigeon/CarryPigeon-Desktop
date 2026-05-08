@@ -9,6 +9,7 @@
 import { createI18n } from "vue-i18n";
 import { zh_cn } from "./i18n/messages/zh_cn";
 import { en_us } from "./i18n/messages/en_us";
+import { DEFAULT_APP_LOCALE, getStoredLocale } from "@/shared/utils/locale";
 
 /**
  * 应用级 i18n 单例。
@@ -20,7 +21,7 @@ import { en_us } from "./i18n/messages/en_us";
  */
 export const i18n = createI18n({
   legacy: false,
-  locale: "zh_cn",
+  locale: getStoredLocale() ?? DEFAULT_APP_LOCALE,
   messages: {
     zh_cn,
     en_us,

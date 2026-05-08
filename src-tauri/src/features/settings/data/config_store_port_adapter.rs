@@ -21,6 +21,18 @@ impl ConfigStorePort for ConfigStorePortAdapter {
         Box::pin(async { Ok(config_store::get_config().await) })
     }
 
+    fn export_settings<'a>(&'a self) -> ConfigStoreFuture<'a, String> {
+        Box::pin(async { Ok(config_store::export_settings().await) })
+    }
+
+    fn import_settings<'a>(&'a self, raw: String) -> ConfigStoreFuture<'a, ()> {
+        Box::pin(async move { config_store::import_settings(raw).await })
+    }
+
+    fn reset_settings<'a>(&'a self) -> ConfigStoreFuture<'a, ()> {
+        Box::pin(async { config_store::reset_settings().await })
+    }
+
     fn get_config_bool<'a>(&'a self, key: String) -> ConfigStoreFuture<'a, bool> {
         Box::pin(async move { Ok(config_store::get_config_bool(key).await) })
     }

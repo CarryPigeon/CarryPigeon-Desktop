@@ -54,7 +54,7 @@ const { t } = useI18n();
         <button class="cp-channelTabs__btn" type="button" :data-active="props.model.channelTab === 'discover'" @click="props.model.setChannelTab('discover')">
           {{ t("channels_discover") }}
         </button>
-        <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateChannel()" :title="t('create_channel')">+</button>
+        <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateMenu($event)" :title="t('create_chat')">+</button>
       </div>
       <!-- 区块：搜索输入框 -->
       <t-input :model-value="props.model.channelSearch" :placeholder="t('channel_search_placeholder')" clearable @update:model-value="props.model.setChannelSearch" />

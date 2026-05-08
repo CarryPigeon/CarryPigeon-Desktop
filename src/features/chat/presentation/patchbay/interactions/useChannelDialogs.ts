@@ -31,13 +31,41 @@ export type UseChannelDialogsDeps = {
  */
 export function useChannelDialogs(deps: UseChannelDialogsDeps) {
   const showCreateChannel = ref(false);
+  const showCreateChatMenu = ref(false);
+  const createChatMenuX = ref(0);
+  const createChatMenuY = ref(0);
+  const showCreateFriendPrivateChat = ref(false);
   const showDeleteChannel = ref(false);
   const deleteChannelId = ref("");
   const deleteChannelName = ref("");
   const runAsyncTask = createAsyncTaskRunner(deps.onAsyncError);
 
+  function openCreateChatMenu(e: MouseEvent): void {
+    const target = e.currentTarget as HTMLElement | null;
+    const rect = target?.getBoundingClientRect();
+    createChatMenuX.value = Math.trunc(rect?.left ?? e.clientX);
+    createChatMenuY.value = Math.trunc((rect?.bottom ?? e.clientY) + 8);
+    showCreateChatMenu.value = true;
+  }
+
+  function closeCreateChatMenu(): void {
+    showCreateChatMenu.value = false;
+  }
+
   function setShowCreateChannel(visible: boolean): void {
     showCreateChannel.value = visible;
+  }
+
+  function setShowCreateFriendPrivateChat(visible: boolean): void {
+    showCreateFriendPrivateChat.value = visible;
+  }
+
+  function openCreateChannelDialog(): void {
+    showCreateChannel.value = true;
+  }
+
+  function openCreateFriendPrivateChatDialog(): void {
+    showCreateFriendPrivateChat.value = true;
   }
 
   function setShowDeleteChannel(visible: boolean): void {
@@ -88,12 +116,21 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
   }
 
   return {
+    showCreateChatMenu,
+    createChatMenuX,
+    createChatMenuY,
     showCreateChannel,
+    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
+    openCreateChatMenu,
+    closeCreateChatMenu,
     setShowCreateChannel,
+    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
+    openCreateChannelDialog,
+    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     openDeleteChannelDialog,
     handleChannelDeleted,

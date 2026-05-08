@@ -16,6 +16,30 @@ pub async fn get_config() -> CommandResult<String> {
         .map_err(|e| to_command_error("SETTINGS_GET_CONFIG_FAILED", e))
 }
 
+/// 导出版本化 settings envelope。
+#[tauri::command]
+pub async fn export_settings() -> CommandResult<String> {
+    config_usecases::export_settings(ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_EXPORT_SETTINGS_FAILED", e))
+}
+
+/// 导入版本化 settings envelope。
+#[tauri::command]
+pub async fn import_settings(raw: String) -> CommandResult<()> {
+    config_usecases::import_settings(raw, ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_IMPORT_SETTINGS_FAILED", e))
+}
+
+/// 重置 settings 到默认值。
+#[tauri::command]
+pub async fn reset_settings() -> CommandResult<()> {
+    config_usecases::reset_settings(ConfigStorePortAdapter::shared())
+        .await
+        .map_err(|e| to_command_error("SETTINGS_RESET_SETTINGS_FAILED", e))
+}
+
 /// 读取 bool 类型配置值（顶层字段）。
 ///
 /// # 参数

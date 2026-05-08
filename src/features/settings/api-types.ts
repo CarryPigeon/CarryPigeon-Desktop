@@ -7,6 +7,18 @@
 import type { AppSettings, AppTheme } from "./domain/types/SettingsTypes";
 
 export type { AppSettings, AppTheme } from "./domain/types/SettingsTypes";
+export type {
+  SettingsApplyMode,
+  SettingsBackendStateV1,
+  SettingsFieldDefinition,
+  SettingsImportValidationRule,
+  SettingsLocalCacheStateV1,
+  SettingsOwnership,
+  SettingsSchemaEnvelopeV1,
+  SettingsSchemaVersion,
+  SettingsServerConfig,
+  SettingsTaxonomyGroup,
+} from "./domain/types/SettingsTypes";
 
 /**
  * settings feature 对外稳定能力契约。

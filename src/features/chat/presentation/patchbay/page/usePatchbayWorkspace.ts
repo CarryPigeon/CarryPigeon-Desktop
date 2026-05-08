@@ -11,8 +11,8 @@ import {
   chatServerRacks,
   switchChatServerWorkspace,
   useChatServerWorkspace,
-} from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
-import { createChatPluginAccess } from "@/features/chat/data/plugins/chatPluginAccess";
+} from "@/features/chat/composition/serverWorkspaceAdapter";
+import { createChatPluginAccess } from "@/features/chat/composition/chatPluginAccess";
 import {
   ensureChatPluginRuntimeLoaded,
   getChatDomainRegistryView,

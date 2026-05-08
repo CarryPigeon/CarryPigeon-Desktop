@@ -11,8 +11,8 @@ import {
   removeRepoSource,
   repoSources as repoSourcesState,
   setRepoSourceEnabled,
-} from "../presentation/store/repoSourcesStore";
-import type { RepoSource } from "../contracts/repoSource";
+} from "./repoSourcesStore";
+import type { RepoSource } from "../../contracts/repoSource";
 
 type ReadonlyRepoSource = Readonly<RepoSource>;
 

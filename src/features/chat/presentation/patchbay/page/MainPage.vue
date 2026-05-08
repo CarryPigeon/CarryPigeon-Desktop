@@ -11,8 +11,10 @@ import ChannelSettingsMenu from "@/features/chat/presentation/patchbay/component
 import ChatCenter from "@/features/chat/presentation/patchbay/components/layout/ChatCenter.vue";
 import { usePatchbayPageModel } from "@/features/chat/presentation/patchbay/page/usePatchbayPageModel";
 import MessageContextMenu from "@/features/chat/presentation/patchbay/components/menus/MessageContextMenu.vue";
+import CreateChatMenu from "@/features/chat/presentation/patchbay/components/menus/CreateChatMenu.vue";
 import QuickSwitcher from "@/features/chat/presentation/patchbay/components/overlay/QuickSwitcher.vue";
 import CreateChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateChannelDialog.vue";
+import CreateFriendPrivateChatDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateFriendPrivateChatDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
 
 const page = usePatchbayPageModel();
@@ -78,11 +80,26 @@ const page = usePatchbayPageModel();
       @delete="page.channelSettingsMenu.openDeleteChannelDialog"
     />
 
+    <CreateChatMenu
+      :open="page.channelDialogs.showCreateChatMenu"
+      :x="page.channelDialogs.createChatMenuX"
+      :y="page.channelDialogs.createChatMenuY"
+      @close="page.channelDialogs.closeCreateChatMenu"
+      @group="page.channelDialogs.openCreateChannelDialog"
+      @private="page.channelDialogs.openCreateFriendPrivateChatDialog"
+    />
+
     <!-- 区块：创建频道弹窗（Create Channel Dialog） -->
     <CreateChannelDialog
       :visible="page.channelDialogs.showCreateChannel"
       @update:visible="page.channelDialogs.setShowCreateChannel($event)"
       @created="page.channelDialogs.handleChannelCreated"
+    />
+
+    <!-- 区块：创建好友私聊弹窗（Create Friend Private Chat Dialog） -->
+    <CreateFriendPrivateChatDialog
+      :visible="page.channelDialogs.showCreateFriendPrivateChat"
+      @update:visible="page.channelDialogs.setShowCreateFriendPrivateChat($event)"
     />
 
     <!-- 区块：删除频道弹窗（Delete Channel Dialog） -->

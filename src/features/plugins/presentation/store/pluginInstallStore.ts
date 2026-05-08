@@ -36,7 +36,6 @@ import type {
 } from "@/features/plugins/application/pluginCommandOutcome";
 import { toPluginCommandErrorInfo } from "@/features/plugins/application/pluginCommandOutcome";
 import { createLogger } from "@/shared/utils/logger";
-import { IS_STORE_MOCK, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
 import type { PluginRuntimeOpsPort } from "@/features/plugins/domain/usecases/ApplyPluginRuntimeOps";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
@@ -127,7 +126,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   const progressById = reactive<Record<string, PluginProgress | null>>({});
   const busyIdsRef = ref<Set<string>>(new Set());
   const missingRequiredIdsRef = ref<string[]>([]);
-  const runtimeSupported = !IS_STORE_MOCK && !USE_MOCK_TRANSPORT && key !== NO_SERVER_KEY;
+  const runtimeSupported = key !== NO_SERVER_KEY;
   const runtimeAccess = runtimeSupported ? usePluginRuntimeAccess(key) : null;
   const runtimeOps: PluginRuntimeOpsPort = {
     supported: runtimeSupported,
@@ -298,6 +297,25 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     return createCommandError("missing_server_socket", "Missing server socket.", undefined, { pluginId });
   }
 
+  function confirmSensitivePermissionChange(plugin: PluginCatalogEntryLike, pluginId: string, targetVersion: string): PluginCommandErrorInfo | null {
+    const sensitivePermissions = (plugin.permissions ?? [])
+      .filter((permission) => permission.risk === "high" || permission.risk === "medium")
+      .map((permission) => permission.label || permission.key)
+      .filter(Boolean);
+    if (sensitivePermissions.length === 0) return null;
+    const message = [
+      `Update ${pluginId} to ${targetVersion}?`,
+      `This version requests sensitive permissions: ${sensitivePermissions.join(", ")}.`,
+    ].join("\n");
+    const confirmed = typeof window === "undefined" || typeof window.confirm !== "function" ? true : window.confirm(message);
+    if (confirmed) return null;
+    return createCommandError("plugin_operation_failed", "Plugin update cancelled by user.", undefined, {
+      pluginId,
+      version: targetVersion,
+      permissions: sensitivePermissions,
+    });
+  }
+
   async function runInstall(plugin: PluginCatalogEntryLike, version: string): Promise<InstallPluginOutcome> {
     const pluginId = String(plugin?.pluginId ?? "").trim();
     const targetVersion = String(version ?? "").trim();
@@ -334,6 +352,8 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     if (isBusy(pluginId)) {
       return rejectUpdate(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
+    const permissionConfirmationError = confirmSensitivePermissionChange(plugin, pluginId, targetVersion);
+    if (permissionConfirmationError) return rejectUpdate(permissionConfirmationError);
     try {
       await updateToLatest(plugin, targetVersion);
       return {

@@ -20,7 +20,9 @@ pub(super) async fn download_plugin_zip_bytes(
     download_url: reqwest::Url,
 ) -> anyhow::Result<Vec<u8>> {
     if !is_same_origin(&download_url, base) {
-        return Err(anyhow::anyhow!("Cross-origin plugin download rejected by default"));
+        return Err(anyhow::anyhow!(
+            "Cross-origin plugin download rejected by default"
+        ));
     }
 
     Ok(server_client

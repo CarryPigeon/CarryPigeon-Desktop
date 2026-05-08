@@ -56,6 +56,13 @@ export const TAURI_COMMANDS = {
   pluginsStorageGet: "plugins_storage_get",
   pluginsStorageSet: "plugins_storage_set",
   pluginsNetworkFetch: "plugins_network_fetch",
+
+  settingsGetConfigBool: "get_config_bool",
+  settingsUpdateConfigBool: "update_config_bool",
+  settingsUpdateConfigString: "update_config_string",
+  settingsExportSettings: "export_settings",
+  settingsImportSettings: "import_settings",
+  settingsResetSettings: "reset_settings",
 } as const;
 
 /**

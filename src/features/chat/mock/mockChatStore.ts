@@ -4,9 +4,9 @@
  */
 
 import { computed, reactive, ref } from "vue";
-import { currentChatUser, currentChatUsername } from "@/features/chat/data/account-session";
+import { currentChatUser, currentChatUsername } from "@/features/chat/composition/chatAccountSession";
 import { getAvailableChatMessageDomains } from "@/features/chat/data/plugins/chatPluginRuntime";
-import { chatCurrentServerSocket } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+import { chatCurrentServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,

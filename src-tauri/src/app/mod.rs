@@ -124,6 +124,9 @@ pub fn run() -> anyhow::Result<()> {
             crate::shared::log::log_debug,
             // settings/config
             crate::features::settings::di::commands::get_config,
+            crate::features::settings::di::commands::export_settings,
+            crate::features::settings::di::commands::import_settings,
+            crate::features::settings::di::commands::reset_settings,
             crate::features::settings::di::commands::get_config_bool,
             crate::features::settings::di::commands::get_config_u32,
             crate::features::settings::di::commands::get_config_u64,
@@ -137,8 +140,6 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::settings::di::commands::update_config_u64,
             crate::features::settings::di::commands::update_config_string,
             // plugins
-            crate::features::plugins::di::commands::load_plugin,
-            crate::features::plugins::di::commands::list_plugins,
             crate::features::plugins::di::commands::plugins_list_installed,
             crate::features::plugins::di::commands::plugins_get_installed_state,
             crate::features::plugins::di::commands::plugins_get_runtime_entry,
@@ -309,10 +310,7 @@ fn handle_app_scheme(
         .join("/");
 
     let file_path = plugin_store::resolve_app_plugins_canonical_file_path(
-        &server_id,
-        &plugin_id,
-        &version,
-        &rel_path,
+        &server_id, &plugin_id, &version, &rel_path,
     )?;
     let bytes = std::fs::read(&file_path)
         .with_context(|| format!("Failed to read plugin file: {}", file_path.display()))?;

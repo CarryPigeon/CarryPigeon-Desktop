@@ -10,23 +10,25 @@
  * - 将主题同步到 `document.documentElement.dataset.theme`（以及存在时的 `document.body.dataset.theme`）。
  *
  * 关联说明：
- * - `src/App.vue` 的 CSS token 依赖 `:root[data-theme="patchbay"]` 切换调色板。
+ * - `src/App.vue` 的 CSS token 依赖 `:root[data-theme="..."]` 切换调色板。
  * - 默认主题在 `src/main.ts` 启动阶段设置。
  */
 
-export type AppTheme = "patchbay" | "legacy";
+export type AppTheme = "patchbay" | "legacy" | "light";
 
+import { readString, writeString } from "./localStore";
 import { KEY_THEME } from "./storageKeys";
 
 /**
  * 从 `localStorage` 读取已持久化的主题。
  *
- * @returns 当存储值合法时返回 `"patchbay"` / `"legacy"`；否则返回 `null`。
+ * @returns 当存储值合法时返回 `"patchbay"` / `"legacy"` / `"light"`；否则返回 `null`。
  */
 export function getStoredTheme(): AppTheme | null {
-  const raw = String(localStorage.getItem(KEY_THEME) ?? "").trim().toLowerCase();
+  const raw = readString(KEY_THEME).trim().toLowerCase();
   if (raw === "patchbay") return "patchbay";
   if (raw === "legacy") return "legacy";
+  if (raw === "light") return "light";
   return null;
 }
 
@@ -40,7 +42,7 @@ export function getStoredTheme(): AppTheme | null {
  * @param theme - 要应用的目标主题。
  */
 export function setTheme(theme: AppTheme): void {
-  localStorage.setItem(KEY_THEME, theme);
-  document.documentElement.dataset.theme = theme === "patchbay" ? "patchbay" : "legacy";
-  if (document.body) document.body.dataset.theme = theme === "patchbay" ? "patchbay" : "legacy";
+  writeString(KEY_THEME, theme);
+  document.documentElement.dataset.theme = theme;
+  if (document.body) document.body.dataset.theme = theme;
 }

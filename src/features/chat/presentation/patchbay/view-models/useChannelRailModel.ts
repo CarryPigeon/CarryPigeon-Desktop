@@ -28,10 +28,10 @@ type ChannelRailRawModel = {
   currentChannelId: ComputedRef<CurrentChannelSessionSnapshot["currentChannelId"]>;
   setChannelSearch(value: string): void;
   setChannelTab(value: "joined" | "discover"): void;
-  openPlugins(): void;
-  openRequiredSetup(): void;
-  openCreateChannel(): void;
-  openChannelInfo(channelId: string): void;
+    openPlugins(): void;
+    openRequiredSetup(): void;
+    openCreateMenu(e: MouseEvent): void;
+    openChannelInfo(channelId: string): void;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
 };
@@ -51,7 +51,7 @@ export type UseChannelRailModelDeps = {
   missingRequiredCount: RefLike<number>;
   openPlugins(): void;
   openRequiredSetup(): void;
-  openCreateChannel(): void;
+  openCreateMenu(e: MouseEvent): void;
   openChannelInfo(channelId: string): void;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   onAsyncError: AsyncErrorHandler;
@@ -111,7 +111,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     },
     openPlugins: deps.openPlugins,
     openRequiredSetup: deps.openRequiredSetup,
-    openCreateChannel: deps.openCreateChannel,
+    openCreateMenu: deps.openCreateMenu,
     openChannelInfo: deps.openChannelInfo,
     selectChannel,
     applyJoin: deps.applyJoin,

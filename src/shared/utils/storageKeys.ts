@@ -45,6 +45,12 @@ export const KEY_THEME = "carrypigeon:theme";
 
 /**
  * @constant
+ * @description 应用语言 key（全局）。
+ */
+export const KEY_APP_LOCALE = "carrypigeon:appLocale";
+
+/**
+ * @constant
  * @description 稳定 device id key（全局）。
  */
 export const KEY_DEVICE_ID = "carrypigeon:deviceId";

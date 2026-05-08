@@ -108,16 +108,28 @@ fn ensure_write_target_is_safe(
             Ok(meta) => {
                 let file_type = meta.file_type();
                 if std::fs::read_link(&out_path).is_ok() {
-                    return Err(anyhow::anyhow!("Symlink path rejected: {}", out_path.display()));
+                    return Err(anyhow::anyhow!(
+                        "Symlink path rejected: {}",
+                        out_path.display()
+                    ));
                 }
                 if file_type.is_symlink() || is_windows_reparse_point(&meta) {
-                    return Err(anyhow::anyhow!("Symlink path rejected: {}", out_path.display()));
+                    return Err(anyhow::anyhow!(
+                        "Symlink path rejected: {}",
+                        out_path.display()
+                    ));
                 }
                 let canonical = std::fs::canonicalize(&out_path).with_context(|| {
-                    format!("Failed to canonicalize path component: {}", out_path.display())
+                    format!(
+                        "Failed to canonicalize path component: {}",
+                        out_path.display()
+                    )
                 })?;
                 if !canonical.starts_with(canonical_root) {
-                    return Err(anyhow::anyhow!("Symlink path rejected: {}", out_path.display()));
+                    return Err(anyhow::anyhow!(
+                        "Symlink path rejected: {}",
+                        out_path.display()
+                    ));
                 }
                 if idx < segments.len() - 1 && !file_type.is_dir() {
                     return Err(anyhow::anyhow!(
@@ -165,7 +177,10 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
             ));
         }
         let canonical_root = write_root.canonicalize().with_context(|| {
-            format!("Failed to canonicalize plugin write root: {}", write_root.display())
+            format!(
+                "Failed to canonicalize plugin write root: {}",
+                write_root.display()
+            )
         })?;
 
         // 判断 zip 是否把所有内容包在单一根目录下（常见打包方式）。
@@ -193,7 +208,10 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
                 return Err(anyhow::anyhow!("Unsafe zip entry path: {}", normalized));
             }
             if is_zip_entry_symlink(&file) {
-                return Err(anyhow::anyhow!("Symlink zip entry rejected: {}", normalized));
+                return Err(anyhow::anyhow!(
+                    "Symlink zip entry rejected: {}",
+                    normalized
+                ));
             }
 
             let final_name = if let Some(prefix) = root_prefix.as_deref() {
@@ -211,7 +229,8 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
                 ));
             }
 
-            let out_path = ensure_write_target_is_safe(&canonical_root, &final_name, file.is_dir())?;
+            let out_path =
+                ensure_write_target_is_safe(&canonical_root, &final_name, file.is_dir())?;
             if file.is_dir() {
                 std::fs::create_dir_all(&out_path)?;
                 continue;

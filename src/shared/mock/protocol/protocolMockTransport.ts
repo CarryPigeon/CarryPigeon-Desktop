@@ -61,6 +61,15 @@ type TokenSession = {
   expiresAtMs: number;
 };
 
+type MockUserProfile = {
+  uid: string;
+  email: string;
+  nickname: string;
+  avatar: string;
+  bio: string;
+  backgroundUrl: string;
+};
+
 type Channel = {
   cid: string;
   name: string;
@@ -117,6 +126,7 @@ type ServerState = {
   serverId: string;
   sessionsByAccess: Map<string, TokenSession>;
   sessionsByRefresh: Map<string, TokenSession>;
+  usersById: Map<string, MockUserProfile>;
   wsListeners: Set<WsListener>;
   eventSeq: number;
   channelsById: Map<string, Channel>;
@@ -218,6 +228,7 @@ function getServer(serverSocket: string): ServerState {
     serverId: hashToId(key),
     sessionsByAccess: new Map(),
     sessionsByRefresh: new Map(),
+    usersById: new Map(),
     wsListeners: new Set(),
     eventSeq: 0,
     channelsById: new Map(),
@@ -242,6 +253,17 @@ function getServer(serverSocket: string): ServerState {
     { uid: "3", nickname: "PatchCable", role: "member", join_time: now - 1000 * 60 * 60 * 12 },
     { uid: "4", nickname: "Guest", role: "member", join_time: now - 1000 * 60 * 10 },
   ];
+
+  for (const member of seedMembers) {
+    s.usersById.set(member.uid, {
+      uid: member.uid,
+      email: member.uid === "1" ? "user@example.com" : `user${member.uid}@example.com`,
+      nickname: member.nickname,
+      avatar: member.avatar ?? "",
+      bio: member.uid === "1" ? "Protocol mock operator profile." : `Mock profile for ${member.nickname}.`,
+      backgroundUrl: "",
+    });
+  }
 
   for (const c of seedChannels) {
     s.channelsById.set(c.cid, c);
@@ -527,6 +549,15 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
 
     const uid = "1";
     const now = Date.now();
+    const existingUser = server.usersById.get(uid);
+    server.usersById.set(uid, {
+      uid,
+      email,
+      nickname: existingUser?.nickname ?? "Operator",
+      avatar: existingUser?.avatar ?? "",
+      bio: existingUser?.bio ?? "Protocol mock operator profile.",
+      backgroundUrl: existingUser?.backgroundUrl ?? "",
+    });
     const access_token = `pmock-access:${uid}:${now.toString(16)}`;
     const refresh_token = `pmock-refresh:${uid}:${now.toString(16)}`;
     const session: TokenSession = {
@@ -600,11 +631,91 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   if (method === "GET" && pathname === "/users/me") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const user = server.usersById.get(session.uid);
     return {
       ok: true,
       status: 200,
-      body: { uid: session.uid, email: session.email, nickname: "Operator", avatar: "" },
+      body: {
+        uid: session.uid,
+        email: user?.email ?? session.email,
+        nickname: user?.nickname ?? "Operator",
+        avatar: user?.avatar ?? "",
+        bio: user?.bio ?? "",
+        backgroundUrl: user?.backgroundUrl ?? "",
+      },
     };
+  }
+
+  if (method === "PUT" && pathname === "/users/me/email") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const body = req.body as { email?: string; code?: string } | null;
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const code = String(body?.code ?? "").trim();
+    if (!email) return { ok: false, error: apiError(400, "invalid_request", "Missing email") };
+    if (!code) return { ok: false, error: apiError(400, "invalid_request", "Missing verification code") };
+    session.email = email;
+    const user = server.usersById.get(session.uid) ?? {
+      uid: session.uid,
+      email,
+      nickname: "Operator",
+      avatar: "",
+      bio: "",
+      backgroundUrl: "",
+    };
+    server.usersById.set(session.uid, { ...user, email });
+    return { ok: true, status: 204, body: null };
+  }
+
+  if (method === "PATCH" && pathname === "/users/me") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const body = req.body as { username?: string; avatar?: number; sex?: number; brief?: string; birthday?: number } | null;
+    const username = String(body?.username ?? "").trim();
+    if (!username) return { ok: false, error: apiError(400, "invalid_request", "Missing username") };
+    const user = server.usersById.get(session.uid) ?? {
+      uid: session.uid,
+      email: session.email,
+      nickname: "Operator",
+      avatar: "",
+      bio: "",
+      backgroundUrl: "",
+    };
+    server.usersById.set(session.uid, {
+      ...user,
+      nickname: username,
+      avatar: String(body?.avatar ?? user.avatar ?? ""),
+      bio: String(body?.brief ?? user.bio ?? ""),
+    });
+    for (const members of server.membersByCid.values()) {
+      for (const member of members) {
+        if (member.uid === session.uid) member.nickname = username;
+      }
+    }
+    return { ok: true, status: 204, body: null };
+  }
+
+  if (method === "POST" && pathname === "/users/me/background") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const shareKey = `pmock-bg-${session.uid}-${Date.now().toString(16)}`;
+    server.filesByShareKey.set(shareKey, {
+      file_id: shareKey,
+      filename: "profile-background.svg",
+      mime_type: "image/svg+xml",
+      size_bytes: 512,
+    });
+    const backgroundUrl = buildProtocolMockDownloadUrl(server.serverSocket, shareKey);
+    const user = server.usersById.get(session.uid) ?? {
+      uid: session.uid,
+      email: session.email,
+      nickname: "Operator",
+      avatar: "",
+      bio: "",
+      backgroundUrl: "",
+    };
+    server.usersById.set(session.uid, { ...user, backgroundUrl });
+    return { ok: true, status: 200, body: { backgroundUrl } };
   }
 
   if (method === "GET" && pathname.startsWith("/users/") && pathname !== "/users/me") {
@@ -612,7 +723,19 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const uid = decodeURIComponent(pathname.slice("/users/".length)).trim();
     if (!uid) return { ok: false, error: apiError(400, "invalid_request", "Missing uid") };
-    return { ok: true, status: 200, body: { uid, nickname: uid === "1" ? "Operator" : "User", avatar: "" } };
+    const user = server.usersById.get(uid);
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        uid,
+        nickname: user?.nickname ?? (uid === "1" ? "Operator" : "User"),
+        avatar: user?.avatar ?? "",
+        email: user?.email ?? `user${uid}@example.com`,
+        bio: user?.bio ?? "",
+        backgroundUrl: user?.backgroundUrl ?? "",
+      },
+    };
   }
 
   if (method === "GET" && pathname === "/users") {
@@ -620,7 +743,17 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const csv = String(searchParams.get("ids") ?? "").trim();
     const ids = csv ? csv.split(",").map((x) => x.trim()).filter(Boolean) : [];
-    const items = ids.map((uid) => ({ uid, nickname: uid === "1" ? "Operator" : "User", avatar: "" }));
+    const items = ids.map((uid) => {
+      const user = server.usersById.get(uid);
+      return {
+        uid,
+        nickname: user?.nickname ?? (uid === "1" ? "Operator" : "User"),
+        avatar: user?.avatar ?? "",
+        email: user?.email ?? `user${uid}@example.com`,
+        bio: user?.bio ?? "",
+        backgroundUrl: user?.backgroundUrl ?? "",
+      };
+    });
     return { ok: true, status: 200, body: { items } };
   }
 

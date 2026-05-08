@@ -12,6 +12,6 @@ import {
   removeRepoSource,
   repoSources,
   setRepoSourceEnabled,
-} from "../application/repoSourcesService";
+} from "../presentation/store/repoSourcesService";
 
 export { addRepoSource, removeRepoSource, setRepoSourceEnabled, listRepoSources, listEnabledRepoSources, repoSources, enabledRepoSources };
