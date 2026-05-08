@@ -161,7 +161,10 @@ pub(super) fn resolve_app_plugins_canonical_file_path(
         )
     })?;
     let canonical_file = lexical_file.canonicalize().with_context(|| {
-        format!("Failed to canonicalize plugin file: {}", lexical_file.display())
+        format!(
+            "Failed to canonicalize plugin file: {}",
+            lexical_file.display()
+        )
     })?;
 
     if !canonical_file.starts_with(&canonical_root) {
@@ -249,8 +252,13 @@ mod tests {
         create_dir_link(&alias_path, &outside);
 
         std::env::set_current_dir(&repo_root).expect("set cwd");
-        let err = resolve_app_plugins_canonical_file_path("server-a", "plugin-a", "1.0.0", "alias/escape.js")
-            .expect_err("symlink escape must be rejected");
+        let err = resolve_app_plugins_canonical_file_path(
+            "server-a",
+            "plugin-a",
+            "1.0.0",
+            "alias/escape.js",
+        )
+        .expect_err("symlink escape must be rejected");
         assert!(err.to_string().contains("escapes canonical root"));
 
         drop(_cwd_guard);

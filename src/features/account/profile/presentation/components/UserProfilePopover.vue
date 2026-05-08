@@ -85,6 +85,18 @@
           </div>
           <div v-else-if="loading" class="cp-user-profile-popover__email-skeleton"></div>
 
+          <!-- UID -->
+          <div v-if="props.userId" class="cp-user-profile-popover__uid">
+            <span>{{ props.userId }}</span>
+            <button
+              class="cp-user-profile-popover__copy-btn"
+              aria-label="复制用户 ID"
+              @click="handleCopyUid"
+            >
+              <t-icon :name="copiedUid ? 'check' : 'copy'" />
+            </button>
+          </div>
+
           <!-- 简介 -->
           <div v-if="resolvedBio" class="cp-user-profile-popover__bio">
             {{ resolvedBio }}
@@ -134,7 +146,7 @@ import { useRouter } from "vue-router";
 import { MessagePlugin } from "tdesign-vue-next";
 import { createLogger } from "@/shared/utils/logger";
 import { getUserUsecase, getUserMutationPort } from "@/features/account/profile/di/user.di";
-import { currentServerSocket } from "@/features/server-connection/rack/presentation/store/currentServer";
+import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { currentUser } from "@/features/account/current-user/presentation/store/userData";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 
@@ -152,6 +164,7 @@ const props = withDefaults(defineProps<UserProfilePopoverProps>(), {
 
 const router = useRouter();
 const logger = createLogger("userProfilePopover");
+const serverConnectionCapabilities = getServerConnectionCapabilities();
 
 // Refs
 const triggerRef = ref<HTMLElement | null>(null);
@@ -166,6 +179,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const profile = ref<UserPublic | null>(null);
 const copiedEmail = ref(false);
+const copiedUid = ref(false);
 const isCurrentUser = computed(() => {
   const currentUid = currentUser.id;
   return String(currentUid) === String(props.userId);
@@ -212,7 +226,7 @@ async function loadProfile() {
   loading.value = true;
   error.value = null;
   try {
-    const serverSocket = currentServerSocket.value;
+    const serverSocket = serverConnectionCapabilities.workspace.readSocket();
     const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
       throw new Error("Not connected to server");
@@ -416,10 +430,38 @@ async function handleCopyEmail() {
   }
 }
 
+async function handleCopyUid() {
+  const uid = String(props.userId ?? "").trim();
+  if (!uid) return;
+
+  try {
+    await navigator.clipboard.writeText(uid);
+    copiedUid.value = true;
+    MessagePlugin.success("已复制到剪贴板");
+    setTimeout(() => {
+      copiedUid.value = false;
+    }, 2000);
+  } catch (e) {
+    MessagePlugin.error("复制失败");
+    logger.error("Action: auth_profile_copy_failed", {
+      error: String(e),
+      field: "uid",
+    });
+  }
+}
+
 // Navigation
 function handleViewFullProfile() {
   closePopover();
-  router.push(`/user-info?uid=${props.userId}`);
+  router.push({
+    path: "/user_info",
+    query: {
+      uid: props.userId,
+      name: resolvedUsername.value || undefined,
+      email: resolvedEmail.value || undefined,
+      bio: resolvedBio.value || undefined,
+    },
+  });
 }
 
 function handleEditProfile() {
@@ -451,7 +493,7 @@ async function handleFileChange(e: Event) {
   }
 
   try {
-    const serverSocket = currentServerSocket.value;
+    const serverSocket = serverConnectionCapabilities.workspace.readSocket();
     const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
       MessagePlugin.error("未连接到服务器，请稍后重试");
@@ -574,7 +616,13 @@ watch(
   &__bg-default {
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background:
+      radial-gradient(circle at 18% 22%, color-mix(in oklab, var(--cp-highlight) 42%, transparent), transparent 34%),
+      linear-gradient(
+        135deg,
+        color-mix(in oklab, var(--cp-accent) 62%, var(--cp-panel)) 0%,
+        color-mix(in oklab, var(--cp-primary) 54%, var(--cp-panel-muted)) 100%
+      );
   }
 
   &__edit-bg-btn {
@@ -584,8 +632,8 @@ watch(
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.4);
-    color: white;
+    background: color-mix(in oklab, var(--cp-panel) 32%, transparent);
+    color: var(--cp-text);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -594,7 +642,7 @@ watch(
     transition: background 0.2s;
 
     &:hover {
-      background: rgba(0, 0, 0, 0.6);
+      background: color-mix(in oklab, var(--cp-panel) 48%, transparent);
     }
 
     :deep(svg) {
@@ -618,7 +666,7 @@ watch(
     border-radius: 50%;
     background: var(--cp-panel);
     padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--cp-shadow-soft);
     cursor: pointer;
     transition: transform 0.2s;
 
@@ -671,6 +719,16 @@ watch(
     font-size: 14px;
     color: var(--cp-text-muted);
     line-height: 1.4;
+  }
+
+  &__uid {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--cp-text-muted);
+    line-height: 1.4;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
   &__copy-btn {
@@ -775,7 +833,7 @@ watch(
 
     &:hover {
       background: var(--cp-primary);
-      color: white;
+      color: var(--cp-panel);
     }
   }
 
@@ -783,7 +841,7 @@ watch(
     background: var(--cp-panel);
 
     &::before {
-      box-shadow: -1px -1px 1px rgba(0, 0, 0, 0.05);
+      box-shadow: var(--cp-shadow-soft);
     }
   }
 }

@@ -5,7 +5,7 @@
  * @description chat｜页面：ChannelInfoPage。
  *
  * PRD 对照：
- * - P0-C2 频道资料：owner 可更新频道资料（name/brief/avatar）——此页提供 name/brief 的 mock 编辑入口。
+ * - P0-C2 频道资料：owner 可更新频道资料（name/brief/avatar）——非 mock 环境下通过后端成员角色判断展示 name/brief 编辑入口。
  */
 
 import { computed } from "vue";

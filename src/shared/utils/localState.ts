@@ -17,6 +17,7 @@ import {
   KEY_LAST_EVENT_ID_PREFIX,
   KEY_LATEST_MESSAGE_TIME_MS,
 } from "@/shared/utils/storageKeys";
+import { readString, writeString } from "@/shared/utils/localStore";
 
 /**
  * 前端侧保存的认证会话结构（按 server scope 隔离）。
@@ -69,7 +70,7 @@ function safeParseNumber(value: string | null): number | null {
  * @returns 最新时间戳（ms）；不可用时返回 0。
  */
 export function getLatestLocalMessageTimeMs(): number {
-  return safeParseNumber(localStorage.getItem(KEY_LATEST_MESSAGE_TIME_MS)) ?? 0;
+  return safeParseNumber(readString(KEY_LATEST_MESSAGE_TIME_MS)) ?? 0;
 }
 
 /**
@@ -81,7 +82,7 @@ export function bumpLatestLocalMessageTimeMs(next: number): void {
   if (!Number.isFinite(next) || next <= 0) return;
   const current = getLatestLocalMessageTimeMs();
   if (next <= current) return;
-  localStorage.setItem(KEY_LATEST_MESSAGE_TIME_MS, String(Math.trunc(next)));
+  writeString(KEY_LATEST_MESSAGE_TIME_MS, String(Math.trunc(next)));
 }
 
 /**
@@ -91,7 +92,7 @@ export function bumpLatestLocalMessageTimeMs(next: number): void {
  * @returns 原始 JSON 字符串。
  */
 export function readAppConfigRaw(fallback: string): string {
-  return localStorage.getItem(KEY_APP_CONFIG_RAW) ?? fallback;
+  return readString(KEY_APP_CONFIG_RAW, fallback);
 }
 
 /**
@@ -100,7 +101,7 @@ export function readAppConfigRaw(fallback: string): string {
  * @param raw - 原始 JSON 字符串。
  */
 export function writeAppConfigRaw(raw: string): void {
-  localStorage.setItem(KEY_APP_CONFIG_RAW, raw);
+  writeString(KEY_APP_CONFIG_RAW, raw);
 }
 
 /**

@@ -311,6 +311,38 @@
 }
 ```
 
+### 5.4 更新当前用户邮箱
+
+- 方法：`PUT /api/users/me/email`
+- 请求：
+
+```json
+{ "email": "new@example.com", "code": "123456" }
+```
+
+- 成功：`204 No Content`
+
+### 5.5 更新当前用户资料
+
+- 方法：`PATCH /api/users/me`
+- 请求：
+
+```json
+{ "username": "Alice", "avatar": 0, "sex": 0, "brief": "hello", "birthday": 0 }
+```
+
+- 成功：`204 No Content`
+
+### 5.6 更新当前用户背景图
+
+- 方法：`POST /api/users/me/background`
+- 请求：`multipart/form-data`，字段名 `background`
+- 成功响应（示例）：
+
+```json
+{ "backgroundUrl": "api/files/download/profile_bg_123" }
+```
+
 ## 6. Channels（需登录）
 
 > 频道型聊天基座（PRD P0）建议服务端至少提供一个默认频道（如 `General`），避免出现“用户登录后无可进入频道”的死路。

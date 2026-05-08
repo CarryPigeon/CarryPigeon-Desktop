@@ -1,11 +1,11 @@
 //! plugins｜领域端口：plugin_install_store_port。
 
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest,
+    PluginNetworkFetchRequest, PluginRuntimeEntry,
 };
 
 pub type PluginInstallStoreFuture<'a, T> =
@@ -55,13 +55,7 @@ pub trait PluginInstallStorePort: Send + Sync {
 
     fn install_from_url<'a>(
         &'a self,
-        server_socket: &'a str,
-        plugin_id: &'a str,
-        version: &'a str,
-        url: &'a str,
-        sha256: &'a str,
-        tls_policy: Option<&'a str>,
-        tls_fingerprint: Option<&'a str>,
+        request: PluginInstallFromUrlRequest<'a>,
     ) -> PluginInstallStoreFuture<'a, InstalledPluginState>;
 
     fn enable<'a>(
@@ -135,12 +129,6 @@ pub trait PluginInstallStorePort: Send + Sync {
 
     fn network_fetch<'a>(
         &'a self,
-        server_socket: &'a str,
-        url: &'a str,
-        method: &'a str,
-        headers: HashMap<String, String>,
-        body: Option<String>,
-        tls_policy: Option<&'a str>,
-        tls_fingerprint: Option<&'a str>,
+        request: PluginNetworkFetchRequest<'a>,
     ) -> PluginInstallStoreFuture<'a, PluginFetchResponse>;
 }

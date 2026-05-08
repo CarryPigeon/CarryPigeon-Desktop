@@ -15,6 +15,9 @@ use crate::shared::net::tls_fingerprint::{
     normalize_sha256_fingerprint, verify_der_sha256_fingerprint,
 };
 
+const TCP_FRAME_MAX_BYTES: usize = u16::MAX as usize;
+const TCP_ACCUMULATOR_MAX_BYTES: usize = 1024 * 1024;
+
 enum Transport {
     Plain,
     Tls {
@@ -86,8 +89,7 @@ fn emit_deframed_payloads(
             acc.drain(0..2);
             continue;
         }
-        // Hard limit: 10MB payload.
-        if len > 10_000_000 {
+        if len > TCP_FRAME_MAX_BYTES {
             tracing::warn!(action = "network_tcp_frame_invalid_length", len);
             acc.clear();
             break;
@@ -214,6 +216,14 @@ impl TcpServiceReal {
 
                         // New: deframe and emit payload frames.
                         acc.extend_from_slice(&chunk);
+                        if acc.len() > TCP_ACCUMULATOR_MAX_BYTES {
+                            tracing::warn!(
+                                action = "network_tcp_frame_accumulator_overflow",
+                                len = acc.len()
+                            );
+                            acc.clear();
+                            continue;
+                        }
                         emit_deframed_payloads(&event_sink, &server_socket, &mut acc);
                     }
                     Err(e) => {

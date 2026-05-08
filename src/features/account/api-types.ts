@@ -8,6 +8,7 @@ import type { ReadableCapability } from "@/shared/types/capabilities";
 import type { CurrentUser, CurrentUserProfilePatch, CurrentUserTrustLevel } from "./current-user/api";
 import type { UpdateUserProfileInput } from "./profile/domain/types/UserTypes";
 import type {
+  AuthRequiredSetupOutcome,
   RevokeTokenOutcome,
   SendVerificationCodeOutcome,
 } from "./auth-flow/api";
@@ -110,6 +111,13 @@ export type AccountServerCapabilities = {
    * @returns 显式发码结果；失败时返回结构化错误信息而非抛出业务分支异常。
    */
   sendVerificationCode(email: string): Promise<SendVerificationCodeOutcome>;
+
+  /**
+   * 检查当前服务器 required 插件是否已满足。
+   *
+   * @returns required gate 检查结果。
+   */
+  checkRequiredSetup(): Promise<AuthRequiredSetupOutcome>;
 
   /**
    * 向当前绑定的服务器撤销 refresh token。

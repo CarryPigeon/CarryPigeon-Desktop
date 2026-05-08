@@ -44,6 +44,19 @@ type ApiUsersBatchResponse = {
   items: ApiUserPublic[];
 };
 
+type ApiUpdateUserEmailRequest = {
+  email: string;
+  code: string;
+};
+
+type ApiUpdateUserProfileRequest = {
+  username: string;
+  avatar: number;
+  sex: number;
+  brief: string;
+  birthday: number;
+};
+
 /**
  * 将未知错误归一化为 ProfileError。
  *
@@ -128,6 +141,65 @@ export async function httpListUsers(serverSocket: string, accessToken: string, i
     return Array.isArray(res?.items) ? res.items : [];
   } catch (e) {
     rethrowProfileError("list_users_failed", "List users failed", e);
+  }
+}
+
+/**
+ * 更新当前用户邮箱。
+ *
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param email - 新邮箱。
+ * @param code - 邮箱验证码。
+ */
+export async function httpUpdateUserEmail(
+  serverSocket: string,
+  accessToken: string,
+  email: string,
+  code: string,
+): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const body: ApiUpdateUserEmailRequest = {
+    email: String(email ?? "").trim(),
+    code: String(code ?? "").trim(),
+  };
+  if (!body.email || !body.code) {
+    throw new ProfileError({ code: "update_email_failed", message: "Missing email or verification code." });
+  }
+  try {
+    await client.requestJson<void>("PUT", "/users/me/email", body);
+  } catch (e) {
+    rethrowProfileError("update_email_failed", "Update user email failed", e);
+  }
+}
+
+/**
+ * 更新当前用户资料。
+ *
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param input - 用户资料输入。
+ */
+export async function httpUpdateUserProfile(
+  serverSocket: string,
+  accessToken: string,
+  input: ApiUpdateUserProfileRequest,
+): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const body: ApiUpdateUserProfileRequest = {
+    username: String(input.username ?? "").trim(),
+    avatar: Number.isFinite(input.avatar) ? Math.trunc(input.avatar) : 0,
+    sex: Number.isFinite(input.sex) ? Math.trunc(input.sex) : 0,
+    brief: String(input.brief ?? ""),
+    birthday: Number.isFinite(input.birthday) ? Math.trunc(input.birthday) : 0,
+  };
+  if (!body.username) {
+    throw new ProfileError({ code: "update_profile_failed", message: "Missing username." });
+  }
+  try {
+    await client.requestJson<void>("PATCH", "/users/me", body);
+  } catch (e) {
+    rethrowProfileError("update_profile_failed", "Update user profile failed", e);
   }
 }
 

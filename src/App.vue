@@ -14,6 +14,8 @@ defineOptions({ name: "App" });
 /* 全局样式入口：主题 token + 基础美学基线 */
 
 :root {
+  color-scheme: light;
+
   /* 字体（有辨识度的字体栈与回退） */
   --cp-font-display: "Smiley Sans", "LXGW WenKai", "Alibaba PuHuiTi 3.0", "HarmonyOS Sans SC",
     "PingFang SC", "Microsoft YaHei UI", sans-serif;
@@ -130,7 +132,13 @@ defineOptions({ name: "App" });
   --td-font-family: var(--cp-font-body);
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 :root[data-theme="patchbay"] {
+  color-scheme: dark;
+
   /* 字体 */
   --cp-font-display: "Saira Semi Condensed", "DIN Alternate", "HarmonyOS Sans SC", "MiSans", "PingFang SC",
     "Microsoft YaHei UI", sans-serif;
@@ -255,6 +263,16 @@ body {
   overflow: hidden;
 }
 
+/* 主题（Light）背景（暖纸 + 柔和光晕） */
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(1200px 700px at 6% 4%, rgba(15, 118, 110, 0.22), transparent 60%),
+    radial-gradient(980px 720px at 94% 10%, rgba(194, 65, 12, 0.14), transparent 62%),
+    radial-gradient(900px 700px at 50% 115%, rgba(2, 132, 199, 0.1), transparent 58%),
+    linear-gradient(180deg, var(--cp-bg), var(--cp-bg-2));
+  background-attachment: fixed;
+}
+
 /* 主题（Patchbay）背景（石墨 + 网格） */
 :root[data-theme="patchbay"] body {
   background:
@@ -270,6 +288,26 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(20, 32, 29, 0.04),
+      rgba(20, 32, 29, 0.04) 1px,
+      transparent 1px,
+      transparent 6px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(20, 32, 29, 0.03),
+      rgba(20, 32, 29, 0.03) 1px,
+      transparent 1px,
+      transparent 10px
+    );
+  opacity: 0.14;
+  mix-blend-mode: multiply;
+}
+
+:root[data-theme="light"] body::before {
   background-image:
     repeating-linear-gradient(
       0deg,
@@ -310,6 +348,10 @@ body::before {
 }
 
 ::selection {
+  background: rgba(15, 118, 110, 0.22);
+}
+
+:root[data-theme="light"] ::selection {
   background: rgba(15, 118, 110, 0.22);
 }
 

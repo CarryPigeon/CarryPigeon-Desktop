@@ -11,7 +11,7 @@
 use tracing::{debug, error, info, warn};
 
 use crate::shared::error::CommandResult;
-use regex::Regex;
+use regex::{Captures, Regex};
 
 /// 从 WebView 传入消息中提取 `action` 字段。
 ///
@@ -68,12 +68,18 @@ fn redact_sensitive_message_body(body: &str) -> String {
     ];
 
     let mut sanitized = body.to_string();
-    let bearer_re = Regex::new(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+").expect("bearer regex is valid");
-    sanitized = bearer_re.replace_all(&sanitized, "[REDACTED]").into_owned();
+    if let Ok(bearer_re) = Regex::new(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+") {
+        sanitized = bearer_re.replace_all(&sanitized, "[REDACTED]").into_owned();
+    }
 
     for pattern in KEY_VALUE_PATTERNS {
-        let re = Regex::new(pattern).expect("sensitive key regex is valid");
-        sanitized = re.replace_all(&sanitized, "$1[REDACTED]$2").into_owned();
+        if let Ok(re) = Regex::new(pattern) {
+            sanitized = re
+                .replace_all(&sanitized, |caps: &Captures<'_>| {
+                    format!("{}[REDACTED]{}", &caps[1], &caps[2])
+                })
+                .into_owned();
+        }
     }
 
     sanitized
@@ -145,8 +151,14 @@ mod tests {
 
     #[test]
     fn log_action_preserved() {
-        assert_eq!(extract_action("Action: network_tcp_send_failed {\"error\":\"boom\"}"), "network_tcp_send_failed");
-        assert_eq!(extract_action("action: app_session_auth_session_clear_failed"), "app_session_auth_session_clear_failed");
+        assert_eq!(
+            extract_action("Action: network_tcp_send_failed {\"error\":\"boom\"}"),
+            "network_tcp_send_failed"
+        );
+        assert_eq!(
+            extract_action("action: app_session_auth_session_clear_failed"),
+            "app_session_auth_session_clear_failed"
+        );
     }
 
     #[test]

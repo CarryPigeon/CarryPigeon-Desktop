@@ -1,6 +1,11 @@
-//! plugins｜数据层：plugin_manager。
+//! plugins｜数据层：plugin_manager（legacy debug loader）。
 //!
 //! 约定：注释中文，日志英文（tracing）。
+//!
+//! 说明：当前插件中心主链路使用 `plugin_store` 安装 ESM + 静态资源包，并通过
+//! `app://plugins/<server_id>/<plugin_id>/<version>/<entry>` 暴露给前端动态 import。
+//! 本模块仅保留给 `load_plugin` 调试命令，兼容早期 wasm 插件实验路径；不得作为
+//! PRD P0 插件运行时主实现继续扩展。
 use std::{
     collections::HashMap,
     path::PathBuf,

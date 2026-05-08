@@ -4,7 +4,7 @@
  * 收敛 chat 实时 Store 的装配细节，避免最终 composition root 再次膨胀。
  */
 
-import { getCurrentChatUserId } from "@/features/chat/data/account-session";
+import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import { createMessageTimelineStatePort } from "@/features/chat/message-flow/presentation/runtime/messageFlowStatePorts";
 import { emitChannelProjectionChanged } from "@/features/chat/presentation/shared/windowMessageEvents";
 import { createChatEventRouter } from "@/features/chat/composition/createChatEventRouter";

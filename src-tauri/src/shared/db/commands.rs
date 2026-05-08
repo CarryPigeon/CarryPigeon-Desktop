@@ -256,6 +256,54 @@ fn exec_result(result: &sea_orm::ExecResult) -> DbExecResult {
     }
 }
 
+fn normalized_sql_head(sql: &str) -> &str {
+    sql.trim_start()
+        .split(|ch: char| ch.is_whitespace() || ch == '(')
+        .next()
+        .unwrap_or("")
+}
+
+fn validate_single_statement_sql(sql: &str) -> CommandResult<()> {
+    let trimmed = sql.trim();
+    if trimmed.is_empty() {
+        return Err(command_error("DB_SQL_REQUIRED", "sql is required"));
+    }
+    if trimmed.trim_end_matches(';').contains(';') {
+        return Err(command_error(
+            "DB_SQL_MULTI_STATEMENT_NOT_ALLOWED",
+            "multiple SQL statements are not allowed",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_query_sql(sql: &str) -> CommandResult<()> {
+    validate_single_statement_sql(sql)?;
+    let head = normalized_sql_head(sql).to_ascii_lowercase();
+    if head == "select" || head == "with" {
+        return Ok(());
+    }
+    Err(command_error(
+        "DB_SQL_QUERY_ONLY",
+        "db_query only accepts SELECT/WITH statements",
+    ))
+}
+
+fn validate_execute_sql(sql: &str) -> CommandResult<()> {
+    validate_single_statement_sql(sql)?;
+    let head = normalized_sql_head(sql).to_ascii_lowercase();
+    if matches!(
+        head.as_str(),
+        "insert" | "update" | "delete" | "replace" | "create" | "alter" | "drop"
+    ) {
+        return Ok(());
+    }
+    Err(command_error(
+        "DB_SQL_EXECUTE_ONLY",
+        "db_execute only accepts non-query statements",
+    ))
+}
+
 #[tauri::command]
 /// 初始化（或连接）一个命名数据库，并按需执行迁移。
 ///
@@ -306,6 +354,7 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
 /// - `Ok(DbExecResult)`：执行结果（行数等）。
 /// - `Err(String)`：执行失败原因。
 pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
+    validate_execute_sql(&req.sql)?;
     let db = get_db(&req.key)
         .await
         .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
@@ -335,6 +384,7 @@ pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
     if req.columns.is_empty() {
         return Err(command_error("DB_COLUMNS_REQUIRED", "columns is required"));
     }
+    validate_query_sql(&req.sql)?;
 
     let db = get_db(&req.key)
         .await
@@ -382,6 +432,7 @@ pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbEx
     let mut results = Vec::with_capacity(req.statements.len());
 
     for statement in req.statements {
+        validate_execute_sql(&statement.sql)?;
         let stmt = RawStatement::new(statement.sql, map_values(statement.params));
         let res = txn
             .execute(&stmt)
@@ -709,7 +760,9 @@ mod tests {
         let expected = dir.join("data").join("db").join("system.db");
         assert!(expected.exists(), "managed db file should be created");
 
-        db_remove("system".to_string()).await.expect("remove system db");
+        db_remove("system".to_string())
+            .await
+            .expect("remove system db");
         assert!(!expected.exists(), "managed db file should be removed");
 
         std::env::set_current_dir(prev).expect("restore cwd");
@@ -773,7 +826,10 @@ mod tests {
             .await
             .expect_err("outside-root db must be rejected");
         assert!(err.contains("DB_PATH_OUTSIDE_ROOT"));
-        assert!(unsafe_path.exists(), "outside-root file must not be deleted");
+        assert!(
+            unsafe_path.exists(),
+            "outside-root file must not be deleted"
+        );
 
         std::env::set_current_dir(prev).expect("restore cwd");
     }
