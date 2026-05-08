@@ -5,7 +5,6 @@
  */
 
 import type { Router } from "vue-router";
-import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { getAccountCapabilities } from "@/features/account/api";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
@@ -17,7 +16,6 @@ import { createLogger } from "@/shared/utils/logger";
 
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 const accountCapabilities = getAccountCapabilities();
-const authFlowCapabilities = getAuthFlowCapabilities();
 const logger = createLogger("appSessionProcess");
 
 function redirectToRequiredSetup(router: Router): void {
@@ -55,7 +53,7 @@ async function redirectIfRequiredSetupNeeded(router: Router, serverSocket: strin
       redirectToRequiredSetup(router);
       return true;
     }
-    const outcome = await authFlowCapabilities.forServer(serverSocket).checkRequiredSetup();
+    const outcome = await accountCapabilities.forServer(serverSocket).checkRequiredSetup();
     if (!outcome.ok) return false;
     if (outcome.kind !== "required_setup_required") return false;
     accountCapabilities.authFlow.updateMissingRequiredPlugins([...outcome.missingPluginIds]);

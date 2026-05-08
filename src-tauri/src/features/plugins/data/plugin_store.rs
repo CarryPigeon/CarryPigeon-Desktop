@@ -811,8 +811,7 @@ mod tests {
             }
         });
         (
-            reqwest::Url::parse(&format!("http://127.0.0.1:{}", addr.port()))
-                .expect("base url"),
+            reqwest::Url::parse(&format!("http://127.0.0.1:{}", addr.port())).expect("base url"),
             handle,
         )
     }
@@ -877,15 +876,16 @@ mod tests {
     #[tokio::test]
     async fn plugin_rejects_untrusted_cross_origin() {
         let base = reqwest::Url::parse("http://127.0.0.1:18080/").expect("base url");
-        let download = reqwest::Url::parse("http://127.0.0.1:18081/plugin.zip")
-            .expect("download url");
+        let download =
+            reqwest::Url::parse("http://127.0.0.1:18081/plugin.zip").expect("download url");
         let client = reqwest::Client::new();
 
         let err = download_plugin_zip_bytes(&base, &client, download)
             .await
             .expect_err("cross-origin download should fail closed");
-        assert!(err
-            .to_string()
-            .contains("Cross-origin plugin download rejected by default"));
+        assert!(
+            err.to_string()
+                .contains("Cross-origin plugin download rejected by default")
+        );
     }
 }

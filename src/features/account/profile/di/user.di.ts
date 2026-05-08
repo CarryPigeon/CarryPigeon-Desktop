@@ -55,15 +55,15 @@ export function getUserMutationPort(serverSocket: string): UserMutationPort {
  * 判断当前运行模式下是否支持 profile mutation。
  *
  * 说明：
- * - 当前 HTTP（off/protocol）后端不支持用户资料写接口；
- * - store mock 模式支持该能力（用于 UI 预览/调试）。
+ * - HTTP / protocol / store 均通过各自端口暴露资料写入能力；
+ * - 真实服务端若未实现对应端点，会按 API 错误正常返回失败 outcome。
  *
  * @returns 支持则为 true。
  */
 export function supportsProfileMutation(): boolean {
   return selectByMockMode<boolean>({
-    off: () => false,
-    protocol: () => false,
+    off: () => true,
+    protocol: () => true,
     store: () => true,
   });
 }

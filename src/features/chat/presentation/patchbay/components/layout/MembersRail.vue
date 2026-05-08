@@ -6,7 +6,7 @@
 
 import type { MembersRailModel } from "@/features/chat/presentation/patchbay/view-models/useMembersRailModel";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
-import UserProfilePopover from "@/features/account/profile/presentation/components/UserProfilePopover.vue";
+import { UserProfilePopover } from "@/features/account/components";
 
 const props = defineProps<{
   model: MembersRailModel;

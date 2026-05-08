@@ -1,7 +1,7 @@
 /**
- * @fileoverview profile 对外公共 API - 组件导出
- * @description 暴露 UserProfilePopover 组件供跨模块使用
+ * @fileoverview profile 对外公共 API。
+ * @description 暴露 profile 子域稳定公共能力。
  */
 
-export { default as UserProfilePopover } from "../presentation/components/UserProfilePopover.vue";
-export type { UserProfilePopoverProps } from "../presentation/components/UserProfilePopover.props";
+export { UserProfilePopover } from "./UserProfilePopover";
+export type { UserProfilePopoverProps } from "./UserProfilePopover";

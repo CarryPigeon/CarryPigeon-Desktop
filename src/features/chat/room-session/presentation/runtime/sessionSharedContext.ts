@@ -14,7 +14,7 @@
 import type { ChatReadStateReporterPort } from "@/features/chat/domain/ports/runtimePorts";
 import { readAuthToken } from "@/shared/utils/localState";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
-import { getActiveChatServerSocket } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { createReadStateReporter, RoomSessionCatalogApplicationService } from "@/features/chat/room-session/internal";
 import type { ChatApiGateway } from "@/features/chat/composition/contracts/chatGateway";
 import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";

@@ -1,7 +1,5 @@
 //! plugins｜数据适配器：plugin_ports。
 
-use std::collections::HashMap;
-
 use crate::features::plugins::domain::ports::plugin_install_store_port::{
     PluginInstallStoreFuture, PluginInstallStorePort,
 };
@@ -9,7 +7,8 @@ use crate::features::plugins::domain::ports::plugin_loader_port::{
     PluginLoaderFuture, PluginLoaderPort,
 };
 use crate::features::plugins::domain::types::{
-    InstalledPluginState, PluginFetchResponse, PluginLoadResult, PluginManifest, PluginRuntimeEntry,
+    InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest, PluginLoadResult,
+    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry,
 };
 
 use super::plugin_manager::{list_installed_manifests, plugin_manager};
@@ -130,23 +129,17 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
 
     fn install_from_url<'a>(
         &'a self,
-        server_socket: &'a str,
-        plugin_id: &'a str,
-        version: &'a str,
-        url: &'a str,
-        sha256: &'a str,
-        tls_policy: Option<&'a str>,
-        tls_fingerprint: Option<&'a str>,
+        request: PluginInstallFromUrlRequest<'a>,
     ) -> PluginInstallStoreFuture<'a, InstalledPluginState> {
         Box::pin(async move {
             plugin_store::install_from_url(
-                server_socket,
-                plugin_id,
-                version,
-                url,
-                sha256,
-                tls_policy,
-                tls_fingerprint,
+                request.server_socket,
+                request.plugin_id,
+                request.version,
+                request.url,
+                request.sha256,
+                request.tls_policy,
+                request.tls_fingerprint,
             )
             .await
         })
@@ -278,23 +271,17 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
 
     fn network_fetch<'a>(
         &'a self,
-        server_socket: &'a str,
-        url: &'a str,
-        method: &'a str,
-        headers: HashMap<String, String>,
-        body: Option<String>,
-        tls_policy: Option<&'a str>,
-        tls_fingerprint: Option<&'a str>,
+        request: PluginNetworkFetchRequest<'a>,
     ) -> PluginInstallStoreFuture<'a, PluginFetchResponse> {
         Box::pin(async move {
             plugin_store::network_fetch(
-                server_socket,
-                url,
-                method,
-                headers,
-                body,
-                tls_policy,
-                tls_fingerprint,
+                request.server_socket,
+                request.url,
+                request.method,
+                request.headers,
+                request.body,
+                request.tls_policy,
+                request.tls_fingerprint,
             )
             .await
         })

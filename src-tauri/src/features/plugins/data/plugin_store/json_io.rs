@@ -68,7 +68,7 @@ async fn replace_file_atomic(src: &Path, dst: &Path) -> anyhow::Result<()> {
         replace_file_windows(src, dst).with_context(|| {
             format!("Failed to replace file via MoveFileExW: {}", dst.display())
         })?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(not(windows))]
     {

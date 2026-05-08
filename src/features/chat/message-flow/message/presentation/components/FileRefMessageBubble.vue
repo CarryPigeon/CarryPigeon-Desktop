@@ -7,7 +7,7 @@
 
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { getActiveChatServerSocket } from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
 
 const props = defineProps<{

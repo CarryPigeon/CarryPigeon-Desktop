@@ -9,7 +9,7 @@ import { useI18n } from "vue-i18n";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
-import UserProfilePopover from "@/features/account/profile/presentation/components/UserProfilePopover.vue";
+import { UserProfilePopover } from "@/features/account/components";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";

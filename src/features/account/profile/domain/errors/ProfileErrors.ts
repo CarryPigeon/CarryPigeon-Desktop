@@ -8,6 +8,8 @@ export type ProfileErrorCode =
   | "get_me_failed"
   | "get_user_failed"
   | "list_users_failed"
+  | "update_email_failed"
+  | "update_profile_failed"
   | "upload_background_failed"
   | "mutation_unsupported";
 

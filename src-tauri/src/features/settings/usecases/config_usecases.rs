@@ -11,6 +11,24 @@ pub async fn get_config(config_store_port: &dyn ConfigStorePort) -> anyhow::Resu
     config_store_port.get_config().await
 }
 
+/// 导出版本化 settings envelope。
+pub async fn export_settings(config_store_port: &dyn ConfigStorePort) -> anyhow::Result<String> {
+    config_store_port.export_settings().await
+}
+
+/// 导入版本化 settings envelope。
+pub async fn import_settings(
+    raw: String,
+    config_store_port: &dyn ConfigStorePort,
+) -> anyhow::Result<()> {
+    config_store_port.import_settings(raw).await
+}
+
+/// 重置 settings 到默认值。
+pub async fn reset_settings(config_store_port: &dyn ConfigStorePort) -> anyhow::Result<()> {
+    config_store_port.reset_settings().await
+}
+
 /// 读取 bool 类型配置值（顶层字段）。
 ///
 /// # 参数

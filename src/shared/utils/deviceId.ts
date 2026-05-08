@@ -11,6 +11,7 @@
  */
 
 import { KEY_DEVICE_ID } from "./storageKeys";
+import { readString, writeString } from "./localStore";
 
 /**
  * 生成适合作为本地 device id 的伪随机标识。
@@ -31,9 +32,9 @@ function generateDeviceId(): string {
  * @returns device id 字符串。
  */
 export function getDeviceId(): string {
-  const existing = localStorage.getItem(KEY_DEVICE_ID);
+  const existing = readString(KEY_DEVICE_ID);
   if (existing && existing.trim()) return existing.trim();
   const next = generateDeviceId();
-  localStorage.setItem(KEY_DEVICE_ID, next);
+  writeString(KEY_DEVICE_ID, next);
   return next;
 }

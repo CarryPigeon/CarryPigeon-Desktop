@@ -5,6 +5,7 @@
  */
 
 import { onMounted, ref, watch, type Ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { readSettings, updateTheme } from "@/features/settings/application/settingsService";
 import { DEFAULT_APP_THEME, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
 
@@ -15,6 +16,7 @@ export type ThemePreferenceModel = {
 };
 
 export function useThemePreferenceModel(): ThemePreferenceModel {
+  const { t } = useI18n();
   const theme = ref<AppTheme>(DEFAULT_APP_THEME);
   const themeError = ref("");
   const hydrated = ref(false);
@@ -31,12 +33,15 @@ export function useThemePreferenceModel(): ThemePreferenceModel {
     try {
       await updateTheme(nextTheme);
     } catch (error) {
-      themeError.value = String(error) || "Save theme failed.";
+      themeError.value = String(error) || t("settings_save_theme_failed");
       rollbackThemeTo(previousTheme);
     }
   }
 
   function applyHydratedTheme(nextTheme: AppTheme): void {
+    if (theme.value === nextTheme) {
+      return;
+    }
     skipNextPersist = true;
     theme.value = nextTheme;
   }

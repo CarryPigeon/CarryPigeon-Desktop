@@ -12,6 +12,7 @@
 ## 当前文件
 
 - `docs/tmp/improvement-notes.md`
+- `docs/tmp/feature-deep-design-todo.md`
 - `docs/tmp/prd-api-migration-matrix-v1.1-v1.0.md`
 - `docs/tmp/archive-ui-legacy-warm-glass/README.md`
 

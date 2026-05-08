@@ -61,3 +61,25 @@ pub struct PluginFetchResponse {
     pub body_text: String,
     pub headers: HashMap<String, String>,
 }
+
+#[derive(Debug, Clone)]
+pub struct PluginInstallFromUrlRequest<'a> {
+    pub server_socket: &'a str,
+    pub plugin_id: &'a str,
+    pub version: &'a str,
+    pub url: &'a str,
+    pub sha256: &'a str,
+    pub tls_policy: Option<&'a str>,
+    pub tls_fingerprint: Option<&'a str>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginNetworkFetchRequest<'a> {
+    pub server_socket: &'a str,
+    pub url: &'a str,
+    pub method: &'a str,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
+    pub tls_policy: Option<&'a str>,
+    pub tls_fingerprint: Option<&'a str>,
+}

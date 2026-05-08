@@ -7,12 +7,12 @@
 import { computed, proxyRefs, ref, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { createLogger } from "@/shared/utils/logger";
-import { currentChatUserId } from "@/features/chat/data/account-session";
+import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
   chatConnectionDetail,
   chatConnectionPillState,
   retryChatConnection,
-} from "@/features/chat/data/server-workspace/chatServerWorkspaceAdapter";
+} from "@/features/chat/composition/serverWorkspaceAdapter";
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import type { DeleteChatMessageOutcome, MessageFlowCapabilities } from "@/features/chat/message-flow/api-types";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
@@ -188,24 +188,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     roomDirectory.focusDiscoverChannel(channelName);
   }
 
-  const channelRail = useChannelRailModel({
-    directory: roomDirectory,
-    currentSession,
-    socket,
-    serverId,
-    missingRequiredCount,
-    openPlugins: goPlugins,
-    openRequiredSetup: handleOpenRequiredSetup,
-    openCreateChannel: () => setShowCreateChannel(true),
-    openChannelInfo,
-    applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
-    onAsyncError: logAsyncError,
-  });
-
-  const membersRail = useMembersRailModel({
-    members: roomGovernance.currentChannel.members,
-  });
-
   const {
     signalPaneRef,
     showJumpToBottom,
@@ -235,12 +217,21 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   } = useChannelSettingsMenu();
 
   const {
+    showCreateChatMenu,
+    createChatMenuX,
+    createChatMenuY,
     showCreateChannel,
+    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
+    openCreateChatMenu,
+    closeCreateChatMenu,
     setShowCreateChannel,
+    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
+    openCreateChannelDialog,
+    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     openDeleteChannelDialog,
     handleChannelDeleted,
@@ -251,6 +242,24 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     selectChannel: currentSession.selectChannel,
     closeChannelMenu,
     onAsyncError: logAsyncError,
+  });
+
+  const channelRail = useChannelRailModel({
+    directory: roomDirectory,
+    currentSession,
+    socket,
+    serverId,
+    missingRequiredCount,
+    openPlugins: goPlugins,
+    openRequiredSetup: handleOpenRequiredSetup,
+    openCreateMenu: openCreateChatMenu,
+    openChannelInfo,
+    applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
+    onAsyncError: logAsyncError,
+  });
+
+  const membersRail = useMembersRailModel({
+    members: roomGovernance.currentChannel.members,
   });
 
   function handleReplyShortcut(messageId: string): void {
@@ -327,13 +336,17 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     quickSwitcherOpen,
     menuOpen,
     showChannelMenu,
+    showCreateChatMenu,
     showCreateChannel,
+    showCreateFriendPrivateChat,
     showDeleteChannel,
     closeQuickSwitcher,
     openQuickSwitcher,
     closeMenu,
     closeChannelMenu,
+    closeCreateChatMenu,
     setShowCreateChannel,
+    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
     goPlugins,
     openSettings: handleOpenSettings,
@@ -400,12 +413,20 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   });
 
   const channelDialogs = createPatchbayChannelDialogsSection({
+    showCreateChatMenu,
+    createChatMenuX,
+    createChatMenuY,
     showCreateChannel,
+    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
+    closeCreateChatMenu,
     setShowCreateChannel,
+    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
+    openCreateChannelDialog,
+    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     handleChannelDeleted,
   });

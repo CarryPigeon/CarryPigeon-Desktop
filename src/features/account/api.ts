@@ -49,6 +49,9 @@ export function createAccountCapabilities(): AccountCapabilities {
         sendVerificationCode(email) {
           return authServer.sendVerificationCode(email);
         },
+        checkRequiredSetup() {
+          return authServer.checkRequiredSetup();
+        },
         revokeToken(refreshToken) {
           return authServer.revokeToken(refreshToken);
         },
