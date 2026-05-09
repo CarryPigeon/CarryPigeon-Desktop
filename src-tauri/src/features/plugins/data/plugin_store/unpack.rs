@@ -215,6 +215,10 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
             }
 
             let final_name = if let Some(prefix) = root_prefix.as_deref() {
+                // Check the original path for symlinks before stripping the
+                // common root prefix — stripping would skip over a symlink
+                // placed inside the root-prefix directory.
+                ensure_write_target_is_safe(&canonical_root, &normalized, file.is_dir())?;
                 strip_root_prefix(&normalized, prefix)
             } else {
                 normalized
@@ -288,6 +292,7 @@ mod tests {
 
     #[cfg(unix)]
     fn build_nested_zip_bytes() -> Vec<u8> {
+        use std::io::Write;
         use zip::write::FileOptions;
 
         let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
