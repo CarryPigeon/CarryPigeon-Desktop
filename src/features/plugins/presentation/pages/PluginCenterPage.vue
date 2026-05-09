@@ -474,10 +474,12 @@ function onGlobalKeydown(e: KeyboardEvent): void {
 }
 
 .cp-plugins__gridWrap {
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   overflow: hidden;
   display: flex;
   flex-direction: column;
