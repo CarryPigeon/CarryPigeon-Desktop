@@ -43,3 +43,4 @@ data/db/*.db
 # Local workflow docs
 AGENTS.md
 CLAUDE.md
+.claude/
