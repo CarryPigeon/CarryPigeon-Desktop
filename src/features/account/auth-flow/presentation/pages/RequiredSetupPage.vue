@@ -172,8 +172,10 @@ const {
 
 /* Banner (power latch status) */
 .cp-required__banner {
-  border: 1px solid color-mix(in oklab, var(--cp-danger) 26%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
@@ -186,8 +188,10 @@ const {
 
 /* Banner variant when latch is closed */
 .cp-required__banner[data-ok="true"] {
-  border-color: color-mix(in oklab, var(--cp-accent) 26%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 10%, var(--cp-panel));
+  border-color: var(--cp-border);
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   animation: none;
 }
 
@@ -262,6 +266,8 @@ const {
 .cp-required__body {
   border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border-radius: 18px;
   box-shadow: var(--cp-shadow);
   overflow: hidden;
@@ -450,6 +456,13 @@ const {
 
 /* Footer actions row */
 .cp-required__footer {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
+  border-radius: 18px;
+  box-shadow: var(--cp-shadow-soft);
+  padding: 14px;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;

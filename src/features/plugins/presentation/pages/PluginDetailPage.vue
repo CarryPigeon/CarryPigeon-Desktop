@@ -267,8 +267,10 @@ onMounted(handleMounted);
 }
 
 .cp-plugin-detail__head {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
@@ -333,10 +335,12 @@ onMounted(handleMounted);
 .cp-plugin-detail__body {
   flex: 1 1 auto;
   min-height: 0;
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   padding: 14px;
   overflow: auto;
   display: grid;
@@ -525,10 +529,12 @@ onMounted(handleMounted);
 
 .cp-plugin-detail__empty {
   flex: 1 1 auto;
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   display: grid;
   place-items: center;
   gap: 12px;

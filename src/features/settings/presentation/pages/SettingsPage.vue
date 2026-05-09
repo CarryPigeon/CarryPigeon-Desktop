@@ -420,8 +420,10 @@ async function handleResetDefaults(): Promise<void> {
 
 /* 选择器：`.cp-settings__head`｜用途：头部卡片（返回/标题/动作） */
 .cp-settings__head {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
@@ -492,10 +494,12 @@ async function handleResetDefaults(): Promise<void> {
 
 /* 选择器：`.cp-settings__toolbar`｜用途：全局状态 / 主操作条 */
 .cp-settings__toolbar {
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   padding: 12px;
   display: flex;
   flex-wrap: wrap;
@@ -548,6 +552,12 @@ async function handleResetDefaults(): Promise<void> {
 
 /* 选择器：`.cp-settings__nav`｜用途：设置 section tabs */
 .cp-settings__nav {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
+  border-radius: 18px;
+  box-shadow: var(--cp-shadow-soft);
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -594,6 +604,12 @@ async function handleResetDefaults(): Promise<void> {
 
 /* 选择器：`.cp-settings__sections`｜用途：可滚动 section 容器 */
 .cp-settings__sections {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
+  border-radius: 18px;
+  box-shadow: var(--cp-shadow-soft);
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;

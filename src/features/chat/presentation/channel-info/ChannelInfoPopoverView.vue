@@ -58,8 +58,10 @@ const owner = computed(computeOwner);
 .cp-pop {
   height: 100%;
   padding: 12px;
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
   border-radius: 18px;
   box-shadow: var(--cp-shadow);
 }

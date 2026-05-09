@@ -59,7 +59,9 @@ const bio = computed(computeBio);
   height: 100%;
   padding: 12px;
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border-radius: 18px;
   box-shadow: var(--cp-shadow);
 }

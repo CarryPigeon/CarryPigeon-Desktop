@@ -412,8 +412,10 @@ watch(watchActiveSocket, handleActiveSocketChange);
 
 /* Header */
 .cp-servers__head {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
@@ -478,10 +480,12 @@ watch(watchActiveSocket, handleActiveSocketChange);
 
 /* Create panel */
 .cp-servers__create {
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   padding: 14px;
 }
 
@@ -505,10 +509,12 @@ watch(watchActiveSocket, handleActiveSocketChange);
 
 /* Workspace maintenance panel */
 .cp-servers__maintenance {
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   padding: 14px;
 }
 
@@ -602,10 +608,12 @@ watch(watchActiveSocket, handleActiveSocketChange);
 
 /* List panel */
 .cp-servers__listWrap {
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  box-shadow: var(--cp-shadow-soft);
   padding: 14px;
   overflow: auto;
   min-height: 0;

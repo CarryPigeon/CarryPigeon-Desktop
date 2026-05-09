@@ -53,8 +53,10 @@ const emit = defineEmits<{
 }
 
 .cp-governancePage__head {
+  background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
@@ -117,8 +119,10 @@ const emit = defineEmits<{
 .cp-governancePage__body {
   flex: 1 1 auto;
   min-height: 0;
-  border: 1px solid var(--cp-border);
   background: var(--cp-surface);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border: 1px solid var(--cp-border);
   border-radius: 18px;
   box-shadow: var(--cp-shadow);
   padding: 14px;
