@@ -1,11 +1,56 @@
 /* 样式：Patchbay｜布局：四栏网格（servers / channels / messages / members） */
 .cp-main {
   height: 100%;
-  display: grid;
-  grid-template-columns: 180px 300px 1fr 240px;
-  gap: 14px;
-  padding: 14px;
+  display: flex;
+  gap: 0;
+  padding: 14px 0;
   position: relative;
+  min-width: 0;
+  background: var(--cp-surface);
+}
+
+.cp-resizer {
+  flex: 0 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: col-resize;
+  margin: 10px -4px;
+  z-index: 1;
+  padding: 0;
+  position: relative;
+  touch-action: none;
+}
+
+.cp-resizer::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--cp-border-light);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
+}
+
+.cp-resizer:hover::before,
+.cp-resizer[data-active="true"]::before {
+  background: color-mix(in oklab, var(--cp-info) 56%, var(--cp-border));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-info) 14%, transparent);
+}
+
+.cp-resizer:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline-offset: 2px;
+}
+
+.cp-is-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* 区块：游标分页“加载更早历史”行 */
@@ -65,12 +110,35 @@
 .cp-center {
   border: 1px solid var(--cp-border);
   background: var(--cp-surface);
-  border-radius: 18px;
+  border-radius: 0;
   box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
   backdrop-filter: blur(16px) saturate(1.08);
   -webkit-backdrop-filter: blur(16px) saturate(1.08);
   overflow: hidden;
   min-width: 0;
+}
+
+.cp-rail--servers {
+  flex: 0 1 var(--cp-server-rail-width, 180px);
+  min-width: 96px;
+  max-width: 320px;
+}
+
+.cp-rail--channels {
+  flex: 0 1 var(--cp-channel-rail-width, 300px);
+  min-width: 220px;
+  max-width: 520px;
+}
+
+.cp-center {
+  flex: 1 1 0;
+  min-width: 240px;
+}
+
+.cp-rail--members {
+  flex: 0 1 var(--cp-members-rail-width, 240px);
+  min-width: 160px;
+  max-width: 380px;
 }
 
 /* 栏（Rail）：基础布局（标题 / 可滚动主体 / 底部） */
@@ -87,6 +155,7 @@
 /* 栏（Rail）：成员栏无底部区 */
 .cp-rail--members {
   grid-template-rows: auto 1fr;
+  border-radius: 0;
 }
 
 /* 栏标题：大写标签 */
