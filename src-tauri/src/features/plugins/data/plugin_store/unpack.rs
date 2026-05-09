@@ -288,6 +288,7 @@ mod tests {
 
     #[cfg(unix)]
     fn build_nested_zip_bytes() -> Vec<u8> {
+        use std::io::Write;
         use zip::write::FileOptions;
 
         let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
