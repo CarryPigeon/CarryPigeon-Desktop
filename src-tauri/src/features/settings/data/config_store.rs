@@ -419,7 +419,7 @@ where
     let envelope = load_current_envelope().await;
     envelope_value_for_key(&envelope, &key)
         .map(|value| T::extract(&value))
-        .unwrap_or_else(T::default)
+        .unwrap_or_default()
 }
 
 /// 异步读取配置文件中的 server_list，并按 server_socket 匹配返回对应条目。

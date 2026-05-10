@@ -87,7 +87,7 @@ fn is_windows_reparse_point(_meta: &std::fs::Metadata) -> bool {
     false
 }
 
-fn is_zip_entry_symlink(file: &zip::read::ZipFile<'_>) -> bool {
+fn is_zip_entry_symlink<R: Read>(file: &zip::read::ZipFile<'_, R>) -> bool {
     file.unix_mode()
         .map(|mode| mode & 0o170000 == 0o120000)
         .unwrap_or(false)

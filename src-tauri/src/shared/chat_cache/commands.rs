@@ -2,7 +2,7 @@
 
 use aes_gcm::{Aes256Gcm, Nonce, aead::Aead, aead::KeyInit};
 use anyhow::{Context, Result};
-use keyring::Entry;
+use keyring_core::Entry;
 use sea_orm::ConnectionTrait;
 use sea_orm::{Database, DatabaseBackend, Statement, StatementBuilder, TransactionTrait, Value};
 use serde::{Deserialize, Serialize};

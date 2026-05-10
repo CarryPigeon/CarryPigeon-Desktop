@@ -118,7 +118,7 @@ pub async fn download_avatar_impl(
     file.flush().await?;
 
     // 计算最终哈希
-    let hash = format!("{:x}", hasher.finalize());
+    let hash = hex::encode(hasher.finalize());
     info!(
         action = "network_download_completed",
         path = %output_path.display(),
