@@ -280,10 +280,10 @@ mod tests {
     }
 
     fn build_symlink_zip_bytes() -> Vec<u8> {
-        use zip::write::FileOptions;
+        use zip::write::{ExtendedFileOptions, FileOptions};
 
         let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-        let options = FileOptions::default().unix_permissions(0o120777);
+        let options = FileOptions::<ExtendedFileOptions>::default().unix_permissions(0o120777);
         writer
             .add_symlink("demo-plugin/link", "/tmp/escape.js", options)
             .expect("start symlink entry");
@@ -293,10 +293,10 @@ mod tests {
     #[cfg(unix)]
     fn build_nested_zip_bytes() -> Vec<u8> {
         use std::io::Write;
-        use zip::write::FileOptions;
+        use zip::write::{ExtendedFileOptions, FileOptions};
 
         let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-        let options = FileOptions::default().unix_permissions(0o100644);
+        let options = FileOptions::<ExtendedFileOptions>::default().unix_permissions(0o100644);
         writer
             .start_file("demo-plugin/linked/payload.js", options)
             .expect("start file");
