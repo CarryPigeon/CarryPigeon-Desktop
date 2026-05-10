@@ -831,7 +831,7 @@ mod tests {
             )
             .expect("write manifest");
         writer
-            .start_file("demo-plugin/index.js", options)
+            .start_file("demo-plugin/index.js", options.clone())
             .expect("start entry");
         writer.write_all(b"export default 1;").expect("write entry");
         writer.finish().expect("finish zip").into_inner()
