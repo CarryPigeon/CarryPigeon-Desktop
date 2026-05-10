@@ -4,4 +4,5 @@
 export * from "./commands";
 export * from "./events";
 export * from "./invokeClient";
+export * from "./runtime";
 export * from "./tauriLog";

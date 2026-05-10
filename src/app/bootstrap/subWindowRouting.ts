@@ -11,6 +11,8 @@ import type { Router } from "vue-router";
 function buildCommonProfileQuery(searchParams: URLSearchParams): Record<string, string> {
   return {
     avatar: searchParams.get("avatar") ?? "",
+    avatarUrl: searchParams.get("avatarUrl") ?? searchParams.get("avatar") ?? "",
+    backgroundUrl: searchParams.get("backgroundUrl") ?? "",
     name: searchParams.get("name") ?? "",
     bio: searchParams.get("bio") ?? searchParams.get("description") ?? "",
   };

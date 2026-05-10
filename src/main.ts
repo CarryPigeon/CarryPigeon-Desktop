@@ -28,6 +28,7 @@ import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { getPluginsCapabilities } from "@/features/plugins/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { createLogger } from "@/shared/utils/logger";
+import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 
 const app = createApp(App);
 app.use(router).use(i18n);
@@ -52,6 +53,7 @@ setTheme(getStoredTheme() ?? "patchbay");
 
 const searchParams = new URLSearchParams(window.location.search);
 const isSubWindow = routeIfSubWindow(router, searchParams);
+const hasTauriRuntime = isTauriRuntimeAvailable();
 
 async function startMainWindowRuntimes(): Promise<boolean> {
   try {
@@ -88,9 +90,11 @@ function releaseMainWindowRuntimes(): void {
 window.addEventListener("beforeunload", releaseMainWindowRuntimes);
 
 async function bootstrap(): Promise<void> {
-  await ensureSecureChatCacheReady();
+  if (hasTauriRuntime) {
+    await ensureSecureChatCacheReady();
+  }
   let serverConnectionReady = false;
-  if (!isSubWindow) {
+  if (!isSubWindow && hasTauriRuntime) {
     // Main window owns runtime startup and bridge registration.
     serverConnectionReady = await startMainWindowRuntimes();
   }
@@ -99,7 +103,7 @@ async function bootstrap(): Promise<void> {
   await router.isReady();
   app.mount("#app");
 
-  if (!isSubWindow && serverConnectionReady) {
+  if (!isSubWindow && serverConnectionReady && hasTauriRuntime) {
     // Session restore starts after mount to avoid blocking first paint.
     ensureInitialServerSelection();
     void restoreStartupSession(router);
