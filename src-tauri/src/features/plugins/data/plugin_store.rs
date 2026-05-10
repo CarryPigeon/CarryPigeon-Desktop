@@ -818,10 +818,10 @@ mod tests {
 
     fn build_plugin_zip_bytes() -> Vec<u8> {
         use std::io::Write;
-        use zip::write::FileOptions;
+        use zip::write::{ExtendedFileOptions, FileOptions};
 
         let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-        let options = FileOptions::default().unix_permissions(0o100644);
+        let options = FileOptions::<ExtendedFileOptions>::default().unix_permissions(0o100644);
         writer
             .start_file("demo-plugin/plugin.json", options)
             .expect("start file");
