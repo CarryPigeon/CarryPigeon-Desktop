@@ -83,7 +83,7 @@ impl PluginManager {
         backend_wasm: &[u8],
     ) -> anyhow::Result<()> {
         let component_backend = Component::from_binary(&self.engine, backend_wasm)
-            .context("Failed to create backend module from wasm bytes")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create backend module from wasm bytes: {e}"))?;
 
         let mut store: Store<String> = Store::new(&self.engine, plugin_name.to_string());
         let linker = Linker::new(&self.engine);
@@ -91,11 +91,11 @@ impl PluginManager {
         let backend_instance = linker
             .instantiate_async(&mut store, &component_backend)
             .await
-            .context("Failed to instantiate backend module")?;
+            .map_err(|e| anyhow::anyhow!("Failed to instantiate backend module: {e}"))?;
 
         let backend_start = backend_instance
             .get_typed_func::<(), ()>(&mut store, "start")
-            .context("Failed to get 'start' function from backend module")?;
+            .map_err(|e| anyhow::anyhow!("Failed to get 'start' function from backend module: {e}"))?;
 
         backend_start.call_async(&mut store, ()).await?;
         Ok(())
@@ -297,7 +297,7 @@ impl PluginManager {
         };
 
         let _component_frontend = Module::from_binary(&self.engine, &frontend_wasm)
-            .context("Failed to create frontend module from wasm bytes")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create frontend module from wasm bytes: {e}"))?;
         self.run_backend_start(&manifest.name, &backend_wasm)
             .await?;
 
@@ -330,7 +330,7 @@ pub static PLUGINMANAGER: OnceLock<PluginManager> = OnceLock::new();
 fn create_plugin_manager() -> anyhow::Result<PluginManager> {
     let mut config = wasmtime::Config::new();
     config.wasm_component_model(true);
-    let engine = Engine::new(&config).context("Failed to create Wasmtime engine")?;
+    let engine = Engine::new(&config).map_err(|e| anyhow::anyhow!("Failed to create Wasmtime engine: {e}"))?;
     PluginManager::new(engine, PathBuf::from("./plugin_cache"))
         .context("Failed to init PluginManager")
 }
