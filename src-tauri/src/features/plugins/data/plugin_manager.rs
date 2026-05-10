@@ -95,7 +95,9 @@ impl PluginManager {
 
         let backend_start = backend_instance
             .get_typed_func::<(), ()>(&mut store, "start")
-            .map_err(|e| anyhow::anyhow!("Failed to get 'start' function from backend module: {e}"))?;
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to get 'start' function from backend module: {e}")
+            })?;
 
         backend_start.call_async(&mut store, ()).await?;
         Ok(())
@@ -296,8 +298,10 @@ impl PluginManager {
             Err(err) => return Err(err.into()),
         };
 
-        let _component_frontend = Module::from_binary(&self.engine, &frontend_wasm)
-            .map_err(|e| anyhow::anyhow!("Failed to create frontend module from wasm bytes: {e}"))?;
+        let _component_frontend =
+            Module::from_binary(&self.engine, &frontend_wasm).map_err(|e| {
+                anyhow::anyhow!("Failed to create frontend module from wasm bytes: {e}")
+            })?;
         self.run_backend_start(&manifest.name, &backend_wasm)
             .await?;
 
@@ -330,7 +334,8 @@ pub static PLUGINMANAGER: OnceLock<PluginManager> = OnceLock::new();
 fn create_plugin_manager() -> anyhow::Result<PluginManager> {
     let mut config = wasmtime::Config::new();
     config.wasm_component_model(true);
-    let engine = Engine::new(&config).map_err(|e| anyhow::anyhow!("Failed to create Wasmtime engine: {e}"))?;
+    let engine = Engine::new(&config)
+        .map_err(|e| anyhow::anyhow!("Failed to create Wasmtime engine: {e}"))?;
     PluginManager::new(engine, PathBuf::from("./plugin_cache"))
         .context("Failed to init PluginManager")
 }
