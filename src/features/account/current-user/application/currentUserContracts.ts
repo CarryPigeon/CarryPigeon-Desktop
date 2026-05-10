@@ -34,6 +34,16 @@ export type CurrentUser = {
   description: string;
 
   /**
+   * 当前展示头像。
+   */
+  avatarUrl: string;
+
+  /**
+   * 当前展示背景图。
+   */
+  backgroundUrl: string;
+
+  /**
    * 当前快照的可信等级。
    */
   trustLevel: CurrentUserTrustLevel;
@@ -50,4 +60,6 @@ export type CurrentUserProfilePatch = {
   username?: string;
   email?: string;
   description?: string;
+  avatarUrl?: string;
+  backgroundUrl?: string;
 };
