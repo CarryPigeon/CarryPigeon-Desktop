@@ -4,6 +4,7 @@
 
 import { invokeTauri } from "@/shared/tauri/invokeClient";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
+import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import {
   KEY_AUTH_SESSION_PREFIX,
   KEY_AUTH_TOKEN_PREFIX,
@@ -162,6 +163,11 @@ export async function ensureSecureChatCacheReady(): Promise<void> {
   if (ready) return;
   if (readyPromise) return readyPromise;
 
+  if (!isTauriRuntimeAvailable()) {
+    ready = true;
+    return;
+  }
+
   readyPromise = (async () => {
     cache.clear();
     trustedKeyReads.clear();
@@ -214,6 +220,7 @@ export async function ensureSecureChatCacheReady(): Promise<void> {
 export async function readSecureChatCacheValue(key: string): Promise<string> {
   const trustedKey = assertTrustedSecureChatCacheKey(key);
   if (cache.has(trustedKey)) return cache.get(trustedKey) ?? "";
+  if (!isTauriRuntimeAvailable()) return "";
   if (!trustedKeyReads.has(trustedKey)) {
     const value = await invokeSecureChatCacheCommand<string | null>(TAURI_COMMANDS.chatCacheGet, { key: trustedKey });
     if (typeof value === "string" && value.length > 0) {
@@ -234,6 +241,10 @@ export function readSecureChatCacheValueSync(key: string): string {
 export async function setSecureChatCacheValue(key: string, value: string): Promise<void> {
   const trustedKey = assertTrustedSecureChatCacheKey(key);
   const next = String(value ?? "");
+  if (!isTauriRuntimeAvailable()) {
+    cache.set(trustedKey, next);
+    return;
+  }
   await persistSecureChatCachePut(trustedKey, next);
   cache.set(trustedKey, next);
 }
@@ -242,6 +253,7 @@ export function setSecureChatCacheValueSync(key: string, value: string): void {
   const trustedKey = assertTrustedSecureChatCacheKey(key);
   const next = String(value ?? "");
   cache.set(trustedKey, next);
+  if (!isTauriRuntimeAvailable()) return;
   void persistSecureChatCachePut(trustedKey, next).catch((error) => {
     logger.error("Action: chat_secure_cache_put_failed", {
       key: trustedKey,
@@ -256,6 +268,10 @@ export async function writeSecureChatCacheValue(key: string, value: string): Pro
 
 export async function removeSecureChatCacheValue(key: string): Promise<void> {
   const trustedKey = assertTrustedSecureChatCacheKey(key);
+  if (!isTauriRuntimeAvailable()) {
+    cache.delete(trustedKey);
+    return;
+  }
   await persistSecureChatCacheRemove(trustedKey);
   cache.delete(trustedKey);
 }
@@ -263,6 +279,7 @@ export async function removeSecureChatCacheValue(key: string): Promise<void> {
 export function removeSecureChatCacheValueSync(key: string): void {
   const trustedKey = assertTrustedSecureChatCacheKey(key);
   cache.delete(trustedKey);
+  if (!isTauriRuntimeAvailable()) return;
   void persistSecureChatCacheRemove(trustedKey).catch((error) => {
     logger.error("Action: chat_secure_cache_remove_failed", {
       key: trustedKey,
@@ -277,6 +294,10 @@ export async function removeSecureChatCacheValueAsync(key: string): Promise<void
 
 export async function removeSecureChatCacheValues(keys: string[]): Promise<void> {
   const trustedKeys = keys.map(assertTrustedSecureChatCacheKey);
+  if (!isTauriRuntimeAvailable()) {
+    for (const key of trustedKeys) cache.delete(key);
+    return;
+  }
   await persistSecureChatCacheRemoveMany(trustedKeys);
   for (const key of trustedKeys) cache.delete(key);
 }
@@ -284,6 +305,7 @@ export async function removeSecureChatCacheValues(keys: string[]): Promise<void>
 export function removeSecureChatCacheValuesSync(keys: string[]): void {
   const trustedKeys = keys.map(assertTrustedSecureChatCacheKey);
   for (const key of trustedKeys) cache.delete(key);
+  if (!isTauriRuntimeAvailable()) return;
   void persistSecureChatCacheRemoveMany(trustedKeys).catch((error) => {
     logger.error("Action: chat_secure_cache_remove_many_failed", {
       key: trustedKeys.join(","),
@@ -299,6 +321,10 @@ export async function removeSecureChatCacheValuesAsync(keys: string[]): Promise<
 export async function clearSecureChatCacheAll(): Promise<void> {
   cache.clear();
   trustedKeyReads.clear();
+  if (!isTauriRuntimeAvailable()) {
+    clearLegacySecureChatCacheAll();
+    return;
+  }
   try {
     await persistSecureChatCacheClearAll();
   } catch (error) {

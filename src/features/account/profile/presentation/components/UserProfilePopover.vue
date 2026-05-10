@@ -460,6 +460,8 @@ function handleViewFullProfile() {
       name: resolvedUsername.value || undefined,
       email: resolvedEmail.value || undefined,
       bio: resolvedBio.value || undefined,
+      avatarUrl: resolvedAvatarUrl.value || undefined,
+      backgroundUrl: resolvedBackgroundUrl.value || undefined,
     },
   });
 }
