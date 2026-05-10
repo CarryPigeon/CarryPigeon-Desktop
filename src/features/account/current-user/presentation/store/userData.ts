@@ -26,6 +26,8 @@ const currentUserState = reactive<CurrentUser>({
   username: "",
   email: "",
   description: "",
+  avatarUrl: "",
+  backgroundUrl: "",
   trustLevel: "anonymous",
 });
 
@@ -34,6 +36,8 @@ const EMPTY_CURRENT_USER: CurrentUser = {
   username: "",
   email: "",
   description: "",
+  avatarUrl: "",
+  backgroundUrl: "",
   trustLevel: "anonymous",
 };
 const currentUserObservers = new Set<(snapshot: CurrentUser) => void>();
@@ -44,6 +48,8 @@ function cloneCurrentUserSnapshot(input: CurrentUser): CurrentUser {
     username: input.username,
     email: input.email,
     description: input.description,
+    avatarUrl: input.avatarUrl ?? "",
+    backgroundUrl: input.backgroundUrl ?? "",
     trustLevel: input.trustLevel,
   };
 }
@@ -77,6 +83,8 @@ export function setCurrentUser(next: Partial<CurrentUser>): void {
   if (typeof next.username === "string") currentUserState.username = next.username;
   if (typeof next.email === "string") currentUserState.email = next.email;
   if (typeof next.description === "string") currentUserState.description = next.description;
+  if (typeof next.avatarUrl === "string") currentUserState.avatarUrl = next.avatarUrl;
+  if (typeof next.backgroundUrl === "string") currentUserState.backgroundUrl = next.backgroundUrl;
   if (
     next.trustLevel === "anonymous" ||
     next.trustLevel === "authenticated" ||

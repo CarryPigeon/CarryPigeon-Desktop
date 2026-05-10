@@ -20,6 +20,8 @@ type UserProfileLike = {
   email?: unknown;
   nickname?: unknown;
   brief?: unknown;
+  avatar?: unknown;
+  backgroundUrl?: unknown;
 };
 
 /**
@@ -34,6 +36,8 @@ export function toCurrentUserSnapshot(profile: UserProfileLike): CurrentUser {
     username,
     email,
     description: String(profile.brief ?? "").trim(),
+    avatarUrl: String(profile.avatar ?? "").trim(),
+    backgroundUrl: String(profile.backgroundUrl ?? "").trim(),
     trustLevel: "authority_profile",
   };
 }
@@ -54,6 +58,8 @@ export function applyAuthenticatedUserSnapshot(input: {
     username: "",
     email: String(input.email ?? "").trim(),
     description: "",
+    avatarUrl: "",
+    backgroundUrl: "",
     trustLevel: "authenticated",
   };
   return replaceCurrentUserSnapshot(snapshot);
@@ -74,6 +80,8 @@ export function applyCurrentUserProfilePatch(patch: CurrentUserProfilePatch): Cu
     username: typeof patch.username === "string" ? patch.username.trim() : current.username,
     email: typeof patch.email === "string" ? patch.email.trim() : current.email,
     description: typeof patch.description === "string" ? patch.description.trim() : current.description,
+    avatarUrl: typeof patch.avatarUrl === "string" ? patch.avatarUrl.trim() : current.avatarUrl,
+    backgroundUrl: typeof patch.backgroundUrl === "string" ? patch.backgroundUrl.trim() : current.backgroundUrl,
     trustLevel: current.trustLevel,
   };
   return replaceCurrentUserSnapshot(snapshot);

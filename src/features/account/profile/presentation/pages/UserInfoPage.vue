@@ -4,16 +4,44 @@
  * @description account/profile｜页面：UserInfoPage。
  */
 
-import { computed } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+import { getAccountCapabilities } from "@/features/account/api";
 import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
+import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 
-const currentUser = useObservedCapabilitySnapshot(getCurrentUserCapabilities());
+type ProfileDraft = {
+  username: string;
+  email: string;
+  emailCode: string;
+  brief: string;
+  avatarUrl: string;
+  backgroundUrl: string;
+};
+
+const currentUserCapabilities = getCurrentUserCapabilities();
+const currentUser = useObservedCapabilitySnapshot(currentUserCapabilities);
+const accountCapabilities = getAccountCapabilities();
+const serverConnectionCapabilities = getServerConnectionCapabilities();
 
 const route = useRoute();
 const router = useRouter();
+
+const isEditing = ref(false);
+const isSaving = ref(false);
+const isSendingEmailCode = ref(false);
+const formError = ref("");
+const formSuccess = ref("");
+const draft = reactive<ProfileDraft>({
+  username: "",
+  email: "",
+  emailCode: "",
+  brief: "",
+  avatarUrl: "",
+  backgroundUrl: "",
+});
 
 /**
  * 读取某个字段的展示值（query 优先，store 作为兜底）。
@@ -38,57 +66,23 @@ function readQueryOrFallback(
  *
  * @returns 用户 id 字符串。
  */
-function computeUid(): string {
-  return readQueryOrFallback("uid", currentUser.value.id);
-}
+const display = computed(() => ({
+  uid: readQueryOrFallback("uid", currentUser.value.id),
+  name: readQueryOrFallback("name", currentUser.value.username),
+  email: readQueryOrFallback("email", currentUser.value.email),
+  bio: readQueryOrFallback("bio", currentUser.value.description),
+  avatarUrl: readQueryOrFallback("avatarUrl", currentUser.value.avatarUrl),
+  backgroundUrl: readQueryOrFallback("backgroundUrl", currentUser.value.backgroundUrl),
+}));
 
-/**
- * 读取展示名称（query 优先，store 兜底）。
- *
- * @returns 用户名称。
- */
-function computeName(): string {
-  return readQueryOrFallback("name", currentUser.value.username);
-}
-
-/**
- * 读取邮箱（query 优先，store 兜底）。
- *
- * @returns 用户邮箱。
- */
-function computeEmail(): string {
-  return readQueryOrFallback("email", currentUser.value.email);
-}
-
-/**
- * 读取简介/描述（query 优先，store 兜底）。
- *
- * @returns 用户简介。
- */
-function computeBio(): string {
-  return readQueryOrFallback("bio", currentUser.value.description);
-}
-
-/**
- * 读取头像（query 优先，空值则回退为空字符串）。
- */
-function computeAvatarUrl(): string {
-  return readQueryOrFallback("avatarUrl", "");
-}
-
-/**
- * 读取背景图（query 优先，空值则回退为空字符串）。
- */
-function computeBackgroundUrl(): string {
-  return readQueryOrFallback("backgroundUrl", "");
-}
-
-const uid = computed(computeUid);
-const name = computed(computeName);
-const email = computed(computeEmail);
-const bio = computed(computeBio);
-const avatarUrl = computed(computeAvatarUrl);
-const backgroundUrl = computed(computeBackgroundUrl);
+const uid = computed(() => display.value.uid);
+const name = computed(() => display.value.name);
+const email = computed(() => display.value.email);
+const bio = computed(() => display.value.bio);
+const avatarUrl = computed(() => display.value.avatarUrl);
+const backgroundUrl = computed(() => display.value.backgroundUrl);
+const isOwnProfile = computed(() => !uid.value || uid.value === currentUser.value.id);
+const isEmailChanged = computed(() => draft.email.trim() !== email.value.trim());
 const heroStyle = computed(() => {
   if (backgroundUrl.value) {
     return {
@@ -101,6 +95,125 @@ const heroStyle = computed(() => {
 
   return {};
 });
+
+function syncDraftFromDisplay(): void {
+  draft.username = display.value.name;
+  draft.email = display.value.email;
+  draft.emailCode = "";
+  draft.brief = display.value.bio;
+  draft.avatarUrl = display.value.avatarUrl;
+  draft.backgroundUrl = display.value.backgroundUrl;
+}
+
+function readActiveServerSocket(): string {
+  const socket = serverConnectionCapabilities.workspace.readSocket().trim();
+  if (!socket) {
+    throw new Error("Missing server socket.");
+  }
+  return socket;
+}
+
+function handleStartEdit(): void {
+  syncDraftFromDisplay();
+  formError.value = "";
+  formSuccess.value = "";
+  isEditing.value = true;
+}
+
+function handleCancelEdit(): void {
+  syncDraftFromDisplay();
+  formError.value = "";
+  formSuccess.value = "";
+  isEditing.value = false;
+}
+
+function validateDraft(): string {
+  if (!draft.username.trim()) {
+    return "Name is required.";
+  }
+  if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
+    return "Email is invalid.";
+  }
+  if (isEmailChanged.value && !draft.emailCode.trim()) {
+    return "Email verification code is required.";
+  }
+  return "";
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message || fallback : String(error) || fallback;
+}
+
+async function handleSendEmailCode(): Promise<void> {
+  if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
+    formError.value = "Email is invalid.";
+    return;
+  }
+
+  isSendingEmailCode.value = true;
+  formError.value = "";
+  formSuccess.value = "";
+  try {
+    const outcome = await accountCapabilities.forServer(readActiveServerSocket()).sendVerificationCode(draft.email.trim());
+    if (!outcome.ok) {
+      formError.value = outcome.error.message;
+      return;
+    }
+    formSuccess.value = "Verification code sent.";
+  } catch (error) {
+    formError.value = toErrorMessage(error, "Failed to send verification code.");
+  } finally {
+    isSendingEmailCode.value = false;
+  }
+}
+
+async function handleSaveEdit(): Promise<void> {
+  const message = validateDraft();
+  if (message) {
+    formError.value = message;
+    return;
+  }
+
+  isSaving.value = true;
+  formError.value = "";
+  formSuccess.value = "";
+  try {
+    const server = accountCapabilities.forServer(readActiveServerSocket());
+    if (isEmailChanged.value) {
+      const emailOutcome = await server.updateUserEmail(draft.email.trim(), draft.emailCode.trim());
+      if (!emailOutcome.ok) {
+        formError.value = emailOutcome.error.message;
+        return;
+      }
+    }
+
+    const profileOutcome = await server.updateUserProfile({
+      username: draft.username.trim(),
+      avatar: 0,
+      sex: 0,
+      brief: draft.brief.trim(),
+      birthday: 0,
+    });
+    if (!profileOutcome.ok) {
+      formError.value = profileOutcome.error.message;
+      return;
+    }
+
+    currentUserCapabilities.applyLocalProfilePatch({
+      username: draft.username.trim(),
+      email: draft.email.trim(),
+      description: draft.brief.trim(),
+      avatarUrl: draft.avatarUrl.trim(),
+      backgroundUrl: draft.backgroundUrl.trim(),
+    });
+    formSuccess.value = "Profile saved.";
+    isEditing.value = false;
+  } catch (error) {
+    formError.value = toErrorMessage(error, "Failed to save profile.");
+  } finally {
+    isSaving.value = false;
+  }
+}
 </script>
 
 <template>
@@ -111,8 +224,49 @@ const heroStyle = computed(() => {
       <div class="cp-info__hero-overlay"></div>
       <div class="cp-info__hero-top">
         <button class="cp-info__back" type="button" @click="router.back()">Back</button>
+        <button v-if="isOwnProfile && !isEditing" class="cp-info__edit" type="button" @click="handleStartEdit">Edit Profile</button>
+        <button v-else-if="isOwnProfile" class="cp-info__edit" type="button" @click="handleCancelEdit">Cancel</button>
       </div>
-      <div class="cp-info__hero-content">
+      <div v-if="isEditing" class="cp-info__hero-edit">
+        <label class="cp-info__field">
+          <span class="cp-info__fieldLabel">Name</span>
+          <input v-model="draft.username" class="cp-info__input" type="text" autocomplete="name" />
+        </label>
+        <label class="cp-info__field">
+          <span class="cp-info__fieldLabel">Email</span>
+          <input v-model="draft.email" class="cp-info__input" type="email" autocomplete="email" />
+        </label>
+        <label v-if="isEmailChanged" class="cp-info__field">
+          <span class="cp-info__fieldLabel">Email Code</span>
+          <span class="cp-info__inline">
+            <input v-model="draft.emailCode" class="cp-info__input" type="text" inputmode="numeric" />
+            <button class="cp-info__smallBtn" :disabled="isSendingEmailCode" type="button" @click="handleSendEmailCode">
+              {{ isSendingEmailCode ? "Sending..." : "Send Code" }}
+            </button>
+          </span>
+        </label>
+        <label class="cp-info__field">
+          <span class="cp-info__fieldLabel">Avatar URL</span>
+          <input v-model="draft.avatarUrl" class="cp-info__input" type="url" />
+        </label>
+        <label class="cp-info__field">
+          <span class="cp-info__fieldLabel">Background URL</span>
+          <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" />
+        </label>
+        <label class="cp-info__field cp-info__field--wide">
+          <span class="cp-info__fieldLabel">Bio</span>
+          <textarea v-model="draft.brief" class="cp-info__textarea" rows="4"></textarea>
+        </label>
+        <div v-if="formError" class="cp-info__status cp-info__status--error">{{ formError }}</div>
+        <div v-if="formSuccess" class="cp-info__status cp-info__status--success">{{ formSuccess }}</div>
+        <div class="cp-info__editActions">
+          <button class="cp-info__back" type="button" @click="handleCancelEdit">Cancel</button>
+          <button class="cp-info__edit" :disabled="isSaving" type="button" @click="handleSaveEdit">
+            {{ isSaving ? "Saving..." : "Save" }}
+          </button>
+        </div>
+      </div>
+      <div v-else class="cp-info__hero-content">
         <div class="cp-info__avatar">
           <img v-if="avatarUrl" class="cp-info__avatar-image" :src="avatarUrl" :alt="name || 'User'" />
           <div v-else class="cp-info__avatar-fallback">{{ (name || "U").slice(0, 1).toUpperCase() }}</div>
@@ -186,7 +340,8 @@ const heroStyle = computed(() => {
   position: relative;
   z-index: 1;
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .cp-info__hero-content {
@@ -235,7 +390,9 @@ const heroStyle = computed(() => {
   flex: 1 1 auto;
 }
 
-.cp-info__back {
+.cp-info__back,
+.cp-info__edit,
+.cp-info__smallBtn {
   border: 1px solid var(--cp-border);
   background: color-mix(in oklab, var(--cp-panel) 74%, transparent);
   color: var(--cp-text);
@@ -249,10 +406,110 @@ const heroStyle = computed(() => {
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-info__back:hover {
+.cp-info__back:hover,
+.cp-info__edit:hover,
+.cp-info__smallBtn:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
+}
+
+.cp-info__edit,
+.cp-info__smallBtn {
+  background: color-mix(in oklab, var(--cp-highlight) 26%, var(--cp-panel));
+}
+
+.cp-info__edit:disabled,
+.cp-info__smallBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
+.cp-info__hero-edit {
+  position: relative;
+  z-index: 1;
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cp-info__field,
+.cp-info__inline {
+  display: flex;
+  gap: 8px;
+}
+
+.cp-info__field {
+  flex-direction: column;
+}
+
+.cp-info__field--wide,
+.cp-info__status,
+.cp-info__editActions {
+  grid-column: 1 / -1;
+}
+
+.cp-info__fieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.cp-info__input,
+.cp-info__textarea {
+  min-width: 0;
+  border: 1px solid var(--cp-border);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--cp-panel) 86%, transparent);
+  color: var(--cp-text);
+  padding: 9px 10px;
+  outline: none;
+}
+
+.cp-info__textarea {
+  resize: vertical;
+}
+
+.cp-info__input:focus,
+.cp-info__textarea:focus {
+  border-color: var(--cp-highlight-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-highlight) 18%, transparent);
+}
+
+.cp-info__inline .cp-info__input {
+  flex: 1 1 auto;
+}
+
+.cp-info__smallBtn {
+  flex: 0 0 auto;
+  border-radius: 12px;
+}
+
+.cp-info__status {
+  border: 1px solid var(--cp-border);
+  border-radius: 12px;
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.cp-info__status--error {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.28);
+}
+
+.cp-info__status--success {
+  color: #bbf7d0;
+  background: rgba(20, 83, 45, 0.24);
+}
+
+.cp-info__editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .cp-info__name {
@@ -350,6 +607,22 @@ const heroStyle = computed(() => {
     align-items: flex-start;
   }
 
+  .cp-info__hero-edit,
+  .cp-info__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cp-info__field--wide,
+  .cp-info__status,
+  .cp-info__editActions {
+    grid-column: auto;
+  }
+
+  .cp-info__inline,
+  .cp-info__editActions {
+    flex-direction: column;
+  }
+
   .cp-info__avatar {
     width: 72px;
     height: 72px;
@@ -362,10 +635,6 @@ const heroStyle = computed(() => {
 
   .cp-info__name {
     font-size: 20px;
-  }
-
-  .cp-info__body {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .cp-info__card.wide {
