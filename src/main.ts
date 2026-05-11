@@ -58,12 +58,13 @@ const hasTauriRuntime = isTauriRuntimeAvailable();
 async function startMainWindowRuntimes(): Promise<boolean> {
   try {
     serverConnectionRuntimeLease = await serverConnectionCapabilities.runtime.acquireLease();
+    pluginsRuntimeLease = await pluginsCapabilities.runtime.acquireLease();
   } catch (e) {
     logger.error("Action: api_main_start_runtime_failed", { error: String(e) });
+    releaseMainWindowRuntimes();
     return false;
   }
 
-  pluginsRuntimeLease = await pluginsCapabilities.runtime.acquireLease();
   try {
     await registerUserProfileBridge(router);
   } catch (e) {

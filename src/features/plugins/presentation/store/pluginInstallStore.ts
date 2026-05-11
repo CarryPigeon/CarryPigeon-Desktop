@@ -42,6 +42,8 @@ import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLif
 import { createPluginOperationHelpers } from "./pluginInstallOperationHelpers";
 import { createPluginInstallActions } from "./pluginInstallActions";
 import { createPluginInstallSelectors } from "./pluginInstallSelectors";
+import { buildSensitivePermissionMessage, collectSensitivePermissionLabelsForVersion } from "./pluginPermissionGuard";
+import { usePluginCatalogStore } from "./pluginCatalogStore";
 import { usePluginRuntimeAccess } from "./pluginRuntimeAccess";
 import { registerPluginRuntimeStateSyncListener } from "./pluginRuntimeStateSync";
 
@@ -286,7 +288,8 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
   function resolveRollbackVersion(installed: InstalledPluginState | undefined): string {
     const versions = installed?.installedVersions ?? [];
     const current = installed?.currentVersion ?? "";
-    for (const version of versions) {
+    for (let index = versions.length - 1; index >= 0; index -= 1) {
+      const version = versions[index];
       if (version && version !== current) return version;
     }
     return "";
@@ -297,19 +300,19 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     return createCommandError("missing_server_socket", "Missing server socket.", undefined, { pluginId });
   }
 
-  function confirmSensitivePermissionChange(plugin: PluginCatalogEntryLike, pluginId: string, targetVersion: string): PluginCommandErrorInfo | null {
-    const sensitivePermissions = (plugin.permissions ?? [])
-      .filter((permission) => permission.risk === "high" || permission.risk === "medium")
-      .map((permission) => permission.label || permission.key)
-      .filter(Boolean);
+  function confirmSensitivePermissionChange(
+    plugin: PluginCatalogEntryLike,
+    pluginId: string,
+    targetVersion: string,
+    operationLabel: "Install" | "Update" | "Switch" | "Rollback",
+  ): PluginCommandErrorInfo | null {
+    const versionPermissions = usePluginCatalogStore(key).getVersionSensitivePermissions(pluginId, targetVersion);
+    const sensitivePermissions = collectSensitivePermissionLabelsForVersion(plugin, versionPermissions);
     if (sensitivePermissions.length === 0) return null;
-    const message = [
-      `Update ${pluginId} to ${targetVersion}?`,
-      `This version requests sensitive permissions: ${sensitivePermissions.join(", ")}.`,
-    ].join("\n");
+    const message = buildSensitivePermissionMessage({ operationLabel, pluginId, targetVersion, sensitivePermissions });
     const confirmed = typeof window === "undefined" || typeof window.confirm !== "function" ? true : window.confirm(message);
     if (confirmed) return null;
-    return createCommandError("plugin_operation_failed", "Plugin update cancelled by user.", undefined, {
+    return createCommandError("plugin_operation_failed", `Plugin ${operationLabel.toLowerCase()} cancelled by user.`, undefined, {
       pluginId,
       version: targetVersion,
       permissions: sensitivePermissions,
@@ -326,6 +329,8 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     if (isBusy(pluginId)) {
       return rejectInstall(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
+    const permissionConfirmationError = confirmSensitivePermissionChange(plugin, pluginId, targetVersion, "Install");
+    if (permissionConfirmationError) return rejectInstall(permissionConfirmationError);
     try {
       await install(plugin, targetVersion);
       return {
@@ -352,7 +357,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     if (isBusy(pluginId)) {
       return rejectUpdate(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
-    const permissionConfirmationError = confirmSensitivePermissionChange(plugin, pluginId, targetVersion);
+    const permissionConfirmationError = confirmSensitivePermissionChange(plugin, pluginId, targetVersion, "Update");
     if (permissionConfirmationError) return rejectUpdate(permissionConfirmationError);
     try {
       await updateToLatest(plugin, targetVersion);
@@ -377,6 +382,17 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     if (isBusy(pluginId)) {
       return rejectSwitch(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
+    const catalogPlugin = usePluginCatalogStore(key).byId.value[pluginId] ?? null;
+    if (!catalogPlugin) {
+      return rejectSwitch(
+        createCommandError("plugin_operation_failed", "Plugin switch confirmation metadata is unavailable.", undefined, {
+          pluginId,
+          version: targetVersion,
+        }),
+      );
+    }
+    const permissionConfirmationError = confirmSensitivePermissionChange(catalogPlugin, pluginId, targetVersion, "Switch");
+    if (permissionConfirmationError) return rejectSwitch(permissionConfirmationError);
     try {
       await switchVersion(pluginId, targetVersion);
       return {
@@ -402,6 +418,17 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     if (isBusy(pluginId)) {
       return rejectRollback(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
+    const catalogPlugin = usePluginCatalogStore(key).byId.value[pluginId] ?? null;
+    if (!catalogPlugin) {
+      return rejectRollback(
+        createCommandError("plugin_operation_failed", "Plugin rollback confirmation metadata is unavailable.", undefined, {
+          pluginId,
+          version: targetVersion,
+        }),
+      );
+    }
+    const permissionConfirmationError = confirmSensitivePermissionChange(catalogPlugin, pluginId, targetVersion, "Rollback");
+    if (permissionConfirmationError) return rejectRollback(permissionConfirmationError);
     try {
       await rollback(pluginId);
       return {

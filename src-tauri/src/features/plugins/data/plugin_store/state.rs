@@ -9,7 +9,7 @@
 //! 说明：
 //! - 该模块只处理“本地状态文件与目录”，不处理下载/解压/网络请求。
 
-use std::collections::BTreeSet;
+use std::{cmp::Ordering, time::SystemTime};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +35,7 @@ pub(super) struct PluginStateFile {
 
 async fn list_installed_versions(server_id: &str, plugin_id: &str) -> anyhow::Result<Vec<String>> {
     let root = plugin_root_dir(server_id, plugin_id)?;
-    let mut set = BTreeSet::<String>::new();
+    let mut versions: Vec<(SystemTime, String)> = Vec::new();
     let mut rd = match tokio::fs::read_dir(&root).await {
         Ok(rd) => rd,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
@@ -50,9 +50,18 @@ async fn list_installed_versions(server_id: &str, plugin_id: &str) -> anyhow::Re
         if name.trim().is_empty() {
             continue;
         }
-        set.insert(name);
+        let modified = ent
+            .metadata()
+            .await
+            .and_then(|meta| meta.modified())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        versions.push((modified, name));
     }
-    Ok(set.into_iter().collect())
+    versions.sort_by(|a, b| match a.0.cmp(&b.0) {
+        Ordering::Equal => a.1.cmp(&b.1),
+        other => other,
+    });
+    Ok(versions.into_iter().map(|(_, version)| version).collect())
 }
 
 pub(super) async fn read_current(
