@@ -63,6 +63,7 @@ export type SwitchVersionInput = {
 export type RollbackInput = {
   serverSocket: string;
   pluginId: string;
+  previousVersion?: string;
   before: InstalledPluginState | null;
   onProgress?: (p: PluginProgress) => void;
 };
@@ -240,7 +241,11 @@ export class ApplyPluginRuntimeOps {
     const versions = input.before?.installedVersions ?? [];
     const current = input.before?.currentVersion ?? "";
     const wasEnabled = Boolean(input.before?.enabled && input.before?.status === "ok" && input.before?.currentVersion);
-    const prev = versions.find((x) => Boolean(x) && x !== current) ?? "";
+    let prev = String(input.previousVersion ?? "").trim();
+    for (let index = versions.length - 1; !prev && index >= 0; index -= 1) {
+      const version = versions[index];
+      if (version && version !== current) prev = version;
+    }
     if (!prev) return null;
 
     if (this.runtime.supported) {

@@ -103,6 +103,7 @@ export function comparePluginVersionDesc(a: string, b: string): number {
  */
 export function normalizePluginCatalogVersionEntries(entries: readonly PluginCatalogVersionEntry[]): PluginCatalogVersionEntry[] {
   const byVersion = new Map<string, PluginCatalogVersionEntry>();
+
   for (const raw of entries) {
     const version = String(raw?.version ?? "").trim();
     if (!version) continue;

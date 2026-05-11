@@ -19,7 +19,8 @@ type PluginInstallLifecycleActions = Pick<
 function resolveRollbackVersion(installed: InstalledPluginState | undefined): string {
   const versions = installed?.installedVersions ?? [];
   const current = installed?.currentVersion ?? "";
-  for (const version of versions) {
+  for (let index = versions.length - 1; index >= 0; index -= 1) {
+    const version = versions[index];
     if (version && version !== current) return version;
   }
   return "";
@@ -67,6 +68,7 @@ export function createPluginInstallLifecycleActions(
         const next = await deps.runtimeOpsUsecase.rollback({
           serverSocket: deps.key,
           pluginId: id,
+          previousVersion,
           before: installed,
           onProgress,
         });

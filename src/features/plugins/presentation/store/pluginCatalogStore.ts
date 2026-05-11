@@ -16,6 +16,7 @@ import {
   getPluginCatalogVersionEntries,
   normalizePluginCatalogVersionEntries,
   type PluginCatalogEntry,
+  type PluginPermission,
 } from "@/features/plugins/domain/types/pluginTypes";
 import { createLogger } from "@/shared/utils/logger";
 import { enabledRepoSources } from "@/features/plugins/presentation/store/repoSourcesStore";
@@ -27,6 +28,7 @@ type CatalogStore = {
   loading: Ref<boolean>;
   error: Ref<string>;
   byId: Readonly<Ref<Record<string, PluginCatalogEntry>>>;
+  getVersionSensitivePermissions(pluginId: string, version: string): readonly PluginPermission[] | null;
   refresh(): Promise<void>;
 };
 
@@ -128,8 +130,21 @@ function sortCatalogEntries(entries: Iterable<PluginCatalogEntry>): PluginCatalo
 
 type RepoCatalogLoadResult = {
   mergedById: Map<string, PluginCatalogEntry>;
+  versionPermissionsById: Map<string, Map<string, PluginPermission[]>>;
   errors: string[];
 };
+
+function recordVersionSensitivePermissions(
+  versionPermissionsById: Map<string, Map<string, PluginPermission[]>>,
+  entry: PluginCatalogEntry,
+): void {
+  const versionPermissions = versionPermissionsById.get(entry.pluginId) ?? new Map<string, PluginPermission[]>();
+  for (const versionEntry of getPluginCatalogVersionEntries(entry)) {
+    if (versionPermissions.has(versionEntry.version)) continue;
+    versionPermissions.set(versionEntry.version, Array.from(entry.permissions));
+  }
+  versionPermissionsById.set(entry.pluginId, versionPermissions);
+}
 
 /**
  * 拉取所有已启用 repo 的 catalog，并按 pluginId 合并。
@@ -145,8 +160,9 @@ async function loadRepoCatalogs(
   repos: readonly { baseUrl: string }[],
 ): Promise<RepoCatalogLoadResult> {
   const mergedById = new Map<string, PluginCatalogEntry>();
+  const versionPermissionsById = new Map<string, Map<string, PluginPermission[]>>();
   const errors: string[] = [];
-  if (repos.length <= 0) return { mergedById, errors };
+  if (repos.length <= 0) return { mergedById, versionPermissionsById, errors };
 
   const settled = await Promise.allSettled(repos.map((repo) => getRepoPluginCatalogPort().listCatalog(repo.baseUrl)));
   for (let index = 0; index < settled.length; index += 1) {
@@ -158,11 +174,12 @@ async function loadRepoCatalogs(
     }
     for (const entry of result.value) {
       const normalized = normalizeCatalogEntry(entry);
+      recordVersionSensitivePermissions(versionPermissionsById, normalized);
       const existing = mergedById.get(entry.pluginId) ?? null;
       mergedById.set(entry.pluginId, existing ? mergeCatalogEntry(existing, normalized) : normalized);
     }
   }
-  return { mergedById, errors };
+  return { mergedById, versionPermissionsById, errors };
 }
 
 /**
@@ -180,6 +197,7 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
     const catalog = ref<PluginCatalogEntry[]>([]);
     const loading = ref(false);
     const error = ref("");
+    const versionPermissionsById = new Map<string, Map<string, PluginPermission[]>>();
 
     /**
      * 基于当前目录列表构建 `pluginId -> entry` 的查找映射。
@@ -209,12 +227,23 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
       try {
         const serverCatalog = await getPluginCatalogPort().listCatalog(key);
         const mergedById = new Map<string, PluginCatalogEntry>();
+        versionPermissionsById.clear();
         for (const item of serverCatalog) {
-          mergedById.set(item.pluginId, normalizeCatalogEntry(item));
+          const normalized = normalizeCatalogEntry(item);
+          recordVersionSensitivePermissions(versionPermissionsById, normalized);
+          mergedById.set(item.pluginId, normalized);
         }
 
-        const { mergedById: repoById, errors: repoErrors } = await loadRepoCatalogs(enabledRepoSources.value);
+        const { mergedById: repoById, versionPermissionsById: repoVersionPermissionsById, errors: repoErrors } = await loadRepoCatalogs(enabledRepoSources.value);
         for (const [pluginId, repoEntry] of repoById.entries()) {
+          const repoVersionPermissions = repoVersionPermissionsById.get(pluginId);
+          if (repoVersionPermissions) {
+            const currentVersionPermissions = versionPermissionsById.get(pluginId) ?? new Map<string, PluginPermission[]>();
+            for (const [version, permissions] of repoVersionPermissions.entries()) {
+              if (!currentVersionPermissions.has(version)) currentVersionPermissions.set(version, permissions);
+            }
+            versionPermissionsById.set(pluginId, currentVersionPermissions);
+          }
           const existing = mergedById.get(pluginId) ?? null;
           mergedById.set(pluginId, existing ? mergeCatalogEntry(existing, repoEntry) : repoEntry);
         }
@@ -229,13 +258,21 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
       } catch (e) {
         logger.error("Action: plugins_catalog_list_failed", { key, error: String(e) });
         error.value = String(e);
+        versionPermissionsById.clear();
         catalog.value = [];
       } finally {
         loading.value = false;
       }
     }
 
-    const store: CatalogStore = { catalog, loading, error, byId, refresh };
+    function getVersionSensitivePermissions(pluginId: string, version: string): readonly PluginPermission[] | null {
+      const normalizedPluginId = String(pluginId ?? "").trim();
+      const normalizedVersion = String(version ?? "").trim();
+      if (!normalizedPluginId || !normalizedVersion) return null;
+      return versionPermissionsById.get(normalizedPluginId)?.get(normalizedVersion) ?? null;
+    }
+
+    const store: CatalogStore = { catalog, loading, error, byId, getVersionSensitivePermissions, refresh };
     return store;
   });
 }

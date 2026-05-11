@@ -109,6 +109,10 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::network::di::commands::api_request_json,
             // db
             crate::shared::db::commands::db_init,
+            crate::shared::db::commands::db_execute,
+            crate::shared::db::commands::db_query,
+            crate::shared::db::commands::db_transaction,
+            crate::shared::db::commands::db_path,
             crate::shared::db::commands::db_close,
             crate::shared::db::commands::db_remove,
             crate::shared::chat_cache::commands::chat_cache_get,
@@ -139,6 +143,9 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::settings::di::commands::update_config_u32,
             crate::features::settings::di::commands::update_config_u64,
             crate::features::settings::di::commands::update_config_string,
+            // plugins legacy debug commands
+            crate::features::plugins::di::commands::load_plugin,
+            crate::features::plugins::di::commands::list_plugins,
             // plugins
             crate::features::plugins::di::commands::plugins_list_installed,
             crate::features::plugins::di::commands::plugins_get_installed_state,
