@@ -144,39 +144,62 @@ fn master_key(create_if_missing: bool) -> Result<Option<[u8; 32]>> {
     {
         return Ok(Some(key));
     }
-    let entry = Entry::new(SERVICE, ACCOUNT)?;
+    let entry = match Entry::new(SERVICE, ACCOUNT) {
+        Ok(entry) => entry,
+        Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => {
+            if create_if_missing {
+                return Ok(Some(generate_master_key(cell)?));
+            }
+            return Ok(None);
+        }
+        Err(err) => return Err(err.into()),
+    };
     match entry.get_password() {
         Ok(secret) => {
             let bytes = hex::decode(secret.trim()).context("Invalid chat cache master key")?;
             let key: [u8; 32] = bytes
                 .try_into()
                 .map_err(|_| anyhow::anyhow!("Invalid chat cache master key length"))?;
-            if let Ok(mut guard) = cell.lock() {
-                *guard = Some(key);
-            }
+            cache_master_key(cell, key);
             Ok(Some(key))
         }
-        Err(_err) if create_if_missing => {
-            let mut key = [0u8; 32];
-            getrandom::fill(&mut key)
-                .map_err(|_| anyhow::anyhow!("Failed to generate chat cache master key"))?;
-            entry
-                .set_password(&hex::encode(key))
-                .context("Failed to persist chat cache master key")?;
-            if let Ok(mut guard) = cell.lock() {
-                *guard = Some(key);
+        Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => {
+            if !create_if_missing {
+                return Ok(None);
             }
-            Ok(Some(key))
+            let key = generate_master_key(cell)?;
+            match entry.set_password(&hex::encode(key)) {
+                Ok(()) => Ok(Some(key)),
+                Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => {
+                    Ok(Some(key))
+                }
+                Err(err) => Err(err.into()),
+            }
         }
-        Err(err) if is_missing_master_key_error_message(&err.to_string()) => Ok(None),
         Err(err) => Err(err.into()),
     }
 }
 
-fn is_missing_master_key_error_message(message: &str) -> bool {
+fn is_missing_secure_storage_error_message(message: &str) -> bool {
     message.contains("not found")
         || message.contains("NoEntry")
         || message.contains("No matching entry found in secure storage")
+        || message.contains("No default store has been set")
+        || message.contains("cannot search or create entries")
+}
+
+fn cache_master_key(cell: &Mutex<Option<[u8; 32]>>, key: [u8; 32]) {
+    if let Ok(mut guard) = cell.lock() {
+        *guard = Some(key);
+    }
+}
+
+fn generate_master_key(cell: &Mutex<Option<[u8; 32]>>) -> Result<[u8; 32]> {
+    let mut key = [0u8; 32];
+    getrandom::fill(&mut key)
+        .map_err(|_| anyhow::anyhow!("Failed to generate chat cache master key"))?;
+    cache_master_key(cell, key);
+    Ok(key)
 }
 
 fn clear_master_key_cache() {
@@ -189,18 +212,14 @@ fn clear_master_key_cache() {
 
 fn forget_master_key() -> Result<()> {
     clear_master_key_cache();
-    let entry = Entry::new(SERVICE, ACCOUNT)?;
+    let entry = match Entry::new(SERVICE, ACCOUNT) {
+        Ok(entry) => entry,
+        Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => return Ok(()),
+        Err(err) => return Err(err.into()),
+    };
     match entry.delete_credential() {
         Ok(()) => Ok(()),
-        Err(err)
-            if err.to_string().contains("not found")
-                || err.to_string().contains("NoEntry")
-                || err
-                    .to_string()
-                    .contains("No matching entry found in secure storage") =>
-        {
-            Ok(())
-        }
+        Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => Ok(()),
         Err(err) => Err(err.into()),
     }
 }
@@ -473,10 +492,10 @@ mod tests {
     static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
     fn test_lock() -> std::sync::MutexGuard<'static, ()> {
-        TEST_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .expect("test lock")
+        match TEST_LOCK.get_or_init(|| Mutex::new(())).lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
     }
 
     fn test_temp_dir() -> PathBuf {
