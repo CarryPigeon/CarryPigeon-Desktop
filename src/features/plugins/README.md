@@ -109,6 +109,7 @@
 - server-scoped 能力统一通过 `capabilities.forServer(serverSocket)` 绑定上下文，避免在根公开面重复透传 `serverSocket`。
 - 运行时采用 `capabilities.runtime.acquireLease()`，而不是根级 `startRuntime()`。
 - 运行时只读查询统一使用 `capabilities.forServer(serverSocket).getRuntimeCapabilities()`，避免把普通查询函数命名成 Vue composable。
+- 稳定性修复不应顺手扩大公共 API：事件订阅、typed config/preferences、publisher trust、catalog 搜索/分页等能力需要单独设计与计划，避免把内部 store 或命令细节泄漏为跨 feature 契约。
 
 ## 相关文档
 
