@@ -823,7 +823,7 @@ mod tests {
         let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
         let options = FileOptions::<ExtendedFileOptions>::default().unix_permissions(0o100644);
         writer
-            .start_file("demo-plugin/plugin.json", options)
+            .start_file("demo-plugin/plugin.json", options.clone())
             .expect("start file");
         writer
             .write_all(
@@ -831,7 +831,7 @@ mod tests {
             )
             .expect("write manifest");
         writer
-            .start_file("demo-plugin/index.js", options.clone())
+            .start_file("demo-plugin/index.js", options)
             .expect("start entry");
         writer.write_all(b"export default 1;").expect("write entry");
         writer.finish().expect("finish zip").into_inner()
