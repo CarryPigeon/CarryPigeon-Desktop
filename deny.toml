@@ -1,0 +1,52 @@
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+    "bzip2-1.0.6",
+    "zlib-acknowledgement",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0411", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0412", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0413", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0414", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0415", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0416", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0417", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0418", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0419", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2024-0420", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2025-0057", reason = "Transitive dependency from Tauri HTML parser stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2025-0075", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2025-0080", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2025-0081", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2025-0098", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
+    { id = "RUSTSEC-2025-0100", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
+]
