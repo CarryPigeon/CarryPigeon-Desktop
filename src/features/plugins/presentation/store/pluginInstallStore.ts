@@ -304,7 +304,7 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     plugin: PluginCatalogEntryLike,
     pluginId: string,
     targetVersion: string,
-    operationLabel: "Install" | "Update" | "Switch" | "Rollback",
+    operationLabel: "Install" | "Update" | "Switch",
   ): PluginCommandErrorInfo | null {
     const versionPermissions = usePluginCatalogStore(key).getVersionSensitivePermissions(pluginId, targetVersion);
     const sensitivePermissions = collectSensitivePermissionLabelsForVersion(plugin, versionPermissions);
@@ -383,16 +383,10 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       return rejectSwitch(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
     const catalogPlugin = usePluginCatalogStore(key).byId.value[pluginId] ?? null;
-    if (!catalogPlugin) {
-      return rejectSwitch(
-        createCommandError("plugin_operation_failed", "Plugin switch confirmation metadata is unavailable.", undefined, {
-          pluginId,
-          version: targetVersion,
-        }),
-      );
+    if (catalogPlugin) {
+      const permissionConfirmationError = confirmSensitivePermissionChange(catalogPlugin, pluginId, targetVersion, "Switch");
+      if (permissionConfirmationError) return rejectSwitch(permissionConfirmationError);
     }
-    const permissionConfirmationError = confirmSensitivePermissionChange(catalogPlugin, pluginId, targetVersion, "Switch");
-    if (permissionConfirmationError) return rejectSwitch(permissionConfirmationError);
     try {
       await switchVersion(pluginId, targetVersion);
       return {
@@ -418,17 +412,6 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
     if (isBusy(pluginId)) {
       return rejectRollback(createCommandError("plugin_busy", "Plugin operation is already in progress.", undefined, { pluginId }));
     }
-    const catalogPlugin = usePluginCatalogStore(key).byId.value[pluginId] ?? null;
-    if (!catalogPlugin) {
-      return rejectRollback(
-        createCommandError("plugin_operation_failed", "Plugin rollback confirmation metadata is unavailable.", undefined, {
-          pluginId,
-          version: targetVersion,
-        }),
-      );
-    }
-    const permissionConfirmationError = confirmSensitivePermissionChange(catalogPlugin, pluginId, targetVersion, "Rollback");
-    if (permissionConfirmationError) return rejectRollback(permissionConfirmationError);
     try {
       await rollback(pluginId);
       return {

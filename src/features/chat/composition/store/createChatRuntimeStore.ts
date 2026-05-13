@@ -66,6 +66,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     currentChannelLoadingMore,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
+    totalUnreadCount,
   } = state;
 
   watch(
@@ -91,6 +92,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     loadingMoreMessages: currentChannelLoadingMore,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
+    totalUnreadCount,
     members,
     ensureChatReady: session.ensureChatReady,
     availableDomains: messageFlow.availableDomains,

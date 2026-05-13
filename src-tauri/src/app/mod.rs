@@ -17,6 +17,7 @@ use tauri::{
 
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
+use crate::features::tray::di::commands::TrayUnreadState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 启动 Tauri 应用。
@@ -41,12 +42,15 @@ pub fn run() -> anyhow::Result<()> {
                 .cloned()
                 .context("Default window icon is missing")?;
 
+            // 初始化托盘未读闪烁状态（to_owned 将 App 借用的图片转为 'static）。
+            app.manage(TrayUnreadState::new(tray_icon.clone().to_owned()));
+
             // 定义托盘菜单行为
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_i])?;
 
             // 定义托盘图标行为
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main")
                 .icon(tray_icon)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
@@ -98,6 +102,8 @@ pub fn run() -> anyhow::Result<()> {
         .plugin(tauri_plugin_opener::init())
         // 注册对外暴露的事件钩子
         .invoke_handler(tauri::generate_handler![
+            // tray
+            crate::features::tray::di::commands::set_tray_unread_flashing,
             // windows
             crate::features::windows::di::commands::to_chat_window_size,
             crate::features::windows::di::commands::open_popover_window,

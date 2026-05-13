@@ -50,10 +50,3 @@ export const pluginPermissionGuardMessageContractCheck: string = buildSensitiveP
   targetVersion: "1.2.3",
   sensitivePermissions: sensitiveLabels,
 });
-
-export const pluginPermissionGuardRollbackMessageContractCheck: string = buildSensitivePermissionMessage({
-  operationLabel: "Rollback",
-  pluginId: "demo.plugin",
-  targetVersion: "1.2.3",
-  sensitivePermissions: pluginPermissionGuardVersionLabelsContractCheck,
-});

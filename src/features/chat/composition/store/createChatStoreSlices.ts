@@ -23,6 +23,7 @@ export function createRoomSessionSlice(store: ChatRuntimeAggregateStore): RoomSe
     currentChannelId: store.currentChannelId,
     currentChannelLastReadTimeMs: store.currentChannelLastReadTimeMs,
     currentChannelLastReadMid: store.currentChannelLastReadMid,
+    totalUnreadCount: store.totalUnreadCount,
     ensureChatReady: store.ensureChatReady,
     selectChannel: store.selectChannel,
     reportCurrentReadState: store.reportCurrentReadState,
