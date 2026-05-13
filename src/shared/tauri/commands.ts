@@ -63,6 +63,8 @@ export const TAURI_COMMANDS = {
   settingsExportSettings: "export_settings",
   settingsImportSettings: "import_settings",
   settingsResetSettings: "reset_settings",
+
+  setTrayUnreadFlashing: "set_tray_unread_flashing",
 } as const;
 
 /**

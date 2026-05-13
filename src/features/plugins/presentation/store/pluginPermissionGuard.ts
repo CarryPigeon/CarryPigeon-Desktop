@@ -7,7 +7,7 @@ import type { PluginCatalogEntryLike, PluginPermission } from "@/features/plugin
 const SENSITIVE_PERMISSION_RISKS = new Set(["high", "medium"]);
 
 export type SensitivePermissionMessageInput = {
-  operationLabel: "Install" | "Update" | "Switch" | "Rollback";
+  operationLabel: "Install" | "Update" | "Switch";
   pluginId: string;
   targetVersion: string;
   sensitivePermissions: readonly string[];

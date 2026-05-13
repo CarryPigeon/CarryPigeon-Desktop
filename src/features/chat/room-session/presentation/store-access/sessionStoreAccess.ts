@@ -59,6 +59,10 @@ export const currentChannelLastReadTimeMs = computed(() => resolveRoomSessionSto
  * 当前频道最后一次本地记录的已读消息 id。
  */
 export const currentChannelLastReadMid = computed(() => resolveRoomSessionStore().currentChannelLastReadMid.value);
+/**
+ * 全部已加入频道的未读消息总数。
+ */
+export const totalUnreadCount = computed(() => resolveRoomSessionStore().totalUnreadCount.value);
 
 /**
  * 确保当前 chat 会话进入可用状态。

@@ -44,6 +44,9 @@ export function createChatSessionState() {
 
   const currentChannelLastReadTimeMs = computed(() => lastReadTimeMsByChannel[currentChannelId.value] ?? 0);
   const currentChannelLastReadMid = computed(() => lastReadMidByChannel[currentChannelId.value] ?? "");
+  const totalUnreadCount = computed(() =>
+    channelsRef.value.reduce((sum, channel) => sum + Math.max(0, Math.trunc(channel.unread ?? 0)), 0),
+  );
 
   return {
     channelsRef,
@@ -58,5 +61,6 @@ export function createChatSessionState() {
     channels,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
+    totalUnreadCount,
   };
 }

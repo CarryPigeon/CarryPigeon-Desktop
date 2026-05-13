@@ -22,6 +22,7 @@ import {
   ensureChatReady,
   reportCurrentReadState,
   selectChannel,
+  totalUnreadCount,
 } from "./presentation/store-access/sessionStoreAccess";
 import type {
   ChatChannel,
@@ -80,6 +81,7 @@ export function createRoomSessionCapabilitySource(): RoomSessionCapabilities {
     directory: {
       getSnapshot: getDirectorySnapshot,
       observeSnapshot: observeDirectorySnapshot,
+      totalUnreadCount,
       /**
        * 设置目录搜索关键字。
        */
