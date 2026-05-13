@@ -165,6 +165,9 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   const loadingMoreMessages = computed(() => false);
   const currentChannelLastReadTimeMs = computed(() => state.lastReadTimeMsByChannel[currentChannelId.value] ?? 0);
   const currentChannelLastReadMid = computed(() => state.lastReadMidByChannel[currentChannelId.value] ?? "");
+  const totalUnreadCount = computed(() =>
+    state.channels.reduce((sum, c) => sum + Math.max(0, Math.trunc(c.unread ?? 0)), 0),
+  );
 
   /**
    * 确保 mock chat store 已就绪。
@@ -774,6 +777,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     loadingMoreMessages,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
+    totalUnreadCount,
     members,
     ensureChatReady,
     availableDomains,

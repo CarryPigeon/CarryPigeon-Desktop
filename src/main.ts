@@ -29,6 +29,8 @@ import { getPluginsCapabilities } from "@/features/plugins/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { createLogger } from "@/shared/utils/logger";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
+import type { WatchStopHandle } from "vue";
+import { clearTrayUnreadFlashing, registerTrayUnreadBridge } from "@/app/bootstrap/trayUnreadBridge";
 
 const app = createApp(App);
 app.use(router).use(i18n);
@@ -39,6 +41,7 @@ const pluginsCapabilities = getPluginsCapabilities();
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 let pluginsRuntimeLease: Awaited<ReturnType<typeof pluginsCapabilities.runtime.acquireLease>> | null = null;
 let serverConnectionRuntimeLease: Awaited<ReturnType<typeof serverConnectionCapabilities.runtime.acquireLease>> | null = null;
+let trayUnreadBridgeStop: WatchStopHandle | null = null;
 
 authFlowCapabilities.configureInstalledPluginsQueryProvider((serverSocket: string) =>
   pluginsCapabilities.forServer(serverSocket).listInstalledPlugins(),
@@ -70,10 +73,19 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   } catch (e) {
     logger.error("Action: api_main_register_user_profile_bridge_failed", { error: String(e) });
   }
+
+  trayUnreadBridgeStop = registerTrayUnreadBridge();
+
   return true;
 }
 
 function releaseMainWindowRuntimes(): void {
+  if (trayUnreadBridgeStop) {
+    trayUnreadBridgeStop();
+    trayUnreadBridgeStop = null;
+  }
+  clearTrayUnreadFlashing();
+
   const releaseTasks: Promise<unknown>[] = [];
   if (pluginsRuntimeLease) {
     releaseTasks.push(pluginsRuntimeLease.release());

@@ -4,6 +4,7 @@
  * 统一承载 room-session 子域的稳定公共契约，避免页面层和聚合层深依赖领域路径。
  */
 
+import type { ComputedRef } from "vue";
 import type { ReadableCapability } from "@/shared/types/capabilities";
 import type { ChannelSelectionOutcome, ChatChannel } from "./domain/contracts";
 
@@ -31,6 +32,7 @@ export type RoomSessionDirectorySnapshot = {
  * - 暴露筛选、标签切换与 discover 聚焦一类本地交互命令。
  */
 export type RoomSessionDirectoryCapabilities = ReadableCapability<RoomSessionDirectorySnapshot> & {
+  totalUnreadCount: ComputedRef<number>;
   setSearchQuery(value: string): void;
   setActiveTab(value: "joined" | "discover"): void;
   focusDiscoverChannel(channelName: string): void;

@@ -50,6 +50,7 @@ export type RoomSessionRuntimeStore = {
   currentChannelId: Ref<string>;
   currentChannelLastReadTimeMs: Readonly<Ref<number>>;
   currentChannelLastReadMid: Readonly<Ref<string>>;
+  totalUnreadCount: Readonly<Ref<number>>;
   ensureChatReady(): Promise<void>;
   selectChannel(id: string): Promise<ChannelSelectionOutcome>;
   reportCurrentReadState(): Promise<void>;

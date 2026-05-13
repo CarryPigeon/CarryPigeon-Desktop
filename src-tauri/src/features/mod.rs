@@ -6,4 +6,5 @@
 pub mod network;
 pub mod plugins;
 pub mod settings;
+pub mod tray;
 pub mod windows;
