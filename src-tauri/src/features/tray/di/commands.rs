@@ -2,9 +2,8 @@
 
 use std::{
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Mutex,
     },
     time::Duration,
 };
