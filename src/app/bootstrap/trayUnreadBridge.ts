@@ -44,6 +44,6 @@ async function setTrayUnreadFlashing(hasUnread: boolean): Promise<void> {
   try {
     await invokeTauri<void>(TAURI_COMMANDS.setTrayUnreadFlashing, { hasUnread });
   } catch (error) {
-    logger.warn("Action: app_tray_unread_state_sync_failed", { error: String(error), hasUnread });
+    logger.warn("Action: chat_tray_unread_state_sync_failed", { error: String(error), hasUnread });
   }
 }
