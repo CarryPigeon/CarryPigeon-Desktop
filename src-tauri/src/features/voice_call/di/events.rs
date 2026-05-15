@@ -1,5 +1,5 @@
-use serde::Serialize;
 use super::super::domain::model::*;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

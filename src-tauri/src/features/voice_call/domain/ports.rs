@@ -1,11 +1,17 @@
+use super::model::*;
 use crate::shared::error::CommandResult;
 use async_trait::async_trait;
-use super::model::*;
 
 #[async_trait]
 pub trait VoiceCallStatePort: Send + Sync {
-    async fn start_direct_call(&self, session_id: &str, target_user_id: &str, room_id: &str) -> CommandResult<CallSession>;
-    async fn start_conference(&self, session_id: &str, room_id: &str) -> CommandResult<CallSession>;
+    async fn start_direct_call(
+        &self,
+        session_id: &str,
+        target_user_id: &str,
+        room_id: &str,
+    ) -> CommandResult<CallSession>;
+    async fn start_conference(&self, session_id: &str, room_id: &str)
+    -> CommandResult<CallSession>;
     async fn accept_call(&self, session_id: &str) -> CommandResult<()>;
     async fn reject_call(&self, session_id: &str, reason: Option<&str>) -> CommandResult<()>;
     async fn hangup_call(&self, session_id: &str) -> CommandResult<()>;

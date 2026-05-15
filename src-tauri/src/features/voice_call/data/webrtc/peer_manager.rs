@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tracing::info;
@@ -17,28 +18,28 @@ impl WebRtcPeerManager {
         }
     }
 
-    pub async fn create_peer_connection(
-        &self,
-        session_id: &str,
-    ) -> Result<PeerConnectionHandle, String> {
+    pub async fn create_peer_connection(&self, session_id: &str) -> Result<PeerConnectionHandle> {
         info!(
-            action = "create_peer_connection",
+            action = "app_voice_call_create_peer_connection",
             session_id = %session_id,
         );
 
         let mut conns = self.connections.lock().await;
-        conns.insert(session_id.to_string(), PeerConnectionHandle {
-            session_id: session_id.to_string(),
-        });
+        conns.insert(
+            session_id.to_string(),
+            PeerConnectionHandle {
+                session_id: session_id.to_string(),
+            },
+        );
 
         Ok(PeerConnectionHandle {
             session_id: session_id.to_string(),
         })
     }
 
-    pub async fn close_peer_connection(&self, session_id: &str) -> Result<(), String> {
+    pub async fn close_peer_connection(&self, session_id: &str) -> Result<()> {
         info!(
-            action = "close_peer_connection",
+            action = "app_voice_call_close_peer_connection",
             session_id = %session_id,
         );
 

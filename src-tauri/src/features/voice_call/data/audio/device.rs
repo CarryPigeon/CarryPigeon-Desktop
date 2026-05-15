@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device as CpalDevice, Stream, StreamConfig as CpalStreamConfig};
 use tracing::warn;
@@ -26,12 +27,12 @@ pub struct AudioDeviceManager {
 }
 
 impl AudioDeviceManager {
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> Result<Self> {
         let host = cpal::default_host();
         Ok(Self { host })
     }
 
-    pub fn enumerate_input_devices(&self) -> Result<Vec<AudioDeviceInfo>, String> {
+    pub fn enumerate_input_devices(&self) -> Result<Vec<AudioDeviceInfo>> {
         let mut devices = Vec::new();
         let default_id = default_device_id(self.host.default_input_device());
 
@@ -45,7 +46,7 @@ impl AudioDeviceManager {
             }
             Err(e) => {
                 warn!(
-                    action = "enumerate_input_devices_failed",
+                    action = "app_voice_call_enumerate_input_devices_failed",
                     error = %e,
                 );
             }
@@ -53,7 +54,7 @@ impl AudioDeviceManager {
         Ok(devices)
     }
 
-    pub fn enumerate_output_devices(&self) -> Result<Vec<AudioDeviceInfo>, String> {
+    pub fn enumerate_output_devices(&self) -> Result<Vec<AudioDeviceInfo>> {
         let mut devices = Vec::new();
         let default_id = default_device_id(self.host.default_output_device());
 
@@ -67,7 +68,7 @@ impl AudioDeviceManager {
             }
             Err(e) => {
                 warn!(
-                    action = "enumerate_output_devices_failed",
+                    action = "app_voice_call_enumerate_output_devices_failed",
                     error = %e,
                 );
             }
@@ -75,25 +76,25 @@ impl AudioDeviceManager {
         Ok(devices)
     }
 
-    pub fn default_input_config(&self) -> Result<CpalStreamConfig, String> {
+    pub fn default_input_config(&self) -> Result<CpalStreamConfig> {
         let device = self
             .host
             .default_input_device()
-            .ok_or("VOICE_AUDIO_DEVICE_UNAVAILABLE: no default input device found")?;
+            .context("VOICE_AUDIO_DEVICE_UNAVAILABLE: no default input device found")?;
         let config = device
             .default_input_config()
-            .map_err(|e| format!("VOICE_AUDIO_DEVICE_UNAVAILABLE: {}", e))?;
+            .context("VOICE_AUDIO_DEVICE_UNAVAILABLE")?;
         Ok(config.into())
     }
 
-    pub fn default_output_config(&self) -> Result<CpalStreamConfig, String> {
+    pub fn default_output_config(&self) -> Result<CpalStreamConfig> {
         let device = self
             .host
             .default_output_device()
-            .ok_or("VOICE_AUDIO_DEVICE_UNAVAILABLE: no default output device found")?;
+            .context("VOICE_AUDIO_DEVICE_UNAVAILABLE: no default output device found")?;
         let config = device
             .default_output_config()
-            .map_err(|e| format!("VOICE_AUDIO_DEVICE_UNAVAILABLE: {}", e))?;
+            .context("VOICE_AUDIO_DEVICE_UNAVAILABLE")?;
         Ok(config.into())
     }
 }
@@ -107,15 +108,11 @@ impl AudioStream {
         Self { stream }
     }
 
-    pub fn play(&self) -> Result<(), String> {
-        self.stream
-            .play()
-            .map_err(|e| format!("VOICE_AUDIO_STREAM_FAILED: {}", e))
+    pub fn play(&self) -> Result<()> {
+        self.stream.play().context("VOICE_AUDIO_STREAM_FAILED")
     }
 
-    pub fn pause(&self) -> Result<(), String> {
-        self.stream
-            .pause()
-            .map_err(|e| format!("VOICE_AUDIO_STREAM_FAILED: {}", e))
+    pub fn pause(&self) -> Result<()> {
+        self.stream.pause().context("VOICE_AUDIO_STREAM_FAILED")
     }
 }
