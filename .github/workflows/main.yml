@@ -30,7 +30,8 @@ jobs:
                     libxdo-dev \
                     libssl-dev \
                     libayatana-appindicator3-dev \
-                    librsvg2-dev
+                    librsvg2-dev \
+                    libasound2-dev
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
@@ -98,7 +99,8 @@ jobs:
                     libxdo-dev \
                     libssl-dev \
                     libayatana-appindicator3-dev \
-                    librsvg2-dev
+                    librsvg2-dev \
+                    libasound2-dev
 
             # 修复：在Action中指定pnpm版本
             - name: Setup pnpm
