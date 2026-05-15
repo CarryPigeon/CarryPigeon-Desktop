@@ -25,6 +25,7 @@ import type {
   RoomGovernanceCapabilities,
   RoomGovernanceMembersSnapshot,
 } from "../room-governance/api-types";
+import type { VoiceCallCapabilities } from "../voice-call/api-types";
 
 export type {
   ChannelSelectionErrorInfo,
@@ -142,4 +143,9 @@ export type ChatCapabilities = {
    * chat 治理能力分组。
    */
   governance: ChatGovernanceCapabilities;
+
+  /**
+   * chat 语音通话能力分组。
+   */
+  voiceCall: VoiceCallCapabilities;
 };

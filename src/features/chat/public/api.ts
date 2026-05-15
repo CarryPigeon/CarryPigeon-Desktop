@@ -11,6 +11,7 @@
 import { createMessageFlowCapabilities } from "../message-flow/api";
 import { createRoomGovernanceCapabilities } from "../room-governance/api";
 import { createRoomSessionCapabilities } from "../room-session/api";
+import { getVoiceCallCapabilities } from "../voice-call/api";
 import type { ChatCapabilities } from "./api-types";
 
 let cachedChatCapabilities: ChatCapabilities | null = null;
@@ -47,6 +48,7 @@ export function createChatCapabilities(): ChatCapabilities {
       createChannel: roomGovernanceCapabilities.createChannel,
       forChannel: roomGovernanceCapabilities.forChannel,
     },
+    voiceCall: getVoiceCallCapabilities(),
   };
 }
 

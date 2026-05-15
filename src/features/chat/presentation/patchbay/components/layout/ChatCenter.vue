@@ -7,6 +7,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
+import type { CallState } from "@/features/chat/voice-call/domain/contracts";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
@@ -14,6 +15,8 @@ import SignalStrip from "@/features/chat/message-flow/message/presentation/compo
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
+import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
+import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components/VoiceCallTrigger.vue";
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -68,6 +71,17 @@ const connectionActionLabel = computed(() =>
   props.model.connectionPillState === "offline" ? t("retry") : "",
 );
 
+const voiceHostRef = ref<{
+  callState: { value: CallState };
+  startDirectCall: (targetUserId: string) => Promise<unknown>;
+} | null>(null);
+
+const currentCallState = computed<CallState>(() => voiceHostRef.value?.callState?.value ?? "idle");
+
+function handleVoiceCallStart(): void {
+  voiceHostRef.value?.startDirectCall("");
+}
+
 /**
  * 将当前 signal pane DOM 引用回传给父级。
  *
@@ -91,6 +105,13 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         <div class="cp-topConsole__title">Messages</div>
       </div>
       <div class="cp-topConsole__right">
+        <VoiceCallTrigger
+          v-if="props.model.currentChannelId"
+          :room-id="props.model.currentChannelId"
+          :room-name="props.model.currentChannelName"
+          :call-state="currentCallState"
+          @start="handleVoiceCallStart"
+        />
         <button
           v-if="props.model.currentChannelId"
           class="cp-topConsole__settings"
@@ -109,6 +130,12 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         />
       </div>
     </header>
+
+    <VoiceCallHost
+      ref="voiceHostRef"
+      :room-id="props.model.currentChannelId"
+      :room-name="props.model.currentChannelName"
+    />
 
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
       <!-- 区块：游标分页（加载更早历史） -->

@@ -21,6 +21,7 @@ import type { RoomSessionStatePort } from "@/features/chat/room-session/domain/p
 import { createMessageEventRouter } from "@/features/chat/message-flow/internal";
 import { createReadStateEventRouter } from "@/features/chat/room-session/internal";
 import { createChatGovernanceEventRouter } from "./createChatGovernanceEventRouter";
+import { createVoiceCallEventRouter } from "@/features/chat/voice-call/domain/event-handlers/voiceCallEventRouter";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -81,6 +82,21 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     state: deps.readStateProjection,
   });
 
+  const routeVoiceCallEvent = createVoiceCallEventRouter({
+    setIncomingCall: (_session) => {
+      // 注入 voiceCall store — 后续完善
+    },
+    updateCallState: (_sessionId, _state) => {
+      // 注入 voiceCall store — 后续完善
+    },
+    updateParticipants: (_sessionId, _participants) => {
+      // 注入 voiceCall store — 后续完善
+    },
+    setCallSummary: (_sessionId, _duration, _reason) => {
+      // 注入 voiceCall store — 后续完善
+    },
+  });
+
   return function handleWsEvent(env: ChatEventEnvelope): void {
     const eventType = String(env.eventType ?? "").trim();
     const payload = env.payload && typeof env.payload === "object" ? (env.payload as Record<string, unknown>) : null;
@@ -88,6 +104,8 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     if (routeGovernanceEvent(eventType, payload)) return;
     if (routeMessageEvent(eventType, payload)) return;
     if (routeReadStateEvent(eventType, payload)) return;
+
+    if (routeVoiceCallEvent(eventType, payload)) return;
 
     deps.logger.debug("Action: chat_ws_event_ignored", { eventType });
   };

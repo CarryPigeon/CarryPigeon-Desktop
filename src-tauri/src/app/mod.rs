@@ -100,6 +100,7 @@ pub fn run() -> anyhow::Result<()> {
             }
         })
         .plugin(tauri_plugin_opener::init())
+        .manage(crate::features::voice_call::di::commands::VoiceCallService)
         // 注册对外暴露的事件钩子
         .invoke_handler(tauri::generate_handler![
             // tray
@@ -168,6 +169,18 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::plugins::di::commands::plugins_storage_get,
             crate::features::plugins::di::commands::plugins_storage_set,
             crate::features::plugins::di::commands::plugins_network_fetch,
+            // voice_call
+            crate::features::voice_call::di::commands::start_direct_call,
+            crate::features::voice_call::di::commands::start_conference,
+            crate::features::voice_call::di::commands::accept_call,
+            crate::features::voice_call::di::commands::reject_call,
+            crate::features::voice_call::di::commands::hangup_call,
+            crate::features::voice_call::di::commands::toggle_mute,
+            crate::features::voice_call::di::commands::toggle_noise_suppression,
+            crate::features::voice_call::di::commands::enumerate_input_devices,
+            crate::features::voice_call::di::commands::enumerate_output_devices,
+            crate::features::voice_call::di::commands::select_input_device,
+            crate::features::voice_call::di::commands::select_output_device,
         ])
         .run(tauri::generate_context!())
         .context("error while running tauri application")?;
