@@ -292,12 +292,18 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onAsyncError: logAsyncError,
   });
 
+  const currentChannelName = computed(() => {
+    const channel = roomDirectory.findChannelById(currentSessionSnapshot.value.currentChannelId);
+    return channel?.name ?? currentSessionSnapshot.value.currentChannelId;
+  });
+
   const chatCenter = useChatCenterModel({
     currentSession,
     currentTimeline: currentChannelMessageFlow,
     messageComposer,
     lookupChannel: messageFlow.forChannel,
     currentUserId,
+    currentChannelName,
     connectionDetail: chatConnectionDetail,
     connectionPillState: chatConnectionPillState,
     retryConnection: retryChatConnection,

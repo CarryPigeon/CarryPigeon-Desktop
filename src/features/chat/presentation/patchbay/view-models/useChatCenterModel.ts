@@ -53,6 +53,7 @@ type ChatCenterRawModel = {
   connectionPillState: ComputedRef<ChatConnectionPillStateView>;
   retryConnection(): Promise<ServerWorkspaceConnectionOutcome>;
   currentChannelId: ComputedRef<CurrentChannelSessionSnapshot["currentChannelId"]>;
+  currentChannelName: ComputedRef<string>;
   currentChannelHasMore: ComputedRef<MessageTimelineSnapshot["hasMoreHistory"]>;
   loadingMoreMessages: ComputedRef<MessageTimelineSnapshot["isLoadingHistory"]>;
   messageRows: ComputedRef<MessageRow[]>;
@@ -91,6 +92,7 @@ export type UseChatCenterModelDeps = {
   messageComposer: MessageComposerCapabilities;
   lookupChannel(channelId: string): ChannelMessageLookupCapabilities;
   currentUserId: RefLike<string>;
+  currentChannelName: RefLike<string>;
   connectionDetail: RefLike<string>;
   connectionPillState: RefLike<ChatConnectionPillStateView>;
   retryConnection(): Promise<ServerWorkspaceConnectionOutcome>;
@@ -242,6 +244,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     connectionPillState: computed(() => deps.connectionPillState.value),
     retryConnection: deps.retryConnection,
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
+    currentChannelName: computed(() => deps.currentChannelName.value),
     currentChannelHasMore: computed(() => messageTimelineSnapshot.value.hasMoreHistory),
     loadingMoreMessages: computed(() => messageTimelineSnapshot.value.isLoadingHistory),
     messageRows,
