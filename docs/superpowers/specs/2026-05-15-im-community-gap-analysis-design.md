@@ -221,31 +221,747 @@ P0 能力不应全部塞进 `message-flow`。推荐沿用现有 `chat` 三子域
 
 它消费服务端 API，不反向依赖治理页面内部状态。
 
-## 协议与事件扩展
+## API 参数设计
 
-建议新增或扩展 HTTP：
+本节是 P0 能力的准协议设计。正式落地时应拆入 `docs/api/*`，并保持错误模型、分页结构和 ID 约定与 `docs/api/13-error-model-and-reasons-v1.md`、`docs/api/14-pagination-and-cursor-v1.md` 一致。
 
-1. `GET /api/channels/{cid}/messages/search`
-2. `PATCH /api/messages/{mid}`
-3. `POST /api/channels/{cid}/pins/{mid}`
-4. `DELETE /api/channels/{cid}/pins/{mid}`
-5. `GET /api/channels/{cid}/pins`
-6. `POST /api/messages/{mid}/forward`
-7. `GET /api/mentions`
-8. `PUT /api/channels/{cid}/notification_preference`
-9. `GET /api/audit_logs`
-10. `GET /api/channels/discover?q=`
+### 公共约定
 
-建议新增或扩展 WS 事件：
+1. 所有实体 ID 继续使用字符串：`uid/cid/mid/category_id/pin_id/mention_id/audit_id`。
+2. 时间统一使用 Unix epoch milliseconds。
+3. 分页响应统一使用 `{ items, next_cursor, has_more }`。
+4. `limit` 默认 20，最大 50；审计日志可默认 50，最大 100。
+5. 客户端不得解析 cursor，不得跨端点复用 cursor。
+6. 写操作需要服务端生成审计日志，除非该操作本身是通知偏好这类个人设置。
+7. 写操作失败时客户端必须以 `error.reason` 分支，不解析 `message`。
 
-1. `message.updated`
-2. `message.pinned`
-3. `message.unpinned`
-4. `mention.created`
-5. `audit_log.created`
-6. `channel.category_changed`
+### 扩展消息模型
+
+现有 message record 建议增加以下可选字段：
+
+```json
+{
+  "mid": "100",
+  "cid": "10",
+  "uid": "20",
+  "send_time": 1700000000000,
+  "domain": "Core:Text",
+  "domain_version": "1.0.0",
+  "data": { "text": "hello @Alice" },
+  "preview": "hello @Alice",
+  "reply_to_mid": "0",
+  "edited_at": 1700000001000,
+  "edit_version": 2,
+  "mentions": [
+    { "type": "user", "uid": "30" }
+  ],
+  "forwarded_from": {
+    "mid": "90",
+    "cid": "8",
+    "uid": "31",
+    "preview": "original message",
+    "send_time": 1699999999000
+  }
+}
+```
+
+字段说明：
+
+1. `edited_at`：消息最后一次编辑时间；未编辑时缺省。
+2. `edit_version`：消息编辑版本，从 1 开始；客户端可用于乐观并发。
+3. `mentions`：服务端规范化后的提及目标列表。
+4. `forwarded_from`：转发消息的来源摘要；不要求客户端访问原频道时也能读取完整原消息。
+
+`mentions[].type` P0 只要求 `user`，但预留：
+
+```json
+{ "type": "user", "uid": "30" }
+{ "type": "role", "role_id": "moderator" }
+{ "type": "everyone" }
+```
+
+### 发送消息扩展
+
+现有 `POST /api/channels/{cid}/messages` 建议扩展请求字段：
+
+```json
+{
+  "domain": "Core:Text",
+  "domain_version": "1.0.0",
+  "data": { "text": "hello @Alice" },
+  "reply_to_mid": "0",
+  "mentions": [
+    { "type": "user", "uid": "30" }
+  ],
+  "client_message_id": "local_01H..."
+}
+```
+
+字段说明：
+
+1. `mentions` 可选；客户端传入的是候选提及目标，服务端必须重新校验、去重、按权限过滤并写回规范化结果。
+2. `client_message_id` 可选；用于客户端把本地 optimistic message 与服务端返回消息关联，不参与服务端全局 ID 语义。
+3. 发送幂等仍优先使用 HTTP `Idempotency-Key` header；`client_message_id` 不替代幂等键。
+4. P0 不允许客户端通过 `mentions` 直接触发 `role` 或 `everyone` 提及；服务端应返回 `forbidden` 或降级忽略，具体策略必须稳定。
+
+响应继续返回完整 message record，并带上服务端规范化后的 `mentions`。
+
+新增错误：
+
+1. `mention_target_invalid`：提及目标不存在、不可见或格式非法。
+2. `mention_not_allowed`：当前用户无权使用该提及类型。
+
+这两个 reason 可在 P0 先统一映射为 `validation_failed` / `forbidden`，但正式 API 文档应保留细分空间。
+
+### 扩展频道模型
+
+现有 channel record 建议增加：
+
+```json
+{
+  "cid": "10",
+  "name": "General",
+  "brief": "",
+  "avatar": "",
+  "owner_uid": "20",
+  "category_id": "cat_text",
+  "category_name": "Text Channels",
+  "order": 1000,
+  "type": "text",
+  "joined": true,
+  "join_requested": false
+}
+```
+
+字段说明：
+
+1. `category_id`：频道分类 ID；无分类时可为 `"default"`。
+2. `category_name`：分类展示名，P0 可随频道返回，后续可拆成独立 categories API。
+3. `order`：服务端排序键，数值越小越靠前。
+4. `type`：P0 支持 `text`、`announcement`、`management`；其他类型客户端降级为 `text` 展示。
+5. `joined`：当前用户是否已加入；`GET /api/channels` 通常只返回已加入频道，此字段用于 discover 复用同一模型。
+6. `join_requested`：当前用户是否已提交待处理申请。
+
+现有 `GET /api/channels` 无需新增 query 参数即可返回这些字段。客户端必须能兼容旧服务端缺省字段：
+
+1. `category_id` 缺省时归入 `"default"`。
+2. `category_name` 缺省时展示为 `"Channels"`。
+3. `order` 缺省时按服务端返回顺序展示。
+4. `type` 缺省时按 `"text"` 处理。
+
+### 消息搜索
+
+`GET /api/channels/{cid}/messages/search`
+
+Path：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `cid` | string | 是 | 目标频道 ID |
+
+Query：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `q` | string | 是 | 搜索词，trim 后长度 1-100 |
+| `cursor` | string | 否 | 不透明分页游标 |
+| `limit` | number | 否 | 默认 20，最大 50 |
+| `sender_uid` | string | 否 | 按发送者过滤，P0 可选 |
+| `domain` | string | 否 | 按消息 domain 过滤，P0 可选 |
+| `before_mid` | string | 否 | 只查该消息之前的结果，P1 可选 |
+| `after_mid` | string | 否 | 只查该消息之后的结果，P1 可选 |
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "message": {
+        "mid": "100",
+        "cid": "10",
+        "uid": "20",
+        "sender": { "uid": "20", "nickname": "Alice", "avatar": "avatars/u/20.png" },
+        "send_time": 1700000000000,
+        "domain": "Core:Text",
+        "domain_version": "1.0.0",
+        "data": { "text": "search target" },
+        "preview": "search target"
+      },
+      "match": {
+        "snippet": "search target",
+        "ranges": [
+          { "start": 0, "end": 6 }
+        ]
+      }
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}
+```
+
+错误：
+
+1. `validation_failed`：`q` 为空、过长或 `limit` 越界。
+2. `not_channel_member`：当前用户不在频道中。
+3. `not_found`：频道不存在。
+4. `cursor_invalid`：cursor 无效或过期。
+
+### 消息上下文定位
+
+搜索、提及、置顶列表点击后都需要加载目标消息附近上下文。建议扩展现有消息列表端点：
+
+`GET /api/channels/{cid}/messages?around_mid={mid}&before={n}&after={n}`
+
+Query：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `around_mid` | string | 否 | 目标消息 ID |
+| `before` | number | 否 | 目标消息之前加载条数，默认 25，最大 50 |
+| `after` | number | 否 | 目标消息之后加载条数，默认 25，最大 50 |
+
+响应仍使用现有 `ChatMessagePage`，但当 `around_mid` 存在时，`items` 应包含目标消息；若目标消息已删除或不可访问，返回 `not_found`。
+
+### 消息编辑
+
+`PATCH /api/messages/{mid}`
+
+Path：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `mid` | string | 是 | 目标消息 ID |
+
+请求：
+
+```json
+{
+  "domain": "Core:Text",
+  "domain_version": "1.0.0",
+  "data": { "text": "updated text" },
+  "mentions": [
+    { "type": "user", "uid": "30" }
+  ],
+  "expected_edit_version": 1
+}
+```
+
+字段说明：
+
+1. P0 只要求 `Core:Text` 可编辑。
+2. `mentions` 可由客户端传入候选列表，但服务端必须重新校验和规范化。
+3. `expected_edit_version` 可选；提供后服务端用于乐观并发，版本不匹配返回 `conflict`。
+
+响应：
+
+```json
+{
+  "message": {
+    "mid": "100",
+    "cid": "10",
+    "uid": "20",
+    "send_time": 1700000000000,
+    "domain": "Core:Text",
+    "domain_version": "1.0.0",
+    "data": { "text": "updated text" },
+    "preview": "updated text",
+    "edited_at": 1700000001000,
+    "edit_version": 2,
+    "mentions": [
+      { "type": "user", "uid": "30" }
+    ]
+  }
+}
+```
+
+错误：
+
+1. `message_not_editable`：消息类型或服务端策略不允许编辑。
+2. `message_edit_window_expired`：超过允许编辑时间。
+3. `forbidden`：非发送者或无管理权限。
+4. `conflict`：`expected_edit_version` 过期。
+5. `schema_invalid`：domain payload 不符合契约。
+
+新增 reason 建议：
+
+1. `message_not_editable`
+2. `message_edit_window_expired`
+
+### 频道置顶
+
+`POST /api/channels/{cid}/pins/{mid}`
+
+请求：
+
+```json
+{
+  "note": "important context"
+}
+```
+
+字段说明：
+
+1. `note` 可选，最大 200 字符。
+2. 重复置顶同一消息应返回既有 pin 结果，或返回 `conflict`；推荐返回既有结果以保持幂等。
+
+响应：
+
+```json
+{
+  "pin": {
+    "pin_id": "pin_1",
+    "cid": "10",
+    "mid": "100",
+    "pinned_by_uid": "20",
+    "pinned_at": 1700000002000,
+    "note": "important context",
+    "message": {
+      "mid": "100",
+      "cid": "10",
+      "uid": "21",
+      "send_time": 1700000000000,
+      "domain": "Core:Text",
+      "domain_version": "1.0.0",
+      "data": { "text": "important" },
+      "preview": "important"
+    }
+  }
+}
+```
+
+`DELETE /api/channels/{cid}/pins/{mid}`
+
+成功：`204 No Content`
+
+`GET /api/channels/{cid}/pins?cursor=&limit=`
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "pin_id": "pin_1",
+      "cid": "10",
+      "mid": "100",
+      "pinned_by_uid": "20",
+      "pinned_at": 1700000002000,
+      "note": "important context",
+      "message": {}
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}
+```
+
+错误：
+
+1. `channel_admin_required`：置顶或取消置顶需要管理员权限。
+2. `not_found`：频道或消息不存在。
+3. `pin_limit_reached`：频道置顶数量达到上限。
+
+新增 reason 建议：
+
+1. `pin_limit_reached`
+
+### 消息转发
+
+`POST /api/messages/{mid}/forward`
+
+请求：
+
+```json
+{
+  "target_cid": "11",
+  "comment": "see this",
+  "idempotency_key": "8e4e7b2b-6a20-4d2a-b1bb-3f7d1d67e83b"
+}
+```
+
+字段说明：
+
+1. `target_cid`：目标频道 ID。
+2. `comment`：可选附言，P0 最大 500 字符。
+3. `idempotency_key`：推荐，也可继续使用 HTTP `Idempotency-Key` header；两者同时存在时 header 优先。
+4. 服务端应生成新的消息，`forwarded_from` 携带来源摘要。
+
+响应：
+
+```json
+{
+  "message": {
+    "mid": "120",
+    "cid": "11",
+    "uid": "20",
+    "send_time": 1700000003000,
+    "domain": "Core:Text",
+    "domain_version": "1.0.0",
+    "data": { "text": "see this" },
+    "preview": "see this",
+    "forwarded_from": {
+      "mid": "100",
+      "cid": "10",
+      "uid": "21",
+      "preview": "original message",
+      "send_time": 1700000000000
+    }
+  }
+}
+```
+
+错误：
+
+1. `not_found`：源消息不存在或已被硬删除。
+2. `not_channel_member`：不是源频道或目标频道成员。
+3. `forbidden`：源消息策略禁止转发。
+4. `user_muted`：当前用户在目标频道被禁言。
+5. `rate_limited`：转发频率过高。
+
+新增 reason 建议：
+
+1. `message_forward_forbidden`
+
+### 提及收件箱
+
+`GET /api/mentions?cursor=&limit=&unread_only=&cid=`
+
+Query：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `cursor` | string | 否 | 不透明分页游标 |
+| `limit` | number | 否 | 默认 20，最大 50 |
+| `unread_only` | boolean | 否 | 只返回未读提及 |
+| `cid` | string | 否 | 限定频道 |
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "mention_id": "men_1",
+      "cid": "10",
+      "mid": "100",
+      "from_uid": "21",
+      "target": { "type": "user", "uid": "20" },
+      "created_at": 1700000000000,
+      "read_at": null,
+      "message": {
+        "mid": "100",
+        "cid": "10",
+        "uid": "21",
+        "send_time": 1700000000000,
+        "domain": "Core:Text",
+        "domain_version": "1.0.0",
+        "preview": "@you please check"
+      }
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}
+```
+
+`PUT /api/mentions/{mention_id}/read`
+
+成功响应：
+
+```json
+{
+  "mention_id": "men_1",
+  "read_at": 1700000004000
+}
+```
+
+`PUT /api/mentions/read_state`
+
+批量标记请求：
+
+```json
+{
+  "before_mention_id": "men_100",
+  "cid": "10"
+}
+```
+
+字段说明：
+
+1. `before_mention_id` 可选；存在时标记该 mention 及之前的提及为已读。
+2. `cid` 可选；存在时只标记该频道内的提及。
+3. 两者都缺省时表示标记当前用户所有提及为已读，客户端应二次确认。
+
+错误：
+
+1. `not_found`：mention 不存在。
+2. `forbidden`：mention 不属于当前用户。
+3. `cursor_invalid`：分页游标无效。
+
+### 通知偏好
+
+P0 可先本地实现；如果进入服务端同步，建议使用以下协议。
+
+`GET /api/notification_preferences`
+
+响应：
+
+```json
+{
+  "server": {
+    "mode": "all",
+    "muted_until": 0
+  },
+  "channels": [
+    {
+      "cid": "10",
+      "mode": "mentions_only",
+      "muted_until": 0
+    }
+  ]
+}
+```
+
+`PUT /api/channels/{cid}/notification_preference`
+
+请求：
+
+```json
+{
+  "mode": "mentions_only",
+  "muted_until": 0
+}
+```
+
+`PUT /api/notification_preferences/server`
+
+请求：
+
+```json
+{
+  "mode": "muted",
+  "muted_until": 1700003600000
+}
+```
+
+字段说明：
+
+1. `mode` 枚举：`all`、`mentions_only`、`muted`、`inherit`。
+2. 频道级 `inherit` 表示使用 server 默认。
+3. server 级不允许 `inherit`。
+4. `muted_until = 0` 表示一直静音；缺省或 null 表示不设置时间边界。
+
+错误：
+
+1. `validation_failed`：mode 非法或 `muted_until` 非法。
+2. `not_found`：频道不存在。
+3. `not_channel_member`：不是频道成员。
+
+### 远端频道发现
+
+`GET /api/channels/discover?q=&cursor=&limit=`
+
+Query：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `q` | string | 否 | 搜索词；缺省时返回推荐或公开频道 |
+| `cursor` | string | 否 | 不透明分页游标 |
+| `limit` | number | 否 | 默认 20，最大 50 |
+| `type` | string | 否 | `text`、`announcement`、`management` |
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "cid": "12",
+      "name": "Rules",
+      "brief": "server rules",
+      "avatar": "",
+      "owner_uid": "20",
+      "category_id": "cat_info",
+      "category_name": "Information",
+      "order": 100,
+      "type": "announcement",
+      "joined": false,
+      "join_requested": true,
+      "member_count": 120,
+      "requires_application": true
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}
+```
+
+错误：
+
+1. `validation_failed`：查询参数非法。
+2. `cursor_invalid`：分页游标无效。
+
+### 审计日志
+
+`GET /api/audit_logs?cursor=&limit=&cid=&actor_uid=&action=&from_time=&to_time=`
+
+Query：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `cursor` | string | 否 | 不透明分页游标 |
+| `limit` | number | 否 | 默认 50，最大 100 |
+| `cid` | string | 否 | 限定频道 |
+| `actor_uid` | string | 否 | 操作者 |
+| `action` | string | 否 | 动作类型 |
+| `from_time` | number | 否 | 起始时间，epoch ms |
+| `to_time` | number | 否 | 结束时间，epoch ms |
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "audit_id": "aud_1",
+      "server_id": "550e8400-e29b-41d4-a716-446655440000",
+      "cid": "10",
+      "actor_uid": "20",
+      "target": {
+        "type": "message",
+        "id": "100"
+      },
+      "action": "message.delete",
+      "created_at": 1700000005000,
+      "reason": "spam",
+      "metadata": {
+        "preview": "deleted message preview"
+      }
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}
+```
+
+P0 `action` 建议枚举：
+
+1. `channel.create`
+2. `channel.delete`
+3. `channel.update`
+4. `channel.member.kick`
+5. `channel.admin.grant`
+6. `channel.admin.revoke`
+7. `channel.ban.create`
+8. `channel.ban.delete`
+9. `message.delete`
+10. `message.edit`
+11. `message.pin`
+12. `message.unpin`
+
+错误：
+
+1. `channel_admin_required`：无查看审计日志权限。
+2. `validation_failed`：筛选参数非法。
+3. `cursor_invalid`：分页游标无效。
+
+### WS 事件扩展
 
 WS 事件只作为增量刷新和实时提示。关键状态必须能通过 HTTP 重新拉取恢复。
+
+`message.updated`
+
+```json
+{
+  "cid": "10",
+  "message": {
+    "mid": "100",
+    "cid": "10",
+    "uid": "20",
+    "send_time": 1700000000000,
+    "domain": "Core:Text",
+    "domain_version": "1.0.0",
+    "data": { "text": "updated text" },
+    "preview": "updated text",
+    "edited_at": 1700000001000,
+    "edit_version": 2
+  }
+}
+```
+
+`message.pinned`
+
+```json
+{
+  "cid": "10",
+  "mid": "100",
+  "pin_id": "pin_1",
+  "pinned_by_uid": "20",
+  "pinned_at": 1700000002000
+}
+```
+
+`message.unpinned`
+
+```json
+{
+  "cid": "10",
+  "mid": "100",
+  "pin_id": "pin_1",
+  "unpinned_by_uid": "20",
+  "unpinned_at": 1700000003000
+}
+```
+
+`mention.created`
+
+```json
+{
+  "mention_id": "men_1",
+  "cid": "10",
+  "mid": "100",
+  "from_uid": "21",
+  "target": { "type": "user", "uid": "20" },
+  "created_at": 1700000000000
+}
+```
+
+`audit_log.created`
+
+```json
+{
+  "audit_id": "aud_1",
+  "cid": "10",
+  "actor_uid": "20",
+  "action": "message.delete",
+  "created_at": 1700000005000
+}
+```
+
+`channel.category_changed`
+
+```json
+{
+  "cid": "10",
+  "category_id": "cat_text",
+  "category_name": "Text Channels",
+  "order": 1000,
+  "type": "text"
+}
+```
+
+### 新增错误 reason 汇总
+
+建议在正式 API 文档中补充：
+
+1. `message_not_editable`
+2. `message_edit_window_expired`
+3. `message_forward_forbidden`
+4. `pin_limit_reached`
+
+其余错误优先复用现有 `validation_failed`、`forbidden`、`not_found`、`conflict`、`cursor_invalid`、`rate_limited`、`not_channel_member`、`channel_admin_required`、`user_muted`。
 
 ## 页面落点
 
