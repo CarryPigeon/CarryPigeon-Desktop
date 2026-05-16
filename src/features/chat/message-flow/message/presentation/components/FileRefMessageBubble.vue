@@ -88,7 +88,7 @@ async function handleDownload(): Promise<void> {
     const token = readAuthToken(socket) || "";
     currentTaskId.value = await downloadFile(downloadUrl.value, token);
   } catch (e) {
-    createLogger("FileRefMessageBubble").error("Action: file_download_failed", { url: downloadUrl.value, error: String(e) });
+    createLogger("FileRefMessageBubble").error("Action: chat_file_download_failed", { url: downloadUrl.value, error: String(e) });
   }
 }
 

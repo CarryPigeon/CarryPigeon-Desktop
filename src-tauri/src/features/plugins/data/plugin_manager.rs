@@ -16,7 +16,7 @@ use anyhow::Context;
 use sha2::Digest;
 use tokio::sync::Mutex;
 use wasmtime::{
-    Engine, Module, Store,
+    Engine, Store,
     component::{Component, Linker},
 };
 
@@ -26,20 +26,20 @@ use crate::features::plugins::domain::types::{PluginLoadResult, PluginManifest};
 /// 已安装并可被运行的插件对象（包含清单与缓存资源）。
 ///
 /// # 说明
-/// - 本结构是插件运行时的“内存态表示”，用于复用已加载的 bytes；
+/// - 本结构是插件运行时的"内存态表示"，用于复用已加载的资源路径；
 /// - 资源缓存目录默认位于 `./plugin_cache/{plugin_name}`（见 `PluginManager`）。
 #[derive(Debug, Clone)]
 pub struct Plugin {
     /// 插件清单（可变：允许在运行期更新字段）。
     pub manifest: Arc<Mutex<PluginManifest>>,
-    /// 前端 wasm 字节（用于 WebView 侧能力）。
-    pub frontend_wasm_bytes: Vec<u8>,
+    /// 前端 wasm 路径。
+    pub frontend_wasm_path: PathBuf,
     /// 后端 wasm 字节（用于 wasmtime 组件启动）。
     pub backend_wasm_bytes: Vec<u8>,
-    /// 前端 JS 字节（用于注入/加载）。
-    pub frontend_js_bytes: Vec<u8>,
-    /// 前端 HTML 字节（可选；缺失时可能为空）。
-    pub frontend_html_bytes: Vec<u8>,
+    /// 前端 JS 路径。
+    pub frontend_js_path: PathBuf,
+    /// 前端 HTML 路径（可选；缺失时可能为空）。
+    pub frontend_html_path: PathBuf,
     /// 插件缓存目录路径。
     pub path: PathBuf,
 }
@@ -211,11 +211,11 @@ impl PluginManager {
             manifest.name.clone(),
             Arc::new(Mutex::new(Plugin {
                 manifest: Arc::new(Mutex::new(manifest)),
-                path: plugin_path,
-                frontend_wasm_bytes,
+                path: plugin_path.clone(),
+                frontend_wasm_path: plugin_path.join("frontend.wasm"),
                 backend_wasm_bytes,
-                frontend_js_bytes,
-                frontend_html_bytes,
+                frontend_js_path: plugin_path.join("frontend.js"),
+                frontend_html_path: plugin_path.join("frontend.html"),
             })),
         );
 
@@ -243,42 +243,32 @@ impl PluginManager {
             .cloned()
         {
             let plugin = plugin.lock().await;
-            let frontend_wasm = plugin.frontend_wasm_bytes.clone();
+            let frontend_wasm_path = plugin.frontend_wasm_path.to_string_lossy().to_string();
             let backend_wasm = plugin.backend_wasm_bytes.clone();
-            let frontend_js = plugin.frontend_js_bytes.clone();
-            let frontend_html = plugin.frontend_html_bytes.clone();
+            let frontend_js_path = plugin.frontend_js_path.to_string_lossy().to_string();
+            let frontend_html_path = plugin.frontend_html_path.to_string_lossy().to_string();
             drop(plugin);
 
             self.run_backend_start(&manifest.name, &backend_wasm)
                 .await?;
 
             return Ok(PluginLoadResult {
-                frontend_wasm,
-                frontend_js,
-                frontend_html,
+                frontend_wasm: frontend_wasm_path,
+                frontend_js: frontend_js_path,
+                frontend_html: frontend_html_path,
             });
         }
 
         let path = self.plugin_path(&manifest.name);
-        let frontend_wasm_res = tokio::fs::read(path.join("frontend.wasm")).await;
-        let backend_wasm_res = tokio::fs::read(path.join("backend.wasm")).await;
-        let frontend_js_res = tokio::fs::read(path.join("frontend.js")).await;
-        let frontend_html_res = tokio::fs::read(path.join("frontend.html")).await;
+        let frontend_wasm_path = path.join("frontend.wasm");
+        let backend_wasm_path = path.join("backend.wasm");
+        let frontend_js_path = path.join("frontend.js");
+        let frontend_html_path = path.join("frontend.html");
 
-        let missing_required = frontend_wasm_res
-            .as_ref()
-            .err()
-            .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound)
-            || backend_wasm_res
-                .as_ref()
-                .err()
-                .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound)
-            || frontend_js_res
-                .as_ref()
-                .err()
-                .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound);
-
-        if missing_required {
+        if !frontend_wasm_path.exists()
+            || !backend_wasm_path.exists()
+            || !frontend_js_path.exists()
+        {
             if manifest.url.trim().is_empty() {
                 return Err(anyhow::anyhow!(
                     "Plugin '{}' is not installed (missing cache files) and no manifest.url provided",
@@ -289,19 +279,13 @@ impl PluginManager {
             return Box::pin(self.load_plugin(manifest)).await;
         }
 
-        let frontend_wasm = frontend_wasm_res.context("Failed to read frontend wasm")?;
-        let backend_wasm = backend_wasm_res.context("Failed to read backend wasm")?;
-        let frontend_js = frontend_js_res.context("Failed to read frontend js")?;
-        let frontend_html = match frontend_html_res {
-            Ok(bytes) => bytes,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => vec![],
-            Err(err) => return Err(err.into()),
+        let backend_wasm = tokio::fs::read(&backend_wasm_path).await?;
+        let frontend_html = if frontend_html_path.exists() {
+            frontend_html_path.to_string_lossy().to_string()
+        } else {
+            String::new()
         };
 
-        let _component_frontend =
-            Module::from_binary(&self.engine, &frontend_wasm).map_err(|e| {
-                anyhow::anyhow!("Failed to create frontend module from wasm bytes: {e}")
-            })?;
         self.run_backend_start(&manifest.name, &backend_wasm)
             .await?;
 
@@ -309,17 +293,17 @@ impl PluginManager {
             manifest.clone().name,
             Arc::new(Mutex::new(Plugin {
                 manifest: Arc::new(Mutex::new(manifest.clone())),
-                path,
-                frontend_wasm_bytes: frontend_wasm.clone(),
+                path: path.clone(),
+                frontend_wasm_path: frontend_wasm_path.clone(),
                 backend_wasm_bytes: backend_wasm,
-                frontend_js_bytes: frontend_js.clone(),
-                frontend_html_bytes: frontend_html.clone(),
+                frontend_js_path: frontend_js_path.clone(),
+                frontend_html_path: PathBuf::from(frontend_html.clone()),
             })),
         );
 
         Ok(PluginLoadResult {
-            frontend_wasm,
-            frontend_js,
+            frontend_wasm: frontend_wasm_path.to_string_lossy().to_string(),
+            frontend_js: frontend_js_path.to_string_lossy().to_string(),
             frontend_html,
         })
     }

@@ -19,6 +19,7 @@ use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
 use crate::features::tray::di::commands::TrayUnreadState;
 use crate::features::tray::domain::tray_i18n::tray_labels;
+use crate::shared::temp_file::TempFileManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 启动 Tauri 应用。
@@ -45,6 +46,19 @@ pub fn run() -> anyhow::Result<()> {
 
             // 初始化托盘未读闪烁状态（to_owned 将 App 借用的图片转为 'static）。
             app.manage(TrayUnreadState::new(tray_icon.clone().to_owned()));
+
+            // 初始化临时文件管理器
+            let app_data_dir = app.path().app_data_dir().context("Failed to get app data dir")?;
+            let metadata_db_path = app_data_dir.join("temp_files").join("metadata.db");
+            let temp_file_manager = tokio::runtime::Handle::current()
+                .block_on(TempFileManager::new(app_data_dir.clone(), metadata_db_path))
+                .context("Failed to initialize TempFileManager")?;
+
+            // 启动时清理过期临时文件
+            let _ = tokio::runtime::Handle::current()
+                .block_on(temp_file_manager.cleanup(None, 24));
+
+            app.manage(temp_file_manager);
 
             // 定义托盘菜单行为（默认中文，前端启动后根据 locale 同步更新）
             let labels = tray_labels("zh_cn");
@@ -130,6 +144,11 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::network::di::commands::remove_tcp_service,
             crate::features::network::di::commands::api_request_json,
             crate::features::network::di::commands::download_file,
+            // temp_file
+            crate::shared::temp_file::commands::cleanup_temp_files,
+            crate::shared::temp_file::commands::remove_temp_file,
+            crate::shared::temp_file::commands::save_temp_file,
+            crate::shared::temp_file::commands::open_temp_file,
             // db
             crate::shared::db::commands::db_init,
             crate::shared::db::commands::db_execute,

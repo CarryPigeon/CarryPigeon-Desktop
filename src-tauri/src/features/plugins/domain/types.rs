@@ -18,9 +18,9 @@ pub struct PluginManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginLoadResult {
-    pub frontend_wasm: Vec<u8>,
-    pub frontend_js: Vec<u8>,
-    pub frontend_html: Vec<u8>,
+    pub frontend_wasm: String,
+    pub frontend_js: String,
+    pub frontend_html: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

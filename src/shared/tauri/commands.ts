@@ -68,6 +68,12 @@ export const TAURI_COMMANDS = {
   setTrayLocale: "set_tray_locale",
 
   downloadFile: "download_file",
+
+  // temp_file
+  cleanupTempFiles: "cleanup_temp_files",
+  removeTempFile: "remove_temp_file",
+  saveTempFile: "save_temp_file",
+  openTempFile: "open_temp_file",
 } as const;
 
 /**
