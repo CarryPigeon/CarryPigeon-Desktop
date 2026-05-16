@@ -8,6 +8,13 @@ import { invokeTauri } from "@/shared/tauri/invokeClient";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { listen } from "@tauri-apps/api/event";
 
+export interface DownloadResult {
+  fileId: string;
+  filePath: string;
+  mimeType?: string;
+  totalSize: number;
+}
+
 export interface DownloadTask {
   id: string;
   filename: string;
@@ -69,27 +76,29 @@ export async function downloadFile(url: string, token: string): Promise<string> 
     task.status = "downloading";
     await ensureProgressListener();
 
-    const bytes: number[] = await invokeTauri<number[]>(TAURI_COMMANDS.downloadFile, {
+    const result = await invokeTauri<DownloadResult>(TAURI_COMMANDS.downloadFile, {
       url,
       token,
       taskId,
     });
 
-    const blob = new Blob([new Uint8Array(bytes)]);
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = task.filename;
-    anchor.click();
-    URL.revokeObjectURL(objectUrl);
-
     task.status = "completed";
     task.progress = 100;
+
+    return result.fileId;
   } catch (e) {
     task.status = "error";
     task.error = String(e);
   }
   return taskId;
+}
+
+export async function saveTempFile(fileId: string, destination: string): Promise<string> {
+  return invokeTauri<string>(TAURI_COMMANDS.saveTempFile, { fileId, destination });
+}
+
+export async function openTempFile(fileId: string): Promise<void> {
+  return invokeTauri<void>(TAURI_COMMANDS.openTempFile, { fileId });
 }
 
 export function getDownloadTasks(): Map<string, DownloadTask> {

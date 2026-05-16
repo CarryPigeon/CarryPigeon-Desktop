@@ -12,6 +12,8 @@ use crate::features::network::di::tcp_backend_factory::DefaultTcpBackendFactory;
 use crate::features::network::usecases::api_usecases::{self, ApiJsonRequest};
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::shared::error::{CommandResult, to_command_error};
+use crate::shared::temp_file::{DownloadResult, TempFileManager};
+use tokio::io::AsyncWriteExt;
 
 #[tauri::command]
 /// 注册并启动一个 TCP service（real 或 mock）。
@@ -122,11 +124,12 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 #[tauri::command]
 pub async fn download_file(
     app: AppHandle,
+    temp_files: State<'_, TempFileManager>,
     url: String,
     token: String,
     task_id: String,
-) -> CommandResult<Vec<u8>> {
-    use tokio::io::AsyncWriteExt;
+) -> CommandResult<DownloadResult> {
+    use futures_util::StreamExt;
 
     let client = HTTP_CLIENT.get_or_init(reqwest::Client::new);
     let response = client
@@ -134,38 +137,94 @@ pub async fn download_file(
         .header("Authorization", format!("Bearer {token}"))
         .send()
         .await
-        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", e))?;
+        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", e))?
+        .error_for_status()
+        .map_err(|e| to_command_error("DOWNLOAD_HTTP_ERROR", e))?;
 
     let total = response.content_length().unwrap_or(0);
+    let mime_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let mut file = temp_files
+        .create_download(&task_id, &url, mime_type.as_deref(), total)
+        .await
+        .map_err(|e| to_command_error("TEMP_FILE_CREATE_FAILED", e))?;
+
     let mut downloaded: u64 = 0;
-    let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
-
     let mut stream = response.bytes_stream();
-    use futures_util::StreamExt;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| to_command_error("DOWNLOAD_STREAM_ERROR", e))?;
-        bytes
-            .write_all(&chunk)
-            .await
-            .map_err(|e| to_command_error("DOWNLOAD_BUFFER_ERROR", e))?;
-        downloaded += chunk.len() as u64;
 
-        let _ = app.emit(
-            "download:progress",
-            serde_json::json!({
-                "taskId": task_id,
-                "downloaded": downloaded,
-                "total": total,
-            }),
-        );
+    let stream_result: Result<(), _> = async {
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| to_command_error("DOWNLOAD_STREAM_ERROR", e))?;
+            file.write_all(&chunk)
+                .await
+                .map_err(|e| to_command_error("TEMP_FILE_WRITE_FAILED", e))?;
+            downloaded += chunk.len() as u64;
+
+            if let Err(e) = temp_files
+                .update_progress(&task_id, downloaded)
+                .await
+            {
+                tracing::warn!(action = "temp_file_update_progress_failed", task_id = %task_id, error = %e);
+            }
+
+            let _ = app.emit(
+                "download:progress",
+                serde_json::json!({
+                    "taskId": task_id,
+                    "downloaded": downloaded,
+                    "total": total,
+                }),
+            );
+        }
+        Ok::<_, String>(())
     }
+    .await;
+
+    if let Err(e) = stream_result {
+        let _ = temp_files.mark_failed(&task_id).await;
+        return Err(e);
+    }
+
+    drop(file);
+
+    let ext = mime_to_ext(mime_type.as_deref().unwrap_or("application/octet-stream"));
+    let final_path = temp_files
+        .mark_complete(&task_id, &ext)
+        .await
+        .map_err(|e| to_command_error("TEMP_FILE_MOVE_FAILED", e))?;
 
     tracing::info!(
         action = "network_download_completed",
         url = %url,
         downloaded,
         total,
+        path = %final_path,
     );
 
-    Ok(bytes)
+    Ok(DownloadResult {
+        file_id: task_id,
+        file_path: final_path,
+        mime_type,
+        total_size: total,
+    })
+}
+
+/// 根据 MIME 类型推导文件扩展名。
+fn mime_to_ext(mime: &str) -> &'static str {
+    match mime {
+        "application/zip" => "zip",
+        "application/pdf" => "pdf",
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "text/plain" => "txt",
+        "text/html" => "html",
+        "application/json" => "json",
+        _ => "bin",
+    }
 }
