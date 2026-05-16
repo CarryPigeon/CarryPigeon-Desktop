@@ -17,6 +17,7 @@ type PatchbayServerRailRawModel = {
   handleOpenServers(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
+  handleOpenFiles(): void;
 };
 /**
  * Patchbay 页面服务器侧栏 section model。
@@ -110,11 +111,9 @@ type CreatePatchbayServerRailSectionDeps = {
   handleOpenServers(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
+  handleOpenFiles(): void;
 };
 
-/**
- * 创建服务器侧栏 section model。
- */
 export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSectionDeps): PatchbayServerRailModel {
   return proxyRefs({
     racks: deps.racks,
@@ -123,6 +122,7 @@ export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSe
     handleOpenServers: deps.handleOpenServers,
     handleOpenSettings: deps.handleOpenSettings,
     goPlugins: deps.goPlugins,
+    handleOpenFiles: deps.handleOpenFiles,
   });
 }
 

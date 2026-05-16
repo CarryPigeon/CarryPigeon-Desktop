@@ -16,7 +16,6 @@ import App from "./App.vue";
 import { router } from "./app/router";
 import { i18n } from "./app/i18n";
 import "tdesign-vue-next/es/style/index.css";
-import "@/features/chat/public/styles";
 import { getStoredTheme, setTheme } from "@/shared/utils/theme";
 import "@/shared/serverIdentity";
 import { routeIfSubWindow } from "@/app/bootstrap/subWindowRouting";
@@ -31,6 +30,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import type { WatchStopHandle } from "vue";
 import { clearTrayUnreadFlashing, registerTrayUnreadBridge } from "@/app/bootstrap/trayUnreadBridge";
+import { syncTrayLocaleOnStartup } from "@/app/bootstrap/trayLocaleBridge";
 
 const app = createApp(App);
 app.use(router).use(i18n);
@@ -60,8 +60,12 @@ const hasTauriRuntime = isTauriRuntimeAvailable();
 
 async function startMainWindowRuntimes(): Promise<boolean> {
   try {
-    serverConnectionRuntimeLease = await serverConnectionCapabilities.runtime.acquireLease();
-    pluginsRuntimeLease = await pluginsCapabilities.runtime.acquireLease();
+    const [serverLease, pluginLease] = await Promise.all([
+      serverConnectionCapabilities.runtime.acquireLease(),
+      pluginsCapabilities.runtime.acquireLease(),
+    ]);
+    serverConnectionRuntimeLease = serverLease;
+    pluginsRuntimeLease = pluginLease;
   } catch (e) {
     logger.error("Action: api_main_start_runtime_failed", { error: String(e) });
     releaseMainWindowRuntimes();
@@ -75,6 +79,7 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   }
 
   trayUnreadBridgeStop = registerTrayUnreadBridge();
+  syncTrayLocaleOnStartup();
 
   return true;
 }
@@ -102,27 +107,20 @@ function releaseMainWindowRuntimes(): void {
 
 window.addEventListener("beforeunload", releaseMainWindowRuntimes);
 
-async function bootstrap(): Promise<void> {
-  if (hasTauriRuntime) {
-    await ensureSecureChatCacheReady();
-  }
-  let serverConnectionReady = false;
-  if (!isSubWindow && hasTauriRuntime) {
-    // Main window owns runtime startup and bridge registration.
-    serverConnectionReady = await startMainWindowRuntimes();
-  }
+// Mount first to unblock LCP
+app.mount("#app");
 
-  // UI mount waits for router readiness for predictable first render route.
-  await router.isReady();
-  app.mount("#app");
-
-  if (!isSubWindow && serverConnectionReady && hasTauriRuntime) {
-    // Session restore starts after mount to avoid blocking first paint.
-    ensureInitialServerSelection();
-    void restoreStartupSession(router);
-  }
+// Async startup after mount (fire-and-forget)
+if (hasTauriRuntime) {
+  void ensureSecureChatCacheReady().catch((e) => {
+    logger.error("Action: api_main_ensure_cache_failed", { error: String(e) });
+  });
 }
-
-void bootstrap().catch((e) => {
-  logger.error("Action: api_main_bootstrap_failed", { error: String(e) });
-});
+if (!isSubWindow && hasTauriRuntime) {
+  void startMainWindowRuntimes().then((ok) => {
+    if (ok) {
+      ensureInitialServerSelection();
+      void restoreStartupSession(router);
+    }
+  });
+}

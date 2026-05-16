@@ -183,7 +183,7 @@ function handleClose(): void {
       </div>
 
       <div class="cp-drawer__section">
-        <div class="cp-drawer__label">domains</div>
+        <div class="cp-drawer__label">{{ t("module_detail_drawer_domains") }}</div>
         <div class="cp-drawer__ports">
           <span
             v-for="d in props.plugin.providesDomains"

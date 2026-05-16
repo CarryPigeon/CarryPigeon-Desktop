@@ -4,6 +4,10 @@
  * @description Patchbay 左侧服务器栏（Rack 列表 + 快捷入口）。
  */
 
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 type ServerRackItem = {
   /**
    * 服务器展示名称。
@@ -43,6 +47,7 @@ const emit = defineEmits<{
    * 打开设置页。
    */
   (e: "open-settings"): void;
+  (e: "open-files"): void;
 }>();
 </script>
 
@@ -68,7 +73,8 @@ const emit = defineEmits<{
     <div class="cp-rail__foot">
       <button class="cp-rail__btn" type="button" @click="emit('open-servers')">Manage</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">Plugins</button>
-      <button class="cp-rail__btn" type="button" @click="emit('open-settings')">Settings</button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-files')">{{ t("file_manager") }}</button>
     </div>
   </aside>
 </template>

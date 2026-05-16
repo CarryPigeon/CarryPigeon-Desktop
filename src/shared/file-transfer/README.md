@@ -14,3 +14,4 @@
 
 - 上传任务队列与 UI 交互状态（由 `chat/message-flow/upload` 负责）。
 - 聊天消息中的文件语义渲染（由 `chat/message-flow/message` 负责）。
+- 下载进度组件 UI（由 `chat/message-flow/download` 负责，共享状态存于此）。

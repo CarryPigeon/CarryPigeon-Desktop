@@ -17,6 +17,7 @@ import QuickSwitcher from "@/features/chat/presentation/patchbay/components/over
 import CreateChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateChannelDialog.vue";
 import CreateFriendPrivateChatDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateFriendPrivateChatDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
+import "@/features/chat/public/styles";
 
 const page = usePatchbayPageModel();
 
@@ -223,6 +224,7 @@ onBeforeUnmount(() => {
       @open-servers="page.serverRail.handleOpenServers"
       @open-plugins="page.serverRail.goPlugins"
       @open-settings="page.serverRail.handleOpenSettings"
+      @open-files="page.serverRail.handleOpenFiles"
     />
 
     <button

@@ -12,11 +12,13 @@
 
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
 import { createDomainCatalogContext } from "@/features/plugins/presentation/composables/useDomainCatalogContext";
 
 const router = useRouter();
+const { t } = useI18n();
 const q = ref("");
 
 const { socket, serverId, refreshServerInfo } = usePluginsServerWorkspace();
@@ -54,10 +56,10 @@ onMounted(() => {
   <!-- 页面：DomainCatalogPage｜职责：Domain Catalog（providers/constraints/contract）展示与复制 -->
   <main class="cp-domains">
     <header class="cp-domains__head">
-      <button class="cp-domains__back" type="button" @click="router.back()">Back</button>
+      <button class="cp-domains__back" type="button" @click="router.back()">{{ t("back") }}</button>
       <div class="cp-domains__title">
-        <div class="cp-domains__name">Domain Catalog</div>
-        <div class="cp-domains__sub">Contracts · Providers · Constraints</div>
+        <div class="cp-domains__name">{{ t("domain_catalog") }}</div>
+        <div class="cp-domains__sub">{{ t("domain_catalog_sub") }}</div>
       </div>
       <div class="cp-domains__meta">
         <MonoTag :value="socket || 'no-server'" title="server socket" :copyable="true" />
@@ -67,24 +69,22 @@ onMounted(() => {
 
     <section class="cp-domains__controls">
       <div class="cp-domains__field">
-        <div class="cp-domains__label">search</div>
-        <t-input v-model="q" placeholder="Core:Text / Math:Formula …" clearable />
+        <div class="cp-domains__label">{{ t("domain_search_label") }}</div>
+        <t-input v-model="q" :placeholder="t('domain_search_placeholder')" clearable />
       </div>
       <div class="cp-domains__actions">
-        <button class="cp-domains__btn" type="button" @click="refresh">Refresh</button>
-        <button class="cp-domains__btn" type="button" @click="$router.push('/plugins')">Plugin Center</button>
+        <button class="cp-domains__btn" type="button" @click="refresh">{{ t("domain_refresh") }}</button>
+        <button class="cp-domains__btn" type="button" @click="$router.push('/plugins')">{{ t("plugin_center") }}</button>
       </div>
     </section>
 
-    <div v-if="socket && !serverId" class="cp-domains__state warn">
-      Missing <code>server_id</code> from <code>GET /api/server</code>. Plugin install/enable/update will be disabled, but Domain Catalog remains readable.
-    </div>
+    <div v-if="socket && !serverId" class="cp-domains__state warn" v-text="t('domain_missing_id')"></div>
 
-    <div v-if="domainCatalogStore.loading.value" class="cp-domains__state">Loading…</div>
+    <div v-if="domainCatalogStore.loading.value" class="cp-domains__state">{{ t("domain_loading") }}</div>
     <div v-else-if="domainCatalogStore.error.value" class="cp-domains__state err">{{ domainCatalogStore.error.value }}</div>
 
     <section v-else class="cp-domains__list">
-      <div v-if="filtered.length === 0" class="cp-domains__state">No items.</div>
+      <div v-if="filtered.length === 0" class="cp-domains__state">{{ t("domain_no_items") }}</div>
 
       <article v-for="it in filtered" :key="it.domain" class="cp-domainCard">
         <div class="cp-domainCard__top">

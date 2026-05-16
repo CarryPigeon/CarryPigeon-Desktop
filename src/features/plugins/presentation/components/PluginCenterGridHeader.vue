@@ -81,7 +81,7 @@ function handleBackToChat(): void {
     </div>
     <div class="cp-plugins__headRight">
       <button class="cp-plugins__headBtn" type="button" @click="handleRefresh">{{ t("refresh") }}</button>
-      <button class="cp-plugins__headBtn" type="button" @click="handleOpenDomains">Domains</button>
+      <button class="cp-plugins__headBtn" type="button" @click="handleOpenDomains">{{ t("plugin_center_domains") }}</button>
       <button class="cp-plugins__headBtn" type="button" @click="handleBackToChat">{{ t("back_to_patchbay") }}</button>
     </div>
   </header>

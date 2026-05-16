@@ -40,6 +40,9 @@ docs/superpowers/
 .sisyphus/
 data/db/*.db
 
+# Individual build/plan artifacts
+docs/tmp/voice-call-implementation-plan.md
+
 # Local workflow docs
 AGENTS.md
 CLAUDE.md

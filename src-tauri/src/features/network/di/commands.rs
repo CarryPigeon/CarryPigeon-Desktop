@@ -2,7 +2,8 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
-use tauri::{AppHandle, State};
+use std::sync::OnceLock;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::features::network::data::http_client::ReqwestApiRequestAdapter;
 use crate::features::network::di::event_sink::TauriTcpEventSink;
@@ -108,4 +109,63 @@ pub async fn api_request_json(args: ApiRequestJsonArgs) -> CommandResult<ApiRequ
             error: result.error,
         })
         .map_err(|e| to_command_error("NETWORK_API_REQUEST_FAILED", e))
+}
+
+/// 使用 Rust `reqwest` 下载文件，通过 Tauri event 推送下载进度。
+///
+/// Tauri 事件 `download:progress` 负载:
+/// ```json
+/// { "taskId": "...", "downloaded": 12345, "total": 99999 }
+/// ```
+static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+#[tauri::command]
+pub async fn download_file(
+    app: AppHandle,
+    url: String,
+    token: String,
+    task_id: String,
+) -> CommandResult<Vec<u8>> {
+    use tokio::io::AsyncWriteExt;
+
+    let client = HTTP_CLIENT.get_or_init(reqwest::Client::new);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", e))?;
+
+    let total = response.content_length().unwrap_or(0);
+    let mut downloaded: u64 = 0;
+    let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
+
+    let mut stream = response.bytes_stream();
+    use futures_util::StreamExt;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| to_command_error("DOWNLOAD_STREAM_ERROR", e))?;
+        bytes
+            .write_all(&chunk)
+            .await
+            .map_err(|e| to_command_error("DOWNLOAD_BUFFER_ERROR", e))?;
+        downloaded += chunk.len() as u64;
+
+        let _ = app.emit(
+            "download:progress",
+            serde_json::json!({
+                "taskId": task_id,
+                "downloaded": downloaded,
+                "total": total,
+            }),
+        );
+    }
+
+    tracing::info!(
+        action = "network_download_completed",
+        url = %url,
+        downloaded,
+        total,
+    );
+
+    Ok(bytes)
 }
