@@ -5,10 +5,14 @@
  * message-flow/message｜文件引用消息气泡组件。
  */
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
+import { readAuthToken } from "@/shared/utils/localState";
+import { downloadFile, getDownloadTasks } from "@/shared/file-transfer";
+import { createLogger } from "@/shared/utils/logger";
+import DownloadProgress from "@/features/chat/message-flow/download/presentation/components/DownloadProgress.vue";
 
 const props = defineProps<{
   /**
@@ -68,14 +72,29 @@ function getFileIcon(mimeType: string | undefined): string {
   return "📎";
 }
 
-/**
- * 在新标签页中打开下载链接。
- *
- * @returns 无返回值。
- */
-function handleDownload(): void {
+const showDownloadProgress = ref(false);
+const currentTaskId = ref<string>("");
+
+const downloadTask = computed(() => {
+  if (!showDownloadProgress.value || !currentTaskId.value) return null;
+  return getDownloadTasks().get(currentTaskId.value) ?? null;
+});
+
+async function handleDownload(): Promise<void> {
   if (!downloadUrl.value) return;
-  window.open(downloadUrl.value, "_blank");
+  showDownloadProgress.value = true;
+  try {
+    const socket = getActiveChatServerSocket();
+    const token = readAuthToken(socket) || "";
+    currentTaskId.value = await downloadFile(downloadUrl.value, token);
+  } catch (e) {
+    createLogger("FileRefMessageBubble").error("Action: file_download_failed", { url: downloadUrl.value, error: String(e) });
+  }
+}
+
+function handleDismissTask(): void {
+  showDownloadProgress.value = false;
+  currentTaskId.value = "";
 }
 </script>
 
@@ -95,6 +114,11 @@ function handleDownload(): void {
     <button v-if="downloadUrl" class="cp-fileBubble__btn" type="button" @click="handleDownload">
       {{ t("download") }}
     </button>
+    <DownloadProgress
+      v-if="downloadTask"
+      :task="downloadTask"
+      @dismiss="handleDismissTask"
+    />
   </div>
 </template>
 

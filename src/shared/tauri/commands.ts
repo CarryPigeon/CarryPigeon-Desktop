@@ -65,6 +65,9 @@ export const TAURI_COMMANDS = {
   settingsResetSettings: "reset_settings",
 
   setTrayUnreadFlashing: "set_tray_unread_flashing",
+  setTrayLocale: "set_tray_locale",
+
+  downloadFile: "download_file",
 } as const;
 
 /**

@@ -13,13 +13,13 @@
  * - 若 `server_id` 缺失，则必须禁用插件安装/启用/更新，并在 UI 给出原因提示
  *
  * 重构说明：
- * - 原来直接依赖低层领域入口 `getGetServerInfoUsecase`，现在改为通过 capability 统一访问
- * - 遵循"优先走 capability 入口"的架构原则，减少对低层实现细节的直接依赖
+ * - 通过 capability 层 `getServerInfoCapabilities().refresh()` 会导致递归循环（capability → store → capability），
+ *   因此 store 的刷新直接使用用例层 `getGetServerInfoUsecase().execute()`
  */
 
 import { ref, type Ref } from "vue";
 import type { ServerInfo } from "../../domain/types/serverInfo";
-import { getServerInfoCapabilities } from "../../api"; // 通过 capability 统一入口访问
+import { getGetServerInfoUsecase } from "../../di/servers.di"; // 直接使用用例层，避免通过 capability 产生递归
 import { createLogger } from "@/shared/utils/logger";
 import { getOrCreateServerScopedStore } from "@/shared/utils/scopedStoreCache";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
@@ -47,16 +47,6 @@ const stores = new Map<string, ServerInfoStore>();
 let runtimeStarted = false;
 /** 清理处理器注销函数 */
 let unregisterServerScopeCleanupHandler: (() => void) | null = null;
-
-/**
- * 获取 server-info capability 单例
- *
- * 内部工具方法，统一通过 capability 入口访问 server-info 能力
- * 避免直接依赖低层领域层入口
- */
-function getCapabilities() {
-  return getServerInfoCapabilities();
-}
 
 /**
  * 启动 server-info 运行时（幂等操作）。
@@ -127,10 +117,8 @@ export function useServerInfoStore(serverSocket: string): ServerInfoStore {
       loading.value = true;
       error.value = "";
       try {
-        // 通过 capability 统一入口刷新，不直接依赖低层 usecase
-        await getCapabilities().refresh(socket);
-        // 刷新完成后从 capability 获取最新快照更新到本地状态
-        info.value = getCapabilities().getSnapshot(socket);
+        // 直接通过用例层获取服务器信息，避免通过 capability 层产生递归调用
+        info.value = await getGetServerInfoUsecase().execute(socket);
       } catch (e) {
         logger.error("Action: servers_info_refresh_failed", { socket, error: String(e) });
         info.value = null;

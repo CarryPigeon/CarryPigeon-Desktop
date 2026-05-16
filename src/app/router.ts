@@ -21,6 +21,7 @@ import {
 import { DomainCatalogPage, PluginCenterPage, PluginDetailPage } from "@/features/plugins/routes";
 import { ServerManagerPage } from "@/features/server-connection/routes";
 import { SettingsPage } from "@/features/settings/routes";
+import { FileManagerPage } from "@/features/files/routes";
 
 /**
  * 应用全局 Vue Router 实例。
@@ -59,5 +60,6 @@ export const router = createRouter({
     { path: "/channel-members", component: ChannelMembersPage },
     { path: "/channel-applications", component: JoinApplicationsPage },
     { path: "/channel-bans", component: ChannelBansPage },
+    { path: "/files", component: FileManagerPage },
   ],
 });

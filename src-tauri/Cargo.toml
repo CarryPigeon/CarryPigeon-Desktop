@@ -46,6 +46,7 @@ keyring-core = "1.0.0"
 
 # 网络请求
 reqwest = { version = "0.13.3", features = ["json", "stream"] }
+futures-util = "0.3"
 sha2 = "0.11.0"
 
 # TLS

@@ -11,13 +11,14 @@
 use anyhow::Context;
 use tauri::{
     Manager,
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
 use crate::features::tray::di::commands::TrayUnreadState;
+use crate::features::tray::domain::tray_i18n::tray_labels;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 启动 Tauri 应用。
@@ -45,9 +46,12 @@ pub fn run() -> anyhow::Result<()> {
             // 初始化托盘未读闪烁状态（to_owned 将 App 借用的图片转为 'static）。
             app.manage(TrayUnreadState::new(tray_icon.clone().to_owned()));
 
-            // 定义托盘菜单行为
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_i])?;
+            // 定义托盘菜单行为（默认中文，前端启动后根据 locale 同步更新）
+            let labels = tray_labels("zh_cn");
+            let show_i = MenuItem::with_id(app, labels[0].0, labels[0].1, true, None::<&str>)?;
+            let sep = PredefinedMenuItem::separator(app)?;
+            let quit_i = MenuItem::with_id(app, labels[1].0, labels[1].1, true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &sep, &quit_i])?;
 
             // 定义托盘图标行为
             let _tray = TrayIconBuilder::with_id("main")
@@ -55,6 +59,16 @@ pub fn run() -> anyhow::Result<()> {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show_window" => {
+                        tracing::info!(action = "app_tray_menu_clicked", item_id = "show_window");
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        } else {
+                            tracing::warn!(action = "app_tray_menu_main_window_missing");
+                        }
+                    }
                     "quit" => {
                         tracing::info!(action = "app_tray_menu_clicked", item_id = "quit");
                         app.exit(0);
@@ -105,6 +119,7 @@ pub fn run() -> anyhow::Result<()> {
         .invoke_handler(tauri::generate_handler![
             // tray
             crate::features::tray::di::commands::set_tray_unread_flashing,
+            crate::features::tray::di::commands::set_tray_locale,
             // windows
             crate::features::windows::di::commands::to_chat_window_size,
             crate::features::windows::di::commands::open_popover_window,
@@ -114,6 +129,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::network::di::commands::add_tcp_service,
             crate::features::network::di::commands::remove_tcp_service,
             crate::features::network::di::commands::api_request_json,
+            crate::features::network::di::commands::download_file,
             // db
             crate::shared::db::commands::db_init,
             crate::shared::db::commands::db_execute,
