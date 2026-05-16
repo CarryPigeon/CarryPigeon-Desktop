@@ -24,7 +24,7 @@ impl TempFileManager {
         let cutoff = match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(d) => d.as_secs() as i64,
             Err(e) => {
-                tracing::warn!(action = "temp_file_cleanup_clock_skew", error = %e);
+                tracing::warn!(action = "db_temp_file_cleanup_clock_skew", error = %e);
                 0
             }
         } - (older_than_hours as i64 * 3600);
@@ -60,7 +60,10 @@ impl TempFileManager {
                 let _ = tokio::fs::remove_file(path).await;
             }
             // 删除 .part 文件（如果 file_path 指向最终文件，.part 可能已不存在）
-            let part_path = self.base_dir().join("downloads").join(format!("{}.part", rec.id));
+            let part_path = self
+                .base_dir()
+                .join("downloads")
+                .join(format!("{}.part", rec.id));
             if part_path.exists() {
                 if let Ok(meta) = tokio::fs::metadata(&part_path).await {
                     freed += meta.len();
@@ -73,13 +76,16 @@ impl TempFileManager {
         }
 
         tracing::info!(
-            action = "temp_file_cleanup_completed",
+            action = "db_temp_file_cleanup_completed",
             removed,
             freed_bytes = freed,
             namespace = ?namespace,
             older_than_hours,
         );
 
-        Ok(CleanupResult { removed_files: removed, freed_bytes: freed })
+        Ok(CleanupResult {
+            removed_files: removed,
+            freed_bytes: freed,
+        })
     }
 }

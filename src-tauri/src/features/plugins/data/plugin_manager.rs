@@ -265,9 +265,7 @@ impl PluginManager {
         let frontend_js_path = path.join("frontend.js");
         let frontend_html_path = path.join("frontend.html");
 
-        if !frontend_wasm_path.exists()
-            || !backend_wasm_path.exists()
-            || !frontend_js_path.exists()
+        if !frontend_wasm_path.exists() || !backend_wasm_path.exists() || !frontend_js_path.exists()
         {
             if manifest.url.trim().is_empty() {
                 return Err(anyhow::anyhow!(

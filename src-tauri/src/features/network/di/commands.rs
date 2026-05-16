@@ -168,7 +168,7 @@ pub async fn download_file(
                 .update_progress(&task_id, downloaded)
                 .await
             {
-                tracing::warn!(action = "temp_file_update_progress_failed", task_id = %task_id, error = %e);
+                tracing::warn!(action = "network_temp_file_update_progress_failed", task_id = %task_id, error = %e);
             }
 
             let _ = app.emit(

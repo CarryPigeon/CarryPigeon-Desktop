@@ -18,6 +18,11 @@ while IFS= read -r file; do
     }
 
     BEGIN { pending_test_attr = 0; in_test_mod = 0; depth = 0; bad = 0 }
+    {
+      if (file ~ "/tests/") {
+        next;
+      }
+    }
     /#\[cfg\(test\)\]/ {
       pending_test_attr = 1;
       next;

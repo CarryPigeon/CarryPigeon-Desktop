@@ -16,7 +16,12 @@ async fn test_create_download_and_mark_complete() {
     let (manager, _dir) = create_test_manager().await;
 
     let mut file = manager
-        .create_download("test-1", "https://example.com/file.bin", Some("application/octet-stream"), 100)
+        .create_download(
+            "test-1",
+            "https://example.com/file.bin",
+            Some("application/octet-stream"),
+            100,
+        )
         .await
         .unwrap();
 
@@ -26,7 +31,13 @@ async fn test_create_download_and_mark_complete() {
     manager.update_progress("test-1", 11).await.unwrap();
     let final_path = manager.mark_complete("test-1", "bin").await.unwrap();
 
-    assert!(!manager.base_dir().join("downloads").join("test-1.part").exists());
+    assert!(
+        !manager
+            .base_dir()
+            .join("downloads")
+            .join("test-1.part")
+            .exists()
+    );
     assert!(std::path::Path::new(&final_path).exists());
 
     let meta = manager.get_metadata("test-1").await.unwrap();
@@ -83,13 +94,13 @@ async fn test_save_to() {
     manager.mark_complete("test-save", "txt").await.unwrap();
 
     let dest = manager.base_dir().join("saved-copy.txt");
-    let _result = manager.save_to("test-save", &dest.to_string_lossy()).await.unwrap();
+    let _result = manager
+        .save_to("test-save", &dest.to_string_lossy())
+        .await
+        .unwrap();
 
     assert!(dest.exists());
-    assert_eq!(
-        std::fs::read_to_string(&dest).unwrap(),
-        "save me"
-    );
+    assert_eq!(std::fs::read_to_string(&dest).unwrap(), "save me");
 }
 
 #[tokio::test]

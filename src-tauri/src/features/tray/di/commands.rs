@@ -8,8 +8,8 @@ use std::{
     time::Duration,
 };
 
-use tauri::{AppHandle, Runtime, State, image::Image};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::{AppHandle, Runtime, State, image::Image};
 
 use crate::features::tray::domain::tray_i18n::tray_labels;
 use crate::shared::error::{CommandResult, command_error, to_command_error};
@@ -129,10 +129,7 @@ fn start_flashing<R: Runtime>(app: AppHandle<R>, state: &TrayUnreadState) {
 
 /// 根据前端语言偏好更新托盘菜单标签。
 #[tauri::command]
-pub fn set_tray_locale<R: Runtime>(
-    app: AppHandle<R>,
-    locale: String,
-) -> CommandResult<()> {
+pub fn set_tray_locale<R: Runtime>(app: AppHandle<R>, locale: String) -> CommandResult<()> {
     let labels = tray_labels(&locale);
     let show_i = MenuItem::with_id(&app, labels[0].0, labels[0].1, true, None::<&str>)
         .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
