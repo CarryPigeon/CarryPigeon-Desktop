@@ -219,7 +219,7 @@ pub async fn remove_db(key: &str) -> anyhow::Result<Option<PathBuf>> {
     }
 }
 
-fn sqlite_url_for_path(path: &Path) -> String {
+pub(crate) fn sqlite_url_for_path(path: &Path) -> String {
     // SQLx/SQLite 期望使用正斜杠；这里统一处理 Windows 的反斜杠路径。
     let path_str = path.to_string_lossy().replace('\\', "/");
     let mut url = if path.is_absolute() {

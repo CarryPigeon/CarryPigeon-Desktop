@@ -29,6 +29,6 @@ async function applyTrayLocale(locale: string): Promise<void> {
   try {
     await invokeTauri<void>(TAURI_COMMANDS.setTrayLocale, { locale });
   } catch (error) {
-    logger.warn("Action: tray_locale_sync_failed", { error: String(error), locale });
+    logger.warn("Action: chat_tray_locale_sync_failed", { error: String(error), locale });
   }
 }

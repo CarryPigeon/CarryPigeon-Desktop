@@ -8,3 +8,4 @@ pub mod db;
 pub mod error;
 pub mod log;
 pub mod net;
+pub mod temp_file;
