@@ -7,7 +7,7 @@ use anyhow::Context;
 use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement, StatementBuilder, Value};
 use tracing::warn;
 
-use crate::shared::db::{sqlite_url_for_path, CPDatabase};
+use crate::shared::db::{CPDatabase, sqlite_url_for_path};
 
 use super::types::*;
 
@@ -19,10 +19,16 @@ struct RawStmt {
 
 impl RawStmt {
     fn raw(sql: &str) -> Self {
-        Self { sql: sql.to_string(), values: vec![] }
+        Self {
+            sql: sql.to_string(),
+            values: vec![],
+        }
     }
     fn with_values(sql: &str, values: Vec<Value>) -> Self {
-        Self { sql: sql.to_string(), values }
+        Self {
+            sql: sql.to_string(),
+            values,
+        }
     }
 }
 
@@ -76,8 +82,14 @@ impl TempFileManager {
 
         // 创建索引
         for (name, sql) in &[
-            ("idx_temp_files_state", "CREATE INDEX IF NOT EXISTS idx_temp_files_state ON temp_files(state)"),
-            ("idx_temp_files_namespace", "CREATE INDEX IF NOT EXISTS idx_temp_files_namespace ON temp_files(namespace)"),
+            (
+                "idx_temp_files_state",
+                "CREATE INDEX IF NOT EXISTS idx_temp_files_state ON temp_files(state)",
+            ),
+            (
+                "idx_temp_files_namespace",
+                "CREATE INDEX IF NOT EXISTS idx_temp_files_namespace ON temp_files(namespace)",
+            ),
         ] {
             db.connection
                 .execute(&RawStmt::raw(&sql))
@@ -85,7 +97,10 @@ impl TempFileManager {
                 .with_context(|| format!("Failed to create temp_file index: {name}"))?;
         }
 
-        Ok(Self { base_dir, db: db.connection })
+        Ok(Self {
+            base_dir,
+            db: db.connection,
+        })
     }
 
     fn downloads_dir(&self) -> PathBuf {
@@ -104,7 +119,7 @@ impl TempFileManager {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(d) => d.as_secs() as i64,
             Err(e) => {
-                tracing::warn!(action = "temp_file_clock_skew", error = %e);
+                tracing::warn!(action = "db_temp_file_clock_skew", error = %e);
                 0
             }
         }
@@ -123,14 +138,17 @@ impl TempFileManager {
 
         let sql = "INSERT INTO temp_files (id, namespace, file_path, url, mime_type, total_size, downloaded, state, created_at, accessed_at) VALUES ($1, 'downloads', $2, $3, $4, $5, 0, 'downloading', $6, $6) ON CONFLICT(id) DO UPDATE SET state='downloading', accessed_at=$6";
         self.db
-            .execute(&RawStmt::with_values(sql, vec![
-                Value::String(Some(id.to_string())),
-                Value::String(Some(part.to_string_lossy().to_string())),
-                Value::String(Some(url.to_string())),
-                Value::String(mime_type.map(|m| m.to_string())),
-                Value::BigInt(Some(total_size as i64)),
-                Value::BigInt(Some(now)),
-            ]))
+            .execute(&RawStmt::with_values(
+                sql,
+                vec![
+                    Value::String(Some(id.to_string())),
+                    Value::String(Some(part.to_string_lossy().to_string())),
+                    Value::String(Some(url.to_string())),
+                    Value::String(mime_type.map(|m| m.to_string())),
+                    Value::BigInt(Some(total_size as i64)),
+                    Value::BigInt(Some(now)),
+                ],
+            ))
             .await
             .context("Failed to insert temp_file metadata")?;
 
@@ -145,11 +163,14 @@ impl TempFileManager {
         let now = Self::now();
         let sql = "UPDATE temp_files SET downloaded=$1, accessed_at=$2 WHERE id=$3";
         self.db
-            .execute(&RawStmt::with_values(sql, vec![
-                Value::BigInt(Some(downloaded as i64)),
-                Value::BigInt(Some(now)),
-                Value::String(Some(id.to_string())),
-            ]))
+            .execute(&RawStmt::with_values(
+                sql,
+                vec![
+                    Value::BigInt(Some(downloaded as i64)),
+                    Value::BigInt(Some(now)),
+                    Value::String(Some(id.to_string())),
+                ],
+            ))
             .await?;
         Ok(())
     }
@@ -170,13 +191,17 @@ impl TempFileManager {
             })?;
 
         let now = Self::now();
-        let sql = "UPDATE temp_files SET file_path=$1, state='complete', accessed_at=$2 WHERE id=$3";
+        let sql =
+            "UPDATE temp_files SET file_path=$1, state='complete', accessed_at=$2 WHERE id=$3";
         self.db
-            .execute(&RawStmt::with_values(sql, vec![
-                Value::String(Some(final_path.to_string_lossy().to_string())),
-                Value::BigInt(Some(now)),
-                Value::String(Some(id.to_string())),
-            ]))
+            .execute(&RawStmt::with_values(
+                sql,
+                vec![
+                    Value::String(Some(final_path.to_string_lossy().to_string())),
+                    Value::BigInt(Some(now)),
+                    Value::String(Some(id.to_string())),
+                ],
+            ))
             .await?;
 
         Ok(final_path.to_string_lossy().to_string())
@@ -187,10 +212,13 @@ impl TempFileManager {
         let now = Self::now();
         let sql = "UPDATE temp_files SET state='failed', accessed_at=$1 WHERE id=$2";
         self.db
-            .execute(&RawStmt::with_values(sql, vec![
-                Value::BigInt(Some(now)),
-                Value::String(Some(id.to_string())),
-            ]))
+            .execute(&RawStmt::with_values(
+                sql,
+                vec![
+                    Value::BigInt(Some(now)),
+                    Value::String(Some(id.to_string())),
+                ],
+            ))
             .await?;
         Ok(())
     }
@@ -213,8 +241,12 @@ impl TempFileManager {
     /// 获取单个元数据记录。
     pub async fn get_metadata(&self, id: &str) -> anyhow::Result<TempFileRecord> {
         let sql = "SELECT id, namespace, file_path, url, mime_type, total_size, downloaded, state, created_at, accessed_at FROM temp_files WHERE id=$1";
-        let rows = self.db
-            .query_all(&RawStmt::with_values(sql, vec![Value::String(Some(id.to_string()))]))
+        let rows = self
+            .db
+            .query_all(&RawStmt::with_values(
+                sql,
+                vec![Value::String(Some(id.to_string()))],
+            ))
             .await
             .context("Failed to query temp_file metadata")?;
 
@@ -228,19 +260,26 @@ impl TempFileManager {
     /// 删除单个临时文件（删除文件 + 移除 SQLite 记录）。
     pub async fn remove(&self, id: &str) -> anyhow::Result<()> {
         let sql_get = "SELECT file_path FROM temp_files WHERE id=$1";
-        let rows = self.db
-            .query_all(&RawStmt::with_values(sql_get, vec![Value::String(Some(id.to_string()))]))
+        let rows = self
+            .db
+            .query_all(&RawStmt::with_values(
+                sql_get,
+                vec![Value::String(Some(id.to_string()))],
+            ))
             .await?;
         if let Some(row) = rows.first() {
             let path: String = row.try_get_by_index(0)?;
             if let Err(e) = tokio::fs::remove_file(&path).await {
-                warn!(action = "temp_file_remove_file_failed", path = %path, error = %e);
+                warn!(action = "db_temp_file_remove_file_failed", path = %path, error = %e);
             }
         }
 
         let sql_del = "DELETE FROM temp_files WHERE id=$1";
         self.db
-            .execute(&RawStmt::with_values(sql_del, vec![Value::String(Some(id.to_string()))]))
+            .execute(&RawStmt::with_values(
+                sql_del,
+                vec![Value::String(Some(id.to_string()))],
+            ))
             .await?;
         Ok(())
     }
@@ -249,7 +288,11 @@ impl TempFileManager {
     pub async fn save_to(&self, id: &str, destination: &str) -> anyhow::Result<String> {
         let meta = self.get_metadata(id).await?;
         if meta.state != "complete" {
-            anyhow::bail!("Temp file '{}' is not in 'complete' state (state={})", id, meta.state);
+            anyhow::bail!(
+                "Temp file '{}' is not in 'complete' state (state={})",
+                id,
+                meta.state
+            );
         }
         let dest = Path::new(destination);
         tokio::fs::copy(&meta.file_path, dest)
@@ -263,8 +306,13 @@ impl TempFileManager {
     }
 
     /// 内部方法：查询匹配条件的记录，供 cleanup 使用。
-    pub async fn query_records(&self, sql: &str, params: Vec<Value>) -> anyhow::Result<Vec<TempFileRecord>> {
-        let rows = self.db
+    pub async fn query_records(
+        &self,
+        sql: &str,
+        params: Vec<Value>,
+    ) -> anyhow::Result<Vec<TempFileRecord>> {
+        let rows = self
+            .db
             .query_all(&RawStmt::with_values(sql, params))
             .await?;
         let mut records = Vec::with_capacity(rows.len());
@@ -278,7 +326,10 @@ impl TempFileManager {
     pub async fn delete_record(&self, id: &str) -> anyhow::Result<()> {
         let sql = "DELETE FROM temp_files WHERE id=$1";
         self.db
-            .execute(&RawStmt::with_values(sql, vec![Value::String(Some(id.to_string()))]))
+            .execute(&RawStmt::with_values(
+                sql,
+                vec![Value::String(Some(id.to_string()))],
+            ))
             .await?;
         Ok(())
     }
