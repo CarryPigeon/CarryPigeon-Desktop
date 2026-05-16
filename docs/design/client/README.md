@@ -12,6 +12,7 @@
 6. `docs/design/client/PLUGIN-ASSET-USAGE.md`
 7. `docs/design/client/PLUGIN-INSTALL-UPDATE.md`
 8. `docs/design/client/PLUGIN-UI-EXTENSIONS.md`
+9. `docs/design/client/VOICE-CALL-DESIGN.md`
 
 ## 真源分工（避免重复）
 

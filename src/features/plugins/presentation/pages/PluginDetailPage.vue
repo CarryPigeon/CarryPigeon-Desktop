@@ -6,6 +6,7 @@
 
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import type { PluginCatalogEntryLike } from "@/features/plugins/domain/types/pluginTypes";
@@ -17,6 +18,7 @@ type PluginCatalogViewEntry = PluginCatalogEntryLike;
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 /**
  * 从路由参数中读取插件 id。
@@ -140,7 +142,7 @@ onMounted(handleMounted);
   <!-- 区块：<main> .cp-plugin-detail -->
   <main class="cp-plugin-detail">
     <header class="cp-plugin-detail__head">
-      <button class="cp-plugin-detail__back" type="button" @click="router.back()">Back</button>
+      <button class="cp-plugin-detail__back" type="button" @click="router.back()">{{ t("back") }}</button>
       <div class="cp-plugin-detail__title">
         <div class="cp-plugin-detail__name">{{ plugin?.name || pluginId }}</div>
         <div class="cp-plugin-detail__meta">
@@ -160,20 +162,20 @@ onMounted(handleMounted);
 
     <section v-if="plugin" class="cp-plugin-detail__body">
       <div v-if="serverSocket && !serverId" class="cp-plugin-detail__card danger">
-        <div class="cp-plugin-detail__k">Locked</div>
-        <div class="cp-plugin-detail__v">Missing `server_id` from server info endpoint. Plugin operations are disabled.</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_locked") }}</div>
+        <div class="cp-plugin-detail__v">{{ t("module_detail_locked_desc") }}</div>
       </div>
       <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">Tagline</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_tagline") }}</div>
         <div class="cp-plugin-detail__v">{{ plugin.tagline }}</div>
       </div>
       <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">Description</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_description") }}</div>
         <div class="cp-plugin-detail__v">{{ plugin.description }}</div>
       </div>
 
       <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">Source / sha256</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_source") }}</div>
         <div class="cp-plugin-detail__vRow">
           <span class="cp-plugin-detail__pill">{{ plugin.source }}</span>
           <MonoTag :value="plugin.sha256" title="sha256" :copyable="true" />
@@ -181,7 +183,7 @@ onMounted(handleMounted);
       </div>
 
       <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">Domains</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_domains") }}</div>
         <div class="cp-plugin-detail__ports">
           <span v-for="d in plugin.providesDomains" :key="d.id" class="cp-plugin-detail__port" :style="{ background: `var(${d.colorVar})` }"></span>
           <span class="cp-plugin-detail__portsText">{{ domainLabelsText }}</span>
@@ -189,7 +191,7 @@ onMounted(handleMounted);
       </div>
 
       <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">Permissions</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_permissions") }}</div>
         <div class="cp-plugin-detail__perms">
           <div v-for="p in plugin.permissions" :key="p.key" class="cp-plugin-detail__perm" :data-risk="p.risk">
             <span class="cp-plugin-detail__permKey">{{ p.key }}</span>
@@ -200,23 +202,23 @@ onMounted(handleMounted);
       </div>
 
       <div v-if="installed?.lastError" class="cp-plugin-detail__card danger">
-        <div class="cp-plugin-detail__k">Last Error</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_last_error") }}</div>
         <div class="cp-plugin-detail__v">{{ installed.lastError }}</div>
       </div>
 
       <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">Installed</div>
+        <div class="cp-plugin-detail__k">{{ t("module_detail_installed_heading") }}</div>
         <div class="cp-plugin-detail__kv">
           <div class="cp-plugin-detail__kvItem">
-            <div class="cp-plugin-detail__kvK">current</div>
+            <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_current") }}</div>
             <div class="cp-plugin-detail__kvV">{{ installed?.currentVersion || "—" }}</div>
           </div>
           <div class="cp-plugin-detail__kvItem">
-            <div class="cp-plugin-detail__kvK">enabled</div>
+            <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_enabled") }}</div>
             <div class="cp-plugin-detail__kvV">{{ installed?.enabled ? "true" : "false" }}</div>
           </div>
           <div class="cp-plugin-detail__kvItem">
-            <div class="cp-plugin-detail__kvK">status</div>
+            <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_status") }}</div>
             <div class="cp-plugin-detail__kvV">{{ installed?.status || "—" }}</div>
           </div>
         </div>
@@ -230,7 +232,7 @@ onMounted(handleMounted);
           :disabled="Boolean(serverSocket) && !Boolean(serverId)"
           @click="handleInstallLatest"
         >
-          Install latest
+          {{ t("install_latest") }}
         </button>
         <button
           v-else-if="!installed.enabled"
@@ -245,13 +247,13 @@ onMounted(handleMounted);
           Disable
         </button>
 
-        <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">Open Center</button>
+        <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">{{ t("open_center") }}</button>
       </div>
     </section>
 
     <section v-else class="cp-plugin-detail__empty">
-      <div class="cp-plugin-detail__emptyText">Module not found.</div>
-      <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">Back to Center</button>
+      <div class="cp-plugin-detail__emptyText">{{ t("module_not_found") }}</div>
+      <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">{{ t("back_to_center") }}</button>
     </section>
   </main>
 </template>

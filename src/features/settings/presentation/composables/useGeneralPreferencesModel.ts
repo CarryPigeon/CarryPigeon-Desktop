@@ -12,6 +12,8 @@ import {
   type GeneralPreferenceKey,
 } from "@/features/settings/application/settingsService";
 import { DEFAULT_APP_LOCALE, setStoredLocale, type AppLocale } from "@/shared/utils/locale";
+import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
+import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 
 export type GeneralPreferencesModel = {
   language: Ref<AppLocale>;
@@ -79,6 +81,9 @@ export function useGeneralPreferencesModel(): GeneralPreferencesModel {
     try {
       setStoredLocale(next);
       i18n.locale.value = next;
+      if (isTauriRuntimeAvailable()) {
+        void invokeTauri<void>(TAURI_COMMANDS.setTrayLocale, { locale: next });
+      }
     } catch (error) {
       language.value = previous;
       setError(error, i18n.t("settings_save_language_preference_failed"));

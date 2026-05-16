@@ -53,15 +53,15 @@ const { t } = useI18n();
   <!-- 组件：PluginCenterFilterRail｜职责：插件中心左侧筛选栏 -->
   <!-- 区块：<aside> .cp-plugins__filters -->
   <aside class="cp-plugins__filters">
-    <div class="cp-plugins__filtersTitle">MODULE RACK</div>
-    <div class="cp-plugins__filtersSub">Search · Filter · Source</div>
+    <div class="cp-plugins__filtersTitle">{{ t("module_rack") }}</div>
+    <div class="cp-plugins__filtersSub">{{ t("module_rack_sub") }}</div>
 
     <div class="cp-plugins__search">
       <t-input :model-value="props.q" :placeholder="t('plugin_search_placeholder')" clearable @update:model-value="emit('update:q', String($event ?? ''))" />
     </div>
 
     <div class="cp-plugins__group">
-      <div class="cp-plugins__label">Filter</div>
+      <div class="cp-plugins__label">{{ t("plugin_filter") }}</div>
       <div class="cp-seg">
         <button class="cp-seg__btn" :data-active="props.filter === 'all'" type="button" @click="emit('update:filter', 'all')">{{ t("plugin_filter_all") }}</button>
         <button class="cp-seg__btn" :data-active="props.filter === 'installed'" type="button" @click="emit('update:filter', 'installed')">{{ t("plugin_filter_installed") }}</button>
@@ -73,50 +73,50 @@ const { t } = useI18n();
     </div>
 
     <div class="cp-plugins__group">
-      <div class="cp-plugins__label">Source</div>
+      <div class="cp-plugins__label">{{ t("plugin_source") }}</div>
       <div class="cp-seg">
-        <button class="cp-seg__btn" :data-active="props.source === 'all'" type="button" @click="emit('update:source', 'all')">All</button>
-        <button class="cp-seg__btn" :data-active="props.source === 'server'" type="button" @click="emit('update:source', 'server')">Server</button>
-        <button class="cp-seg__btn" :data-active="props.source === 'repo'" type="button" @click="emit('update:source', 'repo')">Repo</button>
+        <button class="cp-seg__btn" :data-active="props.source === 'all'" type="button" @click="emit('update:source', 'all')">{{ t("plugin_filter_source_all") }}</button>
+        <button class="cp-seg__btn" :data-active="props.source === 'server'" type="button" @click="emit('update:source', 'server')">{{ t("plugin_filter_source_server") }}</button>
+        <button class="cp-seg__btn" :data-active="props.source === 'repo'" type="button" @click="emit('update:source', 'repo')">{{ t("plugin_filter_source_repo") }}</button>
       </div>
     </div>
 
     <div class="cp-plugins__group">
-      <div class="cp-plugins__label">Repo Sources</div>
+      <div class="cp-plugins__label">{{ t("repo_sources") }}</div>
       <div class="cp-plugins__repoMeta">
-        <div class="cp-plugins__muted">{{ props.enabledRepoCount }} enabled · {{ props.repoSources.length }} total</div>
+        <div class="cp-plugins__muted">{{ t("repo_enabled_count", { enabled: props.enabledRepoCount, total: props.repoSources.length }) }}</div>
         <button class="cp-plugins__repoBtn" type="button" @click="emit('update:showRepoManager', !props.showRepoManager)">
-          {{ props.showRepoManager ? "Hide" : "Manage" }}
+          {{ props.showRepoManager ? t("repo_hide") : t("repo_manage") }}
         </button>
       </div>
       <div v-if="props.showRepoManager" class="cp-plugins__repoPanel">
-        <t-input :model-value="props.repoDraft" placeholder="https://repo.example.com" clearable @update:model-value="emit('update:repoDraft', String($event ?? ''))" />
-        <t-input :model-value="props.repoNoteDraft" placeholder="Note (optional)" clearable @update:model-value="emit('update:repoNoteDraft', String($event ?? ''))" />
-        <button class="cp-plugins__repoAdd" type="button" @click="emit('addRepo')">Add Repo</button>
+        <t-input :model-value="props.repoDraft" :placeholder="t('repo_url_placeholder')" clearable @update:model-value="emit('update:repoDraft', String($event ?? ''))" />
+        <t-input :model-value="props.repoNoteDraft" :placeholder="t('repo_note_placeholder')" clearable @update:model-value="emit('update:repoNoteDraft', String($event ?? ''))" />
+        <button class="cp-plugins__repoAdd" type="button" @click="emit('addRepo')">{{ t("add_repo") }}</button>
         <div v-if="props.repoError" class="cp-plugins__repoErr">{{ props.repoError }}</div>
 
-        <div v-if="props.repoSources.length === 0" class="cp-plugins__muted">No repos added.</div>
+        <div v-if="props.repoSources.length === 0" class="cp-plugins__muted">{{ t("no_repos") }}</div>
         <div v-else class="cp-plugins__repoList">
           <div v-for="r in props.repoSources" :key="r.id" class="cp-plugins__repoRow">
             <label class="cp-plugins__repoToggle">
               <input :checked="r.enabled" type="checkbox" @change="emit('toggleRepo', r.id, !r.enabled)" />
-              <span>Enabled</span>
+              <span>{{ t("repo_enabled_label") }}</span>
             </label>
             <div class="cp-plugins__repoInfo">
               <div class="cp-plugins__repoUrl">{{ r.baseUrl }}</div>
               <div v-if="r.note" class="cp-plugins__repoNote">{{ r.note }}</div>
             </div>
-            <button class="cp-plugins__repoRemove" type="button" @click="emit('removeRepo', r.id)">Remove</button>
+            <button class="cp-plugins__repoRemove" type="button" @click="emit('removeRepo', r.id)">{{ t("remove_repo") }}</button>
           </div>
         </div>
       </div>
     </div>
 
     <div class="cp-plugins__group">
-      <div class="cp-plugins__label">Required Gate</div>
+      <div class="cp-plugins__label">{{ t("plugin_required_gate") }}</div>
       <div class="cp-plugins__gate">
         <div class="cp-plugins__gateLine">
-          <span class="cp-plugins__gateK">missing</span>
+          <span class="cp-plugins__gateK">{{ t("plugin_gate_missing") }}</span>
           <span class="cp-plugins__gateV">{{ props.missingRequiredCount }}</span>
         </div>
         <button class="cp-plugins__gateBtn" type="button" @click="emit('openRequired')">{{ t("open_plugin_center_required") }}</button>

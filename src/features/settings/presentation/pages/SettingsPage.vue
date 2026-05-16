@@ -4,11 +4,12 @@
  * @description 设置页（主题偏好、运行时预览与相关入口）。
  */
 
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { IS_MOCK_ENABLED, MOCK_MODE } from "@/shared/config/runtime";
+import { getAboutCapabilities } from "@/features/about/api";
 import { useSettingsPageModel } from "@/features/settings/presentation/composables/useSettingsPageModel";
 import { DEFAULT_APP_THEME, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
 import { DEFAULT_APP_LOCALE } from "@/shared/utils/locale";
@@ -45,7 +46,7 @@ const {
   businessPreferencesError,
 } = useSettingsPageModel();
 
-const sectionIds = ["general", "business", "data"] as const;
+const sectionIds = ["general", "business", "data", "about"] as const;
 
 type SectionId = (typeof sectionIds)[number];
 
@@ -53,9 +54,46 @@ const sectionNav = computed(() => [
   { id: "general" as const, label: t("general"), subtitle: t("settings_nav_general_sub") },
   { id: "business" as const, label: t("settings_business"), subtitle: t("settings_nav_business_sub") },
   { id: "data" as const, label: t("settings_data"), subtitle: t("settings_nav_data_sub") },
+  { id: "about" as const, label: t("menu_about"), subtitle: t("about_version") },
 ]);
 
 const activeSectionId = ref<SectionId>("general");
+const settingsSectionsRef = ref<HTMLElement | null>(null);
+let sectionObserver: IntersectionObserver | null = null;
+
+onMounted(() => {
+  const container = settingsSectionsRef.value;
+  if (!container) return;
+  sectionObserver = new IntersectionObserver(
+    (entries) => {
+      const visibility = new Map<string, number>();
+      for (const entry of entries) {
+        const id = entry.target.id.replace("settings-section-", "");
+        visibility.set(id, entry.intersectionRatio);
+      }
+      let bestId: SectionId = activeSectionId.value;
+      let bestRatio = 0;
+      for (const [id, ratio] of visibility) {
+        if (ratio > bestRatio && (sectionIds as readonly string[]).includes(id)) {
+          bestRatio = ratio;
+          bestId = id as SectionId;
+        }
+      }
+      if (bestRatio > 0) activeSectionId.value = bestId;
+    },
+    { root: container, threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] },
+  );
+  for (const id of sectionIds) {
+    const el = document.getElementById(`settings-section-${id}`);
+    if (el) sectionObserver.observe(el);
+  }
+});
+
+onBeforeUnmount(() => {
+  sectionObserver?.disconnect();
+});
+
+const appInfo = getAboutCapabilities().getAppInfo();
 const importFileInput = ref<HTMLInputElement | null>(null);
 const dataStatus = ref<{ tone: "success" | "danger"; message: string } | null>(null);
 
@@ -205,7 +243,7 @@ async function handleResetDefaults(): Promise<void> {
       </button>
     </nav>
 
-    <section class="cp-settings__sections">
+    <section ref="settingsSectionsRef" class="cp-settings__sections">
       <section id="settings-section-general" class="cp-settings__section" data-testid="settings-section-general">
         <header class="cp-settings__sectionHead">
           <div>
@@ -399,6 +437,54 @@ async function handleResetDefaults(): Promise<void> {
               <button class="cp-settings__btn" data-testid="settings-open-required-setup" type="button" @click="router.push('/required-setup')">
                 {{ t("settings_open_required_setup") }}
               </button>
+              <button class="cp-settings__btn" data-testid="settings-open-file-manager" type="button" @click="router.push('/files')">
+                {{ t("file_manager") }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings-section-about" class="cp-settings__section" data-testid="settings-section-about">
+        <header class="cp-settings__sectionHead">
+          <div>
+            <div class="cp-settings__sectionName">{{ t("menu_about") }}</div>
+            <div class="cp-settings__sectionSub">{{ t("about_version") }} {{ appInfo.version }}</div>
+          </div>
+        </header>
+        <div class="cp-settings__grid">
+          <div class="cp-settings__card">
+            <div class="cp-settings__k">{{ t("about_version") }}</div>
+            <div class="cp-settings__v">
+              <div class="cp-settings__row">
+                <span class="cp-settings__muted">{{ appInfo.name }}</span>
+                <MonoTag :value="appInfo.version" title="version" />
+              </div>
+            </div>
+          </div>
+          <div class="cp-settings__card">
+            <div class="cp-settings__k">{{ t("about_tech_stack") }}</div>
+            <div class="cp-settings__v">
+              <div v-for="item in appInfo.techStack" :key="item" class="cp-settings__row">
+                <span class="cp-settings__muted">{{ item }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="cp-settings__card">
+            <div class="cp-settings__k">{{ t("about_license") }}</div>
+            <div class="cp-settings__v">
+              <div class="cp-settings__row">
+                <span class="cp-settings__muted">{{ appInfo.license }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="cp-settings__card">
+            <div class="cp-settings__k">{{ t("about_credits") }}</div>
+            <div class="cp-settings__v">
+              <div v-for="credit in appInfo.credits" :key="credit.name" class="cp-settings__row">
+                <a v-if="credit.url" :href="credit.url" target="_blank" rel="noopener" class="cp-settings__link">{{ credit.name }}</a>
+                <span v-else class="cp-settings__muted">{{ credit.name }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -782,6 +868,16 @@ async function handleResetDefaults(): Promise<void> {
 .cp-settings__statusInline[data-tone="success"] {
   border-color: color-mix(in oklab, var(--cp-success) 24%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-success) 10%, var(--cp-panel));
+}
+
+.cp-settings__link {
+  color: var(--cp-accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.cp-settings__link:hover {
+  text-decoration: underline;
 }
 
 .cp-settings__statusInline[data-tone="danger"] {

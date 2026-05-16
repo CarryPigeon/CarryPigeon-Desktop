@@ -9,7 +9,9 @@ use std::{
 };
 
 use tauri::{AppHandle, Runtime, State, image::Image};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 
+use crate::features::tray::domain::tray_i18n::tray_labels;
 use crate::shared::error::{CommandResult, command_error, to_command_error};
 
 const TRAY_ID: &str = "main";
@@ -123,6 +125,31 @@ fn start_flashing<R: Runtime>(app: AppHandle<R>, state: &TrayUnreadState) {
             showing_blank.store(next_showing_blank, Ordering::SeqCst);
         }
     });
+}
+
+/// 根据前端语言偏好更新托盘菜单标签。
+#[tauri::command]
+pub fn set_tray_locale<R: Runtime>(
+    app: AppHandle<R>,
+    locale: String,
+) -> CommandResult<()> {
+    let labels = tray_labels(&locale);
+    let show_i = MenuItem::with_id(&app, labels[0].0, labels[0].1, true, None::<&str>)
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+    let sep = PredefinedMenuItem::separator(&app)
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+    let quit_i = MenuItem::with_id(&app, labels[1].0, labels[1].1, true, None::<&str>)
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+
+    let menu = Menu::with_items(&app, &[&show_i, &sep, &quit_i])
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+
+    let tray = app
+        .tray_by_id(TRAY_ID)
+        .ok_or_else(|| command_error("TRAY_MENU_MISSING", "Main tray icon is missing"))?;
+
+    tray.set_menu(Some(menu))
+        .map_err(|err| to_command_error("TRAY_MENU_SET_FAILED", err))
 }
 
 /// 设置主托盘图标。

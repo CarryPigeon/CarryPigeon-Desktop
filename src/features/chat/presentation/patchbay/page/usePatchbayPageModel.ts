@@ -386,6 +386,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleOpenServers,
     handleOpenSettings,
     goPlugins,
+    handleOpenFiles: () => {
+      void router.push("/files");
+    },
   });
 
   const chatViewport = createPatchbayChatViewportSection({
