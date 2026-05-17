@@ -17,7 +17,7 @@ use tauri::{
 
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
-use crate::features::tray::di::commands::{start_hover_timer, TrayUnreadState};
+use crate::features::tray::di::commands::{TrayUnreadState, start_hover_timer};
 use crate::features::tray::domain::tray_i18n::tray_labels;
 use crate::shared::temp_file::TempFileManager;
 

@@ -507,7 +507,10 @@ pub async fn update_config_u32(key: String, value: u32) -> anyhow::Result<()> {
 pub async fn update_config_u64(key: String, value: u64) -> anyhow::Result<()> {
     let _guard = config_write_lock().lock().await;
     tracing::error!(action = "settings_config_update_unsupported", key = %key, value);
-    Err(anyhow::anyhow!("Unsupported config key for u64 update: {}", key))
+    Err(anyhow::anyhow!(
+        "Unsupported config key for u64 update: {}",
+        key
+    ))
 }
 
 /// 异步更新配置文件中的指定 string 值。
