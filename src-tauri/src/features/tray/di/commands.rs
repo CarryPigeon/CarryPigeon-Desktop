@@ -181,10 +181,7 @@ pub fn start_hover_timer<R: Runtime>(app: AppHandle<R>, state: &TrayUnreadState,
             popover_open.store(false, Ordering::SeqCst);
             return;
         }
-        let _ = app_handle.emit(
-            "tray-hover-settled",
-            serde_json::json!({ "x": x, "y": y }),
-        );
+        let _ = app_handle.emit("tray-hover-settled", serde_json::json!({ "x": x, "y": y }));
     });
 }
 

@@ -146,9 +146,11 @@ pub fn close_notification_popover(app: &AppHandle) -> anyhow::Result<()> {
         win.close().map_err(|e| anyhow::anyhow!(e.to_string()))?;
     }
     if let Some(main) = app.get_webview_window("main") {
-        main.unminimize().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        main.unminimize()
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
         main.show().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        main.set_focus().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        main.set_focus()
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     }
     Ok(())
 }
