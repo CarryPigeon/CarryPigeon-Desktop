@@ -1,97 +1,229 @@
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use super::super::data::audio::device::AudioDeviceManager;
 use super::super::domain::model::*;
 use crate::shared::error::CommandResult;
 use tauri::State;
 
-pub struct VoiceCallService;
+pub struct VoiceCallService {
+    audio: Mutex<Option<AudioDeviceManager>>,
+    sessions: Mutex<HashMap<String, CallSession>>,
+    selected_input: Mutex<Option<String>>,
+    selected_output: Mutex<Option<String>>,
+}
+
+impl VoiceCallService {
+    pub fn new() -> Self {
+        let audio = match AudioDeviceManager::new() {
+            Ok(manager) => Some(manager),
+            Err(e) => {
+                tracing::warn!(action = "voice_call_service_audio_init_failed", error = %e);
+                None
+            }
+        };
+        Self {
+            audio: Mutex::new(audio),
+            sessions: Mutex::new(HashMap::new()),
+            selected_input: Mutex::new(None),
+            selected_output: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for VoiceCallService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn empty_media_settings() -> MediaSettings {
+    MediaSettings {
+        input_device_id: None,
+        output_device_id: None,
+        noise_suppression: false,
+        echo_cancellation: false,
+    }
+}
 
 #[tauri::command]
 pub async fn start_direct_call(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
-    _target_user_id: String,
-    _room_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
+    target_user_id: String,
+    room_id: String,
 ) -> CommandResult<CallSession> {
-    Err("VOICE_NOT_IMPLEMENTED: start_direct_call not yet implemented".into())
+    let session = CallSession {
+        session_id: session_id.clone(),
+        call_kind: CallKind::Direct,
+        state: CallState::Dialing,
+        initiator: target_user_id.clone(),
+        participants: vec![Participant {
+            user_id: target_user_id,
+            display_name: String::new(),
+            is_muted: false,
+            is_speaking: false,
+            audio_level: 0.0,
+            joined_at: None,
+        }],
+        room_id,
+        started_at: Some(now_secs()),
+        ended_at: None,
+        media_settings: empty_media_settings(),
+    };
+    service
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(session_id, session.clone());
+    Ok(session)
 }
 
 #[tauri::command]
 pub async fn start_conference(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
-    _room_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
+    room_id: String,
 ) -> CommandResult<CallSession> {
-    Err("VOICE_NOT_IMPLEMENTED: start_conference not yet implemented".into())
+    let session = CallSession {
+        session_id: session_id.clone(),
+        call_kind: CallKind::Conference,
+        state: CallState::Dialing,
+        initiator: String::new(),
+        participants: Vec::new(),
+        room_id,
+        started_at: Some(now_secs()),
+        ended_at: None,
+        media_settings: empty_media_settings(),
+    };
+    service
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(session_id, session.clone());
+    Ok(session)
 }
 
 #[tauri::command]
 pub async fn accept_call(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
 ) -> CommandResult<()> {
-    Err("VOICE_NOT_IMPLEMENTED: accept_call not yet implemented".into())
+    let mut sessions = service.sessions.lock().unwrap();
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
+    })?;
+    session.state = CallState::Active;
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn reject_call(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
     _reason: Option<String>,
 ) -> CommandResult<()> {
-    Err("VOICE_NOT_IMPLEMENTED: reject_call not yet implemented".into())
+    let mut sessions = service.sessions.lock().unwrap();
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
+    })?;
+    session.state = CallState::Ended;
+    session.ended_at = Some(now_secs());
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn hangup_call(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
 ) -> CommandResult<()> {
-    Err("VOICE_NOT_IMPLEMENTED: hangup_call not yet implemented".into())
+    let mut sessions = service.sessions.lock().unwrap();
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
+    })?;
+    session.state = CallState::Ended;
+    session.ended_at = Some(now_secs());
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn toggle_mute(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
 ) -> CommandResult<bool> {
-    Err("VOICE_NOT_IMPLEMENTED: toggle_mute not yet implemented".into())
+    let mut sessions = service.sessions.lock().unwrap();
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
+    })?;
+    let participant = session.participants.first_mut().ok_or_else(|| {
+        "[VOICE_CALL_FAILED] No participants in session".to_string()
+    })?;
+    participant.is_muted = !participant.is_muted;
+    Ok(participant.is_muted)
 }
 
 #[tauri::command]
 pub async fn toggle_noise_suppression(
-    _service: State<'_, VoiceCallService>,
-    _session_id: String,
+    service: State<'_, VoiceCallService>,
+    session_id: String,
 ) -> CommandResult<bool> {
-    Err("VOICE_NOT_IMPLEMENTED: toggle_noise_suppression not yet implemented".into())
+    let mut sessions = service.sessions.lock().unwrap();
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
+    })?;
+    session.media_settings.noise_suppression = !session.media_settings.noise_suppression;
+    Ok(session.media_settings.noise_suppression)
 }
 
 #[tauri::command]
 pub async fn enumerate_input_devices(
-    _service: State<'_, VoiceCallService>,
+    service: State<'_, VoiceCallService>,
 ) -> CommandResult<Vec<AudioDeviceInfo>> {
-    Err("VOICE_NOT_IMPLEMENTED: enumerate_input_devices not yet implemented".into())
+    let audio = service.audio.lock().unwrap();
+    match audio.as_ref() {
+        Some(manager) => manager.enumerate_input_devices().map_err(|e| {
+            format!("[VOICE_CALL_FAILED] Failed to enumerate input devices: {}", e)
+        }),
+        None => Ok(Vec::new()),
+    }
 }
 
 #[tauri::command]
 pub async fn enumerate_output_devices(
-    _service: State<'_, VoiceCallService>,
+    service: State<'_, VoiceCallService>,
 ) -> CommandResult<Vec<AudioDeviceInfo>> {
-    Err("VOICE_NOT_IMPLEMENTED: enumerate_output_devices not yet implemented".into())
+    let audio = service.audio.lock().unwrap();
+    match audio.as_ref() {
+        Some(manager) => manager.enumerate_output_devices().map_err(|e| {
+            format!("[VOICE_CALL_FAILED] Failed to enumerate output devices: {}", e)
+        }),
+        None => Ok(Vec::new()),
+    }
 }
 
 #[tauri::command]
 pub async fn select_input_device(
-    _service: State<'_, VoiceCallService>,
+    service: State<'_, VoiceCallService>,
     _session_id: String,
-    _device_id: String,
+    device_id: String,
 ) -> CommandResult<()> {
-    Err("VOICE_NOT_IMPLEMENTED: select_input_device not yet implemented".into())
+    *service.selected_input.lock().unwrap() = Some(device_id);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn select_output_device(
-    _service: State<'_, VoiceCallService>,
+    service: State<'_, VoiceCallService>,
     _session_id: String,
-    _device_id: String,
+    device_id: String,
 ) -> CommandResult<()> {
-    Err("VOICE_NOT_IMPLEMENTED: select_output_device not yet implemented".into())
+    *service.selected_output.lock().unwrap() = Some(device_id);
+    Ok(())
 }

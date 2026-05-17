@@ -22,6 +22,7 @@ import { DomainCatalogPage, PluginCenterPage, PluginDetailPage } from "@/feature
 import { ServerManagerPage } from "@/features/server-connection/routes";
 import { SettingsPage } from "@/features/settings/routes";
 import { FileManagerPage } from "@/features/files/routes";
+import { TrayNotificationPopover } from "@/features/tray-notification/routes";
 
 /**
  * 应用全局 Vue Router 实例。
@@ -56,6 +57,7 @@ export const router = createRouter({
     { path: "/channel-info", component: ChannelInfoPage },
     { path: "/user-info-popover", component: UserPopoverPage },
     { path: "/channel-info-popover", component: ChannelInfoPopoverView },
+    { path: "/tray-notification-popover", component: TrayNotificationPopover },
     // 频道管理相关路由
     { path: "/channel-members", component: ChannelMembersPage },
     { path: "/channel-applications", component: JoinApplicationsPage },

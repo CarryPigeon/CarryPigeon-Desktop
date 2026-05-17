@@ -108,3 +108,57 @@ export type ChatReadStateWire = {
   last_read_mid: string;
   last_read_time: number;
 };
+
+export type ChatMessageSearchQueryWire = {
+  q: string;
+  cursor?: string;
+  limit?: number;
+  sender_uid?: string;
+  domain?: string;
+  before_mid?: string;
+  after_mid?: string;
+};
+
+export type ChatMessageEditWire = {
+  domain: string;
+  domain_version: string;
+  data: unknown;
+  mentions?: Array<{ type: string; uid: string }>;
+  expected_edit_version?: number;
+};
+
+export type ChatPinWire = {
+  cid: string;
+  mid: string;
+  pinned_by_uid: string;
+  pinned_at: number;
+  note?: string;
+};
+
+export type ChatPinListWire = {
+  items: ChatPinWire[];
+  next_cursor?: string;
+  has_more?: boolean;
+};
+
+export type ChatMessageForwardWire = {
+  target_cid: string;
+  comment?: string;
+  idempotency_key?: string;
+};
+
+export type ChatMentionWire = {
+  mention_id: string;
+  cid: string;
+  mid: string;
+  from_uid: string;
+  target: { type: string; uid: string };
+  created_at: number;
+  read: boolean;
+};
+
+export type ChatMentionPageWire = {
+  items: ChatMentionWire[];
+  next_cursor?: string;
+  has_more?: boolean;
+};

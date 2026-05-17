@@ -6,7 +6,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 /// settings schema 版本号。
-pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
+pub const SETTINGS_SCHEMA_VERSION: u32 = 2;
 
 /// settings 字段所有权。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,6 +164,7 @@ pub struct SettingsBackendStateV1 {
     pub check_for_updates: bool,
     pub email_notifications: bool,
     pub desktop_notifications: bool,
+    pub server_port: Option<u16>,
     pub server_list: Vec<SettingsServerConfigV1>,
 }
 
@@ -201,7 +202,7 @@ pub struct SettingsImportEnvelopeV1 {
 pub fn parse_settings_import_envelope(raw: &str) -> anyhow::Result<SettingsImportEnvelopeV1> {
     let envelope: SettingsImportEnvelopeV1 =
         serde_json::from_str(raw).with_context(|| "Failed to parse settings import payload")?;
-    if envelope.schema_version != SETTINGS_SCHEMA_VERSION {
+    if envelope.schema_version != 1 && envelope.schema_version != 2 {
         return Err(anyhow::anyhow!(
             "Unsupported settings schema version: {}",
             envelope.schema_version
