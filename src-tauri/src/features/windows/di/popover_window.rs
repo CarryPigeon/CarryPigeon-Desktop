@@ -1,8 +1,11 @@
 //! windows｜DI/命令入口：popover_window。
 //!
 //! 约定：注释中文，日志英文（tracing）。
-use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use std::sync::atomic::Ordering;
 
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+
+use crate::features::tray::di::commands::TrayUnreadState;
 use crate::features::windows::usecases::window_usecases::keep_one_popover_window;
 
 /// 打开用户信息 Popover 窗口。
@@ -129,5 +132,23 @@ pub async fn open_popover_window_impl(
 
     let _ = window.set_focus();
 
+    Ok(())
+}
+
+/// 关闭托盘通知弹窗并聚焦主窗口。
+///
+/// 点击通知弹窗中的消息时由前端触发，关闭弹窗后将主窗口置于前台。
+pub fn close_notification_popover(app: &AppHandle) -> anyhow::Result<()> {
+    if let Some(state) = app.try_state::<TrayUnreadState>() {
+        state.popover_open.store(false, Ordering::SeqCst);
+    }
+    if let Some(win) = app.get_webview_window("tray-notification-popover") {
+        win.close().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        main.unminimize().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        main.show().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        main.set_focus().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
     Ok(())
 }

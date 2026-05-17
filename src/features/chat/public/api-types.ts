@@ -27,6 +27,26 @@ import type {
 } from "../room-governance/api-types";
 import type { VoiceCallCapabilities } from "../voice-call/api-types";
 
+/**
+ * 未读消息预览项。
+ *
+ * 用于托盘通知弹窗等跨 feature 使用场景，提供可在弹窗中直接渲染的摘要信息。
+ */
+export type UnreadMessagePreview = {
+  /** 消息 ID（为空时表示降级预览） */
+  messageId: string;
+  /** 发送者名称 */
+  senderName: string;
+  /** 消息文字预览（单行截断） */
+  textPreview: string;
+  /** 来源频道名称 */
+  channelName: string;
+  /** 来源频道 ID */
+  channelId: string;
+  /** 消息时间戳（ms） */
+  timeMs: number;
+};
+
 export type {
   ChannelSelectionErrorInfo,
   ChannelSelectionOutcome,
@@ -148,4 +168,11 @@ export type ChatCapabilities = {
    * chat 语音通话能力分组。
    */
   voiceCall: VoiceCallCapabilities;
+
+  /**
+   * 获取未读消息预览列表（按时间降序，跨频道）。
+   *
+   * @param maxCount - 最多返回条数
+   */
+  getUnreadMessagePreviews(maxCount: number): UnreadMessagePreview[];
 };
