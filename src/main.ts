@@ -30,6 +30,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import type { WatchStopHandle } from "vue";
 import { clearTrayUnreadFlashing, registerTrayUnreadBridge } from "@/app/bootstrap/trayUnreadBridge";
+import { registerTrayHoverBridge } from "@/app/bootstrap/trayHoverBridge";
 import { syncTrayLocaleOnStartup } from "@/app/bootstrap/trayLocaleBridge";
 
 const app = createApp(App);
@@ -79,6 +80,7 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   }
 
   trayUnreadBridgeStop = registerTrayUnreadBridge();
+  registerTrayHoverBridge();
   syncTrayLocaleOnStartup();
 
   return true;

@@ -14,7 +14,7 @@ const MOCK_FILES: FileRecord[] = [
   { id: "f6", shareKey: "sk-vid-1", filename: "demo-recording.mp4", mimeType: "video/mp4", sizeBytes: 15728640, uploadedAt: "2026-05-09T08:30:00Z", uploaderName: "Charlie", channelName: "dev" },
 ];
 
-export async function mockListFiles(_serverSocket: string, query: FileListQuery): Promise<FileRecord[]> {
+export async function mockListFiles(_serverSocket: string, _accessToken: string, query: FileListQuery): Promise<FileRecord[]> {
   let results = [...MOCK_FILES];
 
   if (query.search) {

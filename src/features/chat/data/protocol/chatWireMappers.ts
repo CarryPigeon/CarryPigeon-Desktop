@@ -10,8 +10,10 @@ import type {
   ChatChannelMemberRecord,
   ChatChannelPatchInput,
   ChatChannelRecord,
+  ChatMentionRecord,
   ChatMessagePage,
   ChatMessageRecord,
+  ChatPinRecord,
   ChatReadStateInput,
   ChatSendMessageInput,
   ChatUnreadState,
@@ -29,8 +31,10 @@ import type {
   ChatChannelBanWire,
   ChatChannelMemberWire,
   ChatChannelWire,
+  ChatMentionWire,
   ChatMessagePageWire,
   ChatMessageWire,
+  ChatPinWire,
   ChatReadStateWire,
   ChatSendMessageWire,
   ChatUnreadStateWire,
@@ -146,6 +150,28 @@ export function mapChatChannelApplicationWire(wire: ChatChannelApplicationWire):
 /**
  * 将封禁 wire 模型映射为领域封禁记录。
  */
+export function mapChatPinWire(wire: ChatPinWire): ChatPinRecord {
+  return {
+    channelId: asTrimmedString(wire.cid),
+    messageId: asTrimmedString(wire.mid),
+    pinnedByUserId: asTrimmedString(wire.pinned_by_uid),
+    pinnedAt: asSafeNumber(wire.pinned_at),
+    note: asOptionalString(wire.note),
+  };
+}
+
+export function mapChatMentionWire(wire: ChatMentionWire): ChatMentionRecord {
+  return {
+    mentionId: asTrimmedString(wire.mention_id),
+    channelId: asTrimmedString(wire.cid),
+    messageId: asTrimmedString(wire.mid),
+    fromUserId: asTrimmedString(wire.from_uid),
+    target: wire.target ? { type: asTrimmedString(wire.target.type), uid: asTrimmedString(wire.target.uid) } : { type: "", uid: "" },
+    createdAt: asSafeNumber(wire.created_at),
+    read: Boolean(wire.read),
+  };
+}
+
 export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanRecord {
   return {
     channelId: asTrimmedString(wire.cid),

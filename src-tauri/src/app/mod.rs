@@ -17,7 +17,7 @@ use tauri::{
 
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
-use crate::features::tray::di::commands::TrayUnreadState;
+use crate::features::tray::di::commands::{start_hover_timer, TrayUnreadState};
 use crate::features::tray::domain::tray_i18n::tray_labels;
 use crate::shared::temp_file::TempFileManager;
 
@@ -92,43 +92,70 @@ pub fn run() -> anyhow::Result<()> {
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
-                    // 设置鼠标左键单击行为
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        position: _,
-                        id: _,
-                        rect: _,
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            if let Err(err) = window.unminimize() {
-                                tracing::warn!(action = "app_tray_click_unminimize_failed", error = %err);
+                    match event {
+                        TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } => {
+                            let app = tray.app_handle();
+                            if let Some(window) = app.get_webview_window("main") {
+                                if let Err(err) = window.unminimize() {
+                                    tracing::warn!(action = "app_tray_click_unminimize_failed", error = %err);
+                                }
+                                if let Err(err) = window.show() {
+                                    tracing::warn!(action = "app_tray_click_show_failed", error = %err);
+                                }
+                                if let Err(err) = window.set_focus() {
+                                    tracing::warn!(action = "app_tray_click_focus_failed", error = %err);
+                                }
+                            } else {
+                                tracing::warn!(action = "app_tray_click_main_window_missing");
                             }
-                            if let Err(err) = window.show() {
-                                tracing::warn!(action = "app_tray_click_show_failed", error = %err);
-                            }
-                            if let Err(err) = window.set_focus() {
-                                tracing::warn!(action = "app_tray_click_focus_failed", error = %err);
-                            }
-                        } else {
-                            tracing::warn!(action = "app_tray_click_main_window_missing");
                         }
+                        TrayIconEvent::Enter { rect, .. } => {
+                            let app = tray.app_handle();
+                            let state: tauri::State<'_, TrayUnreadState> = app.state();
+                            state.is_hovering.store(true, std::sync::atomic::Ordering::SeqCst);
+                            let (px, py) = match rect.position {
+                                tauri::Position::Physical(p) => (p.x as f64, p.y as f64),
+                                tauri::Position::Logical(p) => (p.x, p.y),
+                            };
+                            let (pw, _ph) = match rect.size {
+                                tauri::Size::Physical(s) => (s.width as f64, s.height as f64),
+                                tauri::Size::Logical(s) => (s.width, s.height),
+                            };
+                            let x = px + pw;
+                            let y = py;
+                            start_hover_timer(app.clone(), &state, x, y);
+                        }
+                        TrayIconEvent::Leave { .. } => {
+                            let app = tray.app_handle();
+                            let state: tauri::State<'_, TrayUnreadState> = app.state();
+                            state.is_hovering.store(false, std::sync::atomic::Ordering::SeqCst);
+                            state.popover_open.store(false, std::sync::atomic::Ordering::SeqCst);
+                            if let Some(win) = app.get_webview_window("tray-notification-popover") {
+                                if let Err(err) = win.close() {
+                                    tracing::warn!(action = "app_tray_leave_close_popover_failed", error = %err);
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 })
                 .build(app)?;
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == "user-info-popover"
+            let label = window.label();
+            if (label == "user-info-popover" || label == "tray-notification-popover")
                 && matches!(event, &tauri::WindowEvent::Focused(false))
             {
                 let _ = window.close();
             }
         })
         .plugin(tauri_plugin_opener::init())
-        .manage(crate::features::voice_call::di::commands::VoiceCallService)
+        .manage(crate::features::voice_call::di::commands::VoiceCallService::new())
         // 注册对外暴露的事件钩子
         .invoke_handler(tauri::generate_handler![
             // tray
@@ -138,6 +165,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::windows::di::commands::to_chat_window_size,
             crate::features::windows::di::commands::open_popover_window,
             crate::features::windows::di::commands::open_info_window,
+            crate::features::windows::di::commands::close_tray_notification_popover,
             // network
             crate::features::network::di::commands::send_tcp_service,
             crate::features::network::di::commands::add_tcp_service,

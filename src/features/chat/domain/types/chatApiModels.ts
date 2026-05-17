@@ -132,3 +132,27 @@ export type ChatChannelCreateInput = {
   brief?: string;
   avatar?: string;
 };
+
+export type ChatPinRecord = {
+  channelId: string;
+  messageId: string;
+  pinnedByUserId: string;
+  pinnedAt: number;
+  note?: string;
+};
+
+export type ChatMentionRecord = {
+  mentionId: string;
+  channelId: string;
+  messageId: string;
+  fromUserId: string;
+  target: { type: string; uid: string };
+  createdAt: number;
+  read: boolean;
+};
+
+export type ChatMentionPage = {
+  items: ChatMentionRecord[];
+  nextCursor?: string;
+  hasMore?: boolean;
+};

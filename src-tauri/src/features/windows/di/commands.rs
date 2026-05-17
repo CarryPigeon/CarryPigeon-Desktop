@@ -86,3 +86,12 @@ pub async fn open_info_window(
         .await
         .map_err(|err| to_command_error("WINDOW_INFO_OPEN_FAILED", err))
 }
+
+/// 关闭托盘通知弹窗并聚焦主窗口。
+///
+/// 点击通知弹窗中的消息时由前端触发。
+#[tauri::command]
+pub async fn close_tray_notification_popover(app: AppHandle) -> CommandResult<()> {
+    popover_window::close_notification_popover(&app)
+        .map_err(|err| to_command_error("WINDOW_NOTIFICATION_POPOVER_CLOSE_FAILED", err))
+}

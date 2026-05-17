@@ -12,7 +12,7 @@ import { createMessageFlowCapabilities } from "../message-flow/api";
 import { createRoomGovernanceCapabilities } from "../room-governance/api";
 import { createRoomSessionCapabilities } from "../room-session/api";
 import { getVoiceCallCapabilities } from "../voice-call/api";
-import type { ChatCapabilities } from "./api-types";
+import type { ChatCapabilities, UnreadMessagePreview } from "./api-types";
 
 let cachedChatCapabilities: ChatCapabilities | null = null;
 
@@ -49,6 +49,24 @@ export function createChatCapabilities(): ChatCapabilities {
       forChannel: roomGovernanceCapabilities.forChannel,
     },
     voiceCall: getVoiceCallCapabilities(),
+
+    getUnreadMessagePreviews(maxCount: number) {
+      const snapshot = roomSessionCapabilities.directory.getSnapshot();
+      const channels = snapshot.allChannels;
+      const items: UnreadMessagePreview[] = [];
+      for (const ch of channels) {
+        if (ch.unread <= 0) continue;
+        items.push({
+          messageId: "",
+          senderName: ch.name,
+          textPreview: ch.brief || `${ch.unread} 条未读消息`,
+          channelName: ch.name,
+          channelId: ch.id,
+          timeMs: Date.now(),
+        });
+      }
+      return items.sort((a, b) => b.timeMs - a.timeMs).slice(0, maxCount);
+    },
   };
 }
 

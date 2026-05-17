@@ -9,7 +9,7 @@ use std::{
 };
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::{AppHandle, Runtime, State, image::Image};
+use tauri::{AppHandle, Emitter, Runtime, State, image::Image};
 
 use crate::features::tray::domain::tray_i18n::tray_labels;
 use crate::shared::error::{CommandResult, command_error, to_command_error};
@@ -27,6 +27,8 @@ pub struct TrayUnreadState {
     lifecycle_lock: Mutex<()>,
     normal_icon: Image<'static>,
     blank_icon: Image<'static>,
+    pub is_hovering: Arc<AtomicBool>,
+    pub popover_open: Arc<AtomicBool>,
 }
 
 impl TrayUnreadState {
@@ -40,6 +42,8 @@ impl TrayUnreadState {
             lifecycle_lock: Mutex::new(()),
             normal_icon: normal_icon.to_owned(),
             blank_icon: create_blank_icon(),
+            is_hovering: Arc::new(AtomicBool::new(false)),
+            popover_open: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -159,8 +163,60 @@ fn set_tray_icon<R: Runtime>(app: &AppHandle<R>, icon: &Image<'static>) -> Comma
         .map_err(|err| to_command_error("TRAY_ICON_SET_FAILED", err))
 }
 
+/// 启动托盘悬停计时器（500ms 后弹出通知弹窗）。
+///
+/// 若 500ms 后鼠标仍停留在托盘上且存在未读消息，则向主窗口
+/// 发送 `"tray-hover-settled"` 事件，携带鼠标屏幕坐标。
+pub fn start_hover_timer<R: Runtime>(app: AppHandle<R>, state: &TrayUnreadState, x: f64, y: f64) {
+    if state.popover_open.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let is_hovering = Arc::clone(&state.is_hovering);
+    let has_unread = Arc::clone(&state.has_unread);
+    let popover_open = Arc::clone(&state.popover_open);
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        if !is_hovering.load(Ordering::SeqCst) || !has_unread.load(Ordering::SeqCst) {
+            popover_open.store(false, Ordering::SeqCst);
+            return;
+        }
+        let _ = app_handle.emit(
+            "tray-hover-settled",
+            serde_json::json!({ "x": x, "y": y }),
+        );
+    });
+}
+
 /// 创建透明空白托盘图标。
 fn create_blank_icon() -> Image<'static> {
     let rgba = vec![0; (BLANK_ICON_SIZE * BLANK_ICON_SIZE * 4) as usize];
     Image::new_owned(rgba, BLANK_ICON_SIZE, BLANK_ICON_SIZE)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::Ordering;
+
+    use tauri::image::Image;
+
+    use super::*;
+
+    /// 验证 TrayUnreadState::new() 初始化时悬停和弹窗状态为 false。
+    #[test]
+    fn test_tray_unread_state_new_hover_fields_false() {
+        let rgba = vec![0; (32 * 32 * 4) as usize];
+        let icon = Image::new_owned(rgba, 32, 32);
+        let state = TrayUnreadState::new(icon);
+        assert!(!state.is_hovering.load(Ordering::SeqCst));
+        assert!(!state.popover_open.load(Ordering::SeqCst));
+    }
+
+    /// 验证 create_blank_icon 返回 32x32 有效图像。
+    #[test]
+    fn test_create_blank_icon_dimensions() {
+        let icon = create_blank_icon();
+        assert_eq!(icon.width(), 32);
+        assert_eq!(icon.height(), 32);
+    }
 }

@@ -5,17 +5,18 @@
 
 import { selectByMockMode } from "@/shared/config/mockModeSelector";
 import { mockListFiles } from "../data/mock/mockFileListPort";
+import { httpListFiles } from "../data/httpFileListPort";
 import type { FileRecord, FileListQuery } from "../domain/contracts";
 
-export type FileListPort = (serverSocket: string, query: FileListQuery) => Promise<FileRecord[]>;
+export type FileListPort = (serverSocket: string, accessToken: string, query: FileListQuery) => Promise<FileRecord[]>;
 
 let fileListPort: FileListPort | null = null;
 
 function createFileListPort(): FileListPort {
   return selectByMockMode<FileListPort>({
-    off: () => async (_serverSocket: string, _query: FileListQuery) => [],
+    off: () => async (_serverSocket: string, _accessToken: string, _query: FileListQuery) => [],
     store: () => mockListFiles,
-    protocol: () => async (_serverSocket: string, _query: FileListQuery) => [],
+    protocol: () => httpListFiles,
   });
 }
 

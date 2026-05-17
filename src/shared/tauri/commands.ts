@@ -66,6 +66,7 @@ export const TAURI_COMMANDS = {
 
   setTrayUnreadFlashing: "set_tray_unread_flashing",
   setTrayLocale: "set_tray_locale",
+  closeTrayNotificationPopover: "close_tray_notification_popover",
 
   downloadFile: "download_file",
 

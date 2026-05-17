@@ -27,9 +27,10 @@ const capabilities = getFilesCapabilities();
 async function loadFiles(query: FileListQuery = {}): Promise<void> {
   const socket = getActiveChatServerSocket();
   if (!socket) return;
+  const token = readAuthToken(socket) || "";
   loading.value = true;
   try {
-    files.value = await capabilities.listFiles(socket, query);
+    files.value = await capabilities.listFiles(socket, token, query);
   } finally {
     loading.value = false;
   }

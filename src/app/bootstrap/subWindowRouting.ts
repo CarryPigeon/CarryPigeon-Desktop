@@ -47,6 +47,10 @@ export function routeIfSubWindow(router: Router, searchParams: URLSearchParams):
       });
     case "channel-info-popover":
       return replaceSubWindowRoute(router, "/channel-info-popover", commonProfileQuery);
+    case "tray-notification-popover":
+      return replaceSubWindowRoute(router, "/tray-notification-popover", {
+        data: searchParams.get("data") ?? "[]",
+      });
     case "channel-info":
       return replaceSubWindowRoute(router, "/channel-info", {
         ...commonProfileQuery,

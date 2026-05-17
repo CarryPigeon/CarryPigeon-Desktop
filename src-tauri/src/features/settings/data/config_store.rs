@@ -103,6 +103,7 @@ fn legacy_config_to_backend_state(config: &Config) -> SettingsBackendStateV1 {
         check_for_updates: config.check_for_updates,
         email_notifications: config.email_notifications,
         desktop_notifications: config.desktop_notifications,
+        server_port: None,
         server_list: config
             .server_list
             .iter()
@@ -200,6 +201,10 @@ fn envelope_value_for_key(envelope: &SettingsImportEnvelopeV1, key: &str) -> Opt
         "check_for_updates" => Some(Value::Bool(envelope.backend.check_for_updates)),
         "email_notifications" => Some(Value::Bool(envelope.backend.email_notifications)),
         "desktop_notifications" => Some(Value::Bool(envelope.backend.desktop_notifications)),
+        "server_port" => envelope
+            .backend
+            .server_port
+            .map(|p| Value::Number(serde_json::Number::from(p as u64))),
         "theme" => Some(Value::String(
             settings_theme_to_string(envelope.local_cache.theme).to_string(),
         )),
@@ -228,6 +233,16 @@ fn update_envelope_string(envelope: &mut SettingsImportEnvelopeV1, key: &str, va
                 return true;
             }
             false
+        }
+        _ => false,
+    }
+}
+
+fn update_envelope_u32(envelope: &mut SettingsImportEnvelopeV1, key: &str, value: u32) -> bool {
+    match key {
+        "server_port" => {
+            envelope.backend.server_port = Some(value as u16);
+            true
         }
         _ => false,
     }
@@ -474,15 +489,25 @@ pub async fn update_config_bool(key: String, value: bool) -> anyhow::Result<()> 
 /// 异步更新配置文件中的指定 u32 值。
 pub async fn update_config_u32(key: String, value: u32) -> anyhow::Result<()> {
     let _guard = config_write_lock().lock().await;
-    tracing::error!(action = "settings_config_update_unsupported", key = %key, value);
-    Err(anyhow::anyhow!("Unsupported config key: {}", key))
+    if key == "server_port" && (value == 0 || value > 65535) {
+        return Err(anyhow::anyhow!(
+            "Invalid server_port value: {} (must be 1..=65535)",
+            value
+        ));
+    }
+    let mut envelope = load_current_envelope().await;
+    if !update_envelope_u32(&mut envelope, &key, value) {
+        tracing::error!(action = "settings_config_update_unsupported", key = %key, value);
+        return Err(anyhow::anyhow!("Unsupported config key: {}", key));
+    }
+    persist_envelope(&envelope).await
 }
 
 /// 异步更新配置文件中的指定 u64 值。
 pub async fn update_config_u64(key: String, value: u64) -> anyhow::Result<()> {
     let _guard = config_write_lock().lock().await;
     tracing::error!(action = "settings_config_update_unsupported", key = %key, value);
-    Err(anyhow::anyhow!("Unsupported config key: {}", key))
+    Err(anyhow::anyhow!("Unsupported config key for u64 update: {}", key))
 }
 
 /// 异步更新配置文件中的指定 string 值。
