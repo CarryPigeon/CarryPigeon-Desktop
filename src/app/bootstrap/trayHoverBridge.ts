@@ -60,7 +60,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
           height: Math.min(previews.length * 64 + 40, 320),
         });
       } catch (err) {
-        logger.warn("Action: tray_hover_popover_open_failed", { error: String(err) });
+        logger.warn("Action: chat_tray_hover_popover_open_failed", { error: String(err) });
       }
     });
     unlisteners.push(unlistenHover);
@@ -69,7 +69,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
       try {
         await chat.session.currentChannel.selectChannel(event.payload.channelId);
       } catch (err) {
-        logger.warn("Action: tray_hover_jump_channel_failed", { error: String(err) });
+        logger.warn("Action: chat_tray_hover_jump_channel_failed", { error: String(err) });
       }
     });
     unlisteners.push(unlistenJump);

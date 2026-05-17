@@ -41,7 +41,7 @@ async function handleClick(channelId: string) {
     await invokeTauri<void>(TAURI_COMMANDS.closeTrayNotificationPopover);
     await emit("jump-to-channel", { channelId });
   } catch (err) {
-    logger.warn("Action: tray_notification_click_failed", { error: String(err) });
+    logger.warn("Action: chat_tray_notification_click_failed", { error: String(err) });
   }
 }
 </script>
