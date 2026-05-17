@@ -18,7 +18,7 @@ impl VoiceCallService {
         let audio = match AudioDeviceManager::new() {
             Ok(manager) => Some(manager),
             Err(e) => {
-                tracing::warn!(action = "voice_call_service_audio_init_failed", error = %e);
+                tracing::warn!(action = "app_voice_call_service_audio_init_failed", error = %e);
                 None
             }
         };
@@ -81,7 +81,7 @@ pub async fn start_direct_call(
     service
         .sessions
         .lock()
-        .unwrap()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
         .insert(session_id, session.clone());
     Ok(session)
 }
@@ -106,7 +106,7 @@ pub async fn start_conference(
     service
         .sessions
         .lock()
-        .unwrap()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
         .insert(session_id, session.clone());
     Ok(session)
 }
@@ -116,10 +116,13 @@ pub async fn accept_call(
     service: State<'_, VoiceCallService>,
     session_id: String,
 ) -> CommandResult<()> {
-    let mut sessions = service.sessions.lock().unwrap();
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
-    })?;
+    let mut sessions = service
+        .sessions
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
     session.state = CallState::Active;
     Ok(())
 }
@@ -130,10 +133,13 @@ pub async fn reject_call(
     session_id: String,
     _reason: Option<String>,
 ) -> CommandResult<()> {
-    let mut sessions = service.sessions.lock().unwrap();
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
-    })?;
+    let mut sessions = service
+        .sessions
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
     session.state = CallState::Ended;
     session.ended_at = Some(now_secs());
     Ok(())
@@ -144,10 +150,13 @@ pub async fn hangup_call(
     service: State<'_, VoiceCallService>,
     session_id: String,
 ) -> CommandResult<()> {
-    let mut sessions = service.sessions.lock().unwrap();
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
-    })?;
+    let mut sessions = service
+        .sessions
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
     session.state = CallState::Ended;
     session.ended_at = Some(now_secs());
     Ok(())
@@ -158,13 +167,17 @@ pub async fn toggle_mute(
     service: State<'_, VoiceCallService>,
     session_id: String,
 ) -> CommandResult<bool> {
-    let mut sessions = service.sessions.lock().unwrap();
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
-    })?;
-    let participant = session.participants.first_mut().ok_or_else(|| {
-        "[VOICE_CALL_FAILED] No participants in session".to_string()
-    })?;
+    let mut sessions = service
+        .sessions
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
+    let participant = session
+        .participants
+        .first_mut()
+        .ok_or_else(|| "[VOICE_CALL_FAILED] No participants in session".to_string())?;
     participant.is_muted = !participant.is_muted;
     Ok(participant.is_muted)
 }
@@ -174,10 +187,13 @@ pub async fn toggle_noise_suppression(
     service: State<'_, VoiceCallService>,
     session_id: String,
 ) -> CommandResult<bool> {
-    let mut sessions = service.sessions.lock().unwrap();
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        format!("[VOICE_CALL_FAILED] Session not found: {}", session_id)
-    })?;
+    let mut sessions = service
+        .sessions
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
     session.media_settings.noise_suppression = !session.media_settings.noise_suppression;
     Ok(session.media_settings.noise_suppression)
 }
@@ -186,10 +202,16 @@ pub async fn toggle_noise_suppression(
 pub async fn enumerate_input_devices(
     service: State<'_, VoiceCallService>,
 ) -> CommandResult<Vec<AudioDeviceInfo>> {
-    let audio = service.audio.lock().unwrap();
+    let audio = service
+        .audio
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
     match audio.as_ref() {
         Some(manager) => manager.enumerate_input_devices().map_err(|e| {
-            format!("[VOICE_CALL_FAILED] Failed to enumerate input devices: {}", e)
+            format!(
+                "[VOICE_CALL_FAILED] Failed to enumerate input devices: {}",
+                e
+            )
         }),
         None => Ok(Vec::new()),
     }
@@ -199,10 +221,16 @@ pub async fn enumerate_input_devices(
 pub async fn enumerate_output_devices(
     service: State<'_, VoiceCallService>,
 ) -> CommandResult<Vec<AudioDeviceInfo>> {
-    let audio = service.audio.lock().unwrap();
+    let audio = service
+        .audio
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
     match audio.as_ref() {
         Some(manager) => manager.enumerate_output_devices().map_err(|e| {
-            format!("[VOICE_CALL_FAILED] Failed to enumerate output devices: {}", e)
+            format!(
+                "[VOICE_CALL_FAILED] Failed to enumerate output devices: {}",
+                e
+            )
         }),
         None => Ok(Vec::new()),
     }
@@ -214,7 +242,11 @@ pub async fn select_input_device(
     _session_id: String,
     device_id: String,
 ) -> CommandResult<()> {
-    *service.selected_input.lock().unwrap() = Some(device_id);
+    let mut input = service
+        .selected_input
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    *input = Some(device_id);
     Ok(())
 }
 
@@ -224,6 +256,10 @@ pub async fn select_output_device(
     _session_id: String,
     device_id: String,
 ) -> CommandResult<()> {
-    *service.selected_output.lock().unwrap() = Some(device_id);
+    let mut output = service
+        .selected_output
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    *output = Some(device_id);
     Ok(())
 }
