@@ -19,6 +19,8 @@ import type {
   ChatMessageSearchQueryWire,
   ChatMessageWire,
   ChatPinListWire,
+  ChatReactionRequestWire,
+  ChatReactionResponseWire,
   ChatReadStateWire,
   ChatSendMessageWire,
   ChatUnreadStateWire,
@@ -420,4 +422,49 @@ export async function httpBatchMarkMentionsRead(serverSocket: string, accessToke
   if (beforeMentionId) body.before_mention_id = beforeMentionId;
   if (cid) body.cid = cid;
   await client.requestJson<void>("PUT", "/mentions/read_state", Object.keys(body).length ? body : undefined);
+}
+
+/**
+ * POST /channels/:cid/messages/:mid/reactions
+ * 添加消息回应。
+ */
+export async function httpReactToMessage(
+  serverSocket: string,
+  accessToken: string,
+  cid: string,
+  mid: string,
+  req: ChatReactionRequestWire,
+): Promise<ChatReactionResponseWire> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const channelId = String(cid).trim();
+  const messageId = String(mid).trim();
+  if (!channelId) throw new Error("Missing cid");
+  if (!messageId) throw new Error("Missing mid");
+  return client.requestJson<ChatReactionResponseWire>(
+    "POST",
+    `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+    req,
+  );
+}
+
+/**
+ * DELETE /channels/:cid/messages/:mid/reactions?emoji=:emoji
+ * 取消消息回应。
+ */
+export async function httpRemoveReaction(
+  serverSocket: string,
+  accessToken: string,
+  cid: string,
+  mid: string,
+  emoji: string,
+): Promise<ChatReactionResponseWire> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const channelId = String(cid).trim();
+  const messageId = String(mid).trim();
+  if (!channelId) throw new Error("Missing cid");
+  if (!messageId) throw new Error("Missing mid");
+  return client.requestJson<ChatReactionResponseWire>(
+    "DELETE",
+    `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/reactions?emoji=${encodeURIComponent(emoji)}`,
+  );
 }

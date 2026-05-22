@@ -119,5 +119,7 @@ export function createChatMessageFlowRuntime(
     startReply: (messageId) => applicationService.startReply(messageId),
     cancelReply: () => applicationService.cancelReply(),
     sendComposerMessage: (payload) => applicationService.sendComposerMessage(payload),
+    reactToMessage: (messageId, emoji) => applicationService.reactToMessage(messageId, emoji),
+    removeReaction: (messageId, emoji) => applicationService.removeReaction(messageId, emoji),
   };
 }

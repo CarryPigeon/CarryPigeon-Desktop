@@ -12,6 +12,18 @@
         <span class="voice-call-panel__toggle">{{ minimized ? "▲" : "▼" }}</span>
       </div>
 
+      <div v-if="!minimized && isConference && participants.length > 0" class="voice-call-panel__roster">
+        <div class="voice-call-panel__roster-title">参与者 ({{ participants.length }})</div>
+        <div v-for="p in participants" :key="p.userId" class="voice-call-panel__participant">
+          <span class="voice-call-panel__participant-name">{{ p.displayName || p.userId }}</span>
+          <span v-if="p.isMuted" class="voice-call-panel__participant-icon">🔇</span>
+          <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon">🔊</span>
+          <span class="voice-call-panel__participant-level">
+            <span class="voice-call-panel__level-bar" :style="{ width: (p.audioLevel * 100) + '%' }"></span>
+          </span>
+        </div>
+      </div>
+
       <div v-if="!minimized" class="voice-call-panel__controls">
         <button
           class="voice-call-panel__ctrl-btn"
@@ -67,6 +79,7 @@ const props = defineProps<{
   isNoiseSuppressionOn: boolean;
   inputDevices: readonly AudioDeviceInfo[];
   currentInputDeviceId: string | null;
+  isConference?: boolean;
 }>();
 
 defineEmits<{
@@ -202,6 +215,56 @@ const formattedDuration = computed(() => {
     background: var(--td-bg-color-container);
     color: var(--td-text-color-primary);
     max-width: 120px;
+  }
+
+  &__roster {
+    padding: 8px 16px;
+    border-top: 1px solid var(--td-border-level-2-color);
+  }
+
+  &__roster-title {
+    font-size: 11px;
+    color: var(--td-text-color-secondary);
+    margin-bottom: 6px;
+  }
+
+  &__participant {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 13px;
+  }
+
+  &__participant-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--td-text-color-primary);
+  }
+
+  &__participant-icon {
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  &__participant-level {
+    width: 40px;
+    height: 4px;
+    background: var(--td-gray-color-3);
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  &__level-bar {
+    display: block;
+    height: 100%;
+    background: var(--td-success-color);
+    border-radius: 2px;
+    transition: width 0.2s;
   }
 }
 

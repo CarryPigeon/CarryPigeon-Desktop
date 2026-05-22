@@ -106,6 +106,8 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     cancelReply: messageFlow.cancelReply,
     deleteMessage: messageFlow.deleteMessage,
     sendComposerMessage: messageFlow.sendComposerMessage,
+    reactToMessage: messageFlow.reactToMessage,
+    removeReaction: messageFlow.removeReaction,
     // 频道管理
     listMembers: governance.listMembers,
     kickMember: governance.kickMember,

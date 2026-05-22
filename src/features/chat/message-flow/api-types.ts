@@ -12,6 +12,8 @@ import type {
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
   MessageDomain,
+  ReactToMessageOutcome,
+  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "./domain/contracts";
 
@@ -23,6 +25,8 @@ export type {
   MessageDomain,
   SendChatMessageOutcome,
 } from "./domain/contracts";
+
+export type { MessageReactionSummary, ReactToMessageOutcome, RemoveReactionOutcome } from "./domain/contracts";
 
 /**
  * 当前频道消息时间线快照。
@@ -45,6 +49,8 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
   loadMoreHistory(): Promise<void>;
   beginReply(messageId: string): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
+  reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
+  removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
 };
 
 /**

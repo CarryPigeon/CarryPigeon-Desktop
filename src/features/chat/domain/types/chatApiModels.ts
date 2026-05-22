@@ -77,6 +77,14 @@ export type ChatMessageRecord = {
   data: unknown;
   preview?: string;
   replyToMessageId?: string;
+  reactions?: ChatReactionRecord[];
+};
+
+/** 消息回应领域模型。 */
+export type ChatReactionRecord = {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
 };
 
 /**
