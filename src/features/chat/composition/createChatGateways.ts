@@ -62,6 +62,12 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     deleteMessage(serverSocket, accessToken, messageId) {
       return deps.core.deleteMessage(serverSocket, accessToken, messageId);
     },
+    reactToMessage(serverSocket, accessToken, channelId, messageId, emoji) {
+      return deps.core.reactToMessage(serverSocket, accessToken, channelId, messageId, emoji);
+    },
+    removeReaction(serverSocket, accessToken, channelId, messageId, emoji) {
+      return deps.core.removeReaction(serverSocket, accessToken, channelId, messageId, emoji);
+    },
     updateReadState(serverSocket, accessToken, channelId, readState) {
       return deps.core.updateReadState(serverSocket, accessToken, channelId, readState);
     },

@@ -1,5 +1,6 @@
 use super::super::domain::model::*;
 use serde::Serialize;
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,4 +43,12 @@ pub struct SpeakerUpdate {
     pub user_id: String,
     pub is_speaking: bool,
     pub audio_level: f64,
+}
+
+/// Emit an incoming call event to the frontend via Tauri event system.
+pub fn emit_incoming_call(
+    app_handle: &tauri::AppHandle,
+    event: &IncomingCallEvent,
+) -> Result<(), tauri::Error> {
+    app_handle.emit("voice_call:incoming", event)
 }

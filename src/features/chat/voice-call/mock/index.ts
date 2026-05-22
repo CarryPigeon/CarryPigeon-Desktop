@@ -76,5 +76,40 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
     async enumerateDevices() {
       return { input: mockDevices, output: mockDevices };
     },
+
+    async joinConference(sessionId: string) {
+      const session: CallSession = {
+        sessionId,
+        kind: "conference",
+        state: "connecting",
+        initiator: "host-user",
+        participants: [
+          { userId: "host-user", displayName: "主持人", isMuted: false, isSpeaking: true, audioLevel: 0.7, joinedAt: Date.now() },
+          { userId: "current-user", displayName: "我", isMuted: false, isSpeaking: false, audioLevel: 0, joinedAt: Date.now() },
+        ],
+        roomId: "conference-room",
+        startedAt: Date.now(),
+        endedAt: null,
+        mediaSettings: { inputDeviceId: "default-mic", outputDeviceId: null, noiseSuppression: true, echoCancellation: true },
+      };
+      activeSession.value = session;
+      setTimeout(() => {
+        if (activeSession.value) {
+          activeSession.value = {
+            ...activeSession.value,
+            state: "active",
+            participants: [
+              ...activeSession.value.participants,
+              { userId: "user-3", displayName: "王五", isMuted: false, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() },
+            ],
+          };
+        }
+      }, 2000);
+      return session;
+    },
+
+    async leaveConference(_sessionId: string) {
+      activeSession.value = null;
+    },
   };
 }

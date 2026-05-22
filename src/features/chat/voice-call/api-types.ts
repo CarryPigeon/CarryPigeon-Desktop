@@ -38,4 +38,12 @@ export type VoiceCallCapabilities = ReadableCapability<VoiceCallSnapshot> & {
   selectInputDevice(deviceId: string): Promise<void>;
   /** 选择输出设备 */
   selectOutputDevice(deviceId: string): Promise<void>;
+  /** 监听来电事件（Rust emit → frontend） */
+  listenForIncomingCalls(): Promise<() => void>;
+  /** 连接信令服务器（在登录后调用，用于接收来电和发起通话） */
+  connectSignaling(wsUrl: string, accessToken: string): Promise<void>;
+  /** 加入已有会议 */
+  joinConference(sessionId: string): Promise<CallSession>;
+  /** 离开会议 */
+  leaveConference(sessionId: string): Promise<void>;
 };

@@ -21,6 +21,8 @@ import {
   loadMoreMessages,
   loadingMoreMessages,
   messageActionError,
+  reactToMessage,
+  removeReaction,
   replyToMessageId,
   selectedDomainId,
   sendComposerMessage,
@@ -131,6 +133,8 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       loadMoreHistory: loadMoreMessages,
       beginReply: startReply,
       deleteMessage,
+      reactToMessage,
+      removeReaction,
     },
     composer: {
       getSnapshot: getComposerSnapshot,

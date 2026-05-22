@@ -13,6 +13,7 @@ import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
+import { reactToMessage } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
@@ -21,11 +22,15 @@ import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components
 const props = defineProps<{
   model: ChatCenterModel;
   /**
-   * 是否展示“跳到底部”按钮。
+   * 语音通话目标用户 ID（在 DM 中为对方用户 ID）。
+   */
+  targetUserId?: string;
+  /**
+   * 是否展示”跳到底部”按钮。
    */
   showJumpToBottom: boolean;
   /**
-   * 点击“跳到底部”的处理。
+   * 点击”跳到底部”的处理。
    */
   onJumpToBottom: () => void;
   /**
@@ -74,12 +79,17 @@ const connectionActionLabel = computed(() =>
 const voiceHostRef = ref<{
   callState: { value: CallState };
   startDirectCall: (targetUserId: string) => Promise<unknown>;
+  startConference: () => Promise<unknown>;
 } | null>(null);
 
 const currentCallState = computed<CallState>(() => voiceHostRef.value?.callState?.value ?? "idle");
 
-function handleVoiceCallStart(): void {
-  voiceHostRef.value?.startDirectCall("");
+function handleDirectCallStart(targetUserId: string): void {
+  voiceHostRef.value?.startDirectCall(targetUserId || props.targetUserId || "");
+}
+
+function handleConferenceStart(): void {
+  voiceHostRef.value?.startConference();
 }
 
 /**
@@ -110,7 +120,9 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
           :room-id="props.model.currentChannelId"
           :room-name="props.model.currentChannelName"
           :call-state="currentCallState"
-          @start="handleVoiceCallStart"
+          :target-user-id="props.targetUserId"
+          @start-direct="handleDirectCallStart"
+          @start-conference="handleConferenceStart"
         />
         <button
           v-if="props.model.currentChannelId"
@@ -135,6 +147,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       ref="voiceHostRef"
       :room-id="props.model.currentChannelId"
       :room-name="props.model.currentChannelName"
+      :target-user-id="props.targetUserId"
     />
 
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
@@ -197,6 +210,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
               :reply-text="m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, m.replyToId) : ''"
               :domain-registry-store="props.model.domainRegistryStore"
               @install="props.onInstallHint"
+              @react="(messageId, emoji) => emoji && reactToMessage(messageId, emoji)"
             />
           </div>
         </div>

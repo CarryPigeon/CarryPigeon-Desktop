@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CallSession, CallKind, AudioDeviceInfo } from "../../domain/contracts";
 import type { VoiceCallStatePort } from "../../domain/ports";
+import { activeSession, participants } from "../../presentation/store-access/voiceCallStoreAccess";
 
 export function createTauriVoiceCallApi(): VoiceCallStatePort {
   return {
@@ -43,17 +44,25 @@ export function createTauriVoiceCallApi(): VoiceCallStatePort {
     },
 
     getActiveSession(): CallSession | null {
-      return null;
+      return activeSession.value;
     },
 
     getParticipants(_sessionId: string) {
-      return [];
+      return participants.value;
     },
 
     async enumerateDevices() {
       const input = await invoke<AudioDeviceInfo[]>("enumerate_input_devices");
       const output = await invoke<AudioDeviceInfo[]>("enumerate_output_devices");
       return { input, output };
+    },
+
+    async joinConference(sessionId: string) {
+      return invoke<CallSession>("join_conference", { sessionId });
+    },
+
+    async leaveConference(sessionId: string) {
+      await invoke<void>("leave_conference", { sessionId });
     },
   };
 }

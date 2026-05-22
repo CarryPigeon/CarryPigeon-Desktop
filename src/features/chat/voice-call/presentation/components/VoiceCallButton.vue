@@ -4,10 +4,10 @@
     class="voice-call-button"
     :class="{ 'is-loading': callState === 'dialing' }"
     :disabled="callState !== 'idle' && callState !== 'ended'"
-    :title="'发起语音通话'"
+    :title="conference ? '发起多人会议' : '发起语音通话'"
     @click="$emit('start')"
   >
-    <span class="voice-call-icon">{{ callState === 'dialing' ? '⏳' : '📞' }}</span>
+    <span class="voice-call-icon">{{ callState === 'dialing' ? '⏳' : conference ? '👥' : '📞' }}</span>
   </button>
 </template>
 
@@ -16,6 +16,7 @@ import type { CallState } from "../../domain/contracts";
 
 defineProps<{
   callState: CallState;
+  conference?: boolean;
 }>();
 
 defineEmits<{

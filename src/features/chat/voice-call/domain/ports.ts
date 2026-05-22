@@ -27,4 +27,8 @@ export type VoiceCallStatePort = {
   getParticipants(sessionId: string): readonly CallParticipant[];
   /** 枚举音频设备 */
   enumerateDevices(): Promise<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>;
+  /** 加入会议 */
+  joinConference(sessionId: string): Promise<CallSession>;
+  /** 离开会议 */
+  leaveConference(sessionId: string): Promise<void>;
 };

@@ -1,0 +1,6 @@
+[env]
+# Override cmake crate's broken VS version detection.
+# Without this, audiopus_sys build script generates
+# "-G Visual Studio 18 2026" which cmake 4.x does not support.
+# VS 2022 = generator "Visual Studio 17 2022".
+CMAKE_GENERATOR = "Visual Studio 17 2022"

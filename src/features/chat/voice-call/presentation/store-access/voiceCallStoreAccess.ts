@@ -7,7 +7,7 @@ export function setVoiceCallState(state: VoiceCallState): void {
   voiceCallState = state;
 }
 
-function resolveState(): VoiceCallState {
+export function resolveState(): VoiceCallState {
   if (!voiceCallState) {
     throw new Error("[voice-call] voiceCallState not initialized");
   }
