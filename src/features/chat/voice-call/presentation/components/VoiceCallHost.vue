@@ -34,6 +34,10 @@ const props = defineProps<{
   roomId: string;
   roomName: string;
   targetUserId?: string;
+  wsUrl?: string;
+  accessToken?: string;
+  userId?: string;
+  displayName?: string;
 }>();
 
 const statePort = import.meta.env.PROD
@@ -48,6 +52,7 @@ const {
   isMuted,
   isNoiseSuppressionOn,
   inputDevices,
+  connectSignaling,
   startDirectCall,
   startConference,
   acceptCall,
@@ -94,6 +99,9 @@ function handleHangup() {
 
 onMounted(() => {
   initDevices();
+  if (props.wsUrl && props.accessToken && props.userId && props.displayName) {
+    connectSignaling(props.wsUrl, props.accessToken, props.userId, props.displayName);
+  }
 });
 
 function startCall(targetUserId?: string) {

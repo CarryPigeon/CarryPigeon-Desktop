@@ -5,6 +5,15 @@ import { activeSession, participants } from "../../presentation/store-access/voi
 
 export function createTauriVoiceCallApi(): VoiceCallStatePort {
   return {
+    async connectSignaling(wsUrl: string, accessToken: string, userId: string, displayName: string) {
+      await invoke<void>("connect_signaling", {
+        wsUrl,
+        accessToken,
+        userId,
+        displayName,
+      });
+    },
+
     async startCall(kind: CallKind, roomId: string, targetUserId?: string) {
       if (kind === "direct" && targetUserId) {
         const sessionId = `call-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -57,8 +66,8 @@ export function createTauriVoiceCallApi(): VoiceCallStatePort {
       return { input, output };
     },
 
-    async joinConference(sessionId: string) {
-      return invoke<CallSession>("join_conference", { sessionId });
+    async joinConference(sessionId: string, initiatorId?: string) {
+      return invoke<CallSession>("join_conference", { sessionId, initiatorId: initiatorId ?? null });
     },
 
     async leaveConference(sessionId: string) {

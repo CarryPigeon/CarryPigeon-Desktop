@@ -1,6 +1,8 @@
 use anyhow::Context;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -11,6 +13,7 @@ pub struct PeerConnectionHandle {
     pub connection: Arc<webrtc::peer_connection::RTCPeerConnection>,
     pub local_track: Arc<webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP>,
     pub ice_state_tx: tokio::sync::watch::Sender<String>,
+    pub seq: AtomicU64,
 }
 
 pub struct WebRtcPeerManager {
@@ -26,6 +29,13 @@ impl WebRtcPeerManager {
             stun_server: "stun:stun.l.google.com:19302".to_string(),
             turn_server: None,
         }
+    }
+
+    fn rtp_timestamp() -> u32 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u32
     }
 
     fn build_api() -> anyhow::Result<webrtc::api::API> {
@@ -154,6 +164,7 @@ impl WebRtcPeerManager {
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
+            seq: AtomicU64::new(0),
         };
 
         self.connections
@@ -247,6 +258,7 @@ impl WebRtcPeerManager {
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
+            seq: AtomicU64::new(0),
         };
 
         self.connections
@@ -348,6 +360,7 @@ impl WebRtcPeerManager {
 
         use webrtc::rtp::packet::Packet;
 
+        let seq = handle.seq.fetch_add(1, Ordering::Relaxed);
         let pkt = Packet {
             header: webrtc::rtp::header::Header {
                 version: 2,
@@ -355,8 +368,8 @@ impl WebRtcPeerManager {
                 extension: false,
                 marker: false,
                 payload_type: 111,
-                sequence_number: 0,
-                timestamp: 0,
+                sequence_number: seq as u16,
+                timestamp: Self::rtp_timestamp(),
                 ssrc: 0,
                 csrc: vec![],
                 extension_profile: 0,
@@ -476,6 +489,7 @@ impl WebRtcPeerManager {
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
+            seq: AtomicU64::new(0),
         };
 
         self.connections.lock().await.insert(key, handle);
@@ -562,6 +576,7 @@ impl WebRtcPeerManager {
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
+            seq: AtomicU64::new(0),
         };
 
         self.connections.lock().await.insert(key, handle);
@@ -658,6 +673,7 @@ impl WebRtcPeerManager {
         let conns = self.connections.lock().await;
         let handle = conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?;
 
+        let seq = handle.seq.fetch_add(1, Ordering::Relaxed);
         let pkt = webrtc::rtp::packet::Packet {
             header: webrtc::rtp::header::Header {
                 version: 2,
@@ -665,8 +681,8 @@ impl WebRtcPeerManager {
                 extension: false,
                 marker: false,
                 payload_type: 111,
-                sequence_number: 0,
-                timestamp: 0,
+                sequence_number: seq as u16,
+                timestamp: Self::rtp_timestamp(),
                 ssrc: 0,
                 csrc: vec![],
                 extension_profile: 0,

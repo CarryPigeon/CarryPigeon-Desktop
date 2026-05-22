@@ -7,6 +7,8 @@
 import type { CallSession, CallKind, MediaSettings, AudioDeviceInfo, CallParticipant } from "./contracts";
 
 export type VoiceCallStatePort = {
+  /** 建立信令 WebSocket 连接 */
+  connectSignaling(wsUrl: string, accessToken: string, userId: string, displayName: string): Promise<void>;
   /** 发起通话 */
   startCall(kind: CallKind, roomId: string, targetUserId?: string): Promise<CallSession>;
   /** 接受来电 */
@@ -28,7 +30,7 @@ export type VoiceCallStatePort = {
   /** 枚举音频设备 */
   enumerateDevices(): Promise<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>;
   /** 加入会议 */
-  joinConference(sessionId: string): Promise<CallSession>;
+  joinConference(sessionId: string, initiatorId?: string): Promise<CallSession>;
   /** 离开会议 */
   leaveConference(sessionId: string): Promise<void>;
 };
