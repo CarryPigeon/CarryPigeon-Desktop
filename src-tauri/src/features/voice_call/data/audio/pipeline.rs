@@ -58,9 +58,9 @@ impl AudioPipeline {
             host.input_devices()
                 .context("VOICE_CALL_AUDIO_CAPTURE_FAILED")?
                 .find(|d| {
-                    d.description()
+                    d.id()
                         .ok()
-                        .map(|desc| desc.to_string() == id)
+                        .map(|did| did.to_string() == id)
                         .unwrap_or(false)
                 })
         } else {
@@ -112,11 +112,21 @@ impl AudioPipeline {
         Ok(())
     }
 
-    pub async fn start_playback(&self, _device_id: Option<&str>) -> anyhow::Result<()> {
+    pub async fn start_playback(&self, device_id: Option<&str>) -> anyhow::Result<()> {
         let host = cpal::default_host();
-        let device = host
-            .default_output_device()
-            .context("VOICE_CALL_AUDIO_PLAYBACK_FAILED: no output device")?;
+        let device = if let Some(id) = device_id {
+            host.output_devices()
+                .context("VOICE_CALL_AUDIO_PLAYBACK_FAILED")?
+                .find(|d| {
+                    d.id()
+                        .ok()
+                        .map(|did| did.to_string() == id)
+                        .unwrap_or(false)
+                })
+        } else {
+            host.default_output_device()
+        }
+        .context("VOICE_CALL_AUDIO_PLAYBACK_FAILED: no output device")?;
 
         let config = device
             .default_output_config()

@@ -72,7 +72,7 @@ pub fn run() -> anyhow::Result<()> {
             tauri::async_runtime::spawn(async move {
                 let state = handle.state::<TempFileManager>();
                 if let Err(e) = state.cleanup(None, 24).await {
-                    tracing::warn!(action = "temp_file_startup_cleanup_failed", error = %e);
+                    tracing::warn!(action = "app_temp_file_startup_cleanup_failed", error = %e);
                 }
             });
 

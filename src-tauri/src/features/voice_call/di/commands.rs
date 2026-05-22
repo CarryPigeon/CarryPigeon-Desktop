@@ -101,6 +101,62 @@ fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
+const CALL_TIMEOUT_SECS: u64 = 60;
+
+async fn spawn_call_timeout(inner: Arc<VoiceCallInner>, app_handle: tauri::AppHandle, session_id: String) {
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(CALL_TIMEOUT_SECS)).await;
+
+        let should_cancel = {
+            if let Ok(sessions) = inner.sessions.lock() {
+                sessions
+                    .get(&session_id)
+                    .map(|s| s.state == CallState::Dialing || s.state == CallState::Ringing)
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        };
+
+        if should_cancel {
+            tracing::warn!(action = "app_voice_call_timeout", session_id = %session_id);
+
+            // Send reject/hangup via signaling
+            {
+                let sig_guard = inner.signaling.lock().await;
+                if let Some(ref client) = *sig_guard {
+                    let _ = client
+                        .send(&SignalingMessage::CallHangup {
+                            session_id: session_id.clone(),
+                        })
+                        .await;
+                }
+            }
+
+            // End session
+            {
+                if let Ok(mut sessions) = inner.sessions.lock() {
+                    if let Some(s) = sessions.get_mut(&session_id) {
+                        s.state = CallState::Ended;
+                        s.ended_at = Some(now_secs());
+                    }
+                }
+            }
+
+            inner.cleanup_session(&session_id).await;
+
+            let _ = app_handle.emit(
+                "voice_call:state_change",
+                CallStateChangeEvent {
+                    session_id,
+                    new_state: CallState::Ended,
+                    reason: Some("timeout".to_string()),
+                },
+            );
+        }
+    });
+}
+
 fn empty_media_settings() -> MediaSettings {
     MediaSettings {
         input_device_id: None,
@@ -120,11 +176,13 @@ pub async fn start_direct_call(
 ) -> CommandResult<CallSession> {
     let inner = service.inner.clone();
 
+    let local_uid = inner.local_user_id.lock().await.clone().unwrap_or_default();
+
     let session = CallSession {
         session_id: session_id.clone(),
         call_kind: CallKind::Direct,
         state: CallState::Dialing,
-        initiator: target_user_id.clone(),
+        initiator: local_uid.clone(),
         participants: vec![Participant {
             user_id: target_user_id.clone(),
             display_name: String::new(),
@@ -178,6 +236,9 @@ pub async fn start_direct_call(
     tokio::spawn(async move {
         monitor_ice_state(inner_clone, &session_id_clone, app_handle_clone).await;
     });
+
+    // Spawn call timeout for dialing state
+    spawn_call_timeout(inner.clone(), app_handle.clone(), session_id.clone()).await;
 
     Ok(session)
 }
@@ -274,6 +335,7 @@ pub async fn join_conference(
     service: State<'_, VoiceCallService>,
     app_handle: tauri::AppHandle,
     session_id: String,
+    initiator_id: Option<String>,
 ) -> CommandResult<CallSession> {
     let inner = service.inner.clone();
 
@@ -304,7 +366,7 @@ pub async fn join_conference(
         session_id: session_id.clone(),
         call_kind: CallKind::Conference,
         state: CallState::Connecting,
-        initiator: String::new(),
+        initiator: initiator_id.clone().unwrap_or_default(),
         participants: vec![Participant {
             user_id: user_id.clone(),
             display_name: display_name.clone(),
@@ -465,6 +527,21 @@ pub async fn accept_call(
             .await
             .map_err(|e| format!("[VOICE_CALL_FAILED] {e}"))?
     };
+
+    // Process ICE candidates that arrived with the CallInvite
+    {
+        let offers = inner.session_offers.lock().await;
+        if let Some(candidates_json) = offers.get(&format!("{}:candidates", session_id)) {
+            if let Ok(candidates) = serde_json::from_str::<Vec<String>>(candidates_json) {
+                let webrtc_guard = inner.webrtc.lock().await;
+                if let Some(ref wm) = *webrtc_guard {
+                    for c in &candidates {
+                        let _ = wm.add_remote_candidate(&session_id, c).await;
+                    }
+                }
+            }
+        }
+    }
 
     // Send CallAccept via signaling
     {
@@ -671,6 +748,14 @@ pub async fn toggle_mute(
     service: State<'_, VoiceCallService>,
     session_id: String,
 ) -> CommandResult<bool> {
+    let local_uid = service
+        .inner
+        .local_user_id
+        .lock()
+        .await
+        .clone()
+        .unwrap_or_default();
+
     let muted = {
         let mut sessions = service
             .inner
@@ -682,8 +767,9 @@ pub async fn toggle_mute(
             .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
         let participant = session
             .participants
-            .first_mut()
-            .ok_or_else(|| "[VOICE_CALL_FAILED] No participants in session".to_string())?;
+            .iter_mut()
+            .find(|p| p.user_id == local_uid)
+            .ok_or_else(|| format!("[VOICE_CALL_FAILED] Local user not found in participants: {}", local_uid))?;
         participant.is_muted = !participant.is_muted;
         participant.is_muted
     };
@@ -838,19 +924,35 @@ pub async fn connect_signaling(
 /// Main signaling message dispatch loop. Receives all messages from the
 /// signaling WebSocket and dispatches them to the appropriate handler.
 async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri::AppHandle) {
+    let mut disconnect_count: u32 = 0;
+    const MAX_DISCONNECT_COUNT: u32 = 5;
+
     loop {
         let msg = {
             let sig_guard = inner.signaling.lock().await;
             match sig_guard.as_ref() {
                 Some(client) => match client.recv().await {
-                    Ok(Some(m)) => m,
+                    Ok(Some(m)) => {
+                        disconnect_count = 0;
+                        m
+                    }
                     Ok(None) => {
                         drop(sig_guard);
+                        disconnect_count += 1;
+                        if disconnect_count >= MAX_DISCONNECT_COUNT {
+                            tracing::warn!(action = "app_voice_call_signaling_dead");
+                            break;
+                        }
                         tokio::time::sleep(Duration::from_millis(50)).await;
                         continue;
                     }
                     Err(_) => {
                         drop(sig_guard);
+                        disconnect_count += 1;
+                        if disconnect_count >= MAX_DISCONNECT_COUNT {
+                            tracing::warn!(action = "app_voice_call_signaling_dead");
+                            break;
+                        }
                         tokio::time::sleep(Duration::from_millis(100)).await;
                         continue;
                     }
@@ -864,14 +966,18 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 session_id,
                 target_uid,
                 sdp_offer,
-                ice_candidates: _,
+                ice_candidates,
             } => {
-                // Store SDP offer for when user accepts
-                inner
-                    .session_offers
-                    .lock()
-                    .await
-                    .insert(session_id.clone(), sdp_offer);
+                // Store SDP offer + ICE candidates for when user accepts
+                {
+                    let mut offers = inner.session_offers.lock().await;
+                    offers.insert(session_id.clone(), sdp_offer);
+                    // Store candidates in a parallel entry keyed by session_id:candidates
+                    offers.insert(
+                        format!("{}:candidates", session_id),
+                        serde_json::to_string(&ice_candidates).unwrap_or_default(),
+                    );
+                }
 
                 // Create session in ringing state
                 let session = CallSession {
@@ -900,7 +1006,7 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 let _ = app_handle.emit(
                     "voice_call:incoming",
                     IncomingCallEvent {
-                        session_id,
+                        session_id: session_id.clone(),
                         call_kind: CallKind::Direct,
                         from_user_id: target_uid,
                         from_display_name: String::new(),
@@ -908,6 +1014,9 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                         timestamp: now_secs(),
                     },
                 );
+
+                // Spawn timeout for ringing state
+                spawn_call_timeout(inner.clone(), app_handle.clone(), session_id.clone()).await;
             }
 
             SignalingMessage::CallAccept {
@@ -1251,7 +1360,7 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 session_id,
                 target_user_id,
                 sdp_offer,
-                ice_candidates: _,
+                ice_candidates,
             } => {
                 let answer = {
                     let webrtc_guard = inner.webrtc.lock().await;
@@ -1263,6 +1372,16 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                         None
                     }
                 };
+
+                // Add ICE candidates from the offer after peer connection is created
+                if answer.is_some() {
+                    let webrtc_guard = inner.webrtc.lock().await;
+                    if let Some(ref wm) = *webrtc_guard {
+                        for c in &ice_candidates {
+                            let _ = wm.add_remote_candidate_for(&session_id, &target_user_id, c).await;
+                        }
+                    }
+                }
 
                 if let Some(answer) = answer {
                     if let Some(ref client) = *inner.signaling.lock().await {
@@ -1283,6 +1402,69 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             SignalingMessage::ConferenceJoinAck { .. } => {}
         }
     }
+
+    // ── Cleanup on disconnect ─────────────────────────────────────
+    tracing::warn!(action = "app_voice_call_signaling_cleanup_start");
+
+    // Mark signaling as disconnected
+    {
+        let mut sig = inner.signaling.lock().await;
+        if let Some(ref client) = *sig {
+            client.disconnect().await;
+        }
+        *sig = None;
+    }
+
+    // Close all WebRTC connections
+    {
+        let mut webrtc = inner.webrtc.lock().await;
+        if let Some(ref wm) = *webrtc {
+            let sessions: Vec<String> = {
+                if let Ok(s) = inner.sessions.lock() {
+                    s.keys().cloned().collect()
+                } else {
+                    Vec::new()
+                }
+            };
+            for sid in &sessions {
+                wm.close_all_for_session(sid).await;
+            }
+        }
+        *webrtc = None;
+    }
+
+    // End all sessions and notify frontend
+    {
+        let mut sessions = match inner.sessions.lock() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        for (sid, session) in sessions.iter_mut() {
+            session.state = CallState::Ended;
+            session.ended_at = Some(now_secs());
+            let _ = app_handle.emit(
+                "voice_call:state_change",
+                CallStateChangeEvent {
+                    session_id: sid.clone(),
+                    new_state: CallState::Ended,
+                    reason: Some("signaling_disconnected".to_string()),
+                },
+            );
+        }
+        sessions.clear();
+    }
+
+    // Stop audio pipeline
+    {
+        let pipeline_guard = inner.audio_pipeline.lock().await;
+        if let Some(ref p) = *pipeline_guard {
+            p.disable_conference_mode();
+            let _ = p.stop_capture().await;
+            let _ = p.stop_playback().await;
+        }
+    }
+
+    tracing::warn!(action = "app_voice_call_signaling_cleanup_complete");
 }
 
 /// Periodically sends encoded Opus packets from the audio pipeline

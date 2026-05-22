@@ -1,8 +1,9 @@
-import { ref, watch, readonly, computed } from "vue";
+import { ref, watch, readonly, computed, onUnmounted } from "vue";
 import type { CallState, CallSession, AudioDeviceInfo, CallParticipant, CallSummary } from "../../domain/contracts";
 
 export interface UseVoiceCallOptions {
   statePort: {
+    connectSignaling: (wsUrl: string, accessToken: string, userId: string, displayName: string) => Promise<void>;
     startCall: (kind: "direct" | "conference", roomId: string, targetUserId?: string) => Promise<CallSession>;
     acceptCall: (sessionId: string) => Promise<void>;
     rejectCall: (sessionId: string, reason?: string) => Promise<void>;
@@ -13,7 +14,7 @@ export interface UseVoiceCallOptions {
     getActiveSession: () => CallSession | null;
     getParticipants: (sessionId: string) => readonly CallParticipant[];
     enumerateDevices: () => Promise<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>;
-    joinConference?: (sessionId: string) => Promise<CallSession>;
+    joinConference?: (sessionId: string, initiatorId?: string) => Promise<CallSession>;
     leaveConference?: (sessionId: string) => Promise<void>;
   };
   roomId: () => string;
@@ -134,15 +135,19 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     await statePort.updateMediaSettings(session.sessionId, { outputDeviceId: deviceId });
   }
 
+  async function connectSignaling(wsUrl: string, accessToken: string, userId: string, displayName: string): Promise<void> {
+    await statePort.connectSignaling(wsUrl, accessToken, userId, displayName);
+  }
+
   async function initDevices(): Promise<void> {
     const devices = await statePort.enumerateDevices();
     inputDevices.value = devices.input;
     outputDevices.value = devices.output;
   }
 
-  async function joinConference(sessionId: string): Promise<CallSession | undefined> {
+  async function joinConference(sessionId: string, initiatorId?: string): Promise<CallSession | undefined> {
     if (!statePort.joinConference) return;
-    const session = await statePort.joinConference(sessionId);
+    const session = await statePort.joinConference(sessionId, initiatorId);
     callState.value = "connecting";
     activeSession.value = session;
     startPoll();
@@ -182,6 +187,11 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     }
   });
 
+  onUnmounted(() => {
+    stopTimer();
+    stopPoll();
+  });
+
   return {
     callState: readonly(callState),
     activeSession: readonly(activeSession),
@@ -193,6 +203,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     outputDevices: readonly(outputDevices),
     activeSummary: readonly(activeSummary),
 
+    connectSignaling,
     startDirectCall,
     startConference,
     acceptCall,

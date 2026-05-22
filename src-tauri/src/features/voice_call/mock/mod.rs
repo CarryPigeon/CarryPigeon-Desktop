@@ -42,7 +42,7 @@ impl VoiceCallStatePort for MockVoiceCallService {
             session_id: session_id.to_string(),
             call_kind: CallKind::Direct,
             state: CallState::Dialing,
-            initiator: target_user_id.to_string(),
+            initiator: "local-user".to_string(),
             participants: vec![Participant {
                 user_id: target_user_id.to_string(),
                 display_name: "Mock User".to_string(),
