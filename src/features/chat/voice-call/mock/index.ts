@@ -16,6 +16,10 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
   ];
 
   return {
+    async connectSignaling(_wsUrl: string, _accessToken: string, _userId: string, _displayName: string) {
+      // no-op in mock
+    },
+
     async startCall(kind: CallKind, roomId: string, _targetUserId?: string) {
       const session: CallSession = {
         sessionId: `mock-call-${Date.now()}`,
@@ -77,12 +81,12 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
       return { input: mockDevices, output: mockDevices };
     },
 
-    async joinConference(sessionId: string) {
+    async joinConference(sessionId: string, initiatorId?: string) {
       const session: CallSession = {
         sessionId,
         kind: "conference",
         state: "connecting",
-        initiator: "host-user",
+        initiator: initiatorId || "host-user",
         participants: [
           { userId: "host-user", displayName: "主持人", isMuted: false, isSpeaking: true, audioLevel: 0.7, joinedAt: Date.now() },
           { userId: "current-user", displayName: "我", isMuted: false, isSpeaking: false, audioLevel: 0, joinedAt: Date.now() },
