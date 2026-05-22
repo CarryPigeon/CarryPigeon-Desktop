@@ -103,7 +103,11 @@ fn now_secs() -> u64 {
 
 const CALL_TIMEOUT_SECS: u64 = 60;
 
-async fn spawn_call_timeout(inner: Arc<VoiceCallInner>, app_handle: tauri::AppHandle, session_id: String) {
+async fn spawn_call_timeout(
+    inner: Arc<VoiceCallInner>,
+    app_handle: tauri::AppHandle,
+    session_id: String,
+) {
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(CALL_TIMEOUT_SECS)).await;
 
@@ -769,7 +773,12 @@ pub async fn toggle_mute(
             .participants
             .iter_mut()
             .find(|p| p.user_id == local_uid)
-            .ok_or_else(|| format!("[VOICE_CALL_FAILED] Local user not found in participants: {}", local_uid))?;
+            .ok_or_else(|| {
+                format!(
+                    "[VOICE_CALL_FAILED] Local user not found in participants: {}",
+                    local_uid
+                )
+            })?;
         participant.is_muted = !participant.is_muted;
         participant.is_muted
     };
@@ -1378,7 +1387,9 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                     let webrtc_guard = inner.webrtc.lock().await;
                     if let Some(ref wm) = *webrtc_guard {
                         for c in &ice_candidates {
-                            let _ = wm.add_remote_candidate_for(&session_id, &target_user_id, c).await;
+                            let _ = wm
+                                .add_remote_candidate_for(&session_id, &target_user_id, c)
+                                .await;
                         }
                     }
                 }
