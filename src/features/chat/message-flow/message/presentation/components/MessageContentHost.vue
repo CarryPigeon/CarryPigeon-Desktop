@@ -16,6 +16,7 @@ import {
 } from "@/features/chat/message-flow/message/domain/messageRendererResolver";
 import type { RenderableChatMessage } from "@/features/chat/message-flow/message/domain/messageModels";
 import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
+import ReactionBar from "./ReactionBar.vue";
 
 const props = defineProps<{
   /**
@@ -37,6 +38,10 @@ const emit = defineEmits<{
    * 未知 domain 场景下触发安装提示。
    */
   (event: "install", pluginId: string | undefined): void;
+  /**
+   * 消息回应切换。
+   */
+  (event: "react", messageId: string, emoji: string): void;
 }>();
 
 const registry = computed<MessageRendererRegistry>(() => props.domainRegistryStore as MessageRendererRegistry);
@@ -85,5 +90,10 @@ function handleInstall(): void {
     :plugin-id-hint="renderModel.pluginIdHint || ''"
     :preview="renderModel.preview"
     @install="handleInstall"
+  />
+  <ReactionBar
+    :message-id="props.message.id"
+    :reactions="props.message.reactions ?? []"
+    :on-react="(messageId, emoji) => emit('react', messageId, emoji)"
   />
 </template>

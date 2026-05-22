@@ -1,14 +1,18 @@
 <template>
-  <VoiceCallButton
-    :call-state="callState"
-    :disabled="isBusy"
-    :title="buttonTitle"
-    @start="handleStartCall"
-  />
+  <div class="voice-call-trigger">
+    <VoiceCallButton
+      :call-state="callState"
+      @start="handleDirectCall"
+    />
+    <VoiceCallButton
+      :call-state="callState"
+      conference
+      @start="handleConferenceCall"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import type { CallState } from "../../domain/contracts";
 import VoiceCallButton from "./VoiceCallButton.vue";
 
@@ -16,22 +20,27 @@ const props = defineProps<{
   roomId: string;
   roomName: string;
   callState: CallState;
+  targetUserId?: string;
 }>();
 
 const emit = defineEmits<{
-  start: [];
+  startDirect: [targetUserId: string];
+  startConference: [];
 }>();
 
-const isBusy = computed(() =>
-  props.callState === "dialing" || props.callState === "ringing" || props.callState === "connecting"
-);
+function handleDirectCall() {
+  emit("startDirect", props.targetUserId ?? "");
+}
 
-const buttonTitle = computed(() => {
-  if (props.callState === "active") return "通话中";
-  return "发起语音通话";
-});
-
-function handleStartCall() {
-  emit("start");
+function handleConferenceCall() {
+  emit("startConference");
 }
 </script>
+
+<style scoped lang="scss">
+.voice-call-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+</style>

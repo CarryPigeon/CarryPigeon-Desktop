@@ -5,6 +5,7 @@
 
 import type { ChatMessageRecord } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
+import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 import type {
   ChannelUnreadProjectionPort,
   MessageFlowScopePort,
@@ -21,7 +22,7 @@ export type MessageEventRouterDeps = {
    * - 收到创建/删除事件后，如何更新本地时间线与未读数
    */
   scope: Pick<MessageFlowScopePort, "getActiveServerSocket">;
-  timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage">;
+  timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions">;
   unreadProjection: ChannelUnreadProjectionPort;
   mapWireMessage: (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
   compareMessages: (a: ChatMessage, b: ChatMessage) => number;
@@ -58,6 +59,16 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
       if (!cid || !mid) return true;
 
       deps.timelineState.removeMessage(cid, mid);
+      return true;
+    }
+
+    if (eventType === "message.reactions_updated") {
+      const cid = String(payload?.channelId ?? "").trim();
+      const mid = String(payload?.messageId ?? "").trim();
+      const reactions = (payload?.reactions ?? []) as MessageReactionSummary[];
+      if (!cid || !mid) return true;
+
+      deps.timelineState.updateMessageReactions(cid, mid, reactions);
       return true;
     }
 

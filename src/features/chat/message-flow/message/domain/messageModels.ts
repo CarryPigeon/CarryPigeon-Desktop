@@ -20,6 +20,13 @@ export type MessageDomainRef = {
   version?: string;
 };
 
+/** 消息回应 UI 摘要模型。 */
+export type MessageReactionSummary = {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+};
+
 /**
  * 消息渲染链路使用的最小消息模型。
  */
@@ -32,6 +39,7 @@ export type RenderableChatMessage =
       domain: MessageDomainRef;
       text: string;
       replyToId?: string;
+      reactions?: MessageReactionSummary[];
     }
   | {
       id: string;
@@ -42,6 +50,7 @@ export type RenderableChatMessage =
       preview: string;
       data?: unknown;
       replyToId?: string;
+      reactions?: MessageReactionSummary[];
     };
 
 /**

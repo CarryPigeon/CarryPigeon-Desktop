@@ -5,7 +5,9 @@
  */
 
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
-import type { MessageDomainRef, RenderableChatMessage } from "../message/domain/messageModels";
+import type { MessageDomainRef, MessageReactionSummary, RenderableChatMessage } from "../message/domain/messageModels";
+
+export type { MessageReactionSummary };
 
 /**
  * message-flow 对外暴露的消息域标识模型。
@@ -47,7 +49,8 @@ export type ChatMessageActionErrorCode =
   | "missing_message_id"
   | "stale_runtime_scope"
   | "send_failed"
-  | "delete_failed";
+  | "delete_failed"
+  | "reaction_failed";
 
 /**
  * message-flow 命令失败时的稳定错误代数。
@@ -70,3 +73,17 @@ export type SendChatMessageOutcome =
 export type DeleteChatMessageOutcome =
   | SuccessOutcome<"chat_message_deleted", { messageId: string }>
   | FailureOutcome<"chat_message_delete_rejected", ChatMessageActionErrorCode>;
+
+/**
+ * 添加回应显式结果。
+ */
+export type ReactToMessageOutcome =
+  | SuccessOutcome<"message_reacted", { messageId: string; emoji: string; reactions: MessageReactionSummary[] }>
+  | FailureOutcome<"message_reaction_rejected", ChatMessageActionErrorCode>;
+
+/**
+ * 移除回应显式结果。
+ */
+export type RemoveReactionOutcome =
+  | SuccessOutcome<"message_reaction_removed", { messageId: string; emoji: string; reactions: MessageReactionSummary[] }>
+  | FailureOutcome<"message_reaction_removal_rejected", ChatMessageActionErrorCode>;

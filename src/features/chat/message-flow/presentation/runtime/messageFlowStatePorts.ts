@@ -11,6 +11,7 @@ import type {
   MessageTimelineStatePort,
 } from "@/features/chat/message-flow/domain/ports";
 import type { ChatMessage, ChatMessageActionErrorInfo } from "@/features/chat/message-flow/api-types";
+import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 
 /**
  * 创建消息时间线状态端口所需的底层状态容器。
@@ -67,6 +68,13 @@ export function createMessageTimelineStatePort(
       const list = deps.messagesByChannel[channelId] ?? [];
       const index = list.findIndex((entry) => entry.id === messageId);
       if (index >= 0) list.splice(index, 1);
+    },
+    updateMessageReactions(channelId: string, messageId: string, reactions: MessageReactionSummary[]): void {
+      const list = deps.messagesByChannel[channelId] ?? [];
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx >= 0) {
+        list.splice(idx, 1, { ...list[idx], reactions });
+      }
     },
     readNextCursor(channelId: string): string {
       return String(deps.nextCursorByChannel[channelId] ?? "").trim();

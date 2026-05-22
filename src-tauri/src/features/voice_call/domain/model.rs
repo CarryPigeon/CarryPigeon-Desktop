@@ -13,7 +13,7 @@ pub struct CallSession {
     pub media_settings: MediaSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum CallKind {
     Direct,
@@ -61,4 +61,95 @@ pub struct StreamConfig {
     pub sample_rate: u32,
     pub channels: u16,
     pub buffer_size: usize,
+}
+
+/// SDP + candidates bundle from offer/answer creation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OfferData {
+    pub sdp: String,
+    pub candidates: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnswerData {
+    pub sdp: String,
+    pub candidates: Vec<String>,
+}
+
+/// ICE candidate received from remote peer via signaling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteIceCandidate {
+    pub candidate: String,
+    pub sdp_mid: Option<String>,
+    pub sdp_mline_index: Option<u16>,
+}
+
+/// Signaling message envelope for SDP/ICE relay
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SignalingMessage {
+    CallInvite {
+        session_id: String,
+        target_uid: String,
+        sdp_offer: String,
+        ice_candidates: Vec<String>,
+    },
+    CallAccept {
+        session_id: String,
+        sdp_answer: String,
+        ice_candidates: Vec<String>,
+    },
+    CallReject {
+        session_id: String,
+        reason: Option<String>,
+    },
+    CallHangup {
+        session_id: String,
+    },
+    IceCandidate {
+        session_id: String,
+        candidate: String,
+        sdp_mid: Option<String>,
+        sdp_mline_index: Option<u16>,
+    },
+    // ── Conference (SFU‑ready) ──────────────────────────────
+    ConferenceJoin {
+        session_id: String,
+        user_id: String,
+        display_name: String,
+    },
+    ConferenceJoinAck {
+        session_id: String,
+        user_id: String,
+        participants: Vec<Participant>,
+    },
+    ConferenceSdpOffer {
+        session_id: String,
+        target_user_id: String,
+        sdp_offer: String,
+        ice_candidates: Vec<String>,
+    },
+    ConferenceSdpAnswer {
+        session_id: String,
+        target_user_id: String,
+        sdp_answer: String,
+        ice_candidates: Vec<String>,
+    },
+    ConferenceLeave {
+        session_id: String,
+        user_id: String,
+    },
+}
+
+/// ICE connection state for UI feedback
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum IceConnectionState {
+    New,
+    Checking,
+    Connected,
+    Completed,
+    Failed,
+    Disconnected,
+    Closed,
 }

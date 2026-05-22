@@ -18,6 +18,10 @@ import { createChatMessageFlowRuntime } from "@/features/chat/message-flow/prese
 import { createChatGovernanceRuntime } from "@/features/chat/room-governance/presentation/runtime/governanceRuntime";
 import { createChatSessionRuntime } from "@/features/chat/room-session/presentation/runtime/sessionRuntime";
 import { createChatSessionSharedContext } from "@/features/chat/room-session/presentation/runtime/sessionSharedContext";
+import { createVoiceCallState, setVoiceCallState } from "@/features/chat/voice-call/internal";
+import { getVoiceCallCapabilities } from "@/features/chat/voice-call/api";
+import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
+import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -51,6 +55,10 @@ export type ChatStoreAssemblyDeps = {
  * - `chatRuntimeStore.ts` 只消费最终装配结果，不再关心中间细节。
  */
 export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
+  // Initialize voice call store singleton before any component tries to access it
+  const voiceCallState = createVoiceCallState();
+  setVoiceCallState(voiceCallState);
+
   /**
    * 第一步：创建 chat 聚合响应式状态。
    *
@@ -87,6 +95,17 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     lastReadMidByChannel,
     lastReadReportAtMsByChannel,
   });
+
+  // Defer signaling connection until server socket is available
+  setTimeout(async () => {
+    const socket = getActiveChatServerSocket();
+    if (!socket) return;
+    const token = (await ensureValidAccessToken(socket)).trim();
+    if (!token) return;
+    const voiceCall = getVoiceCallCapabilities();
+    const wsUrl = `wss://${socket}/signaling`;
+    await voiceCall.connectSignaling(wsUrl, token);
+  }, 2000);
 
   /**
    * 第三步：装配 governance runtime。

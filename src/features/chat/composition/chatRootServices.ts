@@ -24,6 +24,7 @@ import type {
   ChatChannelRecord,
   ChatMessagePage,
   ChatMessageRecord,
+  ChatReactionRecord,
   ChatReadStateInput,
   ChatSendMessageInput,
   ChatUnreadState,
@@ -45,6 +46,8 @@ export type ChatCoreApplicationServiceDeps = {
     | "listChannelMessages"
     | "sendChannelMessage"
     | "deleteMessage"
+    | "reactToMessage"
+    | "removeReaction"
     | "updateReadState"
     | "applyJoinChannel"
     | "patchChannel"
@@ -112,6 +115,32 @@ export class ChatCoreApplicationService {
    */
   deleteMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void> {
     return this.deps.api.deleteMessage(serverSocket, accessToken, messageId);
+  }
+
+  /**
+   * 添加消息回应。
+   */
+  reactToMessage(
+    serverSocket: string,
+    accessToken: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<ChatReactionRecord[]> {
+    return this.deps.api.reactToMessage(serverSocket, accessToken, channelId, messageId, emoji);
+  }
+
+  /**
+   * 移除消息回应。
+   */
+  removeReaction(
+    serverSocket: string,
+    accessToken: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<ChatReactionRecord[]> {
+    return this.deps.api.removeReaction(serverSocket, accessToken, channelId, messageId, emoji);
   }
 
   /**

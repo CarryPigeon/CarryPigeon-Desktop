@@ -3,7 +3,7 @@
  * @description chat｜数据层 wire contract：WS event envelope models。
  */
 
-import type { ChatMessageWire } from "./chatWireModels";
+import type { ChatMessageWire, ChatMessageReactionWire } from "./chatWireModels";
 
 /**
  * 服务端推送事件的原始 wire envelope。
@@ -47,4 +47,13 @@ export type ChatReadStateUpdatedEventPayloadWire = {
 export type ChatChannelChangedEventPayloadWire = {
   cid: string;
   scope?: string;
+};
+
+/**
+ * `message.reactions_updated` 事件 payload 的 wire 结构。
+ */
+export type ChatMessageReactionsUpdatedEventPayloadWire = {
+  cid: string;
+  mid: string;
+  reactions: ChatMessageReactionWire[];
 };

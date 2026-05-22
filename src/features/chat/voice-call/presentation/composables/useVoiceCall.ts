@@ -1,4 +1,4 @@
-import { ref, watch, readonly } from "vue";
+import { ref, watch, readonly, computed } from "vue";
 import type { CallState, CallSession, AudioDeviceInfo, CallParticipant, CallSummary } from "../../domain/contracts";
 
 export interface UseVoiceCallOptions {
@@ -13,6 +13,8 @@ export interface UseVoiceCallOptions {
     getActiveSession: () => CallSession | null;
     getParticipants: (sessionId: string) => readonly CallParticipant[];
     enumerateDevices: () => Promise<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>;
+    joinConference?: (sessionId: string) => Promise<CallSession>;
+    leaveConference?: (sessionId: string) => Promise<void>;
   };
   roomId: () => string;
 }
@@ -138,6 +140,38 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     outputDevices.value = devices.output;
   }
 
+  async function joinConference(sessionId: string): Promise<CallSession | undefined> {
+    if (!statePort.joinConference) return;
+    const session = await statePort.joinConference(sessionId);
+    callState.value = "connecting";
+    activeSession.value = session;
+    startPoll();
+    return session;
+  }
+
+  async function leaveConference(): Promise<void> {
+    const session = activeSession.value;
+    if (!session || !statePort.leaveConference) return;
+    callState.value = "ended";
+    await statePort.leaveConference(session.sessionId);
+    stopPoll();
+    stopTimer();
+    activeSummary.value = {
+      sessionId: session.sessionId,
+      kind: session.kind,
+      duration: duration.value,
+      disconnectReason: "left",
+    };
+    setTimeout(() => {
+      callState.value = "idle";
+      activeSession.value = null;
+    }, 500);
+  }
+
+  const isConferenceHost = computed(() =>
+    activeSession.value?.kind === "conference" && activeSession.value?.initiator !== ""
+  );
+
   watch(callState, (newVal) => {
     if (newVal === "active") {
       duration.value = 0;
@@ -169,5 +203,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     selectInputDevice,
     selectOutputDevice,
     initDevices,
+    joinConference,
+    leaveConference,
+    isConferenceHost,
   };
 }

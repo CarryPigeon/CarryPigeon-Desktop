@@ -13,10 +13,11 @@
     :is-noise-suppression-on="isNoiseSuppressionOn"
     :input-devices="inputDevices"
     :current-input-device-id="currentInputDeviceId"
+    :is-conference="isConference"
     @toggle-mute="toggleMute"
     @toggle-noise-suppression="toggleNoiseSuppression"
     @select-input-device="selectInputDevice"
-    @hangup="hangup"
+    @hangup="handleHangup"
   />
 </template>
 
@@ -32,6 +33,7 @@ import type { CallParticipant } from "../../domain/contracts";
 const props = defineProps<{
   roomId: string;
   roomName: string;
+  targetUserId?: string;
 }>();
 
 const statePort = import.meta.env.PROD
@@ -55,10 +57,14 @@ const {
   toggleNoiseSuppression,
   selectInputDevice,
   initDevices,
+  joinConference,
+  leaveConference,
 } = useVoiceCall({
   statePort,
   roomId: () => props.roomId,
 });
+
+const isConference = computed(() => activeSession.value?.kind === "conference");
 
 const callerName = computed(() => {
   const session = activeSession.value;
@@ -78,13 +84,28 @@ function handleReject() {
   rejectCall("declined");
 }
 
+function handleHangup() {
+  if (isConference.value) {
+    void leaveConference();
+  } else {
+    hangup();
+  }
+}
+
 onMounted(() => {
   initDevices();
 });
 
+function startCall(targetUserId?: string) {
+  const uid = targetUserId || props.targetUserId || "";
+  return startDirectCall(uid);
+}
+
 defineExpose({
   callState,
-  startDirectCall,
+  startDirectCall: startCall,
   startConference,
+  joinConference,
+  leaveConference,
 });
 </script>

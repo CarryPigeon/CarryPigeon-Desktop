@@ -13,6 +13,8 @@ import type {
   MessageDomain,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  ReactToMessageOutcome,
+  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
 import type { ChatChannel, ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
@@ -78,6 +80,10 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
           timeMs: Date.now() - 1000 * 60 * 30,
           domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
           text: "Welcome to Patchbay. This is the baseline text domain.",
+          reactions: [
+            { emoji: "\u{1F44D}", count: 2, reactedByMe: true },
+            { emoji: "❤️", count: 1, reactedByMe: false },
+          ],
         },
       ] as ChatMessage[],
       "cid-prod": [
@@ -497,6 +503,100 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     };
   }
 
+  /**
+   * 对消息添加回应（mock）。
+   *
+   * @param messageId - 目标消息 id。
+   * @param emoji - 回应 emoji。
+   * @returns 添加回应结果。
+   */
+  async function reactToMessage(
+    messageId: string,
+    emoji: string,
+  ): Promise<ReactToMessageOutcome> {
+    const list = state.messagesByChannel[currentChannelId.value] ?? [];
+    const message = list.find((m) => m.id === messageId);
+    if (!message) {
+      return {
+        ok: false,
+        kind: "message_reaction_rejected" as const,
+        error: {
+          code: "reaction_failed" as const,
+          message: "Message not found.",
+          retryable: false,
+          details: { messageId },
+        },
+      };
+    }
+
+    const current = message.reactions ?? [];
+    const idx = current.findIndex((r) => r.emoji === emoji);
+    let updated: typeof current;
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = { ...updated[idx], count: updated[idx].count + 1, reactedByMe: true };
+    } else {
+      updated = [...current, { emoji, count: 1, reactedByMe: true }];
+    }
+    message.reactions = updated;
+    return {
+      ok: true,
+      kind: "message_reacted" as const,
+      messageId,
+      emoji,
+      reactions: updated,
+    };
+  }
+
+  /**
+   * 移除消息回应（mock）。
+   *
+   * @param messageId - 目标消息 id。
+   * @param emoji - 回应 emoji。
+   * @returns 移除回应结果。
+   */
+  async function removeReaction(
+    messageId: string,
+    emoji: string,
+  ): Promise<RemoveReactionOutcome> {
+    const list = state.messagesByChannel[currentChannelId.value] ?? [];
+    const message = list.find((m) => m.id === messageId);
+    if (!message) {
+      return {
+        ok: false,
+        kind: "message_reaction_removal_rejected" as const,
+        error: {
+          code: "reaction_failed" as const,
+          message: "Message not found.",
+          retryable: false,
+          details: { messageId },
+        },
+      };
+    }
+
+    const current = message.reactions ?? [];
+    const idx = current.findIndex((r) => r.emoji === emoji && r.reactedByMe);
+    let updated: typeof current;
+    if (idx >= 0) {
+      if (current[idx].count <= 1) {
+        updated = current.filter((_, i) => i !== idx);
+      } else {
+        updated = [...current];
+        updated[idx] = { ...updated[idx], count: updated[idx].count - 1, reactedByMe: false };
+      }
+    } else {
+      updated = current;
+    }
+    message.reactions = updated;
+    return {
+      ok: true,
+      kind: "message_reaction_removed" as const,
+      messageId,
+      emoji,
+      reactions: updated,
+    };
+  }
+
   // ============================================================================
   // 频道管理方法（mock）
   // ============================================================================
@@ -791,6 +891,8 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     cancelReply,
     deleteMessage,
     sendComposerMessage,
+    reactToMessage,
+    removeReaction,
     // 频道管理
     listMembers,
     kickMember,

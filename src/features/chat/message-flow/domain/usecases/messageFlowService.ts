@@ -16,6 +16,9 @@ import type {
   ChatMessage,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MessageReactionSummary,
+  ReactToMessageOutcome,
+  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/domain/contracts";
 import { createMessageActionError, rejectMessageAction } from "../outcomes/messageActionOutcome";
@@ -237,6 +240,180 @@ export class MessageFlowApplicationService {
   }
 
   /**
+   * 添加消息回应。
+   *
+   * 采用"本地先更新，失败再回滚"的乐观更新策略。
+   */
+  async reactToMessage(
+    messageId: string,
+    emoji: string,
+  ): Promise<ReactToMessageOutcome> {
+    const channelId = this.deps.timelineState.readCurrentChannelId();
+    if (!channelId) {
+      return rejectMessageAction("message_reaction_rejected", "reaction_failed", "No channel selected.");
+    }
+    if (!emoji) {
+      return rejectMessageAction("message_reaction_rejected", "reaction_failed", "Missing emoji.");
+    }
+
+    const messages = this.deps.timelineState.listMessages(channelId);
+    const message = messages.find((m) => m.id === messageId);
+    const prevReactions = message?.reactions;
+
+    const updated = computeOptimisticReactions(prevReactions, emoji);
+    this.deps.timelineState.updateMessageReactions(channelId, messageId, updated);
+
+    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    if (!socket || !token) {
+      if (prevReactions) {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, prevReactions);
+      } else {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, []);
+      }
+      return rejectMessageAction("message_reaction_rejected", "reaction_failed", "Not authenticated.");
+    }
+    const requestSocket = socket;
+    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
+
+    try {
+      const result = await this.deps.api.reactToMessage(socket, token, channelId, messageId, emoji);
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
+        // Rollback optimistic update, don't apply potentially wrong server state.
+        if (prevReactions) {
+          this.deps.timelineState.updateMessageReactions(channelId, messageId, prevReactions);
+        } else {
+          this.deps.timelineState.updateMessageReactions(channelId, messageId, []);
+        }
+        return rejectMessageAction(
+          "message_reaction_rejected",
+          "stale_runtime_scope",
+          "Chat runtime changed before the reaction result could be applied.",
+          undefined,
+          { requestSocket, messageId },
+        );
+      }
+
+      const serverReactions: MessageReactionSummary[] = result.map((r) => ({
+        emoji: r.emoji,
+        count: r.count,
+        reactedByMe: r.reactedByMe,
+      }));
+      this.deps.timelineState.updateMessageReactions(channelId, messageId, serverReactions);
+
+      return {
+        ok: true,
+        kind: "message_reacted",
+        messageId,
+        emoji,
+        reactions: serverReactions,
+      };
+    } catch (err) {
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
+        return rejectMessageAction(
+          "message_reaction_rejected",
+          "stale_runtime_scope",
+          "Chat runtime changed before the reaction result could be applied.",
+          undefined,
+          { requestSocket, messageId },
+        );
+      }
+      if (prevReactions) {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, prevReactions);
+      } else {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, []);
+      }
+      return rejectMessageAction("message_reaction_rejected", "reaction_failed", String(err));
+    }
+  }
+
+  /**
+   * 移除消息回应。
+   *
+   * 采用"本地先移除，失败再回滚"的乐观更新策略。
+   */
+  async removeReaction(
+    messageId: string,
+    emoji: string,
+  ): Promise<RemoveReactionOutcome> {
+    const channelId = this.deps.timelineState.readCurrentChannelId();
+    if (!channelId) {
+      return rejectMessageAction("message_reaction_removal_rejected", "reaction_failed", "No channel selected.");
+    }
+    if (!emoji) {
+      return rejectMessageAction("message_reaction_removal_rejected", "reaction_failed", "Missing emoji.");
+    }
+
+    const messages = this.deps.timelineState.listMessages(channelId);
+    const message = messages.find((m) => m.id === messageId);
+    const prevReactions = message?.reactions;
+
+    const updated = (prevReactions ?? []).filter((r) => !(r.emoji === emoji && r.reactedByMe));
+    this.deps.timelineState.updateMessageReactions(channelId, messageId, updated);
+
+    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    if (!socket || !token) {
+      if (prevReactions) {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, prevReactions);
+      } else {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, []);
+      }
+      return rejectMessageAction("message_reaction_removal_rejected", "reaction_failed", "Not authenticated.");
+    }
+    const requestSocket = socket;
+    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
+
+    try {
+      const result = await this.deps.api.removeReaction(socket, token, channelId, messageId, emoji);
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
+        // Rollback optimistic update, don't apply potentially wrong server state.
+        if (prevReactions) {
+          this.deps.timelineState.updateMessageReactions(channelId, messageId, prevReactions);
+        } else {
+          this.deps.timelineState.updateMessageReactions(channelId, messageId, []);
+        }
+        return rejectMessageAction(
+          "message_reaction_removal_rejected",
+          "stale_runtime_scope",
+          "Chat runtime changed before the reaction removal result could be applied.",
+          undefined,
+          { requestSocket, messageId },
+        );
+      }
+
+      const serverReactions: MessageReactionSummary[] = result.map((r) => ({
+        emoji: r.emoji,
+        count: r.count,
+        reactedByMe: r.reactedByMe,
+      }));
+      this.deps.timelineState.updateMessageReactions(channelId, messageId, serverReactions);
+
+      return {
+        ok: true,
+        kind: "message_reaction_removed",
+        messageId,
+        emoji,
+        reactions: serverReactions,
+      };
+    } catch (err) {
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
+        return rejectMessageAction(
+          "message_reaction_removal_rejected",
+          "stale_runtime_scope",
+          "Chat runtime changed before the reaction removal result could be applied.",
+          undefined,
+          { requestSocket, messageId },
+        );
+      }
+      if (prevReactions) {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, prevReactions);
+      } else {
+        this.deps.timelineState.updateMessageReactions(channelId, messageId, []);
+      }
+      return rejectMessageAction("message_reaction_removal_rejected", "reaction_failed", String(err));
+    }
+  }
+
+  /**
    * 加载指定频道的最新一页消息，并覆盖本地 timeline。
    *
    * 典型触发点：
@@ -351,4 +528,34 @@ export class MessageFlowApplicationService {
     const hasMore = Boolean(res.hasMore);
     return { requestSocket, channelId, mapped, nextCursor, hasMore };
   }
+}
+
+/**
+ * 根据当前回应对列表，计算切换指定 emoji 后的乐观回应列表。
+ *
+ * 逻辑：
+ * - 如果 emoji 已存在且当前用户已回应，则移除该用户的回应（count 减 1 或删除整行）；
+ * - 如果 emoji 已存在但当前用户未回应，则增加该 emoji 的计数；
+ * - 如果 emoji 不存在，则新增一条记录。
+ */
+function computeOptimisticReactions(
+  current: readonly MessageReactionSummary[] | undefined,
+  emoji: string,
+): MessageReactionSummary[] {
+  const list = [...(current ?? [])];
+  const idx = list.findIndex((r) => r.emoji === emoji);
+  if (idx >= 0) {
+    if (list[idx].reactedByMe) {
+      if (list[idx].count <= 1) {
+        list.splice(idx, 1);
+      } else {
+        list[idx] = { ...list[idx], count: list[idx].count - 1, reactedByMe: false };
+      }
+    } else {
+      list[idx] = { ...list[idx], count: list[idx].count + 1, reactedByMe: true };
+    }
+  } else {
+    list.push({ emoji, count: 1, reactedByMe: true });
+  }
+  return list;
 }

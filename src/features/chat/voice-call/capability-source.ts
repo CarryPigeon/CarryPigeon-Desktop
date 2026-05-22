@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { clonePlainData } from "@/shared/utils/clonePlainData";
 import { createWatchedSnapshotObserver } from "@/shared/utils/createWatchedSnapshotObserver";
 import type { VoiceCallCapabilities, VoiceCallSnapshot } from "./api-types";
 import type { CallSession } from "./domain/contracts";
+import { currentChatUserId, currentChatUsername } from "../composition/chatAccountSession";
 import {
   currentState,
   activeSession,
@@ -10,6 +12,7 @@ import {
   inputDevices,
   outputDevices,
   activeSummary,
+  resolveState,
 } from "./presentation/store-access/voiceCallStoreAccess";
 
 interface CallSessionWire {
@@ -145,6 +148,55 @@ export function createVoiceCallCapabilitySource(): VoiceCallCapabilities {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
       await invoke("select_output_device", { session_id: session.sessionId, device_id: deviceId });
+    },
+
+    async connectSignaling(wsUrl: string, accessToken: string): Promise<void> {
+      await invoke("connect_signaling", {
+        ws_url: wsUrl,
+        access_token: accessToken,
+        user_id: currentChatUserId.value,
+        display_name: currentChatUsername.value,
+      });
+    },
+
+    async joinConference(sessionId: string): Promise<CallSession> {
+      const wire = await invoke<CallSessionWire>("join_conference", { session_id: sessionId });
+      return mapCallSessionWire(wire);
+    },
+
+    async leaveConference(sessionId: string): Promise<void> {
+      await invoke("leave_conference", { session_id: sessionId });
+    },
+
+    async listenForIncomingCalls(): Promise<() => void> {
+      return listen<{
+        session_id: string;
+        call_kind: string;
+        from_user_id: string;
+        from_display_name: string;
+        room_id: string;
+        timestamp: number;
+      }>("voice_call:incoming", (event) => {
+        const w = event.payload;
+        const state = resolveState();
+        state.currentState.value = "ringing";
+        state.activeSession.value = {
+          sessionId: w.session_id,
+          kind: w.call_kind as CallSession["kind"],
+          state: "ringing",
+          initiator: w.from_user_id,
+          participants: [],
+          roomId: w.room_id,
+          startedAt: w.timestamp,
+          endedAt: null,
+          mediaSettings: {
+            inputDeviceId: null,
+            outputDeviceId: null,
+            noiseSuppression: false,
+            echoCancellation: false,
+          },
+        };
+      });
     },
   };
 }

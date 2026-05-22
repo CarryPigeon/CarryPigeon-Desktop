@@ -71,6 +71,16 @@ export type ChatMessageWire = {
   data: unknown;
   preview?: string;
   reply_to_mid?: string;
+  reactions?: ChatMessageReactionWire[];
+};
+
+/**
+ * 消息回应 wire 模型。
+ */
+export type ChatMessageReactionWire = {
+  emoji: string;
+  count: number;
+  reacted_by_me: boolean;
 };
 
 /**
@@ -161,4 +171,12 @@ export type ChatMentionPageWire = {
   items: ChatMentionWire[];
   next_cursor?: string;
   has_more?: boolean;
+};
+
+export type ChatReactionRequestWire = {
+  emoji: string;
+};
+
+export type ChatReactionResponseWire = {
+  reactions: ChatMessageReactionWire[];
 };

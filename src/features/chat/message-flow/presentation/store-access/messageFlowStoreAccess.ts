@@ -12,6 +12,8 @@ import type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  ReactToMessageOutcome,
+  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
 
@@ -121,6 +123,14 @@ export function sendComposerMessage(payload?: ComposerSubmitPayload): Promise<Se
  */
 export function startReply(messageId: string): void {
   return resolveMessageFlowStore().startReply(messageId);
+}
+
+export function reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome> {
+  return resolveMessageFlowStore().reactToMessage(messageId, emoji);
+}
+
+export function removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome> {
+  return resolveMessageFlowStore().removeReaction(messageId, emoji);
 }
 
 export type { ChatMessage, ComposerSubmitPayload };

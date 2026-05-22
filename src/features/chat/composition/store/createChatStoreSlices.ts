@@ -49,6 +49,8 @@ export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): Messag
     cancelReply: store.cancelReply,
     deleteMessage: store.deleteMessage,
     sendComposerMessage: store.sendComposerMessage,
+    reactToMessage: store.reactToMessage,
+    removeReaction: store.removeReaction,
   };
 }
 

@@ -48,17 +48,33 @@ pub fn run() -> anyhow::Result<()> {
             app.manage(TrayUnreadState::new(tray_icon.clone().to_owned()));
 
             // 初始化临时文件管理器
+            // 注意：setup() 已运行在 tokio 运行时上下文中，不能在当前线程 block_on。
+            // 需要在独立 OS 线程中创建新的 tokio 运行时来执行异步初始化。
             let app_data_dir = app.path().app_data_dir().context("Failed to get app data dir")?;
             let metadata_db_path = app_data_dir.join("temp_files").join("metadata.db");
-            let temp_file_manager = tokio::runtime::Handle::current()
-                .block_on(TempFileManager::new(app_data_dir.clone(), metadata_db_path))
-                .context("Failed to initialize TempFileManager")?;
-
-            // 启动时清理过期临时文件
-            let _ = tokio::runtime::Handle::current()
-                .block_on(temp_file_manager.cleanup(None, 24));
+            let temp_file_manager = std::thread::spawn({
+                let app_data_dir = app_data_dir.clone();
+                let metadata_db_path = metadata_db_path.clone();
+                move || {
+                    let rt = tokio::runtime::Runtime::new()
+                        .context("Failed to create tokio runtime")?;
+                    rt.block_on(TempFileManager::new(app_data_dir, metadata_db_path))
+                }
+            })
+            .join()
+            .map_err(|e| anyhow::anyhow!("Failed to join TempFileManager init thread: {e:?}"))
+            .context("TempFileManager init thread panicked")??;
 
             app.manage(temp_file_manager);
+
+            // 启动时清理过期临时文件（后台执行，不需要阻塞 setup）
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let state = handle.state::<TempFileManager>();
+                if let Err(e) = state.cleanup(None, 24).await {
+                    tracing::warn!(action = "temp_file_startup_cleanup_failed", error = %e);
+                }
+            });
 
             // 定义托盘菜单行为（默认中文，前端启动后根据 locale 同步更新）
             let labels = tray_labels("zh_cn");
@@ -233,6 +249,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::plugins::di::commands::plugins_storage_set,
             crate::features::plugins::di::commands::plugins_network_fetch,
             // voice_call
+            crate::features::voice_call::di::commands::connect_signaling,
             crate::features::voice_call::di::commands::start_direct_call,
             crate::features::voice_call::di::commands::start_conference,
             crate::features::voice_call::di::commands::accept_call,
@@ -244,6 +261,8 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::voice_call::di::commands::enumerate_output_devices,
             crate::features::voice_call::di::commands::select_input_device,
             crate::features::voice_call::di::commands::select_output_device,
+            crate::features::voice_call::di::commands::join_conference,
+            crate::features::voice_call::di::commands::leave_conference,
         ])
         .run(tauri::generate_context!())
         .context("error while running tauri application")?;

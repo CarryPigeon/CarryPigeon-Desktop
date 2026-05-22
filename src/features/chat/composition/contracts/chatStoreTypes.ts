@@ -19,6 +19,8 @@ import type {
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
   MessageDomain,
+  ReactToMessageOutcome,
+  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
 import type {
@@ -74,6 +76,8 @@ export type MessageFlowRuntimeStore = {
   cancelReply(): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
+  reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
+  removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
 };
 
 /**

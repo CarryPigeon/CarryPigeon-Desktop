@@ -22,6 +22,7 @@ import { createMessageEventRouter } from "@/features/chat/message-flow/internal"
 import { createReadStateEventRouter } from "@/features/chat/room-session/internal";
 import { createChatGovernanceEventRouter } from "./createChatGovernanceEventRouter";
 import { createVoiceCallEventRouter } from "@/features/chat/voice-call/domain/event-handlers/voiceCallEventRouter";
+import { resolveState } from "@/features/chat/voice-call/presentation/store-access/voiceCallStoreAccess";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -36,7 +37,7 @@ export type ChatWsEventRouterDeps = {
   getCurrentUserId: () => string;
   timelineState: Pick<
     MessageTimelineStatePort,
-    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage"
+    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions"
   >;
   unreadProjection: ChannelUnreadProjectionPort;
   readStateProjection: Pick<
@@ -83,17 +84,46 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
   });
 
   const routeVoiceCallEvent = createVoiceCallEventRouter({
-    setIncomingCall: (_session) => {
-      // 注入 voiceCall store — 后续完善
+    setIncomingCall: (session) => {
+      const state = resolveState();
+      state.currentState.value = "ringing";
+      state.activeSession.value = session;
     },
-    updateCallState: (_sessionId, _state) => {
-      // 注入 voiceCall store — 后续完善
+    updateCallState: (sessionId, callState) => {
+      const s = resolveState();
+      s.currentState.value = callState;
+      if (callState === "ended") {
+        const session = s.activeSession.value;
+        if (session) {
+          const duration = session.startedAt ? Date.now() / 1000 - session.startedAt : 0;
+          s.activeSummary.value = {
+            sessionId,
+            kind: session.kind,
+            duration,
+            disconnectReason: "ended",
+          };
+        }
+        setTimeout(() => {
+          const fresh = resolveState();
+          fresh.currentState.value = "idle";
+          fresh.activeSession.value = null;
+        }, 3000);
+      }
     },
-    updateParticipants: (_sessionId, _participants) => {
-      // 注入 voiceCall store — 后续完善
+    updateParticipants: (_sessionId, p) => {
+      resolveState().participants.value = p;
     },
-    setCallSummary: (_sessionId, _duration, _reason) => {
-      // 注入 voiceCall store — 后续完善
+    setCallSummary: (sessionId, duration, reason) => {
+      const s = resolveState();
+      const session = s.activeSession.value;
+      if (session) {
+        s.activeSummary.value = {
+          sessionId,
+          kind: session.kind,
+          duration,
+          disconnectReason: reason,
+        };
+      }
     },
   });
 
