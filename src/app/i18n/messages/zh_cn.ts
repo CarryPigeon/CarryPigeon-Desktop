@@ -253,7 +253,6 @@ export const zh_cn = {
   sex_male: "男",
   sex_female: "女",
   birthday: "生日",
-  avatar_upload_todo: "头像上传暂未接入",
   email_required: "请输入邮箱",
   username_required: "请输入用户名",
   email_code_required: "请输入邮箱验证码",

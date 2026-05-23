@@ -185,13 +185,6 @@ pub async fn update_config_u32(
 ///
 /// # 返回值
 /// 无返回值。
-pub async fn update_config_u64(
-    key: String,
-    value: u64,
-    config_store_port: &dyn ConfigStorePort,
-) -> anyhow::Result<()> {
-    config_store_port.update_config_u64(key, value).await
-}
 
 /// 写入 string 类型配置值（顶层字段）。
 ///

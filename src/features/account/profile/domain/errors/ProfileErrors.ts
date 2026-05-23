@@ -11,6 +11,7 @@ export type ProfileErrorCode =
   | "update_email_failed"
   | "update_profile_failed"
   | "upload_background_failed"
+  | "upload_avatar_failed"
   | "mutation_unsupported";
 
 /**

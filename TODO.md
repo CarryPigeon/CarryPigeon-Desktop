@@ -571,14 +571,14 @@ channel record 新增字段
 
 | 分类 | 数量 | 说明 |
 | --- | --- | --- |
-| HTTP 端点，前端层已实现 | 10 | 消息搜索、上下文定位、编辑、置顶 x3、转发、@提及 x3（Wire+Http+Port+Domain 已全，待后端接入） |
+| HTTP 端点，前端层已实现 | 10 | 消息搜索、上下文定位、编辑、置顶 x3、转发、@提及 x3（Wire+Http+Port+Domain **+RootService+Gateway 已全**，待后端接入） |
 | HTTP 端点，无 frontend 数据层 | 5 | 通知偏好 x3、频道发现、审计日志 |
 | 模型/Wire 类型，需扩展 Wire+Domain+Mapper | 4 | 发送消息扩展字段、消息模型、频道模型、WS 事件 |
-| Settings，待补充前端分发 | 2 | `update_config_u32`（仅 `server_port`）、`update_config_bool`（6 个 bool key） |
-| Settings，无可用 key | 1 | `update_config_u64`（始终返回错误） |
-| Settings，发现但先前未记录 | 2 | `update_config_bool`、`update_config_string`（均在 backend 已实现） |
+| Settings，已修复 | 3 | `update_config_u32`（前端已接入，`readServerPort`/`updateServerPort` 已添加）；`update_config_bool`（确认已完整实现）；`update_config_string`（确认已完整实现） |
+| Settings，已删除 | 1 | `update_config_u64`（死代码，已从 Rust 端完全移除，含 command/port/usecase/adapter 全调用链） |
 | Voice Call Rust | 11 | ✅ 已全部实现为真实逻辑（非桩） |
 | Voice Call Frontend | 9 | ✅ 已全部实现为真实 invoke 调用（非桩） |
-| Files | 1 | `listFiles` 无真实 HTTP 后端 |
+| Files | 1 | `listFiles` 非 mock 模式下已改为抛出可见错误（不再静默返回空数组） |
 | 好友私聊 | 1 | MVP 非目标，API 待定 |
-| **总计** | **46** | +2 先前未记录的 Settings command |
+| 用户资料 | 2 | ✅ 头像与背景图已改为文件上传（参考 `UserProfilePopover` 模式）；头像 upload API（`POST /api/users/me/avatar`）待后端实现 |
+| **总计** | **47** | |

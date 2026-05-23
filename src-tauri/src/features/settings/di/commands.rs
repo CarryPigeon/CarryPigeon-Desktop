@@ -190,12 +190,6 @@ pub async fn update_config_u32(key: String, value: u32) -> CommandResult<()> {
 ///
 /// # 返回值
 /// 无返回值。
-#[tauri::command]
-pub async fn update_config_u64(key: String, value: u64) -> CommandResult<()> {
-    config_usecases::update_config_u64(key, value, ConfigStorePortAdapter::shared())
-        .await
-        .map_err(|e| to_command_error("SETTINGS_UPDATE_CONFIG_U64_FAILED", e))
-}
 
 /// 写入 string 类型配置值（顶层字段）。
 ///

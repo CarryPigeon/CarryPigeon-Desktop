@@ -227,7 +227,6 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::settings::di::commands::get_server_config_bool,
             crate::features::settings::di::commands::update_config_bool,
             crate::features::settings::di::commands::update_config_u32,
-            crate::features::settings::di::commands::update_config_u64,
             crate::features::settings::di::commands::update_config_string,
             // plugins legacy debug commands
             crate::features::plugins::di::commands::load_plugin,
