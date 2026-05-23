@@ -256,8 +256,30 @@ fn exec_result(result: &sea_orm::ExecResult) -> DbExecResult {
     }
 }
 
+fn strip_sql_comments(mut s: &str) -> &str {
+    loop {
+        s = s.trim_start();
+        if s.starts_with("--") {
+            if let Some(pos) = s.find('\n') {
+                s = &s[pos..];
+            } else {
+                return "";
+            }
+        } else if s.starts_with("/*") {
+            if let Some(pos) = s.find("*/") {
+                s = &s[pos + 2..];
+            } else {
+                return "";
+            }
+        } else {
+            break;
+        }
+    }
+    s
+}
+
 fn normalized_sql_head(sql: &str) -> &str {
-    sql.trim_start()
+    strip_sql_comments(sql)
         .split(|ch: char| ch.is_whitespace() || ch == '(')
         .next()
         .unwrap_or("")
@@ -268,11 +290,17 @@ fn validate_single_statement_sql(sql: &str) -> CommandResult<()> {
     if trimmed.is_empty() {
         return Err(command_error("DB_SQL_REQUIRED", "sql is required"));
     }
-    if trimmed.trim_end_matches(';').contains(';') {
-        return Err(command_error(
-            "DB_SQL_MULTI_STATEMENT_NOT_ALLOWED",
-            "multiple SQL statements are not allowed",
-        ));
+    let mut in_string = false;
+    let mut chars = trimmed.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\'' {
+            in_string = !in_string;
+        } else if ch == ';' && !in_string {
+            return Err(command_error(
+                "DB_SQL_MULTI_STATEMENT_NOT_ALLOWED",
+                "multiple SQL statements are not allowed",
+            ));
+        }
     }
     Ok(())
 }

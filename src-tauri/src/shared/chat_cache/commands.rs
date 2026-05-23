@@ -148,7 +148,9 @@ fn master_key(create_if_missing: bool) -> Result<Option<[u8; 32]>> {
         Ok(entry) => entry,
         Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => {
             if create_if_missing {
-                return Ok(Some(generate_master_key(cell)?));
+                return Err(anyhow::anyhow!(
+                    "secure storage is unavailable, cannot persist chat cache encryption key"
+                ));
             }
             return Ok(None);
         }
@@ -171,7 +173,9 @@ fn master_key(create_if_missing: bool) -> Result<Option<[u8; 32]>> {
             match entry.set_password(&hex::encode(key)) {
                 Ok(()) => Ok(Some(key)),
                 Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => {
-                    Ok(Some(key))
+                    Err(anyhow::anyhow!(
+                        "secure storage is unavailable, cannot persist chat cache encryption key"
+                    ))
                 }
                 Err(err) => Err(err.into()),
             }

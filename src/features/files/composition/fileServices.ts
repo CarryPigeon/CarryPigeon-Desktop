@@ -14,7 +14,9 @@ let fileListPort: FileListPort | null = null;
 
 function createFileListPort(): FileListPort {
   return selectByMockMode<FileListPort>({
-    off: () => async (_serverSocket: string, _accessToken: string, _query: FileListQuery) => [],
+    off: () => async (_serverSocket: string, _accessToken: string, _query: FileListQuery) => {
+      throw new Error("File listing requires a real backend. Use mock mode 'store' or 'protocol' for development.");
+    },
     store: () => mockListFiles,
     protocol: () => httpListFiles,
   });

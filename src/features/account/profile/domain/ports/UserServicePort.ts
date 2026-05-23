@@ -67,6 +67,15 @@ export interface UserMutationPort {
    * @returns 背景图片 URL。
    */
   updateUserBackgroundImage(accessToken: string, file: File): Promise<string>;
+
+  /**
+   * 更新用户头像。
+   *
+   * @param accessToken - 访问令牌。
+   * @param file - 头像图片文件对象。
+   * @returns 头像图片 URL。
+   */
+  updateUserAvatarImage(accessToken: string, file: File): Promise<string>;
 }
 
 /**

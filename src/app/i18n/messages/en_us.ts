@@ -253,7 +253,6 @@ export const en_us = {
   sex_male: "Male",
   sex_female: "Female",
   birthday: "Birthday",
-  avatar_upload_todo: "Avatar upload unavailable",
   email_required: "Email is required",
   username_required: "Username is required",
   email_code_required: "Email code is required",

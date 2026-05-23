@@ -23,6 +23,5 @@ pub trait ConfigStorePort: Send + Sync {
     fn get_server_config_bool<'a>(&'a self, server_socket: String) -> ConfigStoreFuture<'a, bool>;
     fn update_config_bool<'a>(&'a self, key: String, value: bool) -> ConfigStoreFuture<'a, ()>;
     fn update_config_u32<'a>(&'a self, key: String, value: u32) -> ConfigStoreFuture<'a, ()>;
-    fn update_config_u64<'a>(&'a self, key: String, value: u64) -> ConfigStoreFuture<'a, ()>;
     fn update_config_string<'a>(&'a self, key: String, value: String) -> ConfigStoreFuture<'a, ()>;
 }

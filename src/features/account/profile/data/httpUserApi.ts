@@ -40,6 +40,10 @@ export type ApiUploadBackgroundResponse = {
   backgroundUrl: string;
 };
 
+export type ApiUploadAvatarResponse = {
+  avatarUrl: string;
+};
+
 type ApiUsersBatchResponse = {
   items: ApiUserPublic[];
 };
@@ -228,5 +232,33 @@ export async function httpUploadBackgroundImage(
     return res.backgroundUrl;
   } catch (e) {
     rethrowProfileError("upload_background_failed", "Upload background image failed", e);
+  }
+}
+
+/**
+ * 上传用户头像。
+ *
+ * @param serverSocket - 服务端 socket。
+ * @param accessToken - Access token。
+ * @param file - 头像图片文件。
+ * @returns 头像图片 URL。
+ */
+export async function httpUploadAvatarImage(
+  serverSocket: string,
+  accessToken: string,
+  file: File,
+): Promise<string> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  try {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const res = await client.requestFormData<ApiUploadAvatarResponse>(
+      "POST",
+      "/users/me/avatar",
+      formData,
+    );
+    return res.avatarUrl;
+  } catch (e) {
+    rethrowProfileError("upload_avatar_failed", "Upload avatar image failed", e);
   }
 }

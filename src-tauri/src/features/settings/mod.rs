@@ -145,7 +145,6 @@ where
         if TypeId::of::<T>() == TypeId::of::<u32>() {
             return config_usecases::update_config_u32(key, number as u32, adapter).await;
         }
-        return config_usecases::update_config_u64(key, number, adapter).await;
     }
     if let Some(text) = json.as_str() {
         return config_usecases::update_config_string(key, text.to_string(), adapter).await;

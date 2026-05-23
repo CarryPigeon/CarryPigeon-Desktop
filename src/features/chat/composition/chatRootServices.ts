@@ -22,8 +22,10 @@ import type {
   ChatChannelMemberRecord,
   ChatChannelPatchInput,
   ChatChannelRecord,
+  ChatMentionPage,
   ChatMessagePage,
   ChatMessageRecord,
+  ChatPinRecord,
   ChatReactionRecord,
   ChatReadStateInput,
   ChatSendMessageInput,
@@ -51,6 +53,17 @@ export type ChatCoreApplicationServiceDeps = {
     | "updateReadState"
     | "applyJoinChannel"
     | "patchChannel"
+    | "editMessage"
+    | "pinMessage"
+    | "unpinMessage"
+    | "listPins"
+    | "forwardMessage"
+    | "listMentions"
+    | "markMentionRead"
+    | "batchMarkMentionsRead"
+    | "searchChannelMessages"
+    | "listChannelMessagesAround"
+    | "getChannel"
   >;
 };
 
@@ -172,6 +185,72 @@ export class ChatCoreApplicationService {
     patch: ChatChannelPatchInput,
   ): Promise<ChatChannelRecord> {
     return this.deps.api.patchChannel(serverSocket, accessToken, channelId, patch);
+  }
+
+  editMessage(
+    serverSocket: string,
+    accessToken: string,
+    mid: string,
+    req: { domain: string; domainVersion: string; data: unknown; mentions?: Array<{ type: string; uid: string }>; expectedEditVersion?: number },
+  ): Promise<ChatMessageRecord> {
+    return this.deps.api.editMessage(serverSocket, accessToken, mid, req);
+  }
+
+  pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void> {
+    return this.deps.api.pinMessage(serverSocket, accessToken, cid, mid, note);
+  }
+
+  unpinMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void> {
+    return this.deps.api.unpinMessage(serverSocket, accessToken, cid, mid);
+  }
+
+  listPins(serverSocket: string, accessToken: string, cid: string, cursor?: string, limit?: number): Promise<{ items: ChatPinRecord[]; nextCursor?: string; hasMore?: boolean }> {
+    return this.deps.api.listPins(serverSocket, accessToken, cid, cursor, limit);
+  }
+
+  forwardMessage(
+    serverSocket: string,
+    accessToken: string,
+    mid: string,
+    req: { targetCid: string; comment?: string; idempotencyKey?: string },
+  ): Promise<ChatMessageRecord> {
+    return this.deps.api.forwardMessage(serverSocket, accessToken, mid, req);
+  }
+
+  listMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPage> {
+    return this.deps.api.listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
+  }
+
+  markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void> {
+    return this.deps.api.markMentionRead(serverSocket, accessToken, mentionId);
+  }
+
+  batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
+    return this.deps.api.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
+  }
+
+  searchChannelMessages(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    query: { q: string; cursor?: string; limit?: number; senderUid?: string; domain?: string; beforeMid?: string; afterMid?: string },
+  ): Promise<ChatMessagePage> {
+    return this.deps.api.searchChannelMessages(serverSocket, accessToken, cid, query);
+  }
+
+  listChannelMessagesAround(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    aroundMid: string,
+    before?: number,
+    after?: number,
+  ): Promise<ChatMessagePage> {
+    return this.deps.api.listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
+  }
+
+  getChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelRecord> {
+    return this.deps.api.getChannel(serverSocket, accessToken, cid);
   }
 }
 

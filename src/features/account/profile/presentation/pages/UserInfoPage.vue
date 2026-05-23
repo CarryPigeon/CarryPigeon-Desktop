@@ -11,6 +11,10 @@ import { getAccountCapabilities } from "@/features/account/api";
 import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
+import { getUserMutationPort } from "@/features/account/profile/di/user.di";
+import { ensureValidAccessToken } from "@/shared/net/auth/api";
+import { createLogger } from "@/shared/utils/logger";
+import { MessagePlugin } from "tdesign-vue-next";
 
 type ProfileDraft = {
   username: string;
@@ -32,6 +36,11 @@ const router = useRouter();
 const isEditing = ref(false);
 const isSaving = ref(false);
 const isSendingEmailCode = ref(false);
+const avatarFileInputRef = ref<HTMLInputElement | null>(null);
+const backgroundFileInputRef = ref<HTMLInputElement | null>(null);
+const isUploadingAvatar = ref(false);
+const isUploadingBackground = ref(false);
+const logger = createLogger("UserInfoPage");
 const formError = ref("");
 const formSuccess = ref("");
 const draft = reactive<ProfileDraft>({
@@ -167,6 +176,101 @@ async function handleSendEmailCode(): Promise<void> {
   }
 }
 
+function handleUploadAvatar() {
+  avatarFileInputRef.value?.click();
+}
+
+function handleUploadBackground() {
+  backgroundFileInputRef.value?.click();
+}
+
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function validateImageFile(file: File): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return "Only PNG, JPEG, WebP formats are supported";
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    return "Image size must not exceed 5MB";
+  }
+  return null;
+}
+
+async function handleAvatarFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const error = validateImageFile(file);
+  if (error) {
+    MessagePlugin.error(error);
+    if (avatarFileInputRef.value) avatarFileInputRef.value.value = "";
+    return;
+  }
+  isUploadingAvatar.value = true;
+  try {
+    const serverSocket = serverConnectionCapabilities.workspace.readSocket();
+    const accessToken = await ensureValidAccessToken(serverSocket);
+    if (!serverSocket || !accessToken) {
+      MessagePlugin.error("Not connected to server, please try again");
+      return;
+    }
+    const mutationPort = getUserMutationPort(serverSocket);
+    const avatarUrl = await mutationPort.updateUserAvatarImage(accessToken, file);
+    draft.avatarUrl = avatarUrl;
+    currentUserCapabilities.applyLocalProfilePatch({
+      username: draft.username.trim(),
+      email: draft.email.trim(),
+      description: draft.brief.trim(),
+      avatarUrl,
+      backgroundUrl: draft.backgroundUrl.trim(),
+    });
+    MessagePlugin.success("Avatar uploaded");
+  } catch (err) {
+    logger.error("Action: auth_profile_avatar_upload_failed", { error: String(err) });
+    MessagePlugin.error("Upload failed, please try again");
+  } finally {
+    isUploadingAvatar.value = false;
+    if (avatarFileInputRef.value) avatarFileInputRef.value.value = "";
+  }
+}
+
+async function handleBackgroundFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const error = validateImageFile(file);
+  if (error) {
+    MessagePlugin.error(error);
+    if (backgroundFileInputRef.value) backgroundFileInputRef.value.value = "";
+    return;
+  }
+  isUploadingBackground.value = true;
+  try {
+    const serverSocket = serverConnectionCapabilities.workspace.readSocket();
+    const accessToken = await ensureValidAccessToken(serverSocket);
+    if (!serverSocket || !accessToken) {
+      MessagePlugin.error("Not connected to server, please try again");
+      return;
+    }
+    const mutationPort = getUserMutationPort(serverSocket);
+    const backgroundUrl = await mutationPort.updateUserBackgroundImage(accessToken, file);
+    draft.backgroundUrl = backgroundUrl;
+    currentUserCapabilities.applyLocalProfilePatch({
+      username: draft.username.trim(),
+      email: draft.email.trim(),
+      description: draft.brief.trim(),
+      avatarUrl: draft.avatarUrl.trim(),
+      backgroundUrl,
+    });
+    MessagePlugin.success("Background image uploaded");
+  } catch (err) {
+    logger.error("Action: auth_profile_background_upload_failed", { error: String(err) });
+    MessagePlugin.error("Upload failed, please try again");
+  } finally {
+    isUploadingBackground.value = false;
+    if (backgroundFileInputRef.value) backgroundFileInputRef.value.value = "";
+  }
+}
+
 async function handleSaveEdit(): Promise<void> {
   const message = validateDraft();
   if (message) {
@@ -246,12 +350,24 @@ async function handleSaveEdit(): Promise<void> {
           </span>
         </label>
         <label class="cp-info__field">
-          <span class="cp-info__fieldLabel">Avatar URL</span>
-          <input v-model="draft.avatarUrl" class="cp-info__input" type="url" />
+          <span class="cp-info__fieldLabel">Avatar</span>
+          <input ref="avatarFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleAvatarFileChange" />
+          <span class="cp-info__inline">
+            <input v-model="draft.avatarUrl" class="cp-info__input" type="url" placeholder="Avatar URL (or click Upload)" />
+            <button class="cp-info__smallBtn" :disabled="isUploadingAvatar" type="button" @click="handleUploadAvatar">
+              {{ isUploadingAvatar ? "Uploading..." : "Upload" }}
+            </button>
+          </span>
         </label>
         <label class="cp-info__field">
-          <span class="cp-info__fieldLabel">Background URL</span>
-          <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" />
+          <span class="cp-info__fieldLabel">Background</span>
+          <input ref="backgroundFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleBackgroundFileChange" />
+          <span class="cp-info__inline">
+            <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" placeholder="Background URL (or click Upload)" />
+            <button class="cp-info__smallBtn" :disabled="isUploadingBackground" type="button" @click="handleUploadBackground">
+              {{ isUploadingBackground ? "Uploading..." : "Upload" }}
+            </button>
+          </span>
         </label>
         <label class="cp-info__field cp-info__field--wide">
           <span class="cp-info__fieldLabel">Bio</span>

@@ -76,10 +76,6 @@ impl ConfigStorePort for ConfigStorePortAdapter {
         Box::pin(async move { config_store::update_config_u32(key, value).await })
     }
 
-    fn update_config_u64<'a>(&'a self, key: String, value: u64) -> ConfigStoreFuture<'a, ()> {
-        Box::pin(async move { config_store::update_config_u64(key, value).await })
-    }
-
     fn update_config_string<'a>(&'a self, key: String, value: String) -> ConfigStoreFuture<'a, ()> {
         Box::pin(async move { config_store::update_config_string(key, value).await })
     }

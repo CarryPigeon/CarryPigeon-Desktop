@@ -107,7 +107,9 @@ impl AudioPipeline {
 
         *self.capture_stream.lock().await = Some(stream);
         self.encoded_out.lock().await.clear();
-        self.capture_leftover.lock().unwrap().clear();
+        if let Ok(mut leftover) = self.capture_leftover.lock() {
+            leftover.clear();
+        }
         info!(action = "app_voice_call_capture_started");
         Ok(())
     }
@@ -272,7 +274,10 @@ fn process_capture(
     };
 
     // Combine partial samples from previous callback
-    let mut buf = leftover.lock().unwrap();
+    let mut buf = match leftover.lock() {
+        Ok(b) => b,
+        Err(_) => return,
+    };
     buf.extend_from_slice(&raw);
     let samples = std::mem::take(&mut *buf);
     drop(buf);
@@ -298,7 +303,9 @@ fn process_capture(
 
     // Save leftover for next callback
     if pos < samples.len() {
-        *leftover.lock().unwrap() = samples[pos..].to_vec();
+        if let Ok(mut leftover_guard) = leftover.lock() {
+            *leftover_guard = samples[pos..].to_vec();
+        }
     }
 }
 
