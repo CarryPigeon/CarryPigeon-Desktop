@@ -77,6 +77,39 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     patchChannel(serverSocket, accessToken, channelId, patch) {
       return deps.core.patchChannel(serverSocket, accessToken, channelId, patch);
     },
+    editMessage(serverSocket, accessToken, mid, req) {
+      return deps.core.editMessage(serverSocket, accessToken, mid, req);
+    },
+    pinMessage(serverSocket, accessToken, cid, mid, note) {
+      return deps.core.pinMessage(serverSocket, accessToken, cid, mid, note);
+    },
+    unpinMessage(serverSocket, accessToken, cid, mid) {
+      return deps.core.unpinMessage(serverSocket, accessToken, cid, mid);
+    },
+    listPins(serverSocket, accessToken, cid, cursor, limit) {
+      return deps.core.listPins(serverSocket, accessToken, cid, cursor, limit);
+    },
+    forwardMessage(serverSocket, accessToken, mid, req) {
+      return deps.core.forwardMessage(serverSocket, accessToken, mid, req);
+    },
+    listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid) {
+      return deps.core.listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
+    },
+    markMentionRead(serverSocket, accessToken, mentionId) {
+      return deps.core.markMentionRead(serverSocket, accessToken, mentionId);
+    },
+    batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid) {
+      return deps.core.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
+    },
+    searchChannelMessages(serverSocket, accessToken, cid, query) {
+      return deps.core.searchChannelMessages(serverSocket, accessToken, cid, query);
+    },
+    listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after) {
+      return deps.core.listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
+    },
+    getChannel(serverSocket, accessToken, cid) {
+      return deps.core.getChannel(serverSocket, accessToken, cid);
+    },
   };
 }
 

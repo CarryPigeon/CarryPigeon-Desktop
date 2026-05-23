@@ -12,6 +12,7 @@ import {
   httpListUsers,
   httpUpdateUserEmail,
   httpUpdateUserProfile,
+  httpUploadAvatarImage,
   httpUploadBackgroundImage,
 } from "./httpUserApi";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
@@ -48,6 +49,9 @@ export function createHttpUserServicePort(serverSocket: string): UserServicePort
     },
     async updateUserBackgroundImage(accessToken: string, file: File): Promise<string> {
       return httpUploadBackgroundImage(socket, accessToken, file);
+    },
+    async updateUserAvatarImage(accessToken: string, file: File): Promise<string> {
+      return httpUploadAvatarImage(socket, accessToken, file);
     },
   };
 }

@@ -83,5 +83,12 @@ export function createMockUserServicePort(serverSocket: string): UserServicePort
       const idx = Math.floor(Math.random() * MOCK_BACKGROUNDS.length);
       return MOCK_BACKGROUNDS[idx] ?? MOCK_BACKGROUNDS[0];
     },
+    async updateUserAvatarImage(accessToken: string, file: File): Promise<string> {
+      void accessToken;
+      void file;
+      await sleep(MOCK_LATENCY_MS);
+      // 返回随机头像
+      return "https://picsum.photos/200/200?random=" + Math.random();
+    },
   };
 }

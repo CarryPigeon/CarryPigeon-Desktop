@@ -15,8 +15,10 @@ import type {
   ChatChannelMemberRecord,
   ChatChannelPatchInput,
   ChatChannelRecord,
+  ChatMentionPage,
   ChatMessagePage,
   ChatMessageRecord,
+  ChatPinRecord,
   ChatReactionRecord,
   ChatReadStateInput,
   ChatSendMessageInput,
@@ -79,6 +81,39 @@ export type ChatCoreApiPort = {
     channelId: string,
     patch: ChatChannelPatchInput,
   ): Promise<ChatChannelRecord>;
+  editMessage(
+    serverSocket: string,
+    accessToken: string,
+    mid: string,
+    req: { domain: string; domainVersion: string; data: unknown; mentions?: Array<{ type: string; uid: string }>; expectedEditVersion?: number },
+  ): Promise<ChatMessageRecord>;
+  pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void>;
+  unpinMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void>;
+  listPins(serverSocket: string, accessToken: string, cid: string, cursor?: string, limit?: number): Promise<{ items: ChatPinRecord[]; nextCursor?: string; hasMore?: boolean }>;
+  forwardMessage(
+    serverSocket: string,
+    accessToken: string,
+    mid: string,
+    req: { targetCid: string; comment?: string; idempotencyKey?: string },
+  ): Promise<ChatMessageRecord>;
+  listMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPage>;
+  markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void>;
+  batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void>;
+  searchChannelMessages(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    query: { q: string; cursor?: string; limit?: number; senderUid?: string; domain?: string; beforeMid?: string; afterMid?: string },
+  ): Promise<ChatMessagePage>;
+  listChannelMessagesAround(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    aroundMid: string,
+    before?: number,
+    after?: number,
+  ): Promise<ChatMessagePage>;
+  getChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelRecord>;
 };
 
 /**

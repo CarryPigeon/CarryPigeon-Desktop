@@ -110,3 +110,11 @@ export async function importSettingsEnvelope(raw: string): Promise<void> {
 export async function resetSettingsEnvelope(): Promise<void> {
   await invokeTauri<void>(TAURI_COMMANDS.settingsResetSettings);
 }
+
+export async function readServerPort(): Promise<number> {
+  return invokeTauri<number>(TAURI_COMMANDS.settingsGetConfigU32, { key: "server_port" });
+}
+
+export async function updateServerPort(port: number): Promise<void> {
+  await invokeTauri<void>(TAURI_COMMANDS.settingsUpdateConfigU32, { key: "server_port", value: port });
+}

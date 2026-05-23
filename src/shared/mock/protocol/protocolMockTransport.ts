@@ -132,6 +132,7 @@ type ServerState = {
   channelsById: Map<string, Channel>;
   membersByCid: Map<string, ChannelMember[]>;
   messagesByCid: Map<string, ChatMessage[]>;
+  pinsByCid: Map<string, Array<unknown>>;
   readStateByCidUid: Map<string, number>;
   applicationsByCid: Map<string, ChannelApplication[]>;
   bansByCid: Map<string, ChannelBan[]>;
@@ -234,6 +235,7 @@ function getServer(serverSocket: string): ServerState {
     channelsById: new Map(),
     membersByCid: new Map(),
     messagesByCid: new Map(),
+    pinsByCid: new Map(),
     readStateByCidUid: new Map(),
     applicationsByCid: new Map(),
     bansByCid: new Map(),
@@ -391,7 +393,6 @@ export function connectProtocolMockChatWs(
   onEvent: (env: ProtocolWsEventEnvelope) => void,
   options?: { onAuthError?: (reason: string) => void; onResumeFailed?: (reason: string) => void },
 ): ProtocolWsClient {
-  void options?.onResumeFailed;
   const server = getServer(serverSocket);
   const token = accessToken.trim();
   const ok = Boolean(server.sessionsByAccess.get(token));
@@ -420,6 +421,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   const server = getServer(req.serverSocket);
   const method = String(req.method ?? "GET").trim().toUpperCase();
   const { pathname, searchParams } = parsePath(req.path);
+  const pathnameParts = pathname.split("/").filter(Boolean);
 
   // -------------------------------------------------------------------------
   // Server info (public)
@@ -716,6 +718,28 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     };
     server.usersById.set(session.uid, { ...user, backgroundUrl });
     return { ok: true, status: 200, body: { backgroundUrl } };
+  }
+  if (method === "POST" && pathname === "/users/me/avatar") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const shareKey = `pmock-avatar-${session.uid}-${Date.now().toString(16)}`;
+    server.filesByShareKey.set(shareKey, {
+      file_id: shareKey,
+      filename: "avatar.jpg",
+      mime_type: "image/jpeg",
+      size_bytes: 1024,
+    });
+    const avatarUrl = buildProtocolMockDownloadUrl(server.serverSocket, shareKey);
+    const user = server.usersById.get(session.uid) ?? {
+      uid: session.uid,
+      email: session.email,
+      nickname: "Operator",
+      avatar: "",
+      bio: "",
+      backgroundUrl: "",
+    };
+    server.usersById.set(session.uid, { ...user, avatar: avatarUrl });
+    return { ok: true, status: 200, body: { avatarUrl } };
   }
 
   if (method === "GET" && pathname.startsWith("/users/") && pathname !== "/users/me") {
@@ -1085,6 +1109,192 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const list = (server.bansByCid.get(cid) ?? []).filter((b) => b.uid !== uid);
     server.bansByCid.set(cid, list);
     return { ok: true, status: 204, body: null };
+  }
+
+  // -------------------------------------------------------------------------
+  // Message edit (auth)
+  // -------------------------------------------------------------------------
+  if (method === "PATCH" && pathnameParts.length === 2 && pathnameParts[0] === "messages") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const mid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    for (const [, msgs] of server.messagesByCid) {
+      const idx = msgs.findIndex((m) => (m as { mid: string }).mid === mid);
+      if (idx >= 0) {
+        const msg = msgs[idx] as Record<string, unknown>;
+        const body = req.body as { data?: { text?: string } } | null;
+        if (body?.data && typeof body.data === "object") {
+          (msg.data as Record<string, unknown>).text = (body.data as { text?: string }).text ?? "";
+        }
+        msg.edited_at = Date.now();
+        msg.edit_version = ((msg.edit_version as number) ?? 0) + 1;
+        emitWs(server, "message.updated", { cid: msg.cid, message: msg });
+        return { ok: true, status: 200, body: msg };
+      }
+    }
+    return { ok: false, error: apiError(404, "not_found", "Message not found", { mid }) };
+  }
+
+  // -------------------------------------------------------------------------
+  // Message forward (auth)
+  // -------------------------------------------------------------------------
+  if (method === "POST" && pathnameParts.length === 3 && pathnameParts[0] === "messages" && pathnameParts[2] === "forward") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const mid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const body = req.body as { target_cid?: string; comment?: string } | null;
+    const targetCid = body?.target_cid?.trim();
+    if (!targetCid) return { ok: false, error: apiError(400, "invalid_request", "Missing target_cid") };
+    const msgs = server.messagesByCid.get(targetCid);
+    if (!msgs) return { ok: false, error: apiError(404, "not_found", "Target channel not found") };
+    const newMid = `msg-${Date.now().toString(16)}`;
+    const newMsg = {
+      mid: newMid,
+      cid: targetCid,
+      uid: session.uid,
+      domain: "Core:Text",
+      domain_version: "1.0",
+      data: { text: body?.comment ?? "" },
+      send_time: Date.now(),
+      preview: body?.comment ?? "",
+      forwarded_from: { mid, cid: "", uid: session.uid, preview: "", send_time: 0 },
+    };
+    msgs.push(newMsg);
+    emitWs(server, "message.created", { cid: targetCid, message: newMsg });
+    return { ok: true, status: 200, body: newMsg };
+  }
+
+  // -------------------------------------------------------------------------
+  // Pin message (auth)
+  // -------------------------------------------------------------------------
+  if (method === "POST" && pathnameParts.length === 4 && pathnameParts[0] === "channels" && pathnameParts[2] === "pins") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const mid = decodeURIComponent(pathnameParts[3] ?? "").trim();
+    const pin = { pin_id: `pin-${Date.now().toString(16)}`, cid, mid, pinned_by_uid: session.uid, pinned_at: Date.now() };
+    const pins = server.pinsByCid.get(cid) ?? [];
+    pins.push(pin);
+    server.pinsByCid.set(cid, pins);
+    emitWs(server, "message.pinned", pin);
+    return { ok: true, status: 204, body: null };
+  }
+
+  // -------------------------------------------------------------------------
+  // Unpin message (auth)
+  // -------------------------------------------------------------------------
+  if (method === "DELETE" && pathnameParts.length === 4 && pathnameParts[0] === "channels" && pathnameParts[2] === "pins") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const mid = decodeURIComponent(pathnameParts[3] ?? "").trim();
+    const pins = server.pinsByCid.get(cid) ?? [];
+    const idx = pins.findIndex((p) => (p as { mid: string }).mid === mid);
+    if (idx >= 0) {
+      pins.splice(idx, 1);
+      emitWs(server, "message.unpinned", { cid, mid, unpinned_by_uid: session.uid, unpinned_at: Date.now() });
+    }
+    return { ok: true, status: 204, body: null };
+  }
+
+  // -------------------------------------------------------------------------
+  // List pins (auth)
+  // -------------------------------------------------------------------------
+  if (method === "GET" && pathnameParts.length === 3 && pathnameParts[0] === "channels" && pathnameParts[2] === "pins") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const pins = server.pinsByCid.get(cid) ?? [];
+    return { ok: true, status: 200, body: { items: pins, next_cursor: "", has_more: false } };
+  }
+
+  // -------------------------------------------------------------------------
+  // List mentions (auth)
+  // -------------------------------------------------------------------------
+  if (method === "GET" && pathname === "/mentions") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    return { ok: true, status: 200, body: { items: [], next_cursor: "", has_more: false } };
+  }
+
+  // -------------------------------------------------------------------------
+  // Mark mention read (auth)
+  // -------------------------------------------------------------------------
+  if (method === "PUT" && pathnameParts.length === 3 && pathnameParts[0] === "mentions" && pathnameParts[2] === "read") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    return { ok: true, status: 204, body: null };
+  }
+
+  // -------------------------------------------------------------------------
+  // Batch mark mentions read (auth)
+  // -------------------------------------------------------------------------
+  if (method === "PUT" && pathname === "/mentions/read_state") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    return { ok: true, status: 204, body: null };
+  }
+
+  // -------------------------------------------------------------------------
+  // Search messages (auth)
+  // -------------------------------------------------------------------------
+  if (pathnameParts.length === 4 && pathnameParts[0] === "channels" && pathnameParts[2] === "messages" && pathnameParts[3] === "search" && method === "GET") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const q = searchParams.get("q")?.trim() ?? "";
+    const msgs = server.messagesByCid.get(cid) ?? [];
+    const items = q ? msgs.filter((m) => String((m as Record<string, unknown>).preview ?? "").includes(q)) : [];
+    return { ok: true, status: 200, body: { items, next_cursor: "", has_more: false } };
+  }
+
+  // -------------------------------------------------------------------------
+  // Messages around (auth)
+  // -------------------------------------------------------------------------
+  if (pathnameParts.length === 3 && pathnameParts[0] === "channels" && pathnameParts[2] === "messages" && method === "GET" && searchParams.has("around_mid")) {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const msgs = server.messagesByCid.get(cid) ?? [];
+    return { ok: true, status: 200, body: { items: msgs.slice(-50), next_cursor: "", has_more: false } };
+  }
+
+  // -------------------------------------------------------------------------
+  // Reactions — add (auth)
+  // -------------------------------------------------------------------------
+  if (method === "POST" && pathnameParts.length === 5 && pathnameParts[0] === "channels" && pathnameParts[4] === "reactions") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const mid = decodeURIComponent(pathnameParts[3] ?? "").trim();
+    const body = req.body as { emoji?: string } | null;
+    const emoji = body?.emoji?.trim();
+    if (!emoji) return { ok: false, error: apiError(400, "invalid_request", "Missing emoji") };
+    const reactions = [{ emoji, users: [{ uid: session.uid }] }];
+    emitWs(server, "message.reactions_updated", { cid, mid, reactions });
+    return { ok: true, status: 200, body: reactions };
+  }
+
+  // -------------------------------------------------------------------------
+  // Reactions — remove (auth)
+  // -------------------------------------------------------------------------
+  if (method === "DELETE" && pathnameParts.length === 5 && pathnameParts[0] === "channels" && pathnameParts[4] === "reactions") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
+    const mid = decodeURIComponent(pathnameParts[3] ?? "").trim();
+    const emoji = searchParams.get("emoji")?.trim() ?? "";
+    emitWs(server, "message.reactions_updated", { cid, mid, reactions: [], emoji });
+    return { ok: true, status: 200, body: [] };
+  }
+
+  // -------------------------------------------------------------------------
+  // Files list (auth)
+  // -------------------------------------------------------------------------
+  if (method === "GET" && pathname === "/files/list") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    return { ok: true, status: 200, body: { items: [], next_cursor: "", has_more: false } };
   }
 
   return { ok: false, error: apiError(404, "not_found", "Mock endpoint not implemented", { method, path: pathname }) };
