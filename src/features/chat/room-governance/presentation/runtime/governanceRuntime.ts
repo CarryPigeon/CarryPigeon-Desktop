@@ -109,6 +109,7 @@ export function createChatGovernanceRuntime(
     refreshMembersRail,
     applyJoin: (channelId) => applicationService.applyJoin(channelId),
     updateChannelMeta: (channelId, patch) => applicationService.updateChannelMeta(channelId, patch),
+    updateAnnouncement: (channelId, content) => applicationService.updateChannelAnnouncement(channelId, content),
     listMembers: (channelId) => applicationService.listMembers(channelId),
     kickMember: (channelId, uid) => applicationService.kickMember(channelId, uid),
     setAdmin: (channelId, uid) => applicationService.setAdmin(channelId, uid),

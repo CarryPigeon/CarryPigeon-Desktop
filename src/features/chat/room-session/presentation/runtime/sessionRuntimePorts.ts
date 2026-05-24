@@ -28,6 +28,7 @@ export type ChatSessionStateSlice = Pick<
   | "scopeVersion"
   | "messageActionError"
   | "composerDraft"
+  | "replyDraft"
   | "replyToMessageId"
   | "selectedDomainId"
 >;

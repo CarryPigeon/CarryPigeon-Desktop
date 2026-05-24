@@ -9,6 +9,7 @@ import type {
   ChatMessage,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MentionCandidate,
   MessageDomain,
   ReactToMessageOutcome,
   RemoveReactionOutcome,
@@ -28,8 +29,13 @@ export type ChatMessageFlowStateSlice = Pick<
   | "nextCursorByChannel"
   | "hasMoreByChannel"
   | "loadingMoreByChannel"
+  | "searchState"
+  | "highlightedMessageId"
   | "selectedDomainId"
   | "composerDraft"
+  | "replyDraft"
+  | "draftMentions"
+  | "quoteReplyDraft"
   | "replyToMessageId"
   | "messageActionError"
 >;
@@ -51,9 +57,13 @@ export type ChatMessageFlowRuntimePort = ChatMessageTimelinePort & {
   availableDomains(): MessageDomain[];
   loadMoreMessages(): Promise<void>;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
-  startReply(messageId: string): void;
+  startReply(message: ChatMessage): void;
   cancelReply(): void;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
+  listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
+  searchCurrentChannel(query: string): Promise<void>;
+  loadContextAroundMessage(messageId: string): Promise<void>;
+  clearSearch(): void;
 };

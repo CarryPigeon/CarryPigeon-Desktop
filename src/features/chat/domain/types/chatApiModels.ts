@@ -14,6 +14,39 @@ export type ChatChannelRecord = {
   brief?: string;
   avatar?: string;
   ownerUserId?: string;
+  announcement?: ChatChannelAnnouncementRecord;
+  categoryId?: string;
+  categoryName?: string;
+  order?: number;
+  type?: string;
+  joined?: boolean;
+  joinRequested?: boolean;
+};
+
+export type ChatMessageReplyRecord = {
+  messageId: string;
+  senderName: string;
+  preview: string;
+  createdAt: number;
+  unavailable?: boolean;
+};
+
+export type ChatQuoteReplyRecord = {
+  messageId: string;
+  userId: string;
+  preview: string;
+};
+
+export type ChatMessageMentionRecord = {
+  userId: string;
+  displayName: string;
+  type?: "user" | "everyone" | "here";
+};
+
+export type ChatChannelAnnouncementRecord = {
+  content: string;
+  updatedAt: number;
+  updatedBy?: string;
 };
 
 /**
@@ -59,6 +92,14 @@ export type ChatChannelBanRecord = {
   createTime?: number;
 };
 
+export type ChatForwardedFromRecord = {
+  messageId: string;
+  channelId: string;
+  userId: string;
+  preview: string;
+  sentTime: number;
+};
+
 /**
  * 消息快照。
  *
@@ -77,7 +118,13 @@ export type ChatMessageRecord = {
   data: unknown;
   preview?: string;
   replyToMessageId?: string;
+  replyTo?: ChatMessageReplyRecord;
+  quoteReply?: ChatQuoteReplyRecord;
+  mentions?: ChatMessageMentionRecord[];
   reactions?: ChatReactionRecord[];
+  editedAt?: number;
+  editVersion?: number;
+  forwardedFrom?: ChatForwardedFromRecord;
 };
 
 /** 消息回应领域模型。 */
@@ -104,6 +151,10 @@ export type ChatSendMessageInput = {
   domainVersion: string;
   data: unknown;
   replyToMessageId?: string;
+  replyTo?: ChatMessageReplyRecord;
+  quoteReply?: ChatQuoteReplyRecord;
+  mentions?: ChatMessageMentionRecord[];
+  clientMessageId?: string;
 };
 
 /**
@@ -112,6 +163,7 @@ export type ChatSendMessageInput = {
 export type ChatUnreadState = {
   channelId: string;
   unreadCount: number;
+  mentionUnreadCount?: number;
   lastReadTime: number;
 };
 
@@ -130,6 +182,7 @@ export type ChatChannelPatchInput = {
   name?: string;
   brief?: string;
   avatar?: string;
+  announcement?: string;
 };
 
 /**

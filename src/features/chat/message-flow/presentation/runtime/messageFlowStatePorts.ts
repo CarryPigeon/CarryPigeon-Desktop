@@ -10,7 +10,7 @@ import type {
   MessageComposerStatePort,
   MessageTimelineStatePort,
 } from "@/features/chat/message-flow/domain/ports";
-import type { ChatMessage, ChatMessageActionErrorInfo } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 
 /**
@@ -22,6 +22,8 @@ export type CreateMessageTimelineStatePortDeps = {
   nextCursorByChannel: Record<string, string>;
   hasMoreByChannel: Record<string, boolean>;
   loadingMoreByChannel: Record<string, boolean>;
+  searchState: Ref<MessageSearchState>;
+  highlightedMessageId: Ref<string>;
 };
 
 /**
@@ -94,6 +96,18 @@ export function createMessageTimelineStatePort(
     setLoadingMore(channelId: string, loading: boolean): void {
       deps.loadingMoreByChannel[channelId] = loading;
     },
+    writeSearchState(state: MessageSearchState): void {
+      deps.searchState.value = state;
+    },
+    readSearchState(): MessageSearchState {
+      return deps.searchState.value;
+    },
+    setHighlightedMessageId(messageId: string): void {
+      deps.highlightedMessageId.value = messageId.trim();
+    },
+    readHighlightedMessageId(): string {
+      return deps.highlightedMessageId.value.trim();
+    },
   };
 }
 
@@ -103,8 +117,13 @@ export function createMessageTimelineStatePort(
 export type CreateMessageComposerStatePortDeps = {
   selectedDomainId: Ref<string>;
   composerDraft: Ref<string>;
-  replyToMessageId: Ref<string>;
+  replyDraft: Ref<MessageReplySummary | null>;
+  draftMentions: Ref<MessageMention[]>;
   messageActionError: Ref<ChatMessageActionErrorInfo | null>;
+  quoteReplyDraft: Ref<{ messageId: string; userId: string; preview: string } | null>;
+  readChannelDraft: (channelId: string) => string;
+  saveChannelDraft: (channelId: string, text: string) => void;
+  clearChannelDraft: (channelId: string) => void;
 };
 
 /**
@@ -126,17 +145,67 @@ export function createMessageComposerStatePort(
     clearDraft(): void {
       deps.composerDraft.value = "";
     },
+    readReplyDraft(): MessageReplySummary | null {
+      return deps.replyDraft.value;
+    },
+    setReplyDraft(reply: MessageReplySummary): void {
+      deps.replyDraft.value = reply;
+    },
+    clearReplyDraft(): void {
+      deps.replyDraft.value = null;
+    },
     readReplyToMessageId(): string {
-      return deps.replyToMessageId.value.trim();
+      return deps.replyDraft.value?.messageId ?? "";
     },
     setReplyToMessageId(messageId: string): void {
-      deps.replyToMessageId.value = messageId;
+      deps.replyDraft.value = messageId.trim()
+        ? {
+            messageId: messageId.trim(),
+            senderName: "Unknown",
+            preview: "",
+            createdAt: 0,
+          }
+        : null;
     },
     clearReplyToMessageId(): void {
-      deps.replyToMessageId.value = "";
+      deps.replyDraft.value = null;
+    },
+    listDraftMentions(): MessageMention[] {
+      return [...deps.draftMentions.value];
+    },
+    addDraftMention(mention: MessageMention): void {
+      const userId = mention.userId.trim();
+      if (!userId) return;
+      if (deps.draftMentions.value.some((entry) => entry.userId === userId)) return;
+      deps.draftMentions.value = [...deps.draftMentions.value, { userId, displayName: mention.displayName.trim() || userId, type: mention.type }];
+    },
+    removeDraftMention(userId: string): void {
+      const target = userId.trim();
+      deps.draftMentions.value = deps.draftMentions.value.filter((entry) => entry.userId !== target);
+    },
+    clearDraftMentions(): void {
+      deps.draftMentions.value = [];
     },
     writeActionError(error: ChatMessageActionErrorInfo | null): void {
       deps.messageActionError.value = error;
+    },
+    readQuoteReplyDraft(): { messageId: string; userId: string; preview: string } | null {
+      return deps.quoteReplyDraft.value;
+    },
+    setQuoteReplyDraft(quote: { messageId: string; userId: string; preview: string }): void {
+      deps.quoteReplyDraft.value = quote;
+    },
+    clearQuoteReplyDraft(): void {
+      deps.quoteReplyDraft.value = null;
+    },
+    readChannelDraft(channelId: string): string {
+      return deps.readChannelDraft(channelId);
+    },
+    saveChannelDraft(channelId: string, text: string): void {
+      deps.saveChannelDraft(channelId, text);
+    },
+    clearChannelDraft(channelId: string): void {
+      deps.clearChannelDraft(channelId);
     },
   };
 }

@@ -10,6 +10,7 @@
 import { createChatMessageFlowState } from "@/features/chat/message-flow/presentation/runtime/messageFlowState";
 import { createChatGovernanceState } from "@/features/chat/room-governance/presentation/runtime/governanceState";
 import { createChatSessionState } from "@/features/chat/room-session/presentation/runtime/sessionState";
+import { currentServerSocket } from "@/features/server-connection/api";
 
 /**
  * 创建 chat 实时 Store 的状态容器。
@@ -20,6 +21,7 @@ export function createChatStoreState() {
   const session = createChatSessionState();
   const messageFlow = createChatMessageFlowState({
     currentChannelId: session.currentChannelId,
+    currentServerSocket,
   });
   const governance = createChatGovernanceState();
 

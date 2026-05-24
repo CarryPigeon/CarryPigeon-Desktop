@@ -119,6 +119,8 @@ export const zh_cn = {
   server_brief_placeholder: "暂无服务器简介",
   server_online: "在线",
   server_info_load_failed: "服务器信息加载失败",
+  mute_server: "免打扰",
+  unmute_server: "取消免打扰",
   // 模块：Patchbay / 插件 / Required
   patchbay: "插线板",
   connected: "已连接",

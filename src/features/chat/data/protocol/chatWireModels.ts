@@ -12,6 +12,13 @@ export type ChatChannelWire = {
   brief?: string;
   avatar?: string;
   owner_uid?: string;
+  announcement?: ChatChannelAnnouncementWire;
+  category_id?: string;
+  category_name?: string;
+  order?: number;
+  type?: string;
+  joined?: boolean;
+  join_requested?: boolean;
 };
 
 /**
@@ -21,6 +28,32 @@ export type ChatUserWire = {
   uid: string;
   nickname: string;
   avatar?: string;
+};
+
+export type ChatChannelAnnouncementWire = {
+  content: string;
+  updated_at: number;
+  updated_by?: string;
+};
+
+export type ChatMessageReplyWire = {
+  mid: string;
+  sender_name: string;
+  preview: string;
+  created_at: number;
+  unavailable?: boolean;
+};
+
+export type ChatQuoteReplyWire = {
+  mid: string;
+  uid: string;
+  preview: string;
+};
+
+export type ChatMessageMentionWire = {
+  uid: string;
+  display_name: string;
+  type?: "user" | "everyone" | "here";
 };
 
 /**
@@ -57,6 +90,14 @@ export type ChatChannelBanWire = {
   create_time?: number;
 };
 
+export type ChatForwardedFromWire = {
+  mid: string;
+  cid: string;
+  uid: string;
+  preview: string;
+  send_time: number;
+};
+
 /**
  * 消息实体的 wire 表示。
  */
@@ -71,7 +112,13 @@ export type ChatMessageWire = {
   data: unknown;
   preview?: string;
   reply_to_mid?: string;
+  reply_to?: ChatMessageReplyWire;
+  quote_reply?: ChatQuoteReplyWire;
+  mentions?: ChatMessageMentionWire[];
   reactions?: ChatMessageReactionWire[];
+  edited_at?: number;
+  edit_version?: number;
+  forwarded_from?: ChatForwardedFromWire;
 };
 
 /**
@@ -100,6 +147,10 @@ export type ChatSendMessageWire = {
   domain_version: string;
   data: unknown;
   reply_to_mid?: string;
+  reply_to?: ChatMessageReplyWire;
+  quote_reply?: ChatQuoteReplyWire;
+  mentions?: ChatMessageMentionWire[];
+  client_message_id?: string;
 };
 
 /**
@@ -108,6 +159,7 @@ export type ChatSendMessageWire = {
 export type ChatUnreadStateWire = {
   cid: string;
   unread_count: number;
+  mention_unread_count?: number;
   last_read_time: number;
 };
 

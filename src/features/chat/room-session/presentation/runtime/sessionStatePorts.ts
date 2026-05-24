@@ -13,7 +13,7 @@ import type {
   SessionReadMarkerStatePort,
 } from "@/features/chat/room-session/domain/ports";
 import type { ChatMember } from "@/features/chat/room-governance/api-types";
-import type { ChatMessage, ChatMessageActionErrorInfo } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage, ChatMessageActionErrorInfo, MessageReplySummary } from "@/features/chat/message-flow/api-types";
 import type { ChatChannel } from "@/features/chat/room-session/api-types";
 import {
   createSessionDirectoryStatePort,
@@ -41,6 +41,7 @@ export type CreateRoomSessionStatePortDeps = {
   scopeVersion: Ref<number>;
   messageActionError: Ref<ChatMessageActionErrorInfo | null>;
   composerDraft: Ref<string>;
+  replyDraft: Ref<MessageReplySummary | null>;
   replyToMessageId: Ref<string>;
   selectedDomainId: Ref<string>;
 };
@@ -101,7 +102,7 @@ export function createRoomSessionStatePort(
     },
     resetComposerState(): void {
       deps.composerDraft.value = "";
-      deps.replyToMessageId.value = "";
+      deps.replyDraft.value = null;
       deps.selectedDomainId.value = "Core:Text";
     },
     incrementScopeVersion(): void {

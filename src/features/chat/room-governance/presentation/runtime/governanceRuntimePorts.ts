@@ -18,6 +18,7 @@ import type {
   RemoveChannelBanOutcome,
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "@/features/chat/room-governance/api-types";
 import type { ChatChannel } from "@/features/chat/room-session/api-types";
@@ -40,6 +41,7 @@ export type ChatGovernanceRuntimePort = {
   refreshMembersRail(channelId: string): Promise<void>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   updateChannelMeta(channelId: string, patch: Partial<Pick<ChatChannel, "name" | "brief">>): Promise<UpdateChannelMetaOutcome>;
+  updateAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome>;
   listMembers(channelId: string): Promise<ChannelMember[]>;
   kickMember(channelId: string, uid: string): Promise<KickChannelMemberOutcome>;
   setAdmin(channelId: string, uid: string): Promise<GrantChannelAdminOutcome>;

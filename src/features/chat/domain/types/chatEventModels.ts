@@ -57,6 +57,59 @@ export type ChatMessageReactionsUpdatedEvent = {
   reactions: ChatReactionRecord[];
 };
 
+/** 消息编辑事件。 */
+export type ChatMessageUpdatedEvent = {
+  channelId: string;
+  message: ChatMessageRecord;
+};
+
+/** 消息置顶事件。 */
+export type ChatMessagePinnedEvent = {
+  channelId: string;
+  messageId: string;
+  pinId: string;
+  pinnedByUserId: string;
+  pinnedAt: number;
+  note?: string;
+};
+
+/** 消息取消置顶事件。 */
+export type ChatMessageUnpinnedEvent = {
+  channelId: string;
+  messageId: string;
+  pinId: string;
+  unpinnedByUserId: string;
+  unpinnedAt: number;
+};
+
+/** 提及创建事件。 */
+export type MentionCreatedEvent = {
+  mentionId: string;
+  channelId: string;
+  messageId: string;
+  fromUserId: string;
+  target: { type: string; uid: string };
+  createdAt: number;
+};
+
+/** 审计日志创建事件。 */
+export type AuditLogCreatedEvent = {
+  auditId: string;
+  channelId: string;
+  actorUserId: string;
+  action: string;
+  createdAt: number;
+};
+
+/** 频道分类变更事件。 */
+export type ChannelCategoryChangedEvent = {
+  channelId: string;
+  categoryId: string;
+  categoryName: string;
+  order: number;
+  type: string;
+};
+
 /**
  * chat 领域事件 envelope。
  *
@@ -100,6 +153,42 @@ export type ChatEventEnvelope =
       eventType: "message.reactions_updated";
       serverTime: number;
       payload: ChatMessageReactionsUpdatedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "message.updated";
+      serverTime: number;
+      payload: ChatMessageUpdatedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "message.pinned";
+      serverTime: number;
+      payload: ChatMessagePinnedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "message.unpinned";
+      serverTime: number;
+      payload: ChatMessageUnpinnedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "mention.created";
+      serverTime: number;
+      payload: MentionCreatedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "audit_log.created";
+      serverTime: number;
+      payload: AuditLogCreatedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "channel.category_changed";
+      serverTime: number;
+      payload: ChannelCategoryChangedEvent;
     }
   | {
       eventId: string;

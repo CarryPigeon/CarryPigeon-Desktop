@@ -260,7 +260,7 @@ Path:
 | `channels[].mode` | string | 频道级别，枚举: `all`, `mentions_only`, `muted`, `inherit` | 新建——频道通知模式枚举 |
 | `channels[].muted_until` | number | 频道静音截止时间，0=永久 | 新建——静音时间戳 |
 
-**状态**: ❌ 无 frontend 数据层。需新建 `NotificationPreferencesWire` 类型、Domain 模型、Port 方法、Http 函数和 Mapper。`cid` 可直接引用 `ChatChannelWire`
+**状态**: ✅ 前端层已实现（`NotificationPreferencesWire` → `createHttpNotificationPreferenceApi` → `createNotificationPreferenceCapability`），待后端 HTTP 服务端接入
 
 ---
 
@@ -274,7 +274,7 @@ Path:
 | `mode` | string | 是 | 枚举: `all`, `mentions_only`, `muted`, `inherit` | 新建——同 2.17 `NotificationMode` |
 | `muted_until` | number | 否 | 0=永久静音 | 新建——同 2.17 |
 
-**状态**: ❌ 无 frontend 数据层。新建 `ChannelNotificationPreferenceWire` 类型
+**状态**: ✅ 前端层已实现（`ChannelNotificationPreferenceWire` → `setChannelPreference` → `PUT /channels/{cid}/notification_preference`），待后端 HTTP 服务端接入
 
 ---
 
@@ -287,7 +287,7 @@ Path:
 | `mode` | string | 是 | 枚举: `all`, `mentions_only`, `muted`（不允许 `inherit`） | 新建——同 2.17 `NotificationServerMode` |
 | `muted_until` | number | 否 | 0=永久静音 | 新建——同 2.17 |
 
-**状态**: ❌ 无 frontend 数据层。新建 `ServerNotificationPreferenceWire` 类型
+**状态**: ✅ 前端层已实现（`ServerNotificationPreferenceWire` → `setServerPreference` → `createNotificationPreferenceCapability`），待后端 HTTP 服务端接入
 
 ---
 
@@ -322,7 +322,7 @@ Query:
 | `next_cursor` | string | 下一页游标 | ✅ 复用 `ChatMessagePageWire.next_cursor` |
 | `has_more` | boolean | 是否还有更多 | ✅ 复用 `ChatMessagePageWire.has_more` |
 
-**状态**: ❌ 无 frontend 数据层。需新建 `ChannelDiscoverItemWire` 类型。建议以 `ChatChannelWire` 为基类型扩展 `member_count` 和 `requires_application`
+**状态**: ✅ 前端层已实现（`ChannelDiscoverItemWire` → `ChatChannelDiscoveryApi.discoverChannels` → `GET /channels/discover`），待后端 HTTP 服务端接入
 
 ---
 
@@ -361,7 +361,7 @@ Query:
 P0 action 枚举（全部新建）:
 `channel.create`, `channel.delete`, `channel.update`, `channel.member.kick`, `channel.admin.grant`, `channel.admin.revoke`, `channel.ban.create`, `channel.ban.delete`, `message.delete`, `message.edit`, `message.pin`, `message.unpin`
 
-**状态**: 新能力，待实现。❌ **无 frontend 数据层**
+**状态**: ✅ 前端层已实现（`AuditLogItemWire` → `ChatAuditLogApi.listAuditLogs` → `GET /audit_logs`），待后端 HTTP 服务端接入
 
 ---
 
@@ -379,7 +379,7 @@ P0 action 枚举（全部新建）:
 
 新增错误 reason: `mention_target_invalid`, `mention_not_allowed`（P0 可先映射为 `validation_failed`/`forbidden`）
 
-**状态**: 需扩展 `ChatSendMessageWire`、`ChatSendMessageInput`、`ChatApiPort.sendChannelMessage` 和 `mapChatSendMessageInput`
+**状态**: ✅ 已扩展 `ChatSendMessageWire.client_message_id`、`ChatSendMessageInput.clientMessageId`、`mapChatSendMessageInput`；`mentions` 已前置完成。`ChatApiPort.sendChannelMessage` 无需修改（透传 wire）
 
 ---
 
@@ -403,7 +403,7 @@ P0 action 枚举（全部新建）:
 | `preview` | string | 源消息预览 | ✅ 复用 `ChatMessageWire.preview` |
 | `send_time` | number | 源发送时间 | ✅ 复用 `ChatMessageWire.send_time` |
 
-**状态**: 需扩展 `ChatMessageWire`、`ChatMessageRecord`、`mapChatMessageWire`，新增 `ChatForwardedFromRecord` Domain 类型
+**状态**: ✅ 已扩展 `ChatMessageWire`（`edited_at`/`edit_version`/`forwarded_from`）、`ChatMessageRecord`（`editedAt`/`editVersion`/`forwardedFrom`）、`mapChatMessageWire`，新增 `ChatForwardedFromWire` 和 `ChatForwardedFromRecord`
 
 ---
 
@@ -423,7 +423,7 @@ channel record 新增字段
 | `joined` | boolean | 否 | 当前用户是否已加入 | ✅ 直接复用 `ChannelSummary.joined`（shared-kernel/channelSummary.ts:15） |
 | `join_requested` | boolean | 否 | 当前用户是否已提交申请 | ✅ 直接复用 `ChannelSummary.joinRequested`（shared-kernel/channelSummary.ts:16） |
 
-**状态**: 需扩展 `ChatChannelWire`、`ChatChannelRecord`、`mapChatChannelWire`；`joined`/`join_requested` 可直接引用 `ChannelSummary` 的现成类型
+**状态**: ✅ 已扩展 `ChatChannelWire`（`category_id`/`category_name`/`order`/`type`/`joined`/`join_requested`）、`ChatChannelRecord`、`mapChatChannelWire`
 
 ---
 
@@ -486,7 +486,7 @@ channel record 新增字段
 | `order` | number | 排序值 | 新建——与 2.24 同步 |
 | `type` | string | 频道类型 | 新建——与 2.24 同步 |
 
-**状态**: 需扩展 `chatWireEvents.ts`、`chatEventModels.ts`、`chatWireMappers.ts`。`message.updated` 和 `mention.created` 可 100% 复用现有类型
+**状态**: ✅ 已扩展 `chatWireEvents.ts`（6 个 payload wire 类型）、`chatEventModels.ts`（6 个 domain 事件 + envelope 分支）、`chatWireMappers.ts`（6 个 mapper + 6 个 event_type 分支）
 
 ---
 
@@ -571,14 +571,12 @@ channel record 新增字段
 
 | 分类 | 数量 | 说明 |
 | --- | --- | --- |
-| HTTP 端点，前端层已实现 | 10 | 消息搜索、上下文定位、编辑、置顶 x3、转发、@提及 x3（Wire+Http+Port+Domain **+RootService+Gateway 已全**，待后端接入） |
-| HTTP 端点，无 frontend 数据层 | 5 | 通知偏好 x3、频道发现、审计日志 |
-| 模型/Wire 类型，需扩展 Wire+Domain+Mapper | 4 | 发送消息扩展字段、消息模型、频道模型、WS 事件 |
+| HTTP 端点，前端层已实现 | 19 | 消息搜索、上下文定位、编辑、置顶 x3、转发、@提及 x3、通知偏好 x3、频道发现、审计日志、频道资料、好友私聊（Wire+Http+Port+Domain 已全，待后端接入） |
+| 模型/Wire 类型，已扩展 | 4 | 发送消息扩展字段、消息模型、频道模型、WS 事件 |
 | Settings，已修复 | 3 | `update_config_u32`（前端已接入，`readServerPort`/`updateServerPort` 已添加）；`update_config_bool`（确认已完整实现）；`update_config_string`（确认已完整实现） |
 | Settings，已删除 | 1 | `update_config_u64`（死代码，已从 Rust 端完全移除，含 command/port/usecase/adapter 全调用链） |
 | Voice Call Rust | 11 | ✅ 已全部实现为真实逻辑（非桩） |
 | Voice Call Frontend | 9 | ✅ 已全部实现为真实 invoke 调用（非桩） |
 | Files | 1 | `listFiles` 非 mock 模式下已改为抛出可见错误（不再静默返回空数组） |
-| 好友私聊 | 1 | MVP 非目标，API 待定 |
 | 用户资料 | 2 | ✅ 头像与背景图已改为文件上传（参考 `UserProfilePopover` 模式）；头像 upload API（`POST /api/users/me/avatar`）待后端实现 |
-| **总计** | **47** | |
+| **总计** | **50** | |

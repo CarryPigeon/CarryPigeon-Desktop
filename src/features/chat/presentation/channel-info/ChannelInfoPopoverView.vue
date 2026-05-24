@@ -37,9 +37,19 @@ function computeOwner(): string {
   return String(route.query.owner ?? "—");
 }
 
+/**
+ * 从 query 参数中读取频道公告。
+ *
+ * @returns 公告内容字符串。
+ */
+function computeAnnouncement(): string {
+  return String(route.query.announcement ?? "");
+}
+
 const name = computed(computeName);
 const bio = computed(computeBio);
 const owner = computed(computeOwner);
+const announcement = computed(computeAnnouncement);
 </script>
 
 <template>
@@ -49,6 +59,10 @@ const owner = computed(computeOwner);
     <div class="cp-pop__title">{{ name }}</div>
     <div class="cp-pop__row"><MonoTag :value="owner" :copyable="true" title="owner" /></div>
     <div class="cp-pop__bio">{{ bio || "—" }}</div>
+    <div v-if="announcement" class="cp-pop__announcement">
+      <div class="cp-pop__label">Announcement</div>
+      <div class="cp-pop__anncText">{{ announcement }}</div>
+    </div>
   </main>
 </template>
 
@@ -86,5 +100,25 @@ const owner = computed(computeOwner);
   font-size: 12px;
   color: var(--cp-text-muted);
   line-height: 1.45;
+}
+
+/* Selector: `.cp-pop__announcement` — announcement section. */
+.cp-pop__announcement {
+  margin-top: 10px;
+}
+
+/* Selector: `.cp-pop__label` — announcement label. */
+.cp-pop__label {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Selector: `.cp-pop__anncText` — announcement text. */
+.cp-pop__anncText {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--cp-text);
 }
 </style>

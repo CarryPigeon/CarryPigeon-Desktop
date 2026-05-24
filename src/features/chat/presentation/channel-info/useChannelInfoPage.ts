@@ -9,6 +9,7 @@ import { currentChatUserId } from "@/features/chat/composition/chatAccountSessio
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import type {
   ApplyJoinChannelOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "@/features/chat/room-governance/api-types";
 import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
@@ -33,6 +34,7 @@ export type ChannelInfoPageDeps = {
   directory: RoomSessionDirectoryCapabilities;
   requestJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   saveChannelMeta(channelId: string, draft: ChannelMetaDraft): Promise<UpdateChannelMetaOutcome>;
+  saveChannelAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome>;
   resolveMayEditChannelMeta(channelId: string): Promise<boolean>;
   openPatchbayForChannel(channel: ChatChannel | null): Promise<ChannelSelectionOutcome | null> | ChannelSelectionOutcome | null;
 };
@@ -44,13 +46,17 @@ export type ChannelInfoPageModel = {
   channelId: ComputedRef<string>;
   channelName: ComputedRef<string>;
   channelBrief: ComputedRef<string>;
+  channelAnnouncement: ComputedRef<string>;
   membershipStatus: ComputedRef<"joined" | "not_joined">;
   isEditing: Ref<boolean>;
+  isEditingAnnouncement: Ref<boolean>;
   isRequestingJoin: Ref<boolean>;
   isSavingMeta: Ref<boolean>;
+  isSavingAnnouncement: Ref<boolean>;
   actionError: Ref<string>;
   draftChannelName: Ref<string>;
   draftChannelBrief: Ref<string>;
+  draftChannelAnnouncement: Ref<string>;
   hasChannel: ComputedRef<boolean>;
   isJoined: ComputedRef<boolean>;
   joinRequested: ComputedRef<boolean>;
@@ -59,6 +65,9 @@ export type ChannelInfoPageModel = {
   beginEdit(): void;
   cancelEdit(): void;
   saveEdit(): Promise<void>;
+  changeAnnouncement(): void;
+  cancelAnnouncementEdit(): void;
+  saveAnnouncement(): Promise<void>;
   handleJoin(): Promise<void>;
   openInPatchbay(): Promise<void>;
   goBack(): void;
@@ -77,6 +86,9 @@ function createDefaultChannelInfoPageDeps(router: Router): ChannelInfoPageDeps {
     },
     saveChannelMeta(channelId: string, draft: ChannelMetaDraft): Promise<UpdateChannelMetaOutcome> {
       return roomGovernanceCapabilities.forChannel(channelId).updateMeta(draft);
+    },
+    saveChannelAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome> {
+      return roomGovernanceCapabilities.forChannel(channelId).updateAnnouncement(content);
     },
     async resolveMayEditChannelMeta(channelId: string): Promise<boolean> {
       if (IS_MOCK_ENABLED) return false;
@@ -125,14 +137,18 @@ export function useChannelInfoPage(
   });
   const channelName = computed(() => channel.value?.name ?? requestedChannelName.value);
   const channelBrief = computed(() => channel.value?.brief ?? requestedChannelBrief.value);
+  const channelAnnouncement = computed(() => channel.value?.announcement?.content ?? "");
 
   const isEditing = ref(false);
+  const isEditingAnnouncement = ref(false);
   const isRequestingJoin = ref(false);
   const isSavingMeta = ref(false);
+  const isSavingAnnouncement = ref(false);
   const mayEditChannelMeta = ref(false);
   const actionError = ref("");
   const draftChannelName = ref("");
   const draftChannelBrief = ref("");
+  const draftChannelAnnouncement = ref("");
   let editPermissionRequestId = 0;
 
   const hasChannel = computed(() => channel.value !== null);
@@ -196,6 +212,38 @@ export function useChannelInfoPage(
     }
   }
 
+  function changeAnnouncement(): void {
+    if (!mayEditChannelMeta.value) return;
+    isEditingAnnouncement.value = true;
+    actionError.value = "";
+    draftChannelAnnouncement.value = channelAnnouncement.value;
+  }
+
+  function cancelAnnouncementEdit(): void {
+    isEditingAnnouncement.value = false;
+    actionError.value = "";
+    draftChannelAnnouncement.value = "";
+  }
+
+  async function saveAnnouncement(): Promise<void> {
+    if (!channelId.value || !mayEditChannelMeta.value || isSavingAnnouncement.value) return;
+
+    isSavingAnnouncement.value = true;
+    actionError.value = "";
+    try {
+      const outcome = await pageDeps.saveChannelAnnouncement(channelId.value, draftChannelAnnouncement.value);
+      if (!outcome.ok) {
+        actionError.value = outcome.error.message;
+        return;
+      }
+      isEditingAnnouncement.value = false;
+    } catch (error: unknown) {
+      actionError.value = String(error) || "Failed to save channel announcement.";
+    } finally {
+      isSavingAnnouncement.value = false;
+    }
+  }
+
   async function handleJoin(): Promise<void> {
     if (!channelId.value || isRequestingJoin.value) return;
 
@@ -228,10 +276,13 @@ export function useChannelInfoPage(
     [channelId, isJoined],
     () => {
       isEditing.value = false;
+      isEditingAnnouncement.value = false;
       isRequestingJoin.value = false;
       isSavingMeta.value = false;
+      isSavingAnnouncement.value = false;
       actionError.value = "";
       resetDraftToCurrentChannelMeta();
+      draftChannelAnnouncement.value = "";
       void refreshEditPermission();
     },
     { immediate: true },
@@ -241,13 +292,17 @@ export function useChannelInfoPage(
     channelId,
     channelName,
     channelBrief,
+    channelAnnouncement,
     membershipStatus,
     isEditing,
+    isEditingAnnouncement,
     isRequestingJoin,
     isSavingMeta,
+    isSavingAnnouncement,
     actionError,
     draftChannelName,
     draftChannelBrief,
+    draftChannelAnnouncement,
     hasChannel,
     isJoined,
     joinRequested,
@@ -256,6 +311,9 @@ export function useChannelInfoPage(
     beginEdit,
     cancelEdit,
     saveEdit,
+    changeAnnouncement,
+    cancelAnnouncementEdit,
+    saveAnnouncement,
     handleJoin,
     openInPatchbay,
     goBack,

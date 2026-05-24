@@ -9,7 +9,10 @@ import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   MessageDomain,
+  MessageMention,
   MessageReactionSummary,
+  MessageReplySummary,
+  MessageSearchState,
 } from "@/features/chat/message-flow/domain/contracts";
 
 /**
@@ -17,7 +20,7 @@ import type {
  */
 export type MessageFlowApiPort = Pick<
   ChatApiPort,
-  "sendChannelMessage" | "deleteMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction"
+  "sendChannelMessage" | "deleteMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction" | "searchChannelMessages" | "listChannelMessagesAround" | "listChannelMembers"
 >;
 
 /**
@@ -68,6 +71,10 @@ export type MessageTimelineStatePort = {
   writeHasMore(channelId: string, hasMore: boolean): void;
   isLoadingMore(channelId: string): boolean;
   setLoadingMore(channelId: string, loading: boolean): void;
+  writeSearchState(state: MessageSearchState): void;
+  readSearchState(): MessageSearchState;
+  setHighlightedMessageId(messageId: string): void;
+  readHighlightedMessageId(): string;
 };
 
 /**
@@ -78,10 +85,28 @@ export type MessageComposerStatePort = {
   readDraft(): string;
   replaceDraft(value: string): void;
   clearDraft(): void;
-  readReplyToMessageId(): string;
-  setReplyToMessageId(messageId: string): void;
-  clearReplyToMessageId(): void;
+  readReplyDraft(): MessageReplySummary | null;
+  setReplyDraft(reply: MessageReplySummary): void;
+  clearReplyDraft(): void;
+  readReplyToMessageId(): string; // keep for backward compat
+  setReplyToMessageId(messageId: string): void; // keep for backward compat
+  clearReplyToMessageId(): void; // keep for backward compat
   writeActionError(error: ChatMessageActionErrorInfo | null): void;
+  // New mention state
+  listDraftMentions(): MessageMention[];
+  addDraftMention(mention: MessageMention): void;
+  removeDraftMention(userId: string): void;
+  clearDraftMentions(): void;
+
+  /** Per-channel draft persistence. */
+  readChannelDraft(channelId: string): string;
+  saveChannelDraft(channelId: string, text: string): void;
+  clearChannelDraft(channelId: string): void;
+
+  /** Inline quote reply state. */
+  readQuoteReplyDraft(): { messageId: string; userId: string; preview: string } | null;
+  setQuoteReplyDraft(quote: { messageId: string; userId: string; preview: string }): void;
+  clearQuoteReplyDraft(): void;
 };
 
 /**

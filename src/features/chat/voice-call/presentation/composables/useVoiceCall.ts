@@ -107,6 +107,25 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     await rejectCall("manual");
   }
 
+  async function cancelCall(): Promise<void> {
+    const session = activeSession.value;
+    if (!session) return;
+    callState.value = "ended";
+    await statePort.cancelCall(session.sessionId);
+    stopPoll();
+    stopTimer();
+    activeSummary.value = {
+      sessionId: session.sessionId,
+      kind: session.kind,
+      duration: duration.value,
+      disconnectReason: "cancelled",
+    };
+    setTimeout(() => {
+      callState.value = "idle";
+      activeSession.value = null;
+    }, 500);
+  }
+
   async function toggleMute(): Promise<boolean> {
     const session = activeSession.value;
     if (!session) return false;
@@ -209,6 +228,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     acceptCall,
     rejectCall,
     hangup,
+    cancelCall,
     toggleMute,
     toggleNoiseSuppression,
     selectInputDevice,

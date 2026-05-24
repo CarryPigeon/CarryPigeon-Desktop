@@ -119,6 +119,8 @@ export const en_us = {
   server_brief_placeholder: "Server brief unavailable",
   server_online: "Online",
   server_info_load_failed: "Failed to load server info",
+  mute_server: "Mute Server",
+  unmute_server: "Unmute Server",
   // Patchbay / Plugins / Required
   patchbay: "Patchbay",
   connected: "Connected",

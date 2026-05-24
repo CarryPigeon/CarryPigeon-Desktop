@@ -35,6 +35,6 @@ export type GovernanceApiPort = Pick<
  */
 export type GovernanceChannelCatalogPort = {
   setJoinRequested(channelId: string, joinRequested: boolean): void;
-  applyChannelPatch(channelId: string, patch: Partial<Pick<GovernanceChannelSummary, "name" | "brief">>): void;
+  applyChannelPatch(channelId: string, patch: Partial<Pick<GovernanceChannelSummary, "name" | "brief" | "announcement">>): void;
   reconcileSelectionAfterDeletion(deletedChannelId: string): void;
 };

@@ -20,6 +20,8 @@ import type {
   ServerConnectionCapabilities,
 } from "./api-types";
 
+export { currentServerSocket } from "./rack/presentation/store/currentServer";
+
 /**
  * 创建 server-connection capability 对象。
  *

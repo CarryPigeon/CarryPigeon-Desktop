@@ -33,6 +33,7 @@ import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "../view-models/useChannelRailModel";
 import { useMembersRailModel } from "../view-models/useMembersRailModel";
 import { useChatCenterModel } from "../view-models/useChatCenterModel";
+import { useServerRailModel } from "../view-models/useServerRailModel";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import {
@@ -276,6 +277,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     return message.kind === "core_text" ? message.text : message.preview;
   }
 
+  // Forwarding variable to break circular dependency between useMessageContextMenu and chatCenter
+  let _enterMultiSelectMode: ((messageId: string) => void) = () => {};
+
   const {
     menuOpen,
     menuX,
@@ -288,13 +292,27 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     getClipboardText: getMessageClipboardText,
     copyTextToClipboard,
     startReply: currentChannelMessageFlow.beginReply,
+    startQuoteReply: (messageId: string, preview: string) => {
+      const message = currentChannelMessageFlow.findMessageById(messageId);
+      if (!message) return;
+      messageComposer.startQuoteReply(messageId, message.from.id, preview);
+    },
     deleteMessage: currentChannelMessageFlow.deleteMessage,
     onAsyncError: logAsyncError,
+    enterMultiSelectMode: (messageId: string) => {
+      _enterMultiSelectMode(messageId);
+    },
   });
 
   const currentChannelName = computed(() => {
     const channel = roomDirectory.findChannelById(currentSessionSnapshot.value.currentChannelId);
     return channel?.name ?? currentSessionSnapshot.value.currentChannelId;
+  });
+
+  const membersSnapshot = useObservedCapabilitySnapshot(roomGovernance.currentChannel.members);
+  const currentUserRole = computed(() => {
+    const member = membersSnapshot.value.find((m) => m.id === currentUserId.value);
+    return member?.role ?? "member";
   });
 
   const chatCenter = useChatCenterModel({
@@ -303,6 +321,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     messageComposer,
     lookupChannel: messageFlow.forChannel,
     currentUserId,
+    currentUserRole,
     currentChannelName,
     connectionDetail: chatConnectionDetail,
     connectionPillState: chatConnectionPillState,
@@ -313,6 +332,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onDeleteShortcut: handleDeleteShortcut,
     onMessageContextMenu: handleMessageContextMenu,
   });
+
+  // Wire up the circular dependency after chatCenter is created
+  _enterMultiSelectMode = (messageId: string) => {
+    chatCenter.enterMultiSelectMode(messageId);
+  };
 
   const {
     quickSwitcherOpen,
@@ -374,6 +398,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     },
   });
 
+  const { serverMuted, toggleServerMute } = useServerRailModel();
+
   /**
    * 下半段只做 section model 装配：
    * - 上半段先把跨 feature 协调、局部 capability、页面交互逻辑收拢；
@@ -382,6 +408,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const serverRail = createPatchbayServerRailSection({
     racks: serverRacks,
     activeSocket: socket,
+    serverMuted,
     handleSwitchServer: runServerSwitch,
     handleOpenServers,
     handleOpenSettings,
@@ -389,6 +416,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleOpenFiles: () => {
       void router.push("/files");
     },
+    toggleServerMute,
   });
 
   const chatViewport = createPatchbayChatViewportSection({

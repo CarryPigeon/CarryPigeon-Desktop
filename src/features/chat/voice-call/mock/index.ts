@@ -33,6 +33,19 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
         mediaSettings: { inputDeviceId: "default-mic", outputDeviceId: null, noiseSuppression: true, echoCancellation: true },
       };
       activeSession.value = session;
+
+      // Simulate call progression: dialing → connecting → active
+      setTimeout(() => {
+        if (activeSession.value?.sessionId === session.sessionId) {
+          activeSession.value = { ...activeSession.value, state: "connecting", participants: mockParticipants };
+        }
+      }, 1500);
+      setTimeout(() => {
+        if (activeSession.value?.sessionId === session.sessionId) {
+          activeSession.value = { ...activeSession.value, state: "active", startedAt: Date.now() };
+        }
+      }, 3000);
+
       return session;
     },
 

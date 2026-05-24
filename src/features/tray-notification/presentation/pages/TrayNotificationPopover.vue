@@ -24,6 +24,10 @@ const items = computed<UnreadMessagePreview[]>(() => {
   }
 });
 
+const sortedItems = computed(() => {
+  return [...items.value].sort((a, b) => Number(Boolean(b.mentionedMe)) - Number(Boolean(a.mentionedMe)));
+});
+
 function formatTime(ms: number): string {
   if (!ms) return "";
   const diff = Date.now() - ms;
@@ -50,7 +54,7 @@ async function handleClick(channelId: string) {
   <main class="cp-notif">
     <div class="cp-notif__header">{{ items.length }} 条未读消息</div>
     <div
-      v-for="(item, idx) in items"
+      v-for="(item, idx) in sortedItems"
       :key="item.messageId || idx"
       class="cp-notif__item"
       @click="handleClick(item.channelId)"

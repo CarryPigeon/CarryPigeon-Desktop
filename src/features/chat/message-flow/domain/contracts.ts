@@ -5,9 +5,18 @@
  */
 
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
-import type { MessageDomainRef, MessageReactionSummary, RenderableChatMessage } from "../message/domain/messageModels";
+import type { MessageDomainRef, MessageMention, MessageReactionSummary, MessageReplySummary, RenderableChatMessage } from "../message/domain/messageModels";
 
-export type { MessageReactionSummary };
+export type { MessageMention, MessageReactionSummary, MessageReplySummary };
+
+/**
+ * 提及候选项（输入 @ 时自动补全的结果）。
+ */
+export type MentionCandidate = {
+  userId: string;
+  displayName: string;
+  avatar?: string;
+};
 
 /**
  * message-flow 对外暴露的消息域标识模型。
@@ -34,6 +43,13 @@ export type ComposerSubmitPayload = {
   domainVersion: string;
   data: unknown;
   replyToMessageId?: string;
+  replyTo?: MessageReplySummary;
+  mentions?: MessageMention[];
+  quoteReply?: {
+    messageId: string;
+    userId: string;
+    preview: string;
+  };
 };
 
 /**
@@ -87,3 +103,21 @@ export type ReactToMessageOutcome =
 export type RemoveReactionOutcome =
   | SuccessOutcome<"message_reaction_removed", { messageId: string; emoji: string; reactions: MessageReactionSummary[] }>
   | FailureOutcome<"message_reaction_removal_rejected", ChatMessageActionErrorCode>;
+
+/**
+ * 消息搜索结果。
+ */
+export type MessageSearchResult = {
+  message: ChatMessage;
+  preview: string;
+};
+
+/**
+ * 消息搜索状态。
+ */
+export type MessageSearchState = {
+  query: string;
+  loading: boolean;
+  error: string;
+  results: MessageSearchResult[];
+};

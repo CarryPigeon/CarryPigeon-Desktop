@@ -10,9 +10,13 @@ import { chatCurrentServerSocket } from "@/features/chat/composition/serverWorks
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
+  MentionCandidate,
   MessageDomain,
+  MessageSearchState,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MessageMention,
+  MessageReplySummary,
   ReactToMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
@@ -34,6 +38,7 @@ import type {
   RemoveChannelBanOutcome,
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
   DecideChannelApplicationOutcome,
 } from "@/features/chat/room-governance/api-types";
@@ -144,7 +149,14 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   const composerDraft = ref<string>("");
   const selectedDomainId = ref<string>("Core:Text");
   const replyToMessageId = ref<string>("");
+  const replyDraft = ref<MessageReplySummary | null>(null);
+  const draftMentions = ref<MessageMention[]>([]);
+  const quoteReplyDraft = ref<{ messageId: string; userId: string; preview: string } | null>(null);
+  const multiSelectMode = ref(false);
+  const selectedMessageIds = ref<Set<string>>(new Set());
   const messageActionError = ref<ChatMessageActionErrorInfo | null>(null);
+  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [] });
+  const highlightedMessageId = ref<string>("");
   const currentChannelId = ref<string>("cid-prod");
   const sendAttempt = ref<number>(0);
 
@@ -363,8 +375,15 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
    * @param messageId - 需要回复的消息 id。
    * @returns void。
    */
-  function startReply(messageId: string): void {
-    replyToMessageId.value = messageId;
+  function startReply(message: ChatMessage): void {
+    const preview = message.kind === "core_text" ? message.text : message.preview;
+    replyDraft.value = {
+      messageId: message.id,
+      senderName: message.from.name,
+      preview,
+      createdAt: message.timeMs,
+    };
+    replyToMessageId.value = message.id;
     messageActionError.value = null;
   }
 
@@ -374,6 +393,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
    * @returns void。
    */
   function cancelReply(): void {
+    replyDraft.value = null;
     replyToMessageId.value = "";
   }
 
@@ -465,7 +485,15 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     const now = Date.now();
     const list = state.messagesByChannel[currentChannelId.value] ?? (state.messagesByChannel[currentChannelId.value] = []);
     const from = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator" };
-    const replyToId = replyToMessageId.value || undefined;
+    const replyToId = replyDraft.value?.messageId || replyToMessageId.value || undefined;
+    const replyTo = replyDraft.value
+      ? {
+          messageId: replyDraft.value.messageId,
+          senderName: replyDraft.value.senderName,
+          preview: replyDraft.value.preview,
+          createdAt: replyDraft.value.createdAt,
+        }
+      : undefined;
     let createdMessage: ChatMessage;
 
     if (payload) {
@@ -478,6 +506,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         preview: `UNPATCHED SIGNAL · ${payload.domain}@${payload.domainVersion}`,
         data: payload.data,
         replyToId,
+        replyTo,
       };
       list.push(createdMessage);
     } else {
@@ -489,11 +518,13 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
         text,
         replyToId,
+        replyTo,
       };
       list.push(createdMessage);
       composerDraft.value = "";
     }
 
+    replyDraft.value = null;
     replyToMessageId.value = "";
     state.lastReadTimeMsByChannel[currentChannelId.value] = now;
     return {
@@ -800,6 +831,30 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   }
 
   /**
+   * 更新频道公告（mock）。
+   *
+   * @param channelId - 频道 id。
+   * @param content - 公告内容。
+   * @returns `Promise<UpdateChannelAnnouncementOutcome>`。
+   */
+  async function updateAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome> {
+    const found = state.channels.find((c) => c.id === channelId);
+    if (!found) {
+      return {
+        ok: false,
+        kind: "channel_announcement_updated_rejected",
+        error: createGovernanceError("missing_channel_id", "Channel not found.", { channelId }),
+      };
+    }
+    found.announcement = { content, updatedAt: Date.now(), updatedBy: undefined };
+    return {
+      ok: true,
+      kind: "channel_announcement_updated",
+      channelId,
+    };
+  }
+
+  /**
    * 创建频道（mock）。
    *
    * @param name - 频道名称。
@@ -862,15 +917,84 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     };
   }
 
+  async function searchCurrentChannel(query: string): Promise<void> {
+    const q = String(query ?? "").trim();
+    if (!q) {
+      searchState.value = { query: "", loading: false, error: "", results: [] };
+      return;
+    }
+    const cid = currentChannelId.value.trim();
+    if (!cid) return;
+    searchState.value = { query: q, loading: true, error: "", results: [] };
+    // Simulate search delay
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const messages = state.messagesByChannel[cid] ?? [];
+    const needle = q.toLowerCase();
+    const results = messages
+      .filter((msg) => {
+        const text = msg.kind === "core_text" ? msg.text : msg.preview;
+        return text.toLowerCase().includes(needle);
+      })
+      .map((message) => ({
+        message,
+        preview: message.kind === "core_text" ? message.text : message.preview,
+      }));
+    searchState.value = { query: q, loading: false, error: "", results };
+  }
+
+  async function loadContextAroundMessage(messageId: string): Promise<void> {
+    const mid = String(messageId ?? "").trim();
+    if (!mid) return;
+    const cid = currentChannelId.value.trim();
+    if (!cid) return;
+    // Ensure the target message exists in the mock timeline
+    const existing = state.messagesByChannel[cid] ?? [];
+    if (!existing.some((m) => m.id === mid)) {
+      state.messagesByChannel[cid] = [
+        ...existing,
+        {
+          id: mid,
+          kind: "core_text" as const,
+          from: { id: "u-1", name: "Operator" },
+          timeMs: Date.now() - 1000 * 60,
+          domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" as const },
+          text: "Message from search result",
+        },
+      ];
+    }
+    highlightedMessageId.value = mid;
+  }
+
+  function clearSearch(): void {
+    searchState.value = { query: "", loading: false, error: "", results: [] };
+    highlightedMessageId.value = "";
+  }
+
+  async function listMentionCandidates(channelId?: string): Promise<MentionCandidate[]> {
+    const cid = String(channelId || currentChannelId.value).trim();
+    if (!cid) return [];
+    return state.members.map((member) => ({
+      userId: member.id,
+      displayName: member.name || member.id,
+    }));
+  }
+
   return {
     channels,
     allChannels,
     channelSearch,
     channelTab,
     composerDraft,
+    multiSelectMode,
+    selectedMessageIds,
     selectedDomainId,
+    replyDraft,
+    draftMentions,
+    quoteReplyDraft,
     replyToMessageId,
     messageActionError,
+    searchState,
+    highlightedMessageId,
     currentChannelId,
     currentMessages,
     currentChannelHasMore,
@@ -887,12 +1011,17 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     loadMoreMessages,
     applyJoin,
     updateChannelMeta,
+    updateAnnouncement,
     startReply,
     cancelReply,
     deleteMessage,
     sendComposerMessage,
     reactToMessage,
     removeReaction,
+    listMentionCandidates,
+    searchCurrentChannel,
+    loadContextAroundMessage,
+    clearSearch,
     // 频道管理
     listMembers,
     kickMember,

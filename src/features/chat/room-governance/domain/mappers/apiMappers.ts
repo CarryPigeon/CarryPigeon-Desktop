@@ -68,5 +68,6 @@ export function mapApiChannel(c: ChatChannelRecord): ChannelSummary {
     unread: 0,
     joined: true,
     joinRequested: false,
+    announcement: c.announcement,
   };
 }

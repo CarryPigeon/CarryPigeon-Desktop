@@ -21,6 +21,7 @@ import type {
   RemoveChannelBanOutcome,
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "@/features/chat/room-governance/api-types";
 
@@ -129,6 +130,13 @@ export function setBan(channelId: string, uid: string, until: number, reason: st
  */
 export function updateChannelMeta(channelId: string, patch: { name?: string; brief?: string }): Promise<UpdateChannelMetaOutcome> {
   return resolveRoomGovernanceStore().updateChannelMeta(channelId, patch);
+}
+
+/**
+ * 更新频道公告。
+ */
+export function updateAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome> {
+  return resolveRoomGovernanceStore().updateAnnouncement(channelId, content);
 }
 
 export type { ChannelApplication, ChannelBan, ChannelMember, GovernanceChannelSummary };

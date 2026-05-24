@@ -10,20 +10,32 @@
 
 import { clonePlainData } from "@/shared/utils/clonePlainData";
 import { createWatchedSnapshotObserver } from "@/shared/utils/createWatchedSnapshotObserver";
+import { currentServerSocket } from "@/features/server-connection/api";
+import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 import {
+  addMention,
   availableDomains,
   cancelReply,
+  clearSearch,
   composerDraft,
   currentChannelHasMore,
   currentMessages,
   deleteMessage,
+  draftMentions,
   getMessageById as findMessageByIdInChannel,
+  highlightedMessageId,
+  listMentionCandidates,
+  loadContextAroundMessage,
   loadMoreMessages,
   loadingMoreMessages,
   messageActionError,
+  quoteReplyDraft,
   reactToMessage,
   removeReaction,
+  replyDraft,
   replyToMessageId,
+  searchCurrentChannel,
+  searchState,
   selectedDomainId,
   sendComposerMessage,
   startReply,
@@ -63,6 +75,8 @@ function getTimelineSnapshot(): MessageTimelineSnapshot {
     currentMessageCount: currentMessages.value.length,
     hasMoreHistory: currentChannelHasMore.value,
     isLoadingHistory: loadingMoreMessages.value,
+    search: { ...searchState.value },
+    highlightedMessageId: highlightedMessageId.value,
   };
 }
 
@@ -81,8 +95,11 @@ function getComposerSnapshot(): MessageComposerSnapshot {
     draft: composerDraft.value,
     activeDomainId: selectedDomainId.value,
     replyToMessageId: replyToMessageId.value,
+    replyDraft: clonePlainData(replyDraft.value),
+    draftMentions: clonePlainData(draftMentions.value),
     actionError: messageActionError.value,
     availableDomains: clonePlainData(availableDomains()),
+    quoteReplyDraft: clonePlainData(quoteReplyDraft.value),
   };
 }
 
@@ -125,16 +142,42 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
     composerDraft.value = text ? `${text}\n[file:${shareKey}]` : `[file:${shareKey}]`;
   }
 
+  const draftStorage = createLocalStorageDraftStorage(
+    () => currentServerSocket.value ?? "",
+  );
+
+  function readChannelDraft(channelId: string): string {
+    return draftStorage.readDraft(channelId)?.text ?? "";
+  }
+
+  function saveChannelDraft(channelId: string, text: string): void {
+    if (!text.trim()) {
+      draftStorage.deleteDraft(channelId);
+      return;
+    }
+    draftStorage.saveDraft({ channelId, text, updatedAt: Date.now() });
+  }
+
+  function clearChannelDraft(channelId: string): void {
+    draftStorage.deleteDraft(channelId);
+  }
+
   return {
     currentChannel: {
       getSnapshot: getTimelineSnapshot,
       observeSnapshot: observeTimelineSnapshot,
       findMessageById: findCurrentChannelMessageById,
       loadMoreHistory: loadMoreMessages,
-      beginReply: startReply,
+      beginReply(messageId: string): void {
+        const message = findCurrentChannelMessageById(messageId);
+        if (message) startReply(message);
+      },
       deleteMessage,
       reactToMessage,
       removeReaction,
+      searchCurrentChannel,
+      loadContextAroundMessage,
+      clearSearch,
     },
     composer: {
       getSnapshot: getComposerSnapshot,
@@ -145,6 +188,17 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       appendAttachmentShareKey,
       cancelReply,
       sendMessage: sendComposerMessage,
+      listMentionCandidates: listMentionCandidates,
+      addMention: addMention,
+      readChannelDraft,
+      saveChannelDraft,
+      clearChannelDraft,
+      startQuoteReply(messageId: string, userId: string, preview: string): void {
+        quoteReplyDraft.value = { messageId, userId, preview };
+      },
+      cancelQuoteReply(): void {
+        quoteReplyDraft.value = null;
+      },
     },
     forChannel(channelId: string): ChannelMessageLookupCapabilities {
       return {

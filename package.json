@@ -3,7 +3,9 @@
     "private": true,
     "version": "0.1.0",
     "type": "module",
-    "pnpm": {},
+    "pnpm": {
+        "onlyBuiltDependencies": ["@parcel/watcher", "esbuild"]
+    },
     "scripts": {
         "dev": "vite",
         "typecheck": "vue-tsc --noEmit",

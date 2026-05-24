@@ -80,6 +80,7 @@ const { t } = useI18n();
             <span class="cp-channel__name">{{ c.name }}</span>
             <span class="cp-channelRow__brief">{{ c.brief }}</span>
           </span>
+          <span v-if="props.model.hasDraft(c.id)" class="cp-channel__draft-indicator" title="Draft">&#x270E;</span>
         </button>
 
         <!-- 区块：右侧动作（未读/加入/信息） -->
