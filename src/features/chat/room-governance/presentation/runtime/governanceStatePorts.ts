@@ -9,6 +9,7 @@ import type { Ref } from "vue";
 import type { GovernanceChannelCatalogPort } from "@/features/chat/room-governance/domain/ports";
 import type { ChatMember } from "@/features/chat/room-governance/api-types";
 import type { ChatChannel } from "@/features/chat/room-session/api-types";
+import type { ChatChannelAnnouncementRecord } from "@/features/chat/domain/types/chatApiModels";
 
 /**
  * 创建治理频道目录端口所需的状态容器。
@@ -29,11 +30,12 @@ export function createGovernanceChannelCatalogPort(
       const channel = deps.channelsRef.value.find((item) => item.id === channelId);
       if (channel) channel.joinRequested = joinRequested;
     },
-    applyChannelPatch(channelId: string, patch: { name?: string; brief?: string }): void {
+    applyChannelPatch(channelId: string, patch: { name?: string; brief?: string; announcement?: ChatChannelAnnouncementRecord }): void {
       const channel = deps.channelsRef.value.find((item) => item.id === channelId);
       if (!channel) return;
       if (typeof patch.name === "string" && patch.name.trim()) channel.name = patch.name.trim();
       if (typeof patch.brief === "string") channel.brief = patch.brief;
+      if (patch.announcement !== undefined) channel.announcement = patch.announcement;
     },
     reconcileSelectionAfterDeletion(deletedChannelId: string): void {
       if (deps.currentChannelId.value !== deletedChannelId) return;

@@ -13,11 +13,13 @@ type RefLike<T> = Ref<T> | ComputedRef<T>;
 type PatchbayServerRailRawModel = {
   racks: RefLike<readonly { serverSocket: string; name: string }[]>;
   activeSocket: RefLike<string>;
+  serverMuted: RefLike<boolean>;
   handleSwitchServer(serverSocket: string): void;
   handleOpenServers(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
+  toggleServerMute(): void;
 };
 /**
  * Patchbay 页面服务器侧栏 section model。
@@ -44,7 +46,7 @@ type PatchbayMessageContextMenuRawModel = {
   x: RefLike<number>;
   y: RefLike<number>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward"): void;
+  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -107,22 +109,26 @@ export type PatchbayQuickSwitcherModel = ShallowUnwrapRef<PatchbayQuickSwitcherR
 type CreatePatchbayServerRailSectionDeps = {
   racks: RefLike<readonly { serverSocket: string; name: string }[]>;
   activeSocket: RefLike<string>;
+  serverMuted: RefLike<boolean>;
   handleSwitchServer(serverSocket: string): void;
   handleOpenServers(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
+  toggleServerMute(): void;
 };
 
 export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSectionDeps): PatchbayServerRailModel {
   return proxyRefs({
     racks: deps.racks,
     activeSocket: deps.activeSocket,
+    serverMuted: deps.serverMuted,
     handleSwitchServer: deps.handleSwitchServer,
     handleOpenServers: deps.handleOpenServers,
     handleOpenSettings: deps.handleOpenSettings,
     goPlugins: deps.goPlugins,
     handleOpenFiles: deps.handleOpenFiles,
+    toggleServerMute: deps.toggleServerMute,
   });
 }
 
@@ -158,7 +164,7 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   x: RefLike<number>;
   y: RefLike<number>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward"): void;
+  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select"): void;
 };
 
 /**

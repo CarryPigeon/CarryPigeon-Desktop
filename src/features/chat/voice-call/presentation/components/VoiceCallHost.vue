@@ -13,10 +13,13 @@
     :is-noise-suppression-on="isNoiseSuppressionOn"
     :input-devices="inputDevices"
     :current-input-device-id="currentInputDeviceId"
+    :output-devices="outputDevices"
+    :current-output-device-id="currentOutputDeviceId"
     :is-conference="isConference"
     @toggle-mute="toggleMute"
     @toggle-noise-suppression="toggleNoiseSuppression"
     @select-input-device="selectInputDevice"
+    @select-output-device="selectOutputDevice"
     @hangup="handleHangup"
   />
 </template>
@@ -52,15 +55,18 @@ const {
   isMuted,
   isNoiseSuppressionOn,
   inputDevices,
+  outputDevices,
   connectSignaling,
   startDirectCall,
   startConference,
   acceptCall,
   rejectCall,
   hangup,
+  cancelCall,
   toggleMute,
   toggleNoiseSuppression,
   selectInputDevice,
+  selectOutputDevice,
   initDevices,
   joinConference,
   leaveConference,
@@ -81,6 +87,10 @@ const currentInputDeviceId = computed(() => {
   return activeSession.value?.mediaSettings.inputDeviceId ?? null;
 });
 
+const currentOutputDeviceId = computed(() => {
+  return activeSession.value?.mediaSettings.outputDeviceId ?? null;
+});
+
 function handleAccept() {
   acceptCall();
 }
@@ -90,7 +100,9 @@ function handleReject() {
 }
 
 function handleHangup() {
-  if (isConference.value) {
+  if (callState.value === "dialing") {
+    cancelCall();
+  } else if (isConference.value) {
     void leaveConference();
   } else {
     hangup();

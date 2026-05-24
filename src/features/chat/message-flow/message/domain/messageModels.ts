@@ -27,6 +27,22 @@ export type MessageReactionSummary = {
   reactedByMe: boolean;
 };
 
+/** 回复引用摘要模型。 */
+export type MessageReplySummary = {
+  messageId: string;
+  senderName: string;
+  preview: string;
+  createdAt: number;
+  unavailable?: boolean;
+};
+
+/** 消息提及模型。 */
+export type MessageMention = {
+  userId: string;
+  displayName: string;
+  type?: "user" | "everyone" | "here";
+};
+
 /**
  * 消息渲染链路使用的最小消息模型。
  */
@@ -39,6 +55,13 @@ export type RenderableChatMessage =
       domain: MessageDomainRef;
       text: string;
       replyToId?: string;
+      replyTo?: MessageReplySummary;
+      quoteReply?: {
+        messageId: string;
+        userId: string;
+        preview: string;
+      };
+      mentions?: MessageMention[];
       reactions?: MessageReactionSummary[];
     }
   | {
@@ -50,6 +73,13 @@ export type RenderableChatMessage =
       preview: string;
       data?: unknown;
       replyToId?: string;
+      replyTo?: MessageReplySummary;
+      quoteReply?: {
+        messageId: string;
+        userId: string;
+        preview: string;
+      };
+      mentions?: MessageMention[];
       reactions?: MessageReactionSummary[];
     };
 

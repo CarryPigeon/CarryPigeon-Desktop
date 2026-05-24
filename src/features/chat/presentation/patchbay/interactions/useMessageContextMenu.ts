@@ -10,7 +10,7 @@ import { createAsyncTaskRunner } from "./asyncTaskRunner";
 /**
  * 消息上下文菜单动作类型。
  */
-export type MessageContextAction = "copy" | "reply" | "delete" | "forward";
+export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select";
 
 /**
  * 消息上下文菜单编排依赖。
@@ -19,8 +19,10 @@ export type UseMessageContextMenuDeps = {
   getClipboardText(messageId: string): string | null;
   copyTextToClipboard(text: string): Promise<unknown>;
   startReply(messageId: string): void;
+  startQuoteReply(messageId: string, preview: string): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   onAsyncError(action: string, error: unknown): void;
+  enterMultiSelectMode(firstMessageId: string): void;
 };
 
 /**
@@ -56,8 +58,17 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
       case "reply":
         deps.startReply(messageId);
         return;
+      case "quote": {
+        const text = deps.getClipboardText(messageId);
+        if (!text) return;
+        deps.startQuoteReply(messageId, text);
+        return;
+      }
       case "delete":
         runAsyncTask(deps.deleteMessage(messageId), "chat_delete_menu_failed");
+        return;
+      case "select":
+        deps.enterMultiSelectMode(messageId);
         return;
       case "forward":
       case "copy": {

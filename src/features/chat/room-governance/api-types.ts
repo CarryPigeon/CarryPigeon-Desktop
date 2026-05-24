@@ -20,6 +20,7 @@ import type {
   RemoveChannelBanOutcome,
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "./domain/contracts";
 
@@ -40,6 +41,7 @@ export type {
   RemoveChannelBanOutcome,
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "./domain/contracts";
 
@@ -62,6 +64,7 @@ export type RoomGovernanceMembersCapabilities = ReadableCapability<RoomGovernanc
 export type ChannelGovernanceCapabilities = {
   applyJoin(): Promise<ApplyJoinChannelOutcome>;
   updateMeta(patch: { name?: string; brief?: string }): Promise<UpdateChannelMetaOutcome>;
+  updateAnnouncement(content: string): Promise<UpdateChannelAnnouncementOutcome>;
   deleteChannel(): Promise<DeleteChannelOutcome>;
   listMembers(): Promise<ChannelMember[]>;
   kickMember(uid: string): Promise<KickChannelMemberOutcome>;

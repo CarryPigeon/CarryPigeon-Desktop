@@ -16,7 +16,9 @@ import type {
   ChatMessage,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MentionCandidate,
   MessageReactionSummary,
+  MessageSearchResult,
   ReactToMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
@@ -73,8 +75,14 @@ export class MessageFlowApplicationService {
   /**
    * 进入回复态，并清空上一次动作错误。
    */
-  startReply(messageId: string): void {
-    this.deps.composerState.setReplyToMessageId(messageId);
+  startReply(message: ChatMessage): void {
+    const preview = message.kind === "core_text" ? message.text : message.preview;
+    this.deps.composerState.setReplyDraft({
+      messageId: message.id,
+      senderName: message.from.name,
+      preview,
+      createdAt: message.timeMs,
+    });
     this.deps.composerState.writeActionError(null);
   }
 
@@ -82,7 +90,7 @@ export class MessageFlowApplicationService {
    * 退出回复态。
    */
   cancelReply(): void {
-    this.deps.composerState.clearReplyToMessageId();
+    this.deps.composerState.clearReplyDraft();
   }
 
   /**
@@ -96,7 +104,8 @@ export class MessageFlowApplicationService {
    */
   async sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome> {
     const uiDomain = this.deps.composerState.readSelectedDomainId();
-    const replyToMid = this.deps.composerState.readReplyToMessageId() || undefined;
+    const replyDraft = this.deps.composerState.readReplyDraft();
+    const quoteReply = payload?.quoteReply ?? this.deps.composerState.readQuoteReplyDraft();
 
     const isCoreText = uiDomain === "Core:Text";
     const text = this.deps.composerState.readDraft().trim();
@@ -131,7 +140,7 @@ export class MessageFlowApplicationService {
     const apiDomain = payload ? String(payload.domain ?? "").trim() : uiDomain;
     const apiVersion = payload ? String(payload.domainVersion ?? "").trim() : "1.0.0";
     const data = payload ? payload.data : { text };
-    const finalReplyToMid = payload?.replyToMessageId ? String(payload.replyToMessageId).trim() : replyToMid;
+    const finalReplyToMid = payload?.replyToMessageId ? String(payload.replyToMessageId).trim() : replyDraft?.messageId;
     if (!apiDomain) {
       const error = createMessageActionError("missing_domain", "Missing domain.");
       this.deps.composerState.writeActionError(error);
@@ -144,7 +153,29 @@ export class MessageFlowApplicationService {
     }
 
     try {
-      const req: ChatSendMessageInput = { domain: apiDomain, domainVersion: apiVersion, data, replyToMessageId: finalReplyToMid };
+      const req: ChatSendMessageInput = {
+        domain: apiDomain,
+        domainVersion: apiVersion,
+        data,
+        replyToMessageId: finalReplyToMid,
+        replyTo: replyDraft
+          ? {
+              messageId: replyDraft.messageId,
+              senderName: replyDraft.senderName,
+              preview: replyDraft.preview,
+              createdAt: replyDraft.createdAt,
+              unavailable: replyDraft.unavailable,
+            }
+          : undefined,
+        quoteReply: quoteReply
+          ? {
+              messageId: quoteReply.messageId,
+              userId: quoteReply.userId,
+              preview: quoteReply.preview,
+            }
+          : undefined,
+        mentions: payload?.mentions ?? this.deps.composerState.listDraftMentions().map((m) => ({ userId: m.userId, displayName: m.displayName, type: m.type })),
+      };
       const created = await this.deps.api.sendChannelMessage(socket, token, cid, req, this.createIdempotencyKey());
       const mapped = this.deps.mapWireMessage(socket, created);
       if (this.isScopeStale(requestSocket, requestScopeVersion)) {
@@ -162,8 +193,11 @@ export class MessageFlowApplicationService {
         mapped,
         (a, b) => (a.timeMs === b.timeMs ? a.id.localeCompare(b.id) : a.timeMs - b.timeMs),
       );
-      this.deps.composerState.clearReplyToMessageId();
+      this.deps.composerState.clearReplyDraft();
+      this.deps.composerState.clearQuoteReplyDraft();
       if (!payload) this.deps.composerState.clearDraft();
+      this.deps.composerState.clearDraftMentions();
+      this.deps.composerState.clearChannelDraft(cid);
 
       const now = Date.now();
       const nextReadTime = this.deps.readStateReporter.advanceLocalReadTime(cid, now);
@@ -411,6 +445,101 @@ export class MessageFlowApplicationService {
       }
       return rejectMessageAction("message_reaction_removal_rejected", "reaction_failed", String(err));
     }
+  }
+
+  /**
+   * 列出当前频道的提及候选成员列表。
+   *
+   * @param channelId - 可选，不传时使用当前时间线的频道 ID。
+   * @returns 提及候选项数组。
+   */
+  async listMentionCandidates(channelId?: string): Promise<MentionCandidate[]> {
+    const cid = String(channelId || this.deps.timelineState.readCurrentChannelId()).trim();
+    if (!cid) return [];
+    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    if (!socket || !token) return [];
+    try {
+      const members = await this.deps.api.listChannelMembers(socket, token, cid);
+      return members.map((member) => ({
+        userId: member.userId,
+        displayName: member.nickname || member.userId,
+        avatar: member.avatar,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 在当前频道中搜索消息。
+   */
+  async searchCurrentChannel(query: string): Promise<void> {
+    const q = String(query ?? "").trim();
+    if (!q) {
+      this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
+      return;
+    }
+    const cid = this.deps.timelineState.readCurrentChannelId();
+    if (!cid) return;
+    this.deps.timelineState.writeSearchState({ query: q, loading: true, error: "", results: [] });
+    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    if (!socket || !token) {
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results: [] });
+      return;
+    }
+    const requestSocket = socket;
+    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
+    try {
+      const page = await this.deps.api.searchChannelMessages(socket, token, cid, { q, limit: 30 });
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
+      const results: MessageSearchResult[] = page.items.map((item) => {
+        const message = this.deps.mapWireMessage(socket, item);
+        return {
+          message,
+          preview: message.kind === "core_text" ? message.text : message.preview,
+        };
+      });
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results });
+    } catch {
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "Search failed.", results: [] });
+    }
+  }
+
+  /**
+   * 加载某条消息周围的上下文，并在本地 timeline 中高亮它。
+   */
+  async loadContextAroundMessage(messageId: string): Promise<void> {
+    const mid = String(messageId ?? "").trim();
+    if (!mid) return;
+    const cid = this.deps.timelineState.readCurrentChannelId();
+    if (!cid) return;
+    const existing = this.deps.timelineState.listMessages(cid).some((message) => message.id === mid);
+    if (existing) {
+      this.deps.timelineState.setHighlightedMessageId(mid);
+      return;
+    }
+    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    if (!socket || !token) return;
+    const requestSocket = socket;
+    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
+    try {
+      const page = await this.deps.api.listChannelMessagesAround(socket, token, cid, mid, 20, 20);
+      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
+      const mapped = page.items.map((item) => this.deps.mapWireMessage(socket, item));
+      this.deps.timelineState.replaceTimeline(cid, mapped);
+      this.deps.timelineState.setHighlightedMessageId(mid);
+    } catch {
+      // Context load failed, leave current timeline intact
+    }
+  }
+
+  /**
+   * 清除搜索状态。
+   */
+  clearSearch(): void {
+    this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
+    this.deps.timelineState.setHighlightedMessageId("");
   }
 
   /**

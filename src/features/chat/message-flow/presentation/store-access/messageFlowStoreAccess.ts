@@ -12,6 +12,9 @@ import type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MentionCandidate,
+  MessageMention,
+  MessageReplySummary,
   ReactToMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
@@ -46,12 +49,47 @@ export const currentMessages = computed(() => resolveMessageFlowStore().currentM
  */
 export const loadingMoreMessages = computed(() => resolveMessageFlowStore().loadingMoreMessages.value);
 /**
- * 当前回复目标消息 id 双向投影。
+ * 当前搜索状态。
+ */
+export const searchState = computed(() => resolveMessageFlowStore().searchState.value);
+/**
+ * 当前高亮消息 id。
+ */
+export const highlightedMessageId = computed(() => resolveMessageFlowStore().highlightedMessageId.value);
+/**
+ * 当前回复目标草稿双向投影。
+ */
+export const replyDraft = computed({
+  get: () => resolveMessageFlowStore().replyDraft.value,
+  set: (value: MessageReplySummary | null) => {
+    resolveMessageFlowStore().replyDraft.value = value;
+  },
+});
+
+/**
+ * 当前内联引用回复草稿双向投影。
+ */
+export const quoteReplyDraft = computed({
+  get: () => resolveMessageFlowStore().quoteReplyDraft.value,
+  set: (value: { messageId: string; userId: string; preview: string } | null) => {
+    resolveMessageFlowStore().quoteReplyDraft.value = value;
+  },
+});
+
+/**
+ * 当前草稿提及列表只读投影。
+ */
+export const draftMentions = computed(() => resolveMessageFlowStore().draftMentions.value);
+
+/**
+ * 当前回复目标消息 id 双向投影（向后兼容）。
  */
 export const replyToMessageId = computed({
   get: () => resolveMessageFlowStore().replyToMessageId.value,
   set: (value: string) => {
-    resolveMessageFlowStore().replyToMessageId.value = value;
+    resolveMessageFlowStore().replyDraft.value = value
+      ? { messageId: value, senderName: "Unknown", preview: "", createdAt: 0 }
+      : null;
   },
 });
 /**
@@ -121,8 +159,8 @@ export function sendComposerMessage(payload?: ComposerSubmitPayload): Promise<Se
 /**
  * 进入回复态。
  */
-export function startReply(messageId: string): void {
-  return resolveMessageFlowStore().startReply(messageId);
+export function startReply(message: ChatMessage): void {
+  return resolveMessageFlowStore().startReply(message);
 }
 
 export function reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome> {
@@ -133,4 +171,90 @@ export function removeReaction(messageId: string, emoji: string): Promise<Remove
   return resolveMessageFlowStore().removeReaction(messageId, emoji);
 }
 
-export type { ChatMessage, ComposerSubmitPayload };
+export function listMentionCandidates(channelId?: string): Promise<MentionCandidate[]> {
+  return resolveMessageFlowStore().listMentionCandidates(channelId);
+}
+
+/**
+ * 在当前频道中搜索消息。
+ */
+export function searchCurrentChannel(query: string): Promise<void> {
+  return resolveMessageFlowStore().searchCurrentChannel(query);
+}
+
+/**
+ * 加载某条消息周围的上下文并在 timeline 中高亮。
+ */
+export function loadContextAroundMessage(messageId: string): Promise<void> {
+  return resolveMessageFlowStore().loadContextAroundMessage(messageId);
+}
+
+/**
+ * 清除搜索状态。
+ */
+export function clearSearch(): void {
+  return resolveMessageFlowStore().clearSearch();
+}
+
+/**
+ * 添加一个提及到草稿提及列表。
+ */
+export function addMention(mention: MessageMention): void {
+  const store = resolveMessageFlowStore();
+  const userId = mention.userId.trim();
+  if (!userId) return;
+  if (store.draftMentions.value.some((entry) => entry.userId === userId)) return;
+  store.draftMentions.value = [...store.draftMentions.value, { userId, displayName: mention.displayName.trim() || userId, type: mention.type }];
+}
+
+/**
+ * Multi-select mode reference.
+ */
+export const multiSelectMode = computed({
+  get: () => resolveMessageFlowStore().multiSelectMode.value,
+  set: (v: boolean) => { resolveMessageFlowStore().multiSelectMode.value = v; },
+});
+
+/**
+ * Check if a message is currently selected.
+ */
+export function isMessageSelected(id: string): boolean {
+  return resolveMessageFlowStore().selectedMessageIds.value.has(id);
+}
+
+/**
+ * Toggle a message's selection state.
+ */
+export function toggleMessageSelection(id: string): void {
+  const set = resolveMessageFlowStore().selectedMessageIds.value;
+  if (set.has(id)) {
+    set.delete(id);
+  } else {
+    set.add(id);
+  }
+  resolveMessageFlowStore().selectedMessageIds.value = new Set(set);
+}
+
+/**
+ * Clear all selected messages and exit multi-select mode.
+ */
+export function clearSelection(): void {
+  resolveMessageFlowStore().selectedMessageIds.value = new Set();
+  resolveMessageFlowStore().multiSelectMode.value = false;
+}
+
+/**
+ * Get the count of selected messages.
+ */
+export function getSelectedCount(): number {
+  return resolveMessageFlowStore().selectedMessageIds.value.size;
+}
+
+/**
+ * Get the sorted array of selected message IDs.
+ */
+export function getSelectedIds(): string[] {
+  return [...resolveMessageFlowStore().selectedMessageIds.value];
+}
+
+export type { ChatMessage, ComposerSubmitPayload, MessageMention };

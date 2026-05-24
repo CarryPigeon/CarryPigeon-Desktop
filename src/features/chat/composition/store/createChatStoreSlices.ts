@@ -36,7 +36,14 @@ export function createRoomSessionSlice(store: ChatRuntimeAggregateStore): RoomSe
 export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): MessageFlowRuntimeStore {
   return {
     composerDraft: store.composerDraft,
+    multiSelectMode: store.multiSelectMode,
+    selectedMessageIds: store.selectedMessageIds,
+    searchState: store.searchState,
+    highlightedMessageId: store.highlightedMessageId,
     selectedDomainId: store.selectedDomainId,
+    replyDraft: store.replyDraft,
+    draftMentions: store.draftMentions,
+    quoteReplyDraft: store.quoteReplyDraft,
     replyToMessageId: store.replyToMessageId,
     messageActionError: store.messageActionError,
     currentMessages: store.currentMessages,
@@ -51,6 +58,10 @@ export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): Messag
     sendComposerMessage: store.sendComposerMessage,
     reactToMessage: store.reactToMessage,
     removeReaction: store.removeReaction,
+    listMentionCandidates: store.listMentionCandidates,
+    searchCurrentChannel: store.searchCurrentChannel,
+    loadContextAroundMessage: store.loadContextAroundMessage,
+    clearSearch: store.clearSearch,
   };
 }
 
@@ -62,6 +73,7 @@ export function createRoomGovernanceSlice(store: ChatRuntimeAggregateStore): Roo
     members: store.members,
     applyJoin: store.applyJoin,
     updateChannelMeta: store.updateChannelMeta,
+    updateAnnouncement: store.updateAnnouncement,
     listMembers: store.listMembers,
     kickMember: store.kickMember,
     setAdmin: store.setAdmin,

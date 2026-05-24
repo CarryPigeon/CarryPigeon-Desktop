@@ -16,6 +16,8 @@ import type {
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { createAsyncTaskRunner } from "@/features/chat/presentation/patchbay/interactions/asyncTaskRunner";
 import type { AsyncErrorHandler } from "@/features/chat/presentation/patchbay/interactions/asyncTaskRunner";
+import { currentServerSocket } from "@/features/server-connection/api";
+import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChannelRailRawModel = {
@@ -34,6 +36,7 @@ type ChannelRailRawModel = {
     openChannelInfo(channelId: string): void;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
+  hasDraft(channelId: string): boolean;
 };
 /**
  * ChannelRail 组件消费的页面模型。
@@ -64,6 +67,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
   const directorySnapshot = useObservedCapabilitySnapshot(deps.directory);
   const currentSessionSnapshot = useObservedCapabilitySnapshot(deps.currentSession);
   const runAsyncTask = createAsyncTaskRunner(deps.onAsyncError);
+  const draftStorage = createLocalStorageDraftStorage(() => currentServerSocket.value ?? "");
 
   /**
    * 从左侧频道栏点击切换频道。
@@ -115,6 +119,10 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     openChannelInfo: deps.openChannelInfo,
     selectChannel,
     applyJoin: deps.applyJoin,
+    hasDraft(channelId: string): boolean {
+      if (!channelId) return false;
+      return draftStorage.readDraft(channelId) !== null;
+    },
   };
   return proxyRefs(rawModel);
 }

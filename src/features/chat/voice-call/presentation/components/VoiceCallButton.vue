@@ -1,13 +1,12 @@
 <template>
   <button
-    v-if="callState === 'idle' || callState === 'dialing' || callState === 'ended'"
+    v-if="callState === 'idle' || callState === 'ended'"
     class="voice-call-button"
-    :class="{ 'is-loading': callState === 'dialing' }"
     :disabled="callState !== 'idle' && callState !== 'ended'"
     :title="conference ? '发起多人会议' : '发起语音通话'"
     @click="$emit('start')"
   >
-    <span class="voice-call-icon">{{ callState === 'dialing' ? '⏳' : conference ? '👥' : '📞' }}</span>
+    <span class="voice-call-icon">{{ conference ? '👥' : '📞' }}</span>
   </button>
 </template>
 
@@ -47,18 +46,9 @@ defineEmits<{
     opacity: 0.5;
   }
 
-  &.is-loading .voice-call-icon {
-    animation: pulse 1s infinite;
-  }
-
   .voice-call-icon {
     font-size: 18px;
     line-height: 1;
   }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 </style>

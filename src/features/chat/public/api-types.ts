@@ -45,6 +45,8 @@ export type UnreadMessagePreview = {
   channelId: string;
   /** 消息时间戳（ms） */
   timeMs: number;
+  /** 是否有提及当前用户。 */
+  mentionedMe?: boolean;
 };
 
 export type {

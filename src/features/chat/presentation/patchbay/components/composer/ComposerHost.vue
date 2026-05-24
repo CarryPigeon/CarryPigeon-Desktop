@@ -21,6 +21,10 @@ const props = defineProps<{
   disabled?: boolean;
   pluginComposer?: Component | null;
   pluginContext?: unknown;
+  mentionCandidates?: Array<{ userId: string; displayName: string; avatar?: string }>;
+  mentionMenuOpen?: boolean;
+  currentUserRole?: string;
+  quoteReplyDraft?: { messageId: string; userId: string; preview: string } | null;
 }>();
 
 const emit = defineEmits<{
@@ -28,6 +32,10 @@ const emit = defineEmits<{
   (e: "update:draft", v: string): void;
   (e: "send", payload?: ComposerSubmitPayload): void;
   (e: "cancelReply"): void;
+  (e: "cancel-quote-reply"): void;
+  (e: "mentionQuery", query: string): void;
+  (e: "selectMention", mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void;
+  (e: "closeMentionMenu"): void;
 }>();
 
 /**
@@ -84,6 +92,14 @@ function handleKeydown(_: string | number, event: { e: KeyboardEvent }): void {
     return;
   }
 
+  // 处理 Escape：关闭提及菜单
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    emit("closeMentionMenu");
+    return;
+  }
+
   // 处理 Enter：发送
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -129,11 +145,33 @@ function handleUpdateDomainId(v: string): void {
 /**
  * textarea draft 的 v-model 适配器。
  *
+ * 同时检测 @ 触发提及菜单。
+ *
  * @param v - 新的 draft 值。
  * @returns 无返回值。
  */
 function handleUpdateDraft(v: string): void {
   emit("update:draft", v);
+  const match = /(^|\s)@([^\s@]*)$/.exec(v);
+  if (match) {
+    emit("mentionQuery", match[2] ?? "");
+  }
+}
+
+/**
+ * 系统级提及列表：@everyone 和 @here。
+ * 只有 admin/owner 角色的用户可以发送。
+ */
+const systemMentions = computed(() => {
+  const items: Array<{ type: "everyone" | "here"; label: string; disabled: boolean }> = [];
+  const isAdmin = props.currentUserRole === "admin" || props.currentUserRole === "owner";
+  items.push({ type: "everyone", label: "@everyone", disabled: !isAdmin });
+  items.push({ type: "here", label: "@here", disabled: !isAdmin });
+  return items;
+});
+
+function selectSystemMention(type: "everyone" | "here"): void {
+  emit("selectMention", { userId: type, displayName: type, type });
 }
 </script>
 
@@ -147,6 +185,15 @@ function handleUpdateDraft(v: string): void {
         <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
       </div>
       <button class="cp-reply__btn" type="button" @click="handleCancelReply">×</button>
+    </div>
+
+    <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
+      <div class="cp-quoteBar__bar"></div>
+      <div class="cp-quoteBar__content">
+        <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
+        <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
+      </div>
+      <button class="cp-quoteBar__close" type="button" @click="$emit('cancel-quote-reply')">&times;</button>
     </div>
 
     <div v-if="props.error" class="cp-composer__error" role="alert">
@@ -184,6 +231,32 @@ function handleUpdateDraft(v: string): void {
       />
     </div>
 
+    <div v-if="props.mentionMenuOpen && (props.mentionCandidates?.length || systemMentions.length)" class="cp-mentionMenu" role="listbox">
+      <button
+        v-for="candidate in props.mentionCandidates"
+        :key="candidate.userId"
+        class="cp-mentionMenu__item"
+        type="button"
+        role="option"
+        @mousedown.prevent="emit('selectMention', { userId: candidate.userId, displayName: candidate.displayName })"
+      >
+        {{ candidate.displayName }}
+      </button>
+      <div v-if="props.mentionCandidates?.length && systemMentions.length" class="cp-mentionMenu__sep"></div>
+      <button
+        v-for="sys in systemMentions"
+        :key="sys.type"
+        class="cp-mentionMenu__item"
+        :class="{ 'cp-mentionMenu__item--disabled': sys.disabled }"
+        :disabled="sys.disabled"
+        :title="sys.disabled ? 'Only admins can use this' : ''"
+        type="button"
+        @click="!sys.disabled && selectSystemMention(sys.type)"
+      >
+        {{ sys.label }}
+      </button>
+    </div>
+
     <div class="cp-composer__actions">
       <div v-if="isPluginComposerActive" class="cp-composer__hint">Sent by plugin composer</div>
       <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">No composer is available for this message type.</div>
@@ -197,6 +270,7 @@ function handleUpdateDraft(v: string): void {
 <style scoped lang="scss">
 /* 布局与变量说明：使用全局 `--cp-*` 变量；包含回复条、错误条、两行输入区与底部动作区。 */
 .cp-composer {
+  position: relative;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
   border-radius: 18px;
@@ -326,5 +400,110 @@ function handleUpdateDraft(v: string): void {
 .cp-composer__send:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.cp-quoteBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in oklab, var(--cp-info) 20%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
+  border-radius: 16px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.cp-quoteBar__bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--cp-info, #89b4fa);
+  flex-shrink: 0;
+  align-self: stretch;
+}
+.cp-quoteBar__content {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.cp-quoteBar__label {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: color-mix(in oklab, var(--cp-text) 72%, transparent);
+  white-space: nowrap;
+}
+.cp-quoteBar__preview {
+  font-size: 12px;
+  color: var(--cp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-quoteBar__close {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
+}
+.cp-quoteBar__close:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
+}
+
+/* 提及自动补全菜单 */
+.cp-mentionMenu {
+  position: absolute;
+  z-index: 70;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel);
+  border-radius: 14px;
+  box-shadow: var(--cp-shadow);
+  padding: 6px;
+  margin-bottom: 6px;
+}
+.cp-mentionMenu__item {
+  width: 100%;
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--cp-text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.cp-mentionMenu__item:hover {
+  background: var(--cp-hover-bg);
+}
+.cp-mentionMenu__item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cp-mentionMenu__item--disabled:hover {
+  background: transparent;
+}
+.cp-mentionMenu__sep {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--cp-border-light, var(--cp-border));
 }
 </style>

@@ -56,6 +56,7 @@ export type ChatSessionRuntimeDeps = {
   scopeVersion: ChatSessionStateSlice["scopeVersion"];
   messageActionError: ChatSessionStateSlice["messageActionError"];
   composerDraft: ChatSessionStateSlice["composerDraft"];
+  replyDraft: ChatSessionStateSlice["replyDraft"];
   replyToMessageId: ChatSessionStateSlice["replyToMessageId"];
   selectedDomainId: ChatSessionStateSlice["selectedDomainId"];
   governance: ChatGovernanceRuntimePort;
@@ -89,6 +90,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     scopeVersion,
     messageActionError,
     composerDraft,
+    replyDraft,
     replyToMessageId,
     selectedDomainId,
     governance,
@@ -111,6 +113,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     scopeVersion,
     messageActionError,
     composerDraft,
+    replyDraft,
     replyToMessageId,
     selectedDomainId,
   });

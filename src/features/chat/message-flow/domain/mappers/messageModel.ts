@@ -44,6 +44,40 @@ export function createMessageMapper(deps: MessageModelDeps) {
 
     const replyToId = String(m.replyToMessageId ?? "").trim() || undefined;
 
+    const replyTo = m.replyTo
+      ? {
+          messageId: String(m.replyTo.messageId ?? "").trim(),
+          senderName: String(m.replyTo.senderName ?? "").trim() || String(m.sender?.nickname ?? "Unknown"),
+          preview: String(m.replyTo.preview ?? "").trim(),
+          createdAt: Number(m.replyTo.createdAt ?? 0) || 0,
+          unavailable: Boolean(m.replyTo.unavailable),
+        }
+      : replyToId
+        ? {
+            messageId: replyToId,
+            senderName: "Unknown",
+            preview: "Original message unavailable",
+            createdAt: 0,
+            unavailable: true,
+          }
+        : undefined;
+
+    const quoteReply = m.quoteReply
+      ? {
+          messageId: String(m.quoteReply.messageId ?? "").trim(),
+          userId: String(m.quoteReply.userId ?? "").trim(),
+          preview: String(m.quoteReply.preview ?? "").trim(),
+        }
+      : undefined;
+
+    const mentions = (m.mentions ?? [])
+      .map((mention) => ({
+        userId: String(mention.userId ?? "").trim(),
+        displayName: String(mention.displayName ?? "").trim(),
+        type: mention.type,
+      }))
+      .filter((mention) => mention.userId);
+
     function tryReadText(data: unknown): string | null {
       if (!data || typeof data !== "object") return null;
       const maybe = data as { text?: unknown };
@@ -52,11 +86,11 @@ export function createMessageMapper(deps: MessageModelDeps) {
 
     if (domainLabel === "Core:Text") {
       const text = tryReadText(m.data) ?? String(m.preview ?? "");
-      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId };
+      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions };
     }
 
     const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${domainLabel}${domain.version ? `@${domain.version}` : ""}`;
-    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId };
+    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions };
   }
 
   return { mapWireMessage };
