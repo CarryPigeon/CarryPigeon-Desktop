@@ -15,6 +15,7 @@ import SignalStrip from "@/features/chat/message-flow/message/presentation/compo
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import { reactToMessage } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
+import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components/menus/MultiSelectToolbar.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
 import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components/VoiceCallTrigger.vue";
@@ -126,6 +127,16 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         />
         <button
           v-if="props.model.currentChannelId"
+          class="cp-topConsole__search"
+          type="button"
+          @click="props.model.openSearchPanel"
+          aria-label="Search messages"
+          :title="'Search'"
+        >
+          Search
+        </button>
+        <button
+          v-if="props.model.currentChannelId"
           class="cp-topConsole__settings"
           type="button"
           @click="props.onOpenChannelSettingsMenu"
@@ -150,6 +161,36 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       :target-user-id="props.targetUserId"
     />
 
+    <section v-if="props.model.searchPanelOpen" class="cp-searchPanel">
+      <div class="cp-searchPanel__row">
+        <t-input placeholder="Search current channel" @enter="props.model.searchMessages" />
+        <button type="button" class="cp-searchPanel__close" @click="props.model.closeSearchPanel">&times;</button>
+      </div>
+      <div v-if="props.model.searchState.loading" class="cp-searchPanel__state">Searching&hellip;</div>
+      <div v-else-if="props.model.searchState.error" class="cp-searchPanel__state cp-searchPanel__error">{{ props.model.searchState.error }}</div>
+      <div v-else-if="props.model.searchState.query && !props.model.searchState.results.length" class="cp-searchPanel__state">No messages found</div>
+      <div class="cp-searchPanel__results">
+        <button
+          v-for="result in props.model.searchState.results"
+          :key="result.message.id"
+          type="button"
+          class="cp-searchPanel__result"
+          @click="props.model.openSearchResult(result.message.id)"
+        >
+          <div class="cp-searchPanel__resultSender">{{ result.message.from.name }}</div>
+          <div class="cp-searchPanel__resultPreview">{{ result.preview }}</div>
+        </button>
+      </div>
+    </section>
+
+    <MultiSelectToolbar
+      v-if="props.model.multiSelectMode"
+      :selected-count="props.model.selectedCount"
+      @cancel="props.model.handleCancelMultiSelect"
+      @forward="props.model.handleBatchForward"
+      @delete="props.model.handleBatchDelete"
+      @bookmark="props.model.handleBatchBookmark"
+    />
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
       <!-- 区块：游标分页（加载更早历史） -->
       <div v-if="props.model.currentChannelHasMore" class="cp-historyMore">
@@ -170,14 +211,25 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         <!-- 区块：消息行 -->
         <div
           class="cp-msg"
+          :data-message-id="m.id"
+          :data-highlighted="m.id === props.model.highlightedMessageId"
           :data-mine="m.from.id === props.model.currentUserId"
           :data-group-start="isGroupStart"
+          :data-mentioned="props.model.isMentioned(m)"
           tabindex="0"
           role="article"
           :aria-label="`message ${m.domain.label} from ${m.from.name}`"
           @contextmenu="props.onMessageContextMenu($event, m.id)"
           @keydown="props.model.handleMessageKeydown($event, m.id)"
         >
+          <!-- 区块：多选复选框 -->
+          <div v-if="props.model.multiSelectMode" class="cp-msg__checkbox">
+            <input
+              type="checkbox"
+              :checked="props.model.isMessageSelected(m.id)"
+              @change="props.model.toggleMessageSelection(m.id)"
+            />
+          </div>
           <!-- 区块：头像列（仅 group-start 可见；预留空间用于对齐） -->
           <div class="cp-msg__avatar" :data-visible="isGroupStart">
             <UserProfilePopover
@@ -242,11 +294,101 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         :error="props.model.messageActionError"
         :plugin-composer="props.model.activePluginComposer"
         :plugin-context="props.model.activePluginContext"
+        :mention-candidates="props.model.mentionCandidates"
+        :mention-menu-open="props.model.mentionMenuOpen"
+        :current-user-role="props.model.currentUserRole"
+        :quote-reply-draft="props.model.quoteReplyDraft"
         @update:domainId="props.model.setDomainId"
         @update:draft="props.model.setDraft"
         @send="props.model.handleSend"
         @cancelReply="props.model.handleCancelReply"
+        @cancel-quote-reply="props.model.handleCancelQuoteReply"
+        @mention-query="props.model.handleMentionQuery"
+        @select-mention="props.model.handleSelectMention"
+        @close-mention-menu="props.model.handleMentionMenuClose"
       />
     </div>
   </section>
 </template>
+
+<style scoped lang="scss">
+.cp-msg[data-mentioned="true"] {
+  background: color-mix(in oklab, var(--cp-warning) 10%, transparent);
+  border-radius: 14px;
+}
+.cp-msg[data-highlighted="true"] {
+  background: color-mix(in oklab, var(--cp-primary) 12%, transparent);
+  border-radius: 14px;
+  outline: 2px solid var(--cp-primary);
+  outline-offset: -2px;
+}
+.cp-searchPanel {
+  border-bottom: 1px solid var(--cp-border-color, #e0e0e0);
+  background: var(--cp-bg-secondary, #fafafa);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow: hidden;
+}
+.cp-searchPanel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cp-searchPanel__close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.cp-searchPanel__state {
+  font-size: 13px;
+  color: var(--cp-text-secondary, #888);
+  padding: 4px 0;
+}
+.cp-searchPanel__error {
+  color: var(--cp-danger, #e34);
+}
+.cp-searchPanel__results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 160px;
+}
+.cp-searchPanel__result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+.cp-searchPanel__result:hover {
+  background: color-mix(in oklab, var(--cp-primary) 8%, transparent);
+}
+.cp-searchPanel__resultSender {
+  font-weight: 600;
+  color: var(--cp-text-primary, #222);
+}
+.cp-searchPanel__resultPreview {
+  color: var(--cp-text-secondary, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-msg__checkbox {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 4px;
+  flex-shrink: 0;
+}
+</style>

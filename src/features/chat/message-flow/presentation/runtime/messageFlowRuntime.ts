@@ -23,6 +23,7 @@ import {
   ChatMessageFlowRuntimePort,
   ChatMessageFlowStateSlice,
 } from "./messageFlowRuntimePorts";
+import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 
 /**
  * message-flow runtime 装配依赖。
@@ -40,8 +41,13 @@ export type ChatMessageFlowRuntimeDeps = {
   nextCursorByChannel: ChatMessageFlowStateSlice["nextCursorByChannel"];
   hasMoreByChannel: ChatMessageFlowStateSlice["hasMoreByChannel"];
   loadingMoreByChannel: ChatMessageFlowStateSlice["loadingMoreByChannel"];
+  searchState: ChatMessageFlowStateSlice["searchState"];
+  highlightedMessageId: ChatMessageFlowStateSlice["highlightedMessageId"];
   selectedDomainId: ChatMessageFlowStateSlice["selectedDomainId"];
   composerDraft: ChatMessageFlowStateSlice["composerDraft"];
+  replyDraft: ChatMessageFlowStateSlice["replyDraft"];
+  draftMentions: ChatMessageFlowStateSlice["draftMentions"];
+  quoteReplyDraft: ChatMessageFlowStateSlice["quoteReplyDraft"];
   replyToMessageId: ChatMessageFlowStateSlice["replyToMessageId"];
   messageActionError: ChatMessageFlowStateSlice["messageActionError"];
   readStateReporter: ChatReadStateReporterPort;
@@ -64,9 +70,14 @@ export function createChatMessageFlowRuntime(
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
+    searchState,
+    highlightedMessageId,
     selectedDomainId,
     composerDraft,
-    replyToMessageId,
+    replyDraft,
+    draftMentions,
+    quoteReplyDraft,
+    replyToMessageId: _replyToMessageId,
     messageActionError,
     readStateReporter,
     scope,
@@ -80,12 +91,36 @@ export function createChatMessageFlowRuntime(
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
+    searchState,
+    highlightedMessageId,
   });
+  const draftStorage = createLocalStorageDraftStorage(
+    () => scope.getActiveServerSocket(),
+  );
+
+  const draftReadChannelDraft = (channelId: string): string =>
+    draftStorage.readDraft(channelId)?.text ?? "";
+  const draftSaveChannelDraft = (channelId: string, text: string): void => {
+    if (!text.trim()) {
+      draftStorage.deleteDraft(channelId);
+      return;
+    }
+    draftStorage.saveDraft({ channelId, text, updatedAt: Date.now() });
+  };
+  const draftClearChannelDraft = (channelId: string): void => {
+    draftStorage.deleteDraft(channelId);
+  };
+
   const composerState = createMessageComposerStatePort({
     selectedDomainId,
     composerDraft,
-    replyToMessageId,
+    replyDraft,
+    draftMentions,
+    quoteReplyDraft,
     messageActionError,
+    readChannelDraft: draftReadChannelDraft,
+    saveChannelDraft: draftSaveChannelDraft,
+    clearChannelDraft: draftClearChannelDraft,
   });
 
   /**
@@ -116,10 +151,14 @@ export function createChatMessageFlowRuntime(
     refreshChannelLatestPage: (channelId) => applicationService.refreshChannelLatestPage(channelId),
     loadMoreMessages: () => applicationService.loadMoreMessages(),
     deleteMessage: (messageId) => applicationService.deleteMessage(messageId),
-    startReply: (messageId) => applicationService.startReply(messageId),
+    startReply: (message) => applicationService.startReply(message),
     cancelReply: () => applicationService.cancelReply(),
     sendComposerMessage: (payload) => applicationService.sendComposerMessage(payload),
     reactToMessage: (messageId, emoji) => applicationService.reactToMessage(messageId, emoji),
     removeReaction: (messageId, emoji) => applicationService.removeReaction(messageId, emoji),
+    listMentionCandidates: (channelId) => applicationService.listMentionCandidates(channelId),
+    searchCurrentChannel: (query) => applicationService.searchCurrentChannel(query),
+    loadContextAroundMessage: (messageId) => applicationService.loadContextAroundMessage(messageId),
+    clearSearch: () => applicationService.clearSearch(),
   };
 }

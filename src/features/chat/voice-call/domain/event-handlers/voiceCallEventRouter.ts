@@ -37,19 +37,21 @@ export function createVoiceCallEventRouter(deps: VoiceCallEventRouterDeps) {
       case "call:answer": {
         if (!payload) return true;
         const accepted = Boolean(payload.accepted);
-        deps.updateCallState(
-          String(payload.sessionId ?? ""),
-          accepted ? "connecting" : "ended"
-        );
+        const sessionId = String(payload.sessionId ?? "");
+        deps.updateCallState(sessionId, accepted ? "connecting" : "ended");
+        if (!accepted) {
+          deps.setCallSummary(sessionId, 0, "declined");
+        }
         return true;
       }
 
       case "call:cancel":
-      case "call:hangup": {
+      case "call:hangup":
+      case "call:timeout": {
         if (!payload) return true;
         deps.updateCallState(String(payload.sessionId ?? ""), "ended");
         const duration = Number(payload.duration) || 0;
-        const reason = eventType === "call:cancel" ? "cancelled" : "manual";
+        const reason = eventType === "call:cancel" ? "cancelled" : eventType === "call:timeout" ? "timeout" : "manual";
         deps.setCallSummary(String(payload.sessionId ?? ""), duration, reason);
         return true;
       }

@@ -107,6 +107,10 @@ export type ApplyJoinChannelOutcome = GovernanceActionOutcome<"channel_join_appl
  */
 export type UpdateChannelMetaOutcome = GovernanceActionOutcome<"channel_meta_updated", { channelId: string }>;
 /**
+ * 更新频道公告结果。
+ */
+export type UpdateChannelAnnouncementOutcome = GovernanceActionOutcome<"channel_announcement_updated", { channelId: string }>;
+/**
  * 创建频道结果。
  */
 export type CreateChannelOutcome = GovernanceActionOutcome<"channel_created", { channel: GovernanceChannelSummary }>;

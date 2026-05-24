@@ -11,7 +11,11 @@ import type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MentionCandidate,
   MessageDomain,
+  MessageMention,
+  MessageReplySummary,
+  MessageSearchState,
   ReactToMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
@@ -23,10 +27,12 @@ export type {
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
   MessageDomain,
+  MessageSearchResult,
+  MessageSearchState,
   SendChatMessageOutcome,
 } from "./domain/contracts";
 
-export type { MessageReactionSummary, ReactToMessageOutcome, RemoveReactionOutcome } from "./domain/contracts";
+export type { MentionCandidate, MessageMention, MessageReactionSummary, MessageReplySummary, ReactToMessageOutcome, RemoveReactionOutcome } from "./domain/contracts";
 
 /**
  * 当前频道消息时间线快照。
@@ -36,6 +42,8 @@ export type MessageTimelineSnapshot = {
   currentMessageCount: number;
   hasMoreHistory: boolean;
   isLoadingHistory: boolean;
+  search: MessageSearchState;
+  highlightedMessageId: string;
 };
 
 /**
@@ -51,6 +59,9 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
+  searchCurrentChannel(query: string): Promise<void>;
+  loadContextAroundMessage(messageId: string): Promise<void>;
+  clearSearch(): void;
 };
 
 /**
@@ -58,6 +69,7 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
  *
  * 只暴露只读查询，避免把任意频道写能力泄漏给调用方。
  */
+
 export type ChannelMessageLookupCapabilities = {
   findMessageById(messageId: string): ChatMessage | null;
 };
@@ -69,8 +81,11 @@ export type MessageComposerSnapshot = {
   draft: string;
   activeDomainId: string;
   replyToMessageId: string;
+  replyDraft: MessageReplySummary | null;
+  draftMentions: readonly MessageMention[];
   actionError: ChatMessageActionErrorInfo | null;
   availableDomains: readonly MessageDomain[];
+  quoteReplyDraft: { messageId: string; userId: string; preview: string } | null;
 };
 
 /**
@@ -85,6 +100,17 @@ export type MessageComposerCapabilities = ReadableCapability<MessageComposerSnap
   appendAttachmentShareKey(shareKey: string): void;
   cancelReply(): void;
   sendMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
+  listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
+  addMention(mention: MessageMention): void;
+
+  /** Per-channel draft persistence. */
+  readChannelDraft(channelId: string): string;
+  saveChannelDraft(channelId: string, text: string): void;
+  clearChannelDraft(channelId: string): void;
+
+  /** Inline quote reply. */
+  startQuoteReply(messageId: string, userId: string, preview: string): void;
+  cancelQuoteReply(): void;
 };
 
 /**

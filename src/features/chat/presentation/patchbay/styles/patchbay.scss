@@ -513,6 +513,14 @@
   text-overflow: ellipsis;
 }
 
+/* 频道行：草稿指示器 */
+.cp-channel__draft-indicator {
+  font-size: 11px;
+  color: var(--cp-warning, #f0a030);
+  margin-left: auto;
+  opacity: 0.8;
+}
+
 /* 频道行：右侧动作（unread/join/info） */
 .cp-channelRow__right {
   display: flex;

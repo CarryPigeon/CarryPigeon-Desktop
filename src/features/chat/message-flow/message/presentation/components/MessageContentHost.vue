@@ -68,6 +68,9 @@ function handleInstall(): void {
     :message-id="renderModel.messageId"
     :text="renderModel.text"
     :reply-text="renderModel.replyText"
+    :reply="props.message.kind === 'core_text' ? props.message.replyTo : undefined"
+    :mentions="props.message.kind === 'core_text' ? props.message.mentions : undefined"
+    :quote-reply="props.message.kind === 'core_text' ? props.message.quoteReply : undefined"
   />
   <div v-else-if="renderModel.kind === 'plugin'" class="cp-pluginBubble">
     <component

@@ -24,6 +24,7 @@ import {
   removeBan,
   setAdmin,
   setBan,
+  updateAnnouncement,
   updateChannelMeta,
 } from "./presentation/store-access/governanceStoreAccess";
 import type {
@@ -41,6 +42,7 @@ import type {
   RoomGovernanceCapabilities,
   RoomGovernanceMembersSnapshot,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "./api-types";
 
@@ -82,6 +84,12 @@ export function createRoomGovernanceCapabilitySource(): RoomGovernanceCapabiliti
          */
         updateMeta(patch: { name?: string; brief?: string }): Promise<UpdateChannelMetaOutcome> {
           return updateChannelMeta(channelId, patch);
+        },
+        /**
+         * 更新当前绑定频道的公告。
+         */
+        updateAnnouncement(content: string): Promise<UpdateChannelAnnouncementOutcome> {
+          return updateAnnouncement(channelId, content);
         },
         /**
          * 删除当前绑定频道。

@@ -18,19 +18,26 @@ const {
   channelId,
   channelName,
   channelBrief,
+  channelAnnouncement,
   membershipStatus,
   isEditing,
+  isEditingAnnouncement,
   isRequestingJoin,
   isSavingMeta,
+  isSavingAnnouncement,
   actionError,
   draftChannelName,
   draftChannelBrief,
+  draftChannelAnnouncement,
   joinRequested,
   canRequestJoin,
   mayEditChannelMeta,
   beginEdit,
   cancelEdit,
   saveEdit,
+  changeAnnouncement,
+  cancelAnnouncementEdit,
+  saveAnnouncement,
   handleJoin,
   openInPatchbay,
   goBack,
@@ -90,6 +97,23 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
           <button v-if="mayEditChannelMeta" class="cp-info__btn" type="button" @click="beginEdit">{{ t("edit") }}</button>
         </div>
         <div v-if="!isEditing && actionError" class="cp-info__error">{{ actionError }}</div>
+      </div>
+      <div class="cp-info__card wide">
+        <div class="cp-info__k">Announcement</div>
+        <div v-if="!isEditingAnnouncement" class="cp-info__v">
+          {{ channelAnnouncement || 'No announcement' }}
+        </div>
+        <div v-else class="cp-info__edit">
+          <t-textarea v-model="draftChannelAnnouncement" :maxlength="2000" :autosize="{ minRows: 4, maxRows: 8 }" />
+          <div v-if="actionError" class="cp-info__error">{{ actionError }}</div>
+          <div class="cp-info__editActions">
+            <button class="cp-info__btn primary" type="button" :disabled="isSavingAnnouncement" @click="saveAnnouncement">
+              {{ isSavingAnnouncement ? 'Saving…' : 'Save' }}
+            </button>
+            <button class="cp-info__btn" type="button" :disabled="isSavingAnnouncement" @click="cancelAnnouncementEdit">Cancel</button>
+          </div>
+        </div>
+        <button v-if="mayEditChannelMeta && !isEditingAnnouncement" class="cp-info__btn" type="button" @click="changeAnnouncement">Edit announcement</button>
       </div>
     </section>
   </main>

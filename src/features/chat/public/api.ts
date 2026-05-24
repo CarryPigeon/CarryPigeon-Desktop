@@ -63,6 +63,7 @@ export function createChatCapabilities(): ChatCapabilities {
           channelName: ch.name,
           channelId: ch.id,
           timeMs: Date.now(),
+          mentionedMe: false,
         });
       }
       return items.sort((a, b) => b.timeMs - a.timeMs).slice(0, maxCount);

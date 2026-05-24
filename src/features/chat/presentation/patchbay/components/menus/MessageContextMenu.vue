@@ -7,7 +7,7 @@
 import { onBeforeUnmount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
-type MessageMenuAction = "copy" | "reply" | "delete" | "forward";
+type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select";
 
 const props = defineProps<{
   open: boolean;
@@ -99,8 +99,15 @@ onBeforeUnmount(handleBeforeUnmount);
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('reply')">
           {{ t("reply_message") }}
         </button>
+        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('quote')">
+          {{ t("quote_message") }}
+        </button>
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
           {{ t("forward_message") }}
+        </button>
+        <div class="cp-msgmenu__sep" aria-hidden="true"></div>
+        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('select')">
+          {{ t("select_message") }}
         </button>
         <div class="cp-msgmenu__sep" aria-hidden="true"></div>
         <button class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('delete')">

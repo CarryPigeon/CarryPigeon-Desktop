@@ -3,8 +3,8 @@
     <div v-if="visible" class="voice-call-panel" :class="{ 'is-minimized': minimized }">
       <div class="voice-call-panel__bar" @click="minimized = !minimized">
         <span class="voice-call-panel__status">
-          <span class="voice-call-panel__dot" :class="{ 'is-active': state === 'active', 'is-connecting': state === 'connecting' }"></span>
-          {{ state === "connecting" ? "正在连接..." : state === "active" ? `通话中 · ${formattedDuration}` : state }}
+          <span class="voice-call-panel__dot" :class="{ 'is-active': state === 'active', 'is-connecting': state === 'connecting' || state === 'dialing' }"></span>
+          {{ state === "dialing" ? "正在拨号..." : state === "connecting" ? "正在连接..." : state === "active" ? `通话中 · ${formattedDuration}` : state }}
         </span>
         <span v-if="state === 'active'" class="voice-call-panel__participant-count">
           {{ participants.length }} 人
@@ -55,6 +55,20 @@
             {{ device.name }}
           </option>
         </select>
+        <select
+          v-if="outputDevices.length > 0"
+          class="voice-call-panel__device-select"
+          :value="currentOutputDeviceId"
+          @change="$emit('selectOutputDevice', ($event.target as HTMLSelectElement).value)"
+        >
+          <option
+            v-for="device in outputDevices"
+            :key="device.deviceId"
+            :value="device.deviceId"
+          >
+            {{ device.name }}
+          </option>
+        </select>
         <button
           class="voice-call-panel__ctrl-btn voice-call-panel__ctrl-btn--hangup"
           title="挂断"
@@ -79,6 +93,8 @@ const props = defineProps<{
   isNoiseSuppressionOn: boolean;
   inputDevices: readonly AudioDeviceInfo[];
   currentInputDeviceId: string | null;
+  outputDevices: readonly AudioDeviceInfo[];
+  currentOutputDeviceId: string | null;
   isConference?: boolean;
 }>();
 
@@ -86,12 +102,13 @@ defineEmits<{
   toggleMute: [];
   toggleNoiseSuppression: [];
   selectInputDevice: [deviceId: string];
+  selectOutputDevice: [deviceId: string];
   hangup: [];
 }>();
 
 const minimized = ref(false);
 
-const visible = computed(() => props.state === "connecting" || props.state === "active");
+const visible = computed(() => props.state === "dialing" || props.state === "connecting" || props.state === "active");
 
 const formattedDuration = computed(() => {
   const totalSec = Math.floor(props.duration / 1000);

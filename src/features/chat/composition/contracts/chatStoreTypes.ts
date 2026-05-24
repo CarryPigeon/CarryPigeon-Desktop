@@ -18,7 +18,11 @@ import type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  MentionCandidate,
   MessageDomain,
+  MessageMention,
+  MessageReplySummary,
+  MessageSearchState,
   ReactToMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
@@ -38,6 +42,7 @@ import type {
   RemoveChannelBanOutcome,
   RevokeChannelAdminOutcome,
   SetChannelBanOutcome,
+  UpdateChannelAnnouncementOutcome,
   UpdateChannelMetaOutcome,
 } from "@/features/chat/room-governance/api-types";
 
@@ -64,20 +69,31 @@ export type RoomSessionRuntimeStore = {
 export type MessageFlowRuntimeStore = {
   composerDraft: Ref<string>;
   selectedDomainId: Ref<string>;
+  replyDraft: Ref<MessageReplySummary | null>;
+  draftMentions: Ref<MessageMention[]>;
+  quoteReplyDraft: Ref<{ messageId: string; userId: string; preview: string } | null>;
+  multiSelectMode: Ref<boolean>;
+  selectedMessageIds: Ref<Set<string>>;
   replyToMessageId: Ref<string>;
   messageActionError: Ref<ChatMessageActionErrorInfo | null>;
   currentMessages: Readonly<Ref<ChatMessage[]>>;
   currentChannelHasMore: Readonly<Ref<boolean>>;
   loadingMoreMessages: Readonly<Ref<boolean>>;
+  searchState: Ref<MessageSearchState>;
+  highlightedMessageId: Ref<string>;
   availableDomains(): MessageDomain[];
   getMessageById(channelId: string, messageId: string): ChatMessage | null;
   loadMoreMessages(): Promise<void>;
-  startReply(messageId: string): void;
+  startReply(message: ChatMessage): void;
   cancelReply(): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
+  listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
+  searchCurrentChannel(query: string): Promise<void>;
+  loadContextAroundMessage(messageId: string): Promise<void>;
+  clearSearch(): void;
 };
 
 /**
@@ -87,6 +103,7 @@ export type RoomGovernanceRuntimeStore = {
   members: Readonly<Ref<ChatMember[]>>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   updateChannelMeta(channelId: string, patch: Partial<Pick<GovernanceChannelSummary, "name" | "brief">>): Promise<UpdateChannelMetaOutcome>;
+  updateAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome>;
   listMembers(channelId: string): Promise<ChannelMember[]>;
   kickMember(channelId: string, uid: string): Promise<KickChannelMemberOutcome>;
   setAdmin(channelId: string, uid: string): Promise<GrantChannelAdminOutcome>;

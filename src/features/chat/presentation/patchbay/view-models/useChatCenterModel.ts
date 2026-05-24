@@ -4,14 +4,16 @@
  * 收敛 ChatCenter 所需的消息流、连接状态、composer 状态与交互动作，避免布局组件直接依赖多个 store。
  */
 
-import { computed, proxyRefs, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { createMessageActionError } from "@/features/chat/message-flow/domain/outcomes/messageActionOutcome";
 import type {
   ChannelMessageLookupCapabilities,
   ChatMessage,
   ComposerSubmitPayload,
+  MentionCandidate,
   MessageComposerCapabilities,
   MessageComposerSnapshot,
+  MessageSearchState,
   MessageTimelineCapabilities,
   MessageTimelineSnapshot,
 } from "@/features/chat/message-flow/api-types";
@@ -22,6 +24,15 @@ import type {
 import type { ServerWorkspaceConnectionOutcome } from "@/features/server-connection/api-types";
 import { isMessageAfterReadMarker } from "@/features/chat/presentation/utils/readMarker";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
+import {
+  multiSelectMode as storeMultiSelectMode,
+  isMessageSelected,
+  toggleMessageSelection,
+  clearSelection,
+  getSelectedCount,
+  getSelectedIds,
+} from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
+import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChatConnectionPillStateView = "connected" | "reconnecting" | "offline";
@@ -67,16 +78,41 @@ type ChatCenterRawModel = {
   activePluginComposer: ComputedRef<Component | null>;
   activePluginContext: ComputedRef<unknown>;
   domainRegistryStore: ComputedRef<DomainRegistryStoreLike>;
+  mentionCandidates: Ref<MentionCandidate[]>;
+  mentionMenuOpen: Ref<boolean>;
+  currentUserRole: ComputedRef<string>;
+  searchPanelOpen: Ref<boolean>;
+  searchState: ComputedRef<MessageSearchState>;
+  highlightedMessageId: ComputedRef<string>;
+  quoteReplyDraft: ComputedRef<{ messageId: string; userId: string; preview: string } | null>;
   fmtTime(ms: number): string;
   formatReplyMiniText(channelId: string, replyToId: string): string;
   setDomainId(v: string): void;
   setDraft(v: string): void;
   handleCancelReply(): void;
+  handleCancelQuoteReply(): void;
   handleFileUploaded(result: { fileId: string; shareKey: string }): void;
   handleFileUploadError(error: string): void;
   handleSend(payload?: ComposerSubmitPayload): void;
   safeLoadMore(): Promise<void>;
   handleMessageKeydown(e: KeyboardEvent, messageId: string): void;
+  handleMentionQuery(query: string): Promise<void>;
+  handleSelectMention(mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void;
+  handleMentionMenuClose(): void;
+  isMentioned(message: ChatMessage): boolean;
+  openSearchPanel(): void;
+  closeSearchPanel(): void;
+  searchMessages(query: string): Promise<void>;
+  openSearchResult(messageId: string): Promise<void>;
+  multiSelectMode: ComputedRef<boolean>;
+  selectedCount: ComputedRef<number>;
+  enterMultiSelectMode(firstMessageId: string): void;
+  handleCancelMultiSelect(): void;
+  handleBatchForward(): Promise<void>;
+  handleBatchDelete(): Promise<void>;
+  handleBatchBookmark(): void;
+  toggleMessageSelection(id: string): void;
+  isMessageSelected(id: string): boolean;
 };
 /**
  * ChatCenter 组件消费的页面模型。
@@ -92,6 +128,7 @@ export type UseChatCenterModelDeps = {
   messageComposer: MessageComposerCapabilities;
   lookupChannel(channelId: string): ChannelMessageLookupCapabilities;
   currentUserId: RefLike<string>;
+  currentUserRole: RefLike<string>;
   currentChannelName: RefLike<string>;
   connectionDetail: RefLike<string>;
   connectionPillState: RefLike<ChatConnectionPillStateView>;
@@ -101,6 +138,7 @@ export type UseChatCenterModelDeps = {
   onReplyShortcut(messageId: string): void;
   onDeleteShortcut(messageId: string): void;
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
+  chatApi?: ChatApiPort;
 };
 
 /**
@@ -132,13 +170,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     return out;
   });
 
-  function findCurrentTimelineMessage(messageId: string): ChatMessage | null {
-    for (const message of messageTimelineSnapshot.value.currentMessages) {
-      if (message.id === messageId) return message;
-    }
-    return null;
-  }
-
   const messageRows = computed<MessageRow[]>(() => {
     const list = messageTimelineSnapshot.value.currentMessages;
     const lastReadTime = currentSessionSnapshot.value.lastReadTimeMs;
@@ -160,15 +191,133 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   });
 
   const replyPreview = computed<{ title: string; snippet: string }>(() => {
-    const id = messageComposerSnapshot.value.replyToMessageId;
-    if (!id) return { title: "", snippet: "" };
-    const msg = findCurrentTimelineMessage(id);
-    if (!msg) return { title: "Reply", snippet: "Message not found" };
-    const snippet = msg.kind === "core_text" ? msg.text : msg.preview;
-    return { title: `Reply → ${msg.from.name}`, snippet };
+    const draft = messageComposerSnapshot.value.replyDraft;
+    if (!draft) return { title: "", snippet: "" };
+    return {
+      title: `Replying to ${draft.senderName}`,
+      snippet: draft.preview,
+    };
   });
 
+  const quoteReplyDraft = computed(() => messageComposerSnapshot.value.quoteReplyDraft);
+
   const currentUserId = computed(() => deps.currentUserId.value || "u-1");
+  const currentUserRole = computed(() => deps.currentUserRole.value);
+
+  /**
+   * 提及候选状态。
+   */
+  const mentionCandidates = ref<MentionCandidate[]>([]);
+  const mentionMenuOpen = ref(false);
+
+  /**
+   * 根据当前输入查询匹配的提及候选列表。
+   */
+  async function handleMentionQuery(query: string): Promise<void> {
+    const all = await deps.messageComposer.listMentionCandidates(deps.currentSession.getSnapshot().currentChannelId);
+    const normalized = query.trim().toLowerCase();
+    mentionCandidates.value = normalized
+      ? all.filter((candidate) => candidate.displayName.toLowerCase().includes(normalized))
+      : all;
+    mentionMenuOpen.value = mentionCandidates.value.length > 0;
+  }
+
+  /**
+   * 选中一个提及候选项。
+   */
+  function handleSelectMention(mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void {
+    deps.messageComposer.addMention?.(mention);
+    mentionMenuOpen.value = false;
+  }
+
+  /**
+   * 关闭提及菜单。
+   */
+  function handleMentionMenuClose(): void {
+    mentionMenuOpen.value = false;
+  }
+
+  /**
+   * 判断消息是否提及了当前用户。
+   */
+  function isMentioned(message: ChatMessage): boolean {
+    return Boolean(message.mentions?.some((mention) => mention.userId === currentUserId.value));
+  }
+
+  /**
+   * 搜索面板状态。
+   */
+  const searchPanelOpen = ref(false);
+  const searchState = computed(() => messageTimelineSnapshot.value.search);
+  const highlightedMessageId = computed(() => messageTimelineSnapshot.value.highlightedMessageId);
+
+  function openSearchPanel(): void {
+    searchPanelOpen.value = true;
+  }
+
+  function closeSearchPanel(): void {
+    searchPanelOpen.value = false;
+    deps.currentTimeline.clearSearch();
+  }
+
+  async function searchMessages(query: string): Promise<void> {
+    await deps.currentTimeline.searchCurrentChannel(query);
+  }
+
+  async function openSearchResult(messageId: string): Promise<void> {
+    await deps.currentTimeline.loadContextAroundMessage(messageId);
+    await nextTick();
+    const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+    if (el) el.scrollIntoView({ block: "center" });
+  }
+
+  /**
+   * Multi-select mode.
+   */
+  const multiSelectMode = computed({
+    get: () => storeMultiSelectMode.value,
+    set: (v: boolean) => { storeMultiSelectMode.value = v; },
+  });
+
+  const selectedCount = computed(() => getSelectedCount());
+
+  function enterMultiSelectMode(firstMessageId: string): void {
+    storeMultiSelectMode.value = true;
+    toggleMessageSelection(firstMessageId);
+  }
+
+  function handleCancelMultiSelect(): void {
+    clearSelection();
+  }
+
+  async function handleBatchForward(): Promise<void> {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    // P0: stub — forward dialog integration will be added in P1
+    clearSelection();
+  }
+
+  async function handleBatchDelete(): Promise<void> {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    for (const mid of ids) {
+      try {
+        await deps.currentTimeline.deleteMessage(mid);
+      } catch {
+        // continue with next
+      }
+    }
+    clearSelection();
+  }
+
+  function handleBatchBookmark(): void {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    const existing: string[] = JSON.parse(localStorage.getItem("cp_bookmarks") ?? "[]");
+    const set = new Set([...existing, ...ids]);
+    localStorage.setItem("cp_bookmarks", JSON.stringify([...set]));
+    clearSelection();
+  }
 
   function fmtTime(ms: number): string {
     return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -185,12 +334,29 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     deps.messageComposer.setActiveDomainId(v);
   }
 
+  let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const DEBOUNCE_MS = 1000;
+
   function setDraft(v: string): void {
     deps.messageComposer.setDraft(v);
+    if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+    const capturedCid = currentSessionSnapshot.value.currentChannelId;
+    draftDebounceTimer = setTimeout(() => {
+      if (capturedCid) deps.messageComposer.saveChannelDraft(capturedCid, v);
+    }, DEBOUNCE_MS);
   }
+
+  onBeforeUnmount(() => {
+    if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+  });
 
   function handleCancelReply(): void {
     deps.messageComposer.cancelReply();
+  }
+
+  function handleCancelQuoteReply(): void {
+    deps.messageComposer.cancelQuoteReply();
   }
 
   function handleFileUploaded(result: { fileId: string; shareKey: string }): void {
@@ -204,6 +370,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   function handleSend(payload?: ComposerSubmitPayload): void {
+    if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
     void deps.messageComposer.sendMessage(payload).then((outcome) => {
       if (outcome.ok) return;
       deps.messageComposer.setActionError(outcome.error);
@@ -213,6 +380,24 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   async function safeLoadMore(): Promise<void> {
     await deps.onLoadMoreMessages();
   }
+
+  /**
+   * 在频道切换时保存当前频道的草稿并恢复目标频道的草稿。
+   * immediate: true 确保首次加载时恢复初始频道的草稿。
+   */
+  watch(() => currentSessionSnapshot.value.currentChannelId, (newCid, oldCid) => {
+    if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+    if (oldCid && oldCid !== newCid) {
+      const currentDraft = messageComposerSnapshot.value.draft;
+      if (currentDraft.trim()) {
+        deps.messageComposer.saveChannelDraft(oldCid, currentDraft);
+      } else {
+        deps.messageComposer.clearChannelDraft(oldCid);
+      }
+    }
+    const restored = deps.messageComposer.readChannelDraft(newCid);
+    deps.messageComposer.setDraft(restored);
+  }, { immediate: true });
 
   function handleMessageKeydown(e: KeyboardEvent, messageId: string): void {
     if (e.key === "Delete") {
@@ -258,16 +443,41 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     activePluginComposer,
     activePluginContext,
     domainRegistryStore,
+    mentionCandidates,
+    mentionMenuOpen,
+    currentUserRole,
+    searchPanelOpen,
+    searchState,
+    highlightedMessageId,
+    quoteReplyDraft,
     fmtTime,
     formatReplyMiniText,
     setDomainId,
     setDraft,
     handleCancelReply,
+    handleCancelQuoteReply,
     handleFileUploaded,
     handleFileUploadError,
     handleSend,
     safeLoadMore,
     handleMessageKeydown,
+    handleMentionQuery,
+    handleSelectMention,
+    handleMentionMenuClose,
+    isMentioned,
+    openSearchPanel,
+    closeSearchPanel,
+    searchMessages,
+    openSearchResult,
+    multiSelectMode,
+    selectedCount,
+    enterMultiSelectMode,
+    handleCancelMultiSelect,
+    handleBatchForward,
+    handleBatchDelete,
+    handleBatchBookmark,
+    toggleMessageSelection: (id: string) => toggleMessageSelection(id),
+    isMessageSelected: (id: string) => isMessageSelected(id),
   };
   return proxyRefs(rawModel);
 }
