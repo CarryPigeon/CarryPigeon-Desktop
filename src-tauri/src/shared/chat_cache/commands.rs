@@ -519,6 +519,14 @@ mod tests {
         let _ = forget_master_key();
     }
 
+    fn ensure_test_master_key() -> [u8; 32] {
+        let cell = CHAT_CACHE_MASTER_KEY.get_or_init(|| Mutex::new(None));
+        if let Some(key) = cell.lock().ok().and_then(|g| *g) {
+            return key;
+        }
+        generate_master_key(cell).expect("generate test master key")
+    }
+
     #[tokio::test]
     async fn load_all_empty_db_without_master_key() {
         let _guard = test_lock();
@@ -542,6 +550,7 @@ mod tests {
         reset_test_state();
         std::env::set_current_dir(&dir).expect("set cwd");
 
+        ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
             key: "chat-cache-test-key".to_string(),
             value: "secret message".to_string(),
@@ -573,6 +582,7 @@ mod tests {
         reset_test_state();
         std::env::set_current_dir(&dir).expect("set cwd");
 
+        ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
             key: "chat-cache-missing-key-test".to_string(),
             value: "secret message".to_string(),
@@ -584,6 +594,7 @@ mod tests {
         let loaded = chat_cache_load_all().await.expect("load after missing key");
         assert!(loaded.is_empty());
 
+        ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
             key: "chat-cache-missing-key-test".to_string(),
             value: "secret message 2".to_string(),
@@ -612,6 +623,7 @@ mod tests {
         reset_test_state();
         std::env::set_current_dir(&dir).expect("set cwd");
 
+        ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
             key: "chat-cache-missing-key-get-test".to_string(),
             value: "secret message".to_string(),
