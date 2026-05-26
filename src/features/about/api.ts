@@ -4,9 +4,8 @@
 
 import type { AboutCapabilities, AppInfo } from "./api-types";
 
-const APP_INFO: AppInfo = {
+const BASE_INFO: Omit<AppInfo, "version"> = {
   name: "CarryPigeon Desktop",
-  version: "0.1.1",
   description: "CarryPigeon 桌面客户端 — 自建服务器聊天与协作平台。",
   techStack: [
     "Tauri 2 (Rust + WebView)",
@@ -24,11 +23,23 @@ const APP_INFO: AppInfo = {
   ],
 };
 
+async function resolveVersion(): Promise<string> {
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    return await getVersion();
+  } catch {
+    return (import.meta as unknown as { env?: { PACKAGE_VERSION?: string } }).env?.PACKAGE_VERSION ?? "0.0.0";
+  }
+}
+
 let aboutCapabilities: AboutCapabilities | null = null;
 
 export function createAboutCapabilities(): AboutCapabilities {
   return {
-    getAppInfo: () => APP_INFO,
+    getAppInfo: async () => {
+      const version = await resolveVersion();
+      return { ...BASE_INFO, version };
+    },
   };
 }
 

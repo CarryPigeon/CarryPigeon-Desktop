@@ -10,6 +10,7 @@ import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { IS_MOCK_ENABLED, MOCK_MODE } from "@/shared/config/runtime";
 import { getAboutCapabilities } from "@/features/about/api";
+import type { AppInfo } from "@/features/about/api-types";
 import { useSettingsPageModel } from "@/features/settings/presentation/composables/useSettingsPageModel";
 import { DEFAULT_APP_THEME, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
 import { DEFAULT_APP_LOCALE } from "@/shared/utils/locale";
@@ -93,7 +94,11 @@ onBeforeUnmount(() => {
   sectionObserver?.disconnect();
 });
 
-const appInfo = getAboutCapabilities().getAppInfo();
+const appInfo = ref<AppInfo | null>(null);
+
+onMounted(async () => {
+  appInfo.value = await getAboutCapabilities().getAppInfo();
+});
 const importFileInput = ref<HTMLInputElement | null>(null);
 const dataStatus = ref<{ tone: "success" | "danger"; message: string } | null>(null);
 
@@ -445,7 +450,7 @@ async function handleResetDefaults(): Promise<void> {
         </div>
       </section>
 
-      <section id="settings-section-about" class="cp-settings__section" data-testid="settings-section-about">
+      <section v-if="appInfo" id="settings-section-about" class="cp-settings__section" data-testid="settings-section-about">
         <header class="cp-settings__sectionHead">
           <div>
             <div class="cp-settings__sectionName">{{ t("menu_about") }}</div>

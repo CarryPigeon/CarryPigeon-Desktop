@@ -6,7 +6,7 @@
     :title="conference ? '发起多人会议' : '发起语音通话'"
     @click="$emit('start')"
   >
-    <span class="voice-call-icon">{{ conference ? '👥' : '📞' }}</span>
+    <t-icon :name="conference ? 'usergroup' : 'call'" class="voice-call-icon" />
   </button>
 </template>
 

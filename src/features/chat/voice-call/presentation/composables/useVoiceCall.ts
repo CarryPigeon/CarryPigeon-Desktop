@@ -63,18 +63,18 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   }
 
   async function startDirectCall(targetUserId: string): Promise<CallSession> {
-    const session = await statePort.startCall("direct", roomId(), targetUserId);
     callState.value = "dialing";
-    activeSession.value = session;
     startPoll();
+    const session = await statePort.startCall("direct", roomId(), targetUserId);
+    activeSession.value = session;
     return session;
   }
 
   async function startConference(): Promise<CallSession> {
-    const session = await statePort.startCall("conference", roomId());
     callState.value = "dialing";
-    activeSession.value = session;
     startPoll();
+    const session = await statePort.startCall("conference", roomId());
+    activeSession.value = session;
     return session;
   }
 

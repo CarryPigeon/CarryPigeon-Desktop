@@ -51,7 +51,7 @@ pub fn run() -> anyhow::Result<()> {
             // 注意：setup() 已运行在 tokio 运行时上下文中，不能在当前线程 block_on。
             // 需要在独立 OS 线程中创建新的 tokio 运行时来执行异步初始化。
             let app_data_dir = app.path().app_data_dir().context("Failed to get app data dir")?;
-            crate::shared::app_data_dir::init_app_data_dir(app_data_dir.clone());
+            crate::shared::app_data_dir::init_app_data_dir(app_data_dir.clone())?;
             let metadata_db_path = app_data_dir.join("temp_files").join("metadata.db");
             let temp_file_manager = std::thread::spawn({
                 let app_data_dir = app_data_dir.clone();

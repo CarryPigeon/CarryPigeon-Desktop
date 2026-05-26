@@ -133,7 +133,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
           aria-label="Search messages"
           :title="'Search'"
         >
-          Search
+          <t-icon name="search" />
         </button>
         <button
           v-if="props.model.currentChannelId"
@@ -142,7 +142,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
           @click="props.onOpenChannelSettingsMenu"
           :title="t('channel_settings')"
         >
-          ⚙
+          <t-icon name="setting" />
         </button>
         <ConnectionPill
           :state="props.model.connectionPillState"

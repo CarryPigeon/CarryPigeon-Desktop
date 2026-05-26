@@ -1,7 +1,7 @@
 <template>
   <div class="call-record-bubble">
     <div class="call-record-bubble__header">
-      <span class="call-record-bubble__icon">📞</span>
+      <t-icon name="call" class="call-record-bubble__icon" />
       <span class="call-record-bubble__title">语音通话</span>
     </div>
     <div class="call-record-bubble__body">
@@ -20,7 +20,7 @@
     </div>
     <div class="call-record-bubble__footer">
       <button class="call-record-bubble__btn" @click="$emit('callback')">
-        📞 回拨
+        <t-icon name="call" /> 回拨
       </button>
     </div>
   </div>
