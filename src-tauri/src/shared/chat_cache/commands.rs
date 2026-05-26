@@ -532,6 +532,7 @@ mod tests {
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
         let result = chat_cache_load_all().await.expect("load all");
         assert!(result.is_empty());
         reset_test_state();
@@ -543,6 +544,7 @@ mod tests {
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir);
 
         ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
@@ -572,6 +574,7 @@ mod tests {
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
 
         ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
@@ -582,6 +585,7 @@ mod tests {
         .expect("put");
 
         reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir);
         let loaded = chat_cache_load_all().await.expect("load after missing key");
         assert!(loaded.is_empty());
 
@@ -610,6 +614,7 @@ mod tests {
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
 
         ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
@@ -620,6 +625,7 @@ mod tests {
         .expect("put");
 
         reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir);
         let loaded = chat_cache_get("chat-cache-missing-key-get-test".to_string())
             .await
             .expect("get after missing key");
