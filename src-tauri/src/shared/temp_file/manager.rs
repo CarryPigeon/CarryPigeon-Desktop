@@ -300,9 +300,7 @@ impl TempFileManager {
         let dest_parent = if dest.is_relative() && dest.parent().is_none() {
             self.base_dir.clone()
         } else {
-            dest.parent()
-                .unwrap_or(Path::new("."))
-                .to_path_buf()
+            dest.parent().unwrap_or(Path::new(".")).to_path_buf()
         };
         let canonical_parent = dest_parent.canonicalize().with_context(|| {
             format!(
