@@ -18,10 +18,11 @@ export interface UseVoiceCallOptions {
     leaveConference?: (sessionId: string) => Promise<void>;
   };
   roomId: () => string;
+  userId: () => string;
 }
 
 export function useVoiceCall(options: UseVoiceCallOptions) {
-  const { statePort, roomId } = options;
+  const { statePort, roomId, userId } = options;
 
   const callState = ref<CallState>("idle");
   const activeSession = ref<CallSession | null>(null);
@@ -51,7 +52,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
         callState.value = session.state;
         activeSession.value = session;
         participants.value = session.participants;
-        isMuted.value = session.participants.find(p => p.userId === "current-user")?.isMuted ?? false;
+        isMuted.value = session.participants.find(p => p.userId === userId())?.isMuted ?? false;
         isNoiseSuppressionOn.value = session.mediaSettings.noiseSuppression;
       }
     }, 500);
