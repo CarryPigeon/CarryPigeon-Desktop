@@ -285,6 +285,8 @@ impl TempFileManager {
     }
 
     /// 复制（或移动）已完成文件到目标路径。
+    ///
+    /// 目标路径必须在 base_dir 范围内，防止路径穿越攻击。
     pub async fn save_to(&self, id: &str, destination: &str) -> anyhow::Result<String> {
         let meta = self.get_metadata(id).await?;
         if meta.state != "complete" {
@@ -295,6 +297,29 @@ impl TempFileManager {
             );
         }
         let dest = Path::new(destination);
+        let dest_parent = if dest.is_relative() && dest.parent().is_none() {
+            self.base_dir.clone()
+        } else {
+            dest.parent()
+                .unwrap_or(Path::new("."))
+                .to_path_buf()
+        };
+        let canonical_parent = dest_parent.canonicalize().with_context(|| {
+            format!(
+                "Failed to resolve destination parent: {}",
+                dest_parent.display()
+            )
+        })?;
+        let canonical_base = self
+            .base_dir
+            .canonicalize()
+            .context("Failed to resolve base directory")?;
+        if !canonical_parent.starts_with(&canonical_base) {
+            anyhow::bail!(
+                "Destination path escapes allowed directory: {}",
+                dest.display()
+            );
+        }
         tokio::fs::copy(&meta.file_path, dest)
             .await
             .with_context(|| format!("Failed to copy {} to {}", meta.file_path, destination))?;

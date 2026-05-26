@@ -122,14 +122,13 @@ pub async fn connect_named(key: &str, path: PathBuf) -> anyhow::Result<()> {
             "Database key already initialized with a different path"
         ));
     }
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let url = sqlite_url_for_path(&path);
     tracing::info!(
         action = "db_connection_opened",
         key = %key,
         path = %path.display(),
         url = %url,
-        cwd = %cwd.display(),
+        app_data_dir = %crate::shared::app_data_dir::get_app_data_dir().display(),
         "Opening database",
     );
     let db = CPDatabase::new(&url).await?;

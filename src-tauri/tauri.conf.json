@@ -23,11 +23,11 @@
     "security": {
       "csp": {
         "default-src": "'self' app:",
-        "script-src": "'self' app: 'unsafe-eval'",
+        "script-src": "'self' app:",
         "style-src": "'self' 'unsafe-inline'",
-        "img-src": "'self' app: data: blob: http: https:",
+        "img-src": "'self' app: data: blob: https:",
         "font-src": "'self' data:",
-        "connect-src": "'self' http: https: ws: wss: app:",
+        "connect-src": "'self' https: wss: app:",
         "object-src": "'none'",
         "base-uri": "'none'",
         "frame-ancestors": "'none'"

@@ -61,15 +61,7 @@ fn now_ms() -> i64 {
 }
 
 fn base_db_dir() -> PathBuf {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let parent = cwd
-        .file_name()
-        .map(|name| name == "src-tauri")
-        .unwrap_or(false)
-        .then(|| cwd.parent().map(|p| p.to_path_buf()))
-        .flatten();
-    let root = parent.unwrap_or(cwd);
-    root.join("data").join("db")
+    crate::shared::app_data_dir::get_app_data_dir().join("db")
 }
 
 fn chat_cache_path() -> PathBuf {
@@ -502,12 +494,18 @@ mod tests {
         }
     }
 
-    fn test_temp_dir() -> PathBuf {
+    fn test_app_data_dir() -> PathBuf {
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time")
             .as_millis();
         std::env::temp_dir().join(format!("carrypigeon-chat-cache-test-{millis}"))
+    }
+
+    fn init_test_app_data_dir() -> PathBuf {
+        let dir = test_app_data_dir();
+        crate::shared::app_data_dir::init_app_data_dir(dir.clone());
+        dir
     }
 
     fn reset_test_state() {
@@ -517,6 +515,7 @@ mod tests {
             }
         }
         let _ = forget_master_key();
+        crate::shared::app_data_dir::reset_app_data_dir();
     }
 
     fn ensure_test_master_key() -> [u8; 32] {
@@ -530,25 +529,20 @@ mod tests {
     #[tokio::test]
     async fn load_all_empty_db_without_master_key() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
-        std::env::set_current_dir(&dir).expect("set cwd");
         let result = chat_cache_load_all().await.expect("load all");
         assert!(result.is_empty());
         reset_test_state();
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 
     #[tokio::test]
     async fn clear_all_removes_data_and_key() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
-        std::env::set_current_dir(&dir).expect("set cwd");
 
         ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
@@ -570,17 +564,14 @@ mod tests {
         assert!(after.is_empty());
 
         reset_test_state();
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 
     #[tokio::test]
     async fn load_all_treats_missing_master_key_as_empty_cache() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
-        std::env::set_current_dir(&dir).expect("set cwd");
 
         ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
@@ -611,17 +602,14 @@ mod tests {
         );
 
         reset_test_state();
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 
     #[tokio::test]
     async fn get_treats_missing_master_key_as_missing_value() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
-        std::env::set_current_dir(&dir).expect("set cwd");
 
         ensure_test_master_key();
         chat_cache_put(ChatCachePutRequest {
@@ -638,7 +626,6 @@ mod tests {
         assert!(loaded.is_none());
 
         reset_test_state();
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 
     #[test]

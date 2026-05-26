@@ -20,7 +20,7 @@ export function syncTrayLocaleOnStartup(): void {
   if (!isTauriRuntimeAvailable() || IS_MOCK_ENABLED) return;
 
   const stored = getStoredLocale();
-  if (stored === null || stored === "zh_cn") return;
+  if (stored === null) return;
 
   applyTrayLocale(stored);
 }

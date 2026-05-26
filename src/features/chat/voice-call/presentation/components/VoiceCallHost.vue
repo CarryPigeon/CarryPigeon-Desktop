@@ -73,6 +73,7 @@ const {
 } = useVoiceCall({
   statePort,
   roomId: () => props.roomId,
+  userId: () => props.userId ?? "",
 });
 
 const isConference = computed(() => activeSession.value?.kind === "conference");
@@ -80,7 +81,8 @@ const isConference = computed(() => activeSession.value?.kind === "conference");
 const callerName = computed(() => {
   const session = activeSession.value;
   if (!session) return "";
-  return session.participants.find((p: CallParticipant) => p.userId !== "current-user")?.displayName ?? "未知用户";
+  const selfId = props.userId ?? "";
+  return session.participants.find((p: CallParticipant) => p.userId !== selfId)?.displayName ?? "未知用户";
 });
 
 const currentInputDeviceId = computed(() => {

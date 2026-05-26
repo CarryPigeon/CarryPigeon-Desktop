@@ -186,15 +186,7 @@ fn validate_managed_db_key(key: &str, kind: ManagedDbKind) -> CommandResult<()> 
 }
 
 fn managed_db_root() -> PathBuf {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let parent = cwd
-        .file_name()
-        .map(|name| name == "src-tauri")
-        .unwrap_or(false)
-        .then(|| cwd.parent().map(|p| p.to_path_buf()))
-        .flatten();
-    let root = parent.unwrap_or(cwd);
-    root.join("data").join("db")
+    crate::shared::app_data_dir::get_app_data_dir().join("db")
 }
 
 fn managed_db_path(key: &str) -> PathBuf {
@@ -752,12 +744,18 @@ mod tests {
             .expect("test lock")
     }
 
-    fn test_temp_dir() -> PathBuf {
+    fn test_app_data_dir() -> PathBuf {
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time")
             .as_millis();
         std::env::temp_dir().join(format!("carrypigeon-db-test-{millis}"))
+    }
+
+    fn init_test_app_data_dir() -> PathBuf {
+        let dir = test_app_data_dir();
+        crate::shared::app_data_dir::init_app_data_dir(dir.clone());
+        dir
     }
 
     fn unique_server_key() -> String {
@@ -772,10 +770,8 @@ mod tests {
     #[tokio::test]
     async fn db_init_uses_managed_path_for_system_db() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        std::fs::create_dir_all(&dir).expect("temp dir");
-        std::env::set_current_dir(&dir).expect("set cwd");
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
 
         db_init(DbInitRequest {
             key: "system".to_string(),
@@ -785,26 +781,22 @@ mod tests {
         .await
         .expect("init system db");
 
-        let expected = dir.join("data").join("db").join("system.db");
+        let expected = app_dir.join("db").join("system.db");
         assert!(expected.exists(), "managed db file should be created");
 
         db_remove("system".to_string())
             .await
             .expect("remove system db");
         assert!(!expected.exists(), "managed db file should be removed");
-
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 
     #[tokio::test]
     async fn db_init_rejects_custom_path_and_invalid_kind() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        std::fs::create_dir_all(&dir).expect("temp dir");
-        std::env::set_current_dir(&dir).expect("set cwd");
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
 
-        let custom_path = dir.join("escape.db").to_string_lossy().to_string();
+        let custom_path = app_dir.join("escape.db").to_string_lossy().to_string();
         let err = db_init(DbInitRequest {
             key: "system".to_string(),
             path: Some(custom_path),
@@ -831,18 +823,14 @@ mod tests {
         .await
         .expect_err("invalid server key must be rejected");
         assert!(err.contains("DB_KEY_INVALID"));
-
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 
     #[tokio::test]
     async fn db_remove_rejects_outside_root_registry_paths() {
         let _guard = test_lock();
-        let prev = std::env::current_dir().expect("cwd");
-        let dir = test_temp_dir();
-        let outside = dir.join("outside-root");
+        let app_dir = init_test_app_data_dir();
+        let outside = app_dir.join("outside-root");
         std::fs::create_dir_all(&outside).expect("outside dir");
-        std::env::set_current_dir(&dir).expect("set cwd");
 
         let key = unique_server_key();
         let unsafe_path = outside.join("server.db");
@@ -858,7 +846,5 @@ mod tests {
             unsafe_path.exists(),
             "outside-root file must not be deleted"
         );
-
-        std::env::set_current_dir(prev).expect("restore cwd");
     }
 }

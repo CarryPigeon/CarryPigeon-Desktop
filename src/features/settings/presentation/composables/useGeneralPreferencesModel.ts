@@ -49,6 +49,9 @@ export function useGeneralPreferencesModel(): GeneralPreferencesModel {
       language.value = settings.locale ?? DEFAULT_APP_LOCALE;
       setStoredLocale(language.value);
       i18n.locale.value = language.value;
+      if (isTauriRuntimeAvailable()) {
+        void invokeTauri<void>(TAURI_COMMANDS.setTrayLocale, { locale: language.value });
+      }
       const snapshot = await readGeneralPreferences();
       autoLogin.value = snapshot.autoLogin;
       autoLaunch.value = snapshot.autoLaunch;
@@ -83,6 +86,7 @@ export function useGeneralPreferencesModel(): GeneralPreferencesModel {
       i18n.locale.value = next;
       if (isTauriRuntimeAvailable()) {
         void invokeTauri<void>(TAURI_COMMANDS.setTrayLocale, { locale: next });
+        void invokeTauri<void>(TAURI_COMMANDS.settingsUpdateConfigString, { key: "locale", value: next });
       }
     } catch (error) {
       language.value = previous;
