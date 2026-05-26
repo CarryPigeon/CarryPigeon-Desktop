@@ -28,10 +28,6 @@ const props = defineProps<{
    * 当前激活的 server socket。
    */
   activeSocket: string;
-  /**
-   * 当前服务器是否处于免打扰（静音）状态。
-   */
-  serverMuted: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -52,10 +48,6 @@ const emit = defineEmits<{
    */
   (e: "open-settings"): void;
   (e: "open-files"): void;
-  /**
-   * 切换服务器免打扰状态。
-   */
-  (e: "toggle-mute"): void;
 }>();
 </script>
 
@@ -78,14 +70,6 @@ const emit = defineEmits<{
         <span class="cp-rack__name">{{ s.name }}</span>
       </button>
     </div>
-    <button
-      class="cp-serverRail__mute"
-      type="button"
-      :title="props.serverMuted ? t('unmute_server') : t('mute_server')"
-      @click="emit('toggle-mute')"
-    >
-      {{ props.serverMuted ? '🔇' : '🔊' }}
-    </button>
     <div class="cp-rail__foot">
       <button class="cp-rail__btn" type="button" @click="emit('open-servers')">Manage</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">Plugins</button>

@@ -33,7 +33,6 @@ import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "../view-models/useChannelRailModel";
 import { useMembersRailModel } from "../view-models/useMembersRailModel";
 import { useChatCenterModel } from "../view-models/useChatCenterModel";
-import { useServerRailModel } from "../view-models/useServerRailModel";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import {
@@ -398,8 +397,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     },
   });
 
-  const { serverMuted, toggleServerMute } = useServerRailModel();
-
   /**
    * 下半段只做 section model 装配：
    * - 上半段先把跨 feature 协调、局部 capability、页面交互逻辑收拢；
@@ -408,7 +405,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const serverRail = createPatchbayServerRailSection({
     racks: serverRacks,
     activeSocket: socket,
-    serverMuted,
     handleSwitchServer: runServerSwitch,
     handleOpenServers,
     handleOpenSettings,
@@ -416,7 +412,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleOpenFiles: () => {
       void router.push("/files");
     },
-    toggleServerMute,
   });
 
   const chatViewport = createPatchbayChatViewportSection({

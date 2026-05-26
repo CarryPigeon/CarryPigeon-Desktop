@@ -7,5 +7,5 @@ import type { AppInfo } from "./domain/contracts";
 export type { AppInfo };
 
 export type AboutCapabilities = {
-  getAppInfo(): AppInfo;
+  getAppInfo(): Promise<AppInfo>;
 };

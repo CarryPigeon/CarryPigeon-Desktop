@@ -31,16 +31,15 @@ import VoiceCallBanner from "./VoiceCallBanner.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
 import { createMockVoiceCallStatePort } from "../../mock";
 import { createTauriVoiceCallApi } from "../../data/tauri/tauriVoiceCallApi";
+import { currentServerSocket } from "@/features/server-connection/api";
+import { readAuthToken } from "@/shared/utils/localState";
+import { currentChatUserId, currentChatUsername } from "../../../composition/chatAccountSession";
 import type { CallParticipant } from "../../domain/contracts";
 
 const props = defineProps<{
   roomId: string;
   roomName: string;
   targetUserId?: string;
-  wsUrl?: string;
-  accessToken?: string;
-  userId?: string;
-  displayName?: string;
 }>();
 
 const statePort = import.meta.env.PROD
@@ -73,7 +72,7 @@ const {
 } = useVoiceCall({
   statePort,
   roomId: () => props.roomId,
-  userId: () => props.userId ?? "",
+  userId: () => currentChatUserId.value,
 });
 
 const isConference = computed(() => activeSession.value?.kind === "conference");
@@ -81,7 +80,7 @@ const isConference = computed(() => activeSession.value?.kind === "conference");
 const callerName = computed(() => {
   const session = activeSession.value;
   if (!session) return "";
-  const selfId = props.userId ?? "";
+  const selfId = currentChatUserId.value;
   return session.participants.find((p: CallParticipant) => p.userId !== selfId)?.displayName ?? "未知用户";
 });
 
@@ -111,10 +110,23 @@ function handleHangup() {
   }
 }
 
+const wsUrl = computed(() => {
+  const socket = currentServerSocket.value;
+  if (!socket) return "";
+  const host = socket.startsWith("http") ? socket.replace(/^https?:\/\//, "") : socket;
+  return `wss://${host}/signaling`;
+});
+
+const accessToken = computed(() => readAuthToken(currentServerSocket.value ?? ""));
+
 onMounted(() => {
   initDevices();
-  if (props.wsUrl && props.accessToken && props.userId && props.displayName) {
-    connectSignaling(props.wsUrl, props.accessToken, props.userId, props.displayName);
+  const url = wsUrl.value;
+  const token = accessToken.value;
+  const uid = currentChatUserId.value;
+  const name = currentChatUsername.value;
+  if (url && token && uid && name) {
+    connectSignaling(url, token, uid, name);
   }
 });
 

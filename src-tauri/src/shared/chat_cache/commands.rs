@@ -60,12 +60,12 @@ fn now_ms() -> i64 {
     millis as i64
 }
 
-fn base_db_dir() -> PathBuf {
-    crate::shared::app_data_dir::get_app_data_dir().join("db")
+fn base_db_dir() -> Result<PathBuf, crate::shared::app_data_dir::AppDataDirError> {
+    Ok(crate::shared::app_data_dir::get_app_data_dir()?.join("db"))
 }
 
-fn chat_cache_path() -> PathBuf {
-    base_db_dir().join("chat_cache.db")
+fn chat_cache_path() -> Result<PathBuf, crate::shared::app_data_dir::AppDataDirError> {
+    Ok(base_db_dir()?.join("chat_cache.db"))
 }
 
 async fn ensure_parent_dir(path: &Path) -> Result<()> {
@@ -91,7 +91,7 @@ async fn db() -> Result<Arc<sea_orm::DatabaseConnection>> {
         return Ok(conn);
     }
 
-    let path = chat_cache_path();
+    let path = chat_cache_path().map_err(|e| anyhow::anyhow!("{e}"))?;
     ensure_parent_dir(&path).await?;
     let path_str = path.to_string_lossy().replace('\\', "/");
     let url = if path.is_absolute() {
@@ -504,7 +504,7 @@ mod tests {
 
     fn init_test_app_data_dir() -> PathBuf {
         let dir = test_app_data_dir();
-        crate::shared::app_data_dir::init_app_data_dir(dir.clone());
+        let _ = crate::shared::app_data_dir::init_app_data_dir(dir.clone());
         dir
     }
 
@@ -515,7 +515,7 @@ mod tests {
             }
         }
         let _ = forget_master_key();
-        crate::shared::app_data_dir::reset_app_data_dir();
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
     }
 
     fn ensure_test_master_key() -> [u8; 32] {

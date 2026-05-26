@@ -13,8 +13,8 @@ use anyhow::Context;
 /// 说明：
 /// - 路径由 setup() 期间初始化的全局 app_data_dir 决定。
 /// - 该目录由上层流程按需创建（本函数不负责创建目录）。
-pub(super) fn base_plugins_dir() -> PathBuf {
-    crate::shared::app_data_dir::get_app_data_dir().join("plugins")
+pub(super) fn base_plugins_dir() -> Result<PathBuf, crate::shared::app_data_dir::AppDataDirError> {
+    Ok(crate::shared::app_data_dir::get_app_data_dir()?.join("plugins"))
 }
 
 fn sanitize_segment(seg: &str) -> anyhow::Result<String> {
@@ -53,7 +53,7 @@ pub(super) fn safe_join(root: &Path, segments: &[String]) -> anyhow::Result<Path
 
 /// 插件根目录：`{base}/{server_id}/{plugin_id}`。
 pub(super) fn plugin_root_dir(server_id: &str, plugin_id: &str) -> anyhow::Result<PathBuf> {
-    let base = base_plugins_dir();
+    let base = base_plugins_dir()?;
     let segments = vec![server_id.to_string(), plugin_id.to_string()];
     safe_join(&base, &segments)
 }
@@ -64,7 +64,7 @@ pub(super) fn plugin_version_dir(
     plugin_id: &str,
     version: &str,
 ) -> anyhow::Result<PathBuf> {
-    let base = base_plugins_dir();
+    let base = base_plugins_dir()?;
     let segments = vec![
         server_id.to_string(),
         plugin_id.to_string(),
@@ -108,7 +108,7 @@ pub(super) fn resolve_app_plugins_path(
     version: &str,
     rel_path: &str,
 ) -> anyhow::Result<PathBuf> {
-    let base = base_plugins_dir();
+    let base = base_plugins_dir()?;
     let rel = rel_path.trim().trim_start_matches('/');
     if rel.is_empty() {
         return Err(anyhow::anyhow!("Missing relative path"));
@@ -222,7 +222,7 @@ mod tests {
     async fn rejects_symlink_escape_when_serving_app_plugins() {
         let _guard = cwd_lock().lock().expect("lock cwd");
         let app_dir = unique_temp_dir("plugin-path-root");
-        crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
         let app_plugins = app_dir.join("plugins");
         let version_root = app_plugins.join("server-a").join("plugin-a").join("1.0.0");
         let outside = app_dir.join("outside");

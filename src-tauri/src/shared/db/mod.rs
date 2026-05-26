@@ -128,7 +128,10 @@ pub async fn connect_named(key: &str, path: PathBuf) -> anyhow::Result<()> {
         key = %key,
         path = %path.display(),
         url = %url,
-        app_data_dir = %crate::shared::app_data_dir::get_app_data_dir().display(),
+        app_data_dir = %match crate::shared::app_data_dir::get_app_data_dir() {
+            Ok(dir) => dir.display().to_string(),
+            Err(_) => String::from("(unavailable)"),
+        },
         "Opening database",
     );
     let db = CPDatabase::new(&url).await?;

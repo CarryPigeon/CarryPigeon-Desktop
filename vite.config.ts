@@ -1,11 +1,16 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "node:path";
+import fs from "node:fs";
 import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import { TDesignResolver } from '@tdesign-vue-next/auto-import-resolver';
 
 const host = process.env.TAURI_DEV_HOST;
+
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8")) as {
+  version: string;
+};
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
@@ -28,6 +33,9 @@ export default defineConfig(async () => ({
     alias: {
       "@": path.resolve(__dirname, "src"),
     },
+  },
+  define: {
+    "import.meta.env.PACKAGE_VERSION": JSON.stringify(pkg.version),
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
