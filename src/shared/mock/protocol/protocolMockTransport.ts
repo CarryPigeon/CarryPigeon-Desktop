@@ -114,6 +114,16 @@ type ChatMessage = {
   data: unknown;
   preview?: string;
   reply_to_mid?: string;
+  forwarded_from?: { mid: string; cid: string; uid: string; preview: string; send_time: number };
+  forwarded_messages?: Array<{ mid: string; cid: string; uid: string; preview: string; send_time: number }>;
+};
+
+type MockForwardedFrom = {
+  mid: string;
+  cid: string;
+  uid: string;
+  preview: string;
+  send_time: number;
 };
 
 type WsListener = {
@@ -1142,13 +1152,41 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const mid = decodeURIComponent(pathnameParts[1] ?? "").trim();
-    const body = req.body as { target_cid?: string; comment?: string } | null;
+    const body = req.body as { target_cid?: string; comment?: string; merged_mids?: string[] } | null;
     const targetCid = body?.target_cid?.trim();
     if (!targetCid) return { ok: false, error: apiError(400, "invalid_request", "Missing target_cid") };
     const msgs = server.messagesByCid.get(targetCid);
     if (!msgs) return { ok: false, error: apiError(404, "not_found", "Target channel not found") };
     const newMid = `msg-${Date.now().toString(16)}`;
-    const newMsg = {
+
+    // 收集所有转发消息的预览（从已存在的消息中查找）
+    const mergedMids = body?.merged_mids;
+    const forwardedMessages = mergedMids && mergedMids.length > 0
+      ? (() => {
+          const result: MockForwardedFrom[] = [];
+          for (const mergedMid of mergedMids) {
+            // 在所有频道中查找原消息
+            let found: MockForwardedFrom | null = null;
+            for (const [, channelMsgs] of server.messagesByCid) {
+              const original = channelMsgs.find((m) => (m as { mid: string }).mid === mergedMid);
+              if (original) {
+                const m = original as { mid: string; cid: string; uid: string; preview?: string; send_time: number };
+                found = { mid: m.mid, cid: m.cid, uid: m.uid, preview: m.preview ?? "", send_time: m.send_time };
+                break;
+              }
+            }
+            if (found) {
+              result.push(found);
+            } else {
+              result.push({ mid: mergedMid, cid: "", uid: session.uid, preview: "", send_time: 0 });
+            }
+          }
+          return result;
+        })()
+      : undefined;
+
+    const hasMerged = Array.isArray(forwardedMessages) && forwardedMessages.length > 0;
+    const newMsg: Record<string, unknown> = {
       mid: newMid,
       cid: targetCid,
       uid: session.uid,
@@ -1156,10 +1194,16 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       domain_version: "1.0",
       data: { text: body?.comment ?? "" },
       send_time: Date.now(),
-      preview: body?.comment ?? "",
-      forwarded_from: { mid, cid: "", uid: session.uid, preview: "", send_time: 0 },
+      preview: body?.comment ?? (hasMerged ? `转发 ${forwardedMessages!.length} 条消息` : ""),
     };
-    msgs.push(newMsg);
+
+    if (hasMerged) {
+      newMsg.forwarded_messages = forwardedMessages;
+    } else {
+      newMsg.forwarded_from = { mid, cid: "", uid: session.uid, preview: "", send_time: 0 };
+    }
+
+    msgs.push(newMsg as ChatMessage);
     emitWs(server, "message.created", { cid: targetCid, message: newMsg });
     return { ok: true, status: 200, body: newMsg };
   }
@@ -1270,9 +1314,9 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const body = req.body as { emoji?: string } | null;
     const emoji = body?.emoji?.trim();
     if (!emoji) return { ok: false, error: apiError(400, "invalid_request", "Missing emoji") };
-    const reactions = [{ emoji, users: [{ uid: session.uid }] }];
+    const reactions = [{ emoji, count: 1, reacted_by_me: true }];
     emitWs(server, "message.reactions_updated", { cid, mid, reactions });
-    return { ok: true, status: 200, body: reactions };
+    return { ok: true, status: 200, body: { reactions } };
   }
 
   // -------------------------------------------------------------------------

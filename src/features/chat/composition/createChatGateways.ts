@@ -89,7 +89,7 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     listPins(serverSocket, accessToken, cid, cursor, limit) {
       return deps.core.listPins(serverSocket, accessToken, cid, cursor, limit);
     },
-    forwardMessage(serverSocket, accessToken, mid, req) {
+    forwardMessage(serverSocket, accessToken, mid, req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] }) {
       return deps.core.forwardMessage(serverSocket, accessToken, mid, req);
     },
     listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid) {

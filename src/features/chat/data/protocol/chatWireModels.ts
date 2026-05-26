@@ -119,6 +119,7 @@ export type ChatMessageWire = {
   edited_at?: number;
   edit_version?: number;
   forwarded_from?: ChatForwardedFromWire;
+  forwarded_messages?: ChatForwardedFromWire[];
 };
 
 /**
@@ -207,6 +208,7 @@ export type ChatMessageForwardWire = {
   target_cid: string;
   comment?: string;
   idempotency_key?: string;
+  merged_mids?: string[];
 };
 
 export type ChatMentionWire = {

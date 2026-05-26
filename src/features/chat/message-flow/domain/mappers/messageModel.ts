@@ -78,6 +78,26 @@ export function createMessageMapper(deps: MessageModelDeps) {
       }))
       .filter((mention) => mention.userId);
 
+    const forwardedFrom = m.forwardedFrom
+      ? {
+          messageId: String(m.forwardedFrom.messageId ?? "").trim(),
+          channelId: String(m.forwardedFrom.channelId ?? "").trim(),
+          userId: String(m.forwardedFrom.userId ?? "").trim(),
+          preview: String(m.forwardedFrom.preview ?? "").trim(),
+          sentTime: Number(m.forwardedFrom.sentTime ?? 0),
+        }
+      : undefined;
+
+    const forwardedMessages = Array.isArray(m.forwardedMessages)
+      ? m.forwardedMessages.map((fm) => ({
+          messageId: String(fm.messageId ?? "").trim(),
+          channelId: String(fm.channelId ?? "").trim(),
+          userId: String(fm.userId ?? "").trim(),
+          preview: String(fm.preview ?? "").trim(),
+          sentTime: Number(fm.sentTime ?? 0),
+        }))
+      : undefined;
+
     function tryReadText(data: unknown): string | null {
       if (!data || typeof data !== "object") return null;
       const maybe = data as { text?: unknown };
@@ -86,11 +106,11 @@ export function createMessageMapper(deps: MessageModelDeps) {
 
     if (domainLabel === "Core:Text") {
       const text = tryReadText(m.data) ?? String(m.preview ?? "");
-      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions };
+      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages };
     }
 
     const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${domainLabel}${domain.version ? `@${domain.version}` : ""}`;
-    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions };
+    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages };
   }
 
   return { mapWireMessage };

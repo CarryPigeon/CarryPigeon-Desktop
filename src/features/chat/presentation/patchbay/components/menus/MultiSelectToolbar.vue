@@ -12,7 +12,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "cancel"): void;
-  (e: "forward"): void;
+  (e: "forward-merged"): void;
+  (e: "forward-separate"): void;
   (e: "delete"): void;
   (e: "bookmark"): void;
 }>();
@@ -29,9 +30,16 @@ const { t } = useI18n();
       <button
         v-if="props.selectedCount > 0"
         class="cp-multiSelectToolbar__btn"
-        @click="emit('forward')"
+        @click="emit('forward-merged')"
       >
-        {{ t("forward") }} ({{ props.selectedCount }})
+        {{ t("forward_merged") }} ({{ props.selectedCount }})
+      </button>
+      <button
+        v-if="props.selectedCount > 0"
+        class="cp-multiSelectToolbar__btn"
+        @click="emit('forward-separate')"
+      >
+        {{ t("forward_separate") }} ({{ props.selectedCount }})
       </button>
       <button
         v-if="props.selectedCount > 0"

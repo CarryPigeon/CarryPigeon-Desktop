@@ -4,14 +4,14 @@
       <div class="voice-call-banner__content">
         <t-icon name="call" class="voice-call-banner__icon" />
         <div class="voice-call-banner__info">
-          <span class="voice-call-banner__title">{{ callerName }} 邀请你语音通话</span>
+          <span class="voice-call-banner__title">{{ t("voice_call_caller_invite", { name: callerName }) }}</span>
         </div>
         <div class="voice-call-banner__actions">
           <button class="voice-call-banner__btn voice-call-banner__btn--accept" @click="$emit('accept')">
-            接听
+            {{ t("voice_call_answer") }}
           </button>
           <button class="voice-call-banner__btn voice-call-banner__btn--reject" @click="$emit('reject')">
-            拒接
+            {{ t("voice_call_reject") }}
           </button>
         </div>
       </div>
@@ -20,6 +20,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 defineProps<{
   callerName: string;
   visible: boolean;

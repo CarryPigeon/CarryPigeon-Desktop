@@ -24,10 +24,10 @@ const { t } = useI18n();
     <div class="cp-panelHead">
       <!-- 区块：标题 + 状态徽章 -->
       <div class="cp-panelHead__top">
-        <div class="cp-panelHead__name">Channels</div>
+        <div class="cp-panelHead__name">{{ t("channels") }}</div>
         <div class="cp-panelHead__badges">
-          <LabelBadge v-if="props.model.missingRequiredCount > 0" variant="required" label="SETUP REQUIRED" />
-          <LabelBadge v-else variant="info" label="READY" />
+          <LabelBadge v-if="props.model.missingRequiredCount > 0" variant="required" :label="t('setup_required_label')" />
+          <LabelBadge v-else variant="info" :label="t('ready_label')" />
         </div>
       </div>
       <!-- 区块：服务器标识信息 -->
@@ -37,9 +37,9 @@ const { t } = useI18n();
       </div>
       <!-- 区块：主要动作按钮 -->
       <div class="cp-panelHead__actions">
-        <button class="cp-panelHead__btn" type="button" @click="props.model.openPlugins()">Plugins</button>
+        <button class="cp-panelHead__btn" type="button" @click="props.model.openPlugins()">{{ t("plugins") }}</button>
         <button v-if="props.model.missingRequiredCount > 0" class="cp-panelHead__btn danger" type="button" @click="props.model.openRequiredSetup()">
-          Required Setup
+          {{ t("required_setup") }}
         </button>
       </div>
     </div>
@@ -80,7 +80,7 @@ const { t } = useI18n();
             <span class="cp-channel__name">{{ c.name }}</span>
             <span class="cp-channelRow__brief">{{ c.brief }}</span>
           </span>
-          <span v-if="props.model.hasDraft(c.id)" class="cp-channel__draft-indicator" title="Draft">&#x270E;</span>
+          <span v-if="props.model.hasDraft(c.id)" class="cp-channel__draft-indicator" :title="t('draft')">&#x270E;</span>
         </button>
 
         <!-- 区块：右侧动作（未读/加入/信息） -->

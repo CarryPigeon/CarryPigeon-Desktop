@@ -5,6 +5,7 @@
  */
 
 import { computed, nextTick, onBeforeUnmount, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
+import { useI18n } from "vue-i18n";
 import { createMessageActionError } from "@/features/chat/message-flow/domain/outcomes/messageActionOutcome";
 import { createLogger } from "@/shared/utils/logger";
 import { MessagePlugin } from "tdesign-vue-next";
@@ -112,7 +113,15 @@ type ChatCenterRawModel = {
   selectedCount: ComputedRef<number>;
   enterMultiSelectMode(firstMessageId: string): void;
   handleCancelMultiSelect(): void;
-  handleBatchForward(): Promise<void>;
+  handleBatchForwardMerged(): void;
+  handleBatchForwardSeparate(): void;
+  handleSingleForward(messageId: string): void;
+  showForwardDialog: Ref<boolean>;
+  forwardMode: Ref<"merged" | "separate">;
+  forwardMessageCount: ComputedRef<number>;
+  isForwarding: Ref<boolean>;
+  closeForwardDialog(): void;
+  handleForwardConfirm(payload: { targetCid: string; comment: string }): Promise<void>;
   handleBatchDelete(): Promise<void>;
   handleBatchBookmark(): void;
   toggleMessageSelection(id: string): void;
@@ -142,6 +151,7 @@ export type UseChatCenterModelDeps = {
   onReplyShortcut(messageId: string): void;
   onDeleteShortcut(messageId: string): void;
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
+  onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
   chatApi?: ChatApiPort;
 };
 
@@ -151,6 +161,7 @@ export type UseChatCenterModelDeps = {
  * 该模型把 capability 快照、插件域投影与局部交互动作收敛为模板友好的单一视图。
  */
 export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterModel {
+  const { t } = useI18n();
   const currentSessionSnapshot = useObservedCapabilitySnapshot(deps.currentSession);
   const messageTimelineSnapshot = useObservedCapabilitySnapshot(deps.currentTimeline);
   const messageComposerSnapshot = useObservedCapabilitySnapshot(deps.messageComposer);
@@ -294,11 +305,91 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     clearSelection();
   }
 
-  async function handleBatchForward(): Promise<void> {
+  // Forward dialog state
+  const showForwardDialog = ref(false);
+  const forwardMode = ref<"merged" | "separate">("separate");
+  const pendingForwardIds = ref<string[]>([]);
+  const forwardMessageCount = computed(() => pendingForwardIds.value.length);
+  const isForwarding = ref(false);
+
+  function handleBatchForwardMerged(): void {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
+    pendingForwardIds.value = [...ids];
+    forwardMode.value = "merged";
+    showForwardDialog.value = true;
+  }
+
+  function handleBatchForwardSeparate(): void {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    pendingForwardIds.value = [...ids];
+    forwardMode.value = "separate";
+    showForwardDialog.value = true;
+  }
+
+  function handleSingleForward(messageId: string): void {
+    pendingForwardIds.value = [messageId];
+    forwardMode.value = "separate";
+    showForwardDialog.value = true;
+  }
+
+  function closeForwardDialog(): void {
+    showForwardDialog.value = false;
+    isForwarding.value = false;
+  }
+
+  async function handleForwardConfirm(payload: { targetCid: string; comment: string }): Promise<void> {
+    const ids = pendingForwardIds.value;
+    if (ids.length === 0) return;
+    if (isForwarding.value) return;
+
+    isForwarding.value = true;
+
+    if (forwardMode.value === "merged") {
+      try {
+        await deps.onForwardMessage(ids[0], {
+          targetCid: payload.targetCid,
+          comment: payload.comment || undefined,
+          mergedMids: ids,
+        });
+        clearSelection();
+        showForwardDialog.value = false;
+        isForwarding.value = false;
+        MessagePlugin.success(t("forward_success", { count: ids.length }));
+        return;
+      } catch (err) {
+        clearSelection();
+        showForwardDialog.value = false;
+        isForwarding.value = false;
+        logger.error("Action: chat_forward_message_failed", { mid: ids[0], error: String(err) });
+        MessagePlugin.warning(t("forward_failed", { failed: 1, total: ids.length }));
+        return;
+      }
+    }
+
+    let failed = 0;
+    for (const mid of ids) {
+      try {
+        await deps.onForwardMessage(mid, {
+          targetCid: payload.targetCid,
+          comment: payload.comment || undefined,
+        });
+      } catch (err) {
+        failed++;
+        logger.error("Action: chat_forward_message_failed", { mid, error: String(err) });
+      }
+    }
+
     clearSelection();
-    MessagePlugin.info("Forward feature coming soon");
+    showForwardDialog.value = false;
+    isForwarding.value = false;
+
+    if (failed > 0) {
+      MessagePlugin.warning(t("forward_failed", { failed, total: ids.length }));
+    } else {
+      MessagePlugin.success(t("forward_success", { count: ids.length - failed }));
+    }
   }
 
   async function handleBatchDelete(): Promise<void> {
@@ -481,7 +572,15 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     selectedCount,
     enterMultiSelectMode,
     handleCancelMultiSelect,
-    handleBatchForward,
+    handleBatchForwardMerged,
+    handleBatchForwardSeparate,
+    handleSingleForward,
+    showForwardDialog,
+    forwardMode,
+    forwardMessageCount,
+    isForwarding,
+    closeForwardDialog,
+    handleForwardConfirm,
     handleBatchDelete,
     handleBatchBookmark,
     toggleMessageSelection: (id: string) => toggleMessageSelection(id),

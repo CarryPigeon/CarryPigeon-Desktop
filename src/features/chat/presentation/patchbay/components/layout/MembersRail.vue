@@ -4,9 +4,12 @@
  * @description Patchbay 右侧成员栏（成员列表只读展示）。
  */
 
+import { useI18n } from "vue-i18n";
 import type { MembersRailModel } from "@/features/chat/presentation/patchbay/view-models/useMembersRailModel";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   model: MembersRailModel;
@@ -17,8 +20,8 @@ const props = defineProps<{
   <!-- 组件：MembersRail｜职责：成员栏（只读成员列表） -->
   <!-- 区块：<aside> .cp-rail--members -->
   <aside class="cp-rail cp-rail--members">
-    <div class="cp-rail__title">Members</div>
-    <div v-if="props.model.members.length === 0" class="cp-rail__empty">No members in this channel.</div>
+    <div class="cp-rail__title">{{ t("members") }}</div>
+    <div v-if="props.model.members.length === 0" class="cp-rail__empty">{{ t("no_members") }}</div>
     <div v-else class="cp-memberList">
       <div v-for="u in props.model.members" :key="u.id" class="cp-member">
         <UserProfilePopover

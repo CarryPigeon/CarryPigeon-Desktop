@@ -125,6 +125,7 @@ export type ChatMessageRecord = {
   editedAt?: number;
   editVersion?: number;
   forwardedFrom?: ChatForwardedFromRecord;
+  forwardedMessages?: ChatForwardedFromRecord[];
 };
 
 /** 消息回应领域模型。 */

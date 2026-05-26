@@ -19,6 +19,8 @@ import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
 import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components/VoiceCallTrigger.vue";
+import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
+import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -58,6 +60,7 @@ const props = defineProps<{
    * 安装提示：从未知 domain 卡片跳转到插件中心。
    */
   onInstallHint: (pluginId: string | undefined) => void;
+  channels: readonly ChannelSummary[];
 }>();
 
 const { t } = useI18n();
@@ -113,7 +116,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
   <section class="cp-center">
     <header class="cp-topConsole">
       <div class="cp-topConsole__left">
-        <div class="cp-topConsole__title">Messages</div>
+        <div class="cp-topConsole__title">{{ t("messages_title") }}</div>
       </div>
       <div class="cp-topConsole__right">
         <VoiceCallTrigger
@@ -130,8 +133,8 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
           class="cp-topConsole__search"
           type="button"
           @click="props.model.openSearchPanel"
-          aria-label="Search messages"
-          :title="'Search'"
+          :aria-label="t('search_messages')"
+          :title="t('search_messages')"
         >
           <t-icon name="search" />
         </button>
@@ -163,12 +166,12 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
 
     <section v-if="props.model.searchPanelOpen" class="cp-searchPanel">
       <div class="cp-searchPanel__row">
-        <t-input placeholder="Search current channel" @enter="props.model.searchMessages" />
+        <t-input :placeholder="t('search_current_channel')" @enter="props.model.searchMessages" />
         <button type="button" class="cp-searchPanel__close" @click="props.model.closeSearchPanel">&times;</button>
       </div>
-      <div v-if="props.model.searchState.loading" class="cp-searchPanel__state">Searching&hellip;</div>
+      <div v-if="props.model.searchState.loading" class="cp-searchPanel__state">{{ t("searching") }}</div>
       <div v-else-if="props.model.searchState.error" class="cp-searchPanel__state cp-searchPanel__error">{{ props.model.searchState.error }}</div>
-      <div v-else-if="props.model.searchState.query && !props.model.searchState.results.length" class="cp-searchPanel__state">No messages found</div>
+      <div v-else-if="props.model.searchState.query && !props.model.searchState.results.length" class="cp-searchPanel__state">{{ t("no_messages_found") }}</div>
       <div class="cp-searchPanel__results">
         <button
           v-for="result in props.model.searchState.results"
@@ -187,7 +190,8 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       v-if="props.model.multiSelectMode"
       :selected-count="props.model.selectedCount"
       @cancel="props.model.handleCancelMultiSelect"
-      @forward="props.model.handleBatchForward"
+      @forward-merged="props.model.handleBatchForwardMerged"
+      @forward-separate="props.model.handleBatchForwardSeparate"
       @delete="props.model.handleBatchDelete"
       @bookmark="props.model.handleBatchBookmark"
     />
@@ -207,7 +211,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       <!-- 区块：消息列表（包含基于 lastReadTime 的“UNREAD”分隔符，mock 逻辑） -->
       <template v-for="{ m, isGroupStart, isUnreadStart } in props.model.messageRows" :key="m.id">
         <!-- 区块：未读边界 -->
-        <div v-if="isUnreadStart" class="cp-unreadSep" role="separator" aria-label="unread boundary">UNREAD</div>
+        <div v-if="isUnreadStart" class="cp-unreadSep" role="separator" :aria-label="t('unread')">{{ t("unread") }}</div>
         <!-- 区块：消息行 -->
         <div
           class="cp-msg"
@@ -253,7 +257,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
               <span class="cp-msg__time">{{ props.model.fmtTime(m.timeMs) }}</span>
               <span class="cp-msg__dot"></span>
               <span class="cp-msg__domain">{{ m.domain.label }}</span>
-              <button class="cp-msg__more" type="button" aria-label="More actions" @click="props.onMoreClick($event, m.id)">⋯</button>
+              <button class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, m.id)">⋯</button>
             </div>
 
             <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
@@ -272,8 +276,8 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         v-if="props.showJumpToBottom"
         class="cp-jumpBottom"
         type="button"
-        aria-label="Jump to bottom"
-        title="Jump to bottom"
+        :aria-label="t('jump_to_bottom')"
+        :title="t('jump_to_bottom')"
         @click="props.onJumpToBottom"
       >
         ↓
@@ -308,6 +312,16 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         @close-mention-menu="props.model.handleMentionMenuClose"
       />
     </div>
+
+    <ForwardChannelDialog
+      :visible="props.model.showForwardDialog"
+      :forward-mode="props.model.forwardMode"
+      :message-count="props.model.forwardMessageCount"
+      :channels="props.channels"
+      :is-forwarding="props.model.isForwarding"
+      @confirm="props.model.handleForwardConfirm"
+      @cancel="props.model.closeForwardDialog"
+    />
   </section>
 </template>
 

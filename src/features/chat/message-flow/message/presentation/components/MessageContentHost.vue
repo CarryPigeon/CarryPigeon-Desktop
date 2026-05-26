@@ -16,6 +16,7 @@ import {
 } from "@/features/chat/message-flow/message/domain/messageRendererResolver";
 import type { RenderableChatMessage } from "@/features/chat/message-flow/message/domain/messageModels";
 import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
+import MergedForwardBubble from "./MergedForwardBubble.vue";
 import ReactionBar from "./ReactionBar.vue";
 
 const props = defineProps<{
@@ -50,6 +51,20 @@ const renderModel = computed(() =>
   resolveMessageRenderModel(props.message, String(props.replyText ?? ""), registry.value),
 );
 
+const isMergedForward = computed(() => {
+  const fms = (props.message as { forwardedMessages?: unknown[] }).forwardedMessages;
+  return Array.isArray(fms) && fms.length > 0;
+});
+
+const mergedForwardData = computed(() => {
+  if (!isMergedForward.value) return null;
+  return {
+    fromName: props.message.from.name,
+    forwardedMessages: (props.message as { forwardedMessages?: Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }> }).forwardedMessages!,
+    comment: props.message.kind === "core_text" ? props.message.text : undefined,
+  };
+});
+
 /**
  * 处理未知 domain 卡片的安装回调。
  *
@@ -63,14 +78,22 @@ function handleInstall(): void {
 
 <template>
   <!-- 组件：MessageContentHost｜职责：统一消息内容渲染入口 -->
+  <MergedForwardBubble
+    v-if="isMergedForward && mergedForwardData"
+    :message-id="props.message.id"
+    :from-name="mergedForwardData.fromName"
+    :forwarded-messages="mergedForwardData.forwardedMessages"
+    :comment="mergedForwardData.comment"
+  />
   <CoreTextMessageBubble
-    v-if="renderModel.kind === 'core'"
+    v-else-if="renderModel.kind === 'core'"
     :message-id="renderModel.messageId"
     :text="renderModel.text"
     :reply-text="renderModel.replyText"
     :reply="props.message.kind === 'core_text' ? props.message.replyTo : undefined"
     :mentions="props.message.kind === 'core_text' ? props.message.mentions : undefined"
     :quote-reply="props.message.kind === 'core_text' ? props.message.quoteReply : undefined"
+    :forwarded-from="props.message.kind === 'core_text' ? props.message.forwardedFrom : undefined"
   />
   <div v-else-if="renderModel.kind === 'plugin'" class="cp-pluginBubble">
     <component

@@ -181,7 +181,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
   <section class="cp-composer">
     <div v-if="props.replyTitle || props.replySnippet" class="cp-reply">
       <div class="cp-reply__left">
-        <div class="cp-reply__title">{{ props.replyTitle || "Reply" }}</div>
+        <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
         <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
       </div>
       <button class="cp-reply__btn" type="button" @click="handleCancelReply">×</button>
@@ -201,7 +201,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
     </div>
 
     <div class="cp-composer__row">
-      <div class="cp-composer__label">Type</div>
+      <div class="cp-composer__label">{{ t("composer_type") }}</div>
       <DomainSelector
         :model-value="props.domainId"
         :options="props.domainOptions"
@@ -210,7 +210,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
     </div>
 
     <div class="cp-composer__row">
-      <div class="cp-composer__label">Message</div>
+      <div class="cp-composer__label">{{ t("composer_message") }}</div>
       <div v-if="isPluginComposerActive" class="cp-composer__plugin">
         <component
           :is="props.pluginComposer"
@@ -224,7 +224,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
         v-else
         :model-value="props.draft"
         :disabled="props.domainId.trim() !== 'Core:Text' || Boolean(props.disabled) || Boolean(props.sending)"
-        :placeholder="props.domainId.trim() === 'Core:Text' ? t('message_input_placeholder') : 'This message type uses a plugin composer'"
+        :placeholder="props.domainId.trim() === 'Core:Text' ? t('message_input_placeholder') : t('plugin_composer_placeholder')"
         :autosize="{ minRows: 2, maxRows: 6 }"
         @keydown="handleKeydown"
         @update:modelValue="handleUpdateDraft"
@@ -249,7 +249,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
         class="cp-mentionMenu__item"
         :class="{ 'cp-mentionMenu__item--disabled': sys.disabled }"
         :disabled="sys.disabled"
-        :title="sys.disabled ? 'Only admins can use this' : ''"
+        :title="sys.disabled ? t('admin_only') : ''"
         type="button"
         @click="!sys.disabled && selectSystemMention(sys.type)"
       >
@@ -258,8 +258,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
     </div>
 
     <div class="cp-composer__actions">
-      <div v-if="isPluginComposerActive" class="cp-composer__hint">Sent by plugin composer</div>
-      <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">No composer is available for this message type.</div>
+      <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
+      <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">{{ t("no_composer_available") }}</div>
       <button v-else class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
         {{ props.sending ? `${t('send')}…` : t("send") }}
       </button>

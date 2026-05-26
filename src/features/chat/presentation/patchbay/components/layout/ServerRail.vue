@@ -55,8 +55,8 @@ const emit = defineEmits<{
   <!-- 组件：ServerRail｜职责：服务器栏（Rack 列表 + 快捷入口） -->
   <!-- 区块：<aside> .cp-rail--servers -->
   <aside class="cp-rail cp-rail--servers">
-    <div class="cp-rail__title">Servers</div>
-    <div v-if="props.racks.length === 0" class="cp-rail__empty">No servers added yet.</div>
+    <div class="cp-rail__title">{{ t("servers") }}</div>
+    <div v-if="props.racks.length === 0" class="cp-rail__empty">{{ t("no_servers") }}</div>
     <div v-else class="cp-rackList" role="listbox" aria-label="servers">
       <button
         v-for="s in props.racks"
@@ -71,8 +71,8 @@ const emit = defineEmits<{
       </button>
     </div>
     <div class="cp-rail__foot">
-      <button class="cp-rail__btn" type="button" @click="emit('open-servers')">Manage</button>
-      <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">Plugins</button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-servers')">{{ t("manage") }}</button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-files')">{{ t("file_manager") }}</button>
     </div>
