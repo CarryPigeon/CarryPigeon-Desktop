@@ -212,7 +212,7 @@ export class ChatCoreApplicationService {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string },
+    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord> {
     return this.deps.api.forwardMessage(serverSocket, accessToken, mid, req);
   }

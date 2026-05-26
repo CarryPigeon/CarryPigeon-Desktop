@@ -38,6 +38,13 @@ const props = defineProps<{
     userId: string;
     preview: string;
   };
+  forwardedFrom?: {
+    messageId: string;
+    channelId: string;
+    userId: string;
+    preview: string;
+    sentTime: number;
+  };
 }>();
 
 /**
@@ -53,6 +60,10 @@ function mentionClass(mention: MessageMention): string {
 <template>
   <!-- 组件：CoreTextMessageBubble｜职责：渲染 core-text（文本 + 文件引用 token） -->
   <div class="cp-bubble">
+    <div v-if="props.forwardedFrom" class="cp-forwardedFrom">
+      <span class="cp-forwardedFrom__icon">↩</span>
+      <span class="cp-forwardedFrom__text">{{ $t('forwarded_from') }} #{{ props.forwardedFrom.channelId }}</span>
+    </div>
     <div v-if="props.quoteReply" class="cp-quoteReply">
       <div class="cp-quoteReply__bar"></div>
       <div class="cp-quoteReply__content">
@@ -160,6 +171,22 @@ function mentionClass(mention: MessageMention): string {
   color: var(--cp-warning, #f0a030);
   font-weight: 600;
   background: color-mix(in oklab, var(--cp-warning) 10%, transparent);
+}
+.cp-forwardedFrom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--cp-text-muted, #a6adc8);
+}
+.cp-forwardedFrom__icon {
+  flex-shrink: 0;
+}
+.cp-forwardedFrom__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
 

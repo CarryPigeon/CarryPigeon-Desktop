@@ -26,7 +26,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useVoiceCall } from "../composables/useVoiceCall";
+
+const { t } = useI18n();
 import VoiceCallBanner from "./VoiceCallBanner.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
 import { createMockVoiceCallStatePort } from "../../mock";
@@ -81,7 +84,7 @@ const callerName = computed(() => {
   const session = activeSession.value;
   if (!session) return "";
   const selfId = currentChatUserId.value;
-  return session.participants.find((p: CallParticipant) => p.userId !== selfId)?.displayName ?? "未知用户";
+  return session.participants.find((p: CallParticipant) => p.userId !== selfId)?.displayName ?? t("voice_call_unknown_user");
 });
 
 const currentInputDeviceId = computed(() => {

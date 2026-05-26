@@ -250,12 +250,13 @@ export const httpChatApiPort: ChatApiPort = {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string },
+    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord> {
     const forwarded = await httpForwardMessage(serverSocket, accessToken, mid, {
       target_cid: req.targetCid,
       comment: req.comment,
       idempotency_key: req.idempotencyKey,
+      merged_mids: req.mergedMids,
     });
     return mapChatMessageWire(forwarded);
   },

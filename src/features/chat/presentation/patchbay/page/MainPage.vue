@@ -259,6 +259,7 @@ onBeforeUnmount(() => {
 
     <ChatCenter
       :model="page.chatCenter"
+      :channels="page.channels"
       :show-jump-to-bottom="page.chatViewport.showJumpToBottom"
       :on-jump-to-bottom="page.chatViewport.handleJumpToBottom"
       :on-signal-scroll="page.chatViewport.handleSignalScroll"

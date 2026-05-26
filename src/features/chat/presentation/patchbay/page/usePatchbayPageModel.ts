@@ -4,7 +4,7 @@
  * 收敛 MainPage 所需的页面级状态、导航、浮层、快捷键与生命周期装配，使页面本身只承担模板入口职责。
  */
 
-import { computed, proxyRefs, ref, type Ref, type ShallowUnwrapRef } from "vue";
+import { computed, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { createLogger } from "@/shared/utils/logger";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
@@ -34,6 +34,9 @@ import { useChannelRailModel } from "../view-models/useChannelRailModel";
 import { useMembersRailModel } from "../view-models/useMembersRailModel";
 import { useChatCenterModel } from "../view-models/useChatCenterModel";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
+import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
+import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
+import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import {
   createPatchbayChannelDialogsSection,
@@ -81,6 +84,7 @@ type PatchbayPageRawModel = {
   channelSettingsMenu: PatchbayChannelSettingsMenuModel;
   channelDialogs: PatchbayChannelDialogsModel;
   quickSwitcher: PatchbayQuickSwitcherModel;
+  channels: ComputedRef<readonly ChannelSummary[]>;
 };
 
 /**
@@ -278,6 +282,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
 
   // Forwarding variable to break circular dependency between useMessageContextMenu and chatCenter
   let _enterMultiSelectMode: ((messageId: string) => void) = () => {};
+  let _openForwardDialog: ((messageId: string) => void) = () => {};
 
   const {
     menuOpen,
@@ -300,6 +305,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onAsyncError: logAsyncError,
     enterMultiSelectMode: (messageId: string) => {
       _enterMultiSelectMode(messageId);
+    },
+    openForwardDialog: (messageId: string) => {
+      _openForwardDialog(messageId);
     },
   });
 
@@ -330,11 +338,25 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onReplyShortcut: handleReplyShortcut,
     onDeleteShortcut: handleDeleteShortcut,
     onMessageContextMenu: handleMessageContextMenu,
+    onForwardMessage: async (mid, req) => {
+      const s = socket.value;
+      if (!s) return;
+      const token = (await ensureValidAccessToken(s)).trim();
+      if (!token) return;
+      await httpChatApiPort.forwardMessage(s, token, mid, {
+        targetCid: req.targetCid,
+        comment: req.comment,
+        mergedMids: req.mergedMids,
+      });
+    },
   });
 
   // Wire up the circular dependency after chatCenter is created
   _enterMultiSelectMode = (messageId: string) => {
     chatCenter.enterMultiSelectMode(messageId);
+  };
+  _openForwardDialog = (messageId: string) => {
+    chatCenter.handleSingleForward(messageId);
   };
 
   const {
@@ -474,9 +496,12 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleSelect: handleQuickSelect,
   });
 
+  const channels = computed(() => roomDirectorySnapshot.value.allChannels as readonly ChannelSummary[]);
+
   const rawModel: PatchbayPageRawModel = {
     flashMessage,
     serverRail,
+    channels,
     channelRail,
     chatCenter,
     membersRail,
