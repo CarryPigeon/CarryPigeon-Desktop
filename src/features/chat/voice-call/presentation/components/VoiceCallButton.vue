@@ -3,7 +3,7 @@
     v-if="callState === 'idle' || callState === 'ended'"
     class="voice-call-button"
     :disabled="callState !== 'idle' && callState !== 'ended'"
-    :title="conference ? '发起多人会议' : '发起语音通话'"
+    :title="conference ? t('voice_call_conference') : t('voice_call_start')"
     @click="$emit('start')"
   >
     <t-icon :name="conference ? 'usergroup' : 'call'" class="voice-call-icon" />
@@ -11,7 +11,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { CallState } from "../../domain/contracts";
+
+const { t } = useI18n();
 
 defineProps<{
   callState: CallState;
@@ -28,17 +31,23 @@ defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
+  gap: 6px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
   cursor: pointer;
-  color: var(--td-text-color-primary);
-  transition: background-color 0.2s;
+  color: var(--cp-text);
+  padding: 8px 12px;
+  font-size: 14px;
+  transition: transform 0.15s ease, background-color 0.15s ease;
 
   &:hover:not(:disabled) {
-    background-color: var(--td-bg-color-component-hover);
+    transform: translateY(-1px);
+    background: var(--cp-hover-bg);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   &:disabled {
@@ -47,7 +56,7 @@ defineEmits<{
   }
 
   .voice-call-icon {
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
   }
 }

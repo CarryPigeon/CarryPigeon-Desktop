@@ -4,16 +4,23 @@
       <div class="voice-call-panel__bar" @click="minimized = !minimized">
         <span class="voice-call-panel__status">
           <span class="voice-call-panel__dot" :class="{ 'is-active': state === 'active', 'is-connecting': state === 'connecting' || state === 'dialing' }"></span>
-          {{ state === "dialing" ? "正在拨号..." : state === "connecting" ? "正在连接..." : state === "active" ? `通话中 · ${formattedDuration}` : state }}
+          {{ state === "dialing" ? t("voice_call_dialing") : state === "connecting" ? t("voice_call_connecting") : state === "active" ? `${t("voice_call_in_call")} · ${formattedDuration}` : state }}
         </span>
         <span v-if="state === 'active'" class="voice-call-panel__participant-count">
-          {{ participants.length }} 人
+          {{ t("voice_call_participants", { count: participants.length }) }}
         </span>
+        <button
+          class="voice-call-panel__bar-hangup"
+          :title="t('voice_call_hangup')"
+          @click.stop="$emit('hangup')"
+        >
+          <t-icon name="close" />
+        </button>
         <span class="voice-call-panel__toggle">{{ minimized ? "▲" : "▼" }}</span>
       </div>
 
       <div v-if="!minimized && isConference && participants.length > 0" class="voice-call-panel__roster">
-        <div class="voice-call-panel__roster-title">参与者 ({{ participants.length }})</div>
+        <div class="voice-call-panel__roster-title">{{ t("voice_call_participants_title") }} ({{ participants.length }})</div>
         <div v-for="p in participants" :key="p.userId" class="voice-call-panel__participant">
           <span class="voice-call-panel__participant-name">{{ p.displayName || p.userId }}</span>
           <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><t-icon name="microphone-off" /></span>
@@ -28,7 +35,7 @@
         <button
           class="voice-call-panel__ctrl-btn"
           :class="{ 'is-muted': isMuted }"
-          :title="isMuted ? '取消静音' : '静音'"
+          :title="isMuted ? t('voice_call_unmute') : t('voice_call_mute')"
           @click="$emit('toggleMute')"
         >
           <t-icon :name="isMuted ? 'microphone-off' : 'microphone'" />
@@ -36,7 +43,7 @@
         <button
           class="voice-call-panel__ctrl-btn"
           :class="{ 'is-off': !isNoiseSuppressionOn }"
-          :title="isNoiseSuppressionOn ? '关闭降噪' : '开启降噪'"
+          :title="isNoiseSuppressionOn ? t('voice_call_noise_off') : t('voice_call_noise_on')"
           @click="$emit('toggleNoiseSuppression')"
         >
           <t-icon name="sound-mute" />
@@ -71,7 +78,7 @@
         </select>
         <button
           class="voice-call-panel__ctrl-btn voice-call-panel__ctrl-btn--hangup"
-          title="挂断"
+          :title="t('voice_call_hangup')"
           @click="$emit('hangup')"
         >
           <t-icon name="close" />
@@ -83,7 +90,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CallState, AudioDeviceInfo, CallParticipant } from "../../domain/contracts";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   state: CallState;
@@ -169,6 +179,27 @@ const formattedDuration = computed(() => {
   &__participant-count {
     font-size: 12px;
     color: var(--td-text-color-secondary);
+  }
+
+  &__bar-hangup {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--td-error-color);
+    border-radius: 50%;
+    background: var(--td-bg-color-component);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--td-error-color);
+    flex-shrink: 0;
+    transition: all 0.2s;
+
+    &:hover {
+      background: var(--td-error-color);
+      color: #fff;
+    }
   }
 
   &__toggle {

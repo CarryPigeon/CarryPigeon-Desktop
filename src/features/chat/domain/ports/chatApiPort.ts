@@ -110,7 +110,7 @@ export type ChatApiPort = {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string },
+    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord>;
   listMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPage>;
   markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void>;

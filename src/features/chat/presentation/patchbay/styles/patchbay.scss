@@ -931,7 +931,28 @@
   padding: 6px 10px;
 }
 
-/* 顶部控制台“设置”按钮 */
+/* 顶部控制台”搜索”按钮 */
+.cp-topConsole__search {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-topConsole__search:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+}
+
+.cp-topConsole__search:active {
+  transform: translateY(0);
+}
+
+/* 顶部控制台”设置”按钮 */
 .cp-topConsole__settings {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -1027,6 +1048,7 @@
 
 .cp-jumpBottom:focus-visible,
 .cp-topConsole__settings:focus-visible,
+.cp-topConsole__search:focus-visible,
 .cp-historyMore__btn:focus-visible,
 .cp-channelMenu__item:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--cp-info) 40%, var(--cp-border));
@@ -1038,6 +1060,7 @@
   .cp-jumpBottom,
   .cp-msg__more,
   .cp-topConsole__settings,
+  .cp-topConsole__search,
   .cp-rail__btn,
   .cp-rack,
   .cp-channelRow,

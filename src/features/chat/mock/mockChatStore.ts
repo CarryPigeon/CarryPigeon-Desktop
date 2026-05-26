@@ -494,6 +494,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
           createdAt: replyDraft.value.createdAt,
         }
       : undefined;
+    const quoteReply = payload?.quoteReply ?? quoteReplyDraft.value ?? undefined;
     let createdMessage: ChatMessage;
 
     if (payload) {
@@ -507,6 +508,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         data: payload.data,
         replyToId,
         replyTo,
+        quoteReply,
       };
       list.push(createdMessage);
     } else {
@@ -519,6 +521,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         text,
         replyToId,
         replyTo,
+        quoteReply,
       };
       list.push(createdMessage);
       composerDraft.value = "";
@@ -526,6 +529,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
 
     replyDraft.value = null;
     replyToMessageId.value = "";
+    quoteReplyDraft.value = null;
     state.lastReadTimeMsByChannel[currentChannelId.value] = now;
     return {
       ok: true,
@@ -564,8 +568,18 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     const idx = current.findIndex((r) => r.emoji === emoji);
     let updated: typeof current;
     if (idx >= 0) {
-      updated = [...current];
-      updated[idx] = { ...updated[idx], count: updated[idx].count + 1, reactedByMe: true };
+      if (current[idx].reactedByMe) {
+        // 已回应过该表情，切换为移除
+        if (current[idx].count <= 1) {
+          updated = current.filter((_, i) => i !== idx);
+        } else {
+          updated = [...current];
+          updated[idx] = { ...updated[idx], count: updated[idx].count - 1, reactedByMe: false };
+        }
+      } else {
+        updated = [...current];
+        updated[idx] = { ...updated[idx], count: updated[idx].count + 1, reactedByMe: true };
+      }
     } else {
       updated = [...current, { emoji, count: 1, reactedByMe: true }];
     }

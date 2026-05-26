@@ -23,6 +23,7 @@ export type UseMessageContextMenuDeps = {
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   onAsyncError(action: string, error: unknown): void;
   enterMultiSelectMode(firstMessageId: string): void;
+  openForwardDialog(messageId: string): void;
 };
 
 /**
@@ -70,9 +71,11 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
       case "select":
         deps.enterMultiSelectMode(messageId);
         return;
-      case "forward":
+      case "forward": {
+        deps.openForwardDialog(messageId);
+        return;
+      }
       case "copy": {
-        // 当前阶段 forward 复用 copy 行为，后续可在此分叉到独立转发流程。
         const text = deps.getClipboardText(messageId);
         if (!text) return;
         runAsyncTask(deps.copyTextToClipboard(text), "chat_copy_message_failed");

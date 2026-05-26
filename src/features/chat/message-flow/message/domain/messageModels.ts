@@ -63,6 +63,20 @@ export type RenderableChatMessage =
       };
       mentions?: MessageMention[];
       reactions?: MessageReactionSummary[];
+      forwardedFrom?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      };
+      forwardedMessages?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      }[];
     }
   | {
       id: string;
@@ -81,6 +95,20 @@ export type RenderableChatMessage =
       };
       mentions?: MessageMention[];
       reactions?: MessageReactionSummary[];
+      forwardedFrom?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      };
+      forwardedMessages?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      }[];
     };
 
 /**

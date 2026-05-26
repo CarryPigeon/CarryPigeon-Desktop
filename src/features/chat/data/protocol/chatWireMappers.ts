@@ -228,6 +228,9 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
     editedAt: wire.edited_at != null ? asSafeNumber(wire.edited_at) : undefined,
     editVersion: wire.edit_version != null ? asSafeNumber(wire.edit_version) : undefined,
     forwardedFrom: mapChatForwardedFromWire(wire.forwarded_from),
+    forwardedMessages: Array.isArray(wire.forwarded_messages)
+      ? wire.forwarded_messages.map(mapChatForwardedFromWire).filter((m): m is ChatForwardedFromRecord => m != null)
+      : undefined,
   };
 }
 
