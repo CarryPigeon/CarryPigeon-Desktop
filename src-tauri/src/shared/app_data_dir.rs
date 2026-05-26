@@ -14,17 +14,13 @@ static APP_DATA_DIR: RwLock<Option<PathBuf>> = RwLock::new(None);
 ///
 /// 必须在 Tauri `setup()` 期间、任何 command handler 运行前调用。
 pub fn init_app_data_dir(dir: PathBuf) {
-    let mut guard = APP_DATA_DIR
-        .write()
-        .expect("app_data_dir 锁已污染");
+    let mut guard = APP_DATA_DIR.write().expect("app_data_dir 锁已污染");
     *guard = Some(dir);
 }
 
 /// 重置应用数据目录（仅测试使用）。
 pub fn reset_app_data_dir() {
-    let mut guard = APP_DATA_DIR
-        .write()
-        .expect("app_data_dir 锁已污染");
+    let mut guard = APP_DATA_DIR.write().expect("app_data_dir 锁已污染");
     *guard = None;
 }
 
