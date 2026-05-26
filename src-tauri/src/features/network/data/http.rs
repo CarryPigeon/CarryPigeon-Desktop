@@ -160,7 +160,9 @@ pub async fn download_avatar(avatar_id: &str, url: &str) -> anyhow::Result<()> {
         anyhow::bail!("Invalid avatar_id: only alphanumeric, hyphen, and underscore are allowed");
     }
 
-    let avatar_dir = crate::shared::app_data_dir::get_app_data_dir().join("avatars");
+    let avatar_dir = crate::shared::app_data_dir::get_app_data_dir()
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+        .join("avatars");
     tokio::fs::create_dir_all(&avatar_dir)
         .await
         .context("Failed to create avatar directory")?;
@@ -255,7 +257,7 @@ mod tests {
             .expect("time")
             .as_millis();
         let app_dir = std::env::temp_dir().join(format!("carrypigeon-avatar-test-{millis}"));
-        crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
 
         let url = "https://httpbin.org/image/jpeg";
         let avatar_id = "test_avatar";

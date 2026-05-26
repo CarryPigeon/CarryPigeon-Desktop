@@ -2,7 +2,7 @@
   <Transition name="voice-banner-slide">
     <div v-if="visible" class="voice-call-banner">
       <div class="voice-call-banner__content">
-        <span class="voice-call-banner__icon">📞</span>
+        <t-icon name="call" class="voice-call-banner__icon" />
         <div class="voice-call-banner__info">
           <span class="voice-call-banner__title">{{ callerName }} 邀请你语音通话</span>
         </div>

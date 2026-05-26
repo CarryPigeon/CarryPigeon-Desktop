@@ -10,30 +10,52 @@ use std::sync::RwLock;
 
 static APP_DATA_DIR: RwLock<Option<PathBuf>> = RwLock::new(None);
 
+/// app_data_dir 错误类型。
+#[derive(Debug, Clone)]
+pub enum AppDataDirError {
+    LockPoisoned,
+    NotInitialized,
+}
+
+impl std::fmt::Display for AppDataDirError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LockPoisoned => write!(f, "app_data_dir 锁已污染"),
+            Self::NotInitialized => write!(
+                f,
+                "app_data_dir 未初始化，请在 Tauri setup() 中调用 shared::app_data_dir::init_app_data_dir()"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for AppDataDirError {}
+
 /// 初始化共享应用数据目录。
 ///
 /// 必须在 Tauri `setup()` 期间、任何 command handler 运行前调用。
-pub fn init_app_data_dir(dir: PathBuf) {
-    let mut guard = APP_DATA_DIR.write().expect("app_data_dir 锁已污染");
+pub fn init_app_data_dir(dir: PathBuf) -> Result<(), AppDataDirError> {
+    let mut guard = APP_DATA_DIR
+        .write()
+        .map_err(|_| AppDataDirError::LockPoisoned)?;
     *guard = Some(dir);
+    Ok(())
 }
 
 /// 重置应用数据目录（仅测试使用）。
-pub fn reset_app_data_dir() {
-    let mut guard = APP_DATA_DIR.write().expect("app_data_dir 锁已污染");
+pub fn reset_app_data_dir() -> Result<(), AppDataDirError> {
+    let mut guard = APP_DATA_DIR
+        .write()
+        .map_err(|_| AppDataDirError::LockPoisoned)?;
     *guard = None;
+    Ok(())
 }
 
 /// 返回已解析的应用数据目录克隆。
-///
-/// # Panics
-///
-/// 若 `init_app_data_dir()` 尚未调用则会 panic。
-/// 这是有意的：setup() 保证在命令处理之前运行。
-pub fn get_app_data_dir() -> PathBuf {
+pub fn get_app_data_dir() -> Result<PathBuf, AppDataDirError> {
     APP_DATA_DIR
         .read()
-        .expect("app_data_dir 锁已污染")
+        .map_err(|_| AppDataDirError::LockPoisoned)?
         .clone()
-        .expect("app_data_dir 未初始化，请在 Tauri setup() 中调用 shared::app_data_dir::init_app_data_dir()")
+        .ok_or(AppDataDirError::NotInitialized)
 }

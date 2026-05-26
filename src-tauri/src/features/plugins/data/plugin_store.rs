@@ -101,7 +101,7 @@ pub async fn list_installed(
 ) -> anyhow::Result<Vec<InstalledPluginState>> {
     let origin = to_http_origin(server_socket)?;
     let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
-    let base = base_plugins_dir().join(&server_id);
+    let base = base_plugins_dir()?.join(&server_id);
 
     let mut out: Vec<InstalledPluginState> = vec![];
     let mut rd = match tokio::fs::read_dir(&base).await {

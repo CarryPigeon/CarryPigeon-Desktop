@@ -16,8 +16,8 @@
         <div class="voice-call-panel__roster-title">参与者 ({{ participants.length }})</div>
         <div v-for="p in participants" :key="p.userId" class="voice-call-panel__participant">
           <span class="voice-call-panel__participant-name">{{ p.displayName || p.userId }}</span>
-          <span v-if="p.isMuted" class="voice-call-panel__participant-icon">🔇</span>
-          <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon">🔊</span>
+          <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><t-icon name="microphone-off" /></span>
+          <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon"><t-icon name="sound" /></span>
           <span class="voice-call-panel__participant-level">
             <span class="voice-call-panel__level-bar" :style="{ width: (p.audioLevel * 100) + '%' }"></span>
           </span>
@@ -31,7 +31,7 @@
           :title="isMuted ? '取消静音' : '静音'"
           @click="$emit('toggleMute')"
         >
-          {{ isMuted ? "🔇" : "🎤" }}
+          <t-icon :name="isMuted ? 'microphone-off' : 'microphone'" />
         </button>
         <button
           class="voice-call-panel__ctrl-btn"
@@ -39,7 +39,7 @@
           :title="isNoiseSuppressionOn ? '关闭降噪' : '开启降噪'"
           @click="$emit('toggleNoiseSuppression')"
         >
-          🔇
+          <t-icon name="sound-mute" />
         </button>
         <select
           v-if="inputDevices.length > 0"
@@ -74,7 +74,7 @@
           title="挂断"
           @click="$emit('hangup')"
         >
-          ❌
+          <t-icon name="close" />
         </button>
       </div>
     </div>

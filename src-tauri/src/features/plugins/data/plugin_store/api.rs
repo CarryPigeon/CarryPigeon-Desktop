@@ -49,7 +49,10 @@ fn server_id_cache() -> &'static RwLock<ServerIdCache> {
 }
 
 fn server_id_cache_file() -> std::path::PathBuf {
-    base_plugins_dir().join("server-id-cache.json")
+    base_plugins_dir().map_or_else(
+        |_| std::path::PathBuf::new(),
+        |p| p.join("server-id-cache.json"),
+    )
 }
 
 async fn read_server_id_cache_file() -> ServerIdCache {

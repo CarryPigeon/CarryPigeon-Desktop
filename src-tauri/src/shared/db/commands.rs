@@ -185,16 +185,19 @@ fn validate_managed_db_key(key: &str, kind: ManagedDbKind) -> CommandResult<()> 
     }
 }
 
-fn managed_db_root() -> PathBuf {
-    crate::shared::app_data_dir::get_app_data_dir().join("db")
+fn managed_db_root() -> Result<PathBuf, crate::shared::app_data_dir::AppDataDirError> {
+    Ok(crate::shared::app_data_dir::get_app_data_dir()?.join("db"))
 }
 
-fn managed_db_path(key: &str) -> PathBuf {
-    managed_db_root().join(format!("{key}.db"))
+fn managed_db_path(key: &str) -> Result<PathBuf, crate::shared::app_data_dir::AppDataDirError> {
+    Ok(managed_db_root()?.join(format!("{key}.db")))
 }
 
 fn is_managed_db_path(path: &Path) -> bool {
-    let root = managed_db_root();
+    let root = match managed_db_root() {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
     match (path.canonicalize(), root.canonicalize()) {
         (Ok(path), Ok(root)) => path.starts_with(root),
         _ => path.starts_with(root),
@@ -352,7 +355,7 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
     let kind = ManagedDbKind::parse(req.kind.as_deref())?;
     validate_managed_db_key(&req.key, kind)?;
 
-    let path = managed_db_path(&req.key);
+    let path = managed_db_path(&req.key).map_err(|e| to_command_error("APP_DATA_DIR", e))?;
     ensure_parent_dir(&path)
         .await
         .map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", e))?;
@@ -513,10 +516,13 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
     };
     validate_managed_db_key(&key, kind)?;
 
-    let path = remove_db(&key)
+    let removed_path = remove_db(&key)
         .await
-        .map_err(|e| to_command_error("DB_REMOVE_FAILED", e))?
-        .unwrap_or_else(|| managed_db_path(&key));
+        .map_err(|e| to_command_error("DB_REMOVE_FAILED", e))?;
+    let path = match removed_path {
+        Some(p) => p,
+        None => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", e))?,
+    };
 
     if !is_managed_db_path(&path) {
         return Err(command_error(
@@ -559,7 +565,7 @@ pub async fn db_path(key: String) -> CommandResult<String> {
 
     let path = match get_entry_path(&key).await {
         Ok(path) => path,
-        Err(_) => managed_db_path(&key),
+        Err(_) => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", e))?,
     };
     Ok(path.to_string_lossy().to_string())
 }
@@ -754,7 +760,7 @@ mod tests {
 
     fn init_test_app_data_dir() -> PathBuf {
         let dir = test_app_data_dir();
-        crate::shared::app_data_dir::init_app_data_dir(dir.clone());
+        let _ = crate::shared::app_data_dir::init_app_data_dir(dir.clone());
         dir
     }
 
