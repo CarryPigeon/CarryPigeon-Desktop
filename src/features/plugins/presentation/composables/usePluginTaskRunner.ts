@@ -4,6 +4,9 @@
  */
 
 import type { PluginLifecycleCommandOutcome } from "@/features/plugins/api-types";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("plugin-task-runner");
 
 /**
  * 触发插件操作任务，并吞掉仍可能由底层 bug 抛出的异常，避免未处理 Promise 告警。
@@ -15,7 +18,7 @@ import type { PluginLifecycleCommandOutcome } from "@/features/plugins/api-types
  * @param task - 插件操作 Promise。
  */
 export function runPluginTask(task: Promise<PluginLifecycleCommandOutcome>): void {
-  void task.catch(() => {
-    // 错误由 pluginInstallStore 的 progress/failed 状态承载。
+  void task.catch((error) => {
+    logger.error("Action: plugins_task_failed", { error: String(error) });
   });
 }

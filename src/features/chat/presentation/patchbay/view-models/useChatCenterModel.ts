@@ -6,6 +6,8 @@
 
 import { computed, nextTick, onBeforeUnmount, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { createMessageActionError } from "@/features/chat/message-flow/domain/outcomes/messageActionOutcome";
+import { createLogger } from "@/shared/utils/logger";
+import { MessagePlugin } from "tdesign-vue-next";
 import type {
   ChannelMessageLookupCapabilities,
   ChatMessage,
@@ -36,6 +38,8 @@ import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChatConnectionPillStateView = "connected" | "reconnecting" | "offline";
+
+const logger = createLogger("chat-center-model");
 
 /**
  * ChatCenter 需要的最小 domain registry 视图。
@@ -293,21 +297,25 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   async function handleBatchForward(): Promise<void> {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    // P0: stub — forward dialog integration will be added in P1
     clearSelection();
+    MessagePlugin.info("Forward feature coming soon");
   }
 
   async function handleBatchDelete(): Promise<void> {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
+    let failed = 0;
     for (const mid of ids) {
       try {
         await deps.currentTimeline.deleteMessage(mid);
       } catch {
-        // continue with next
+        failed++;
       }
     }
     clearSelection();
+    if (failed > 0) {
+      logger.error("Action: chat_batch_delete_partial_failure", { failed, total: ids.length });
+    }
   }
 
   function handleBatchBookmark(): void {

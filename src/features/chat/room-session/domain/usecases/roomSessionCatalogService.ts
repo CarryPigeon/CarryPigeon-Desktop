@@ -15,6 +15,9 @@ import type {
   SessionReadMarkerStatePort,
   SessionScopePort,
 } from "../ports";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("room-session-catalog");
 
 /**
  * `RoomSessionCatalogApplicationService` 的依赖集合。
@@ -47,7 +50,10 @@ export class RoomSessionCatalogApplicationService {
     const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
 
     const list = await this.deps.api.listChannels(socket, token);
-    const unreads = await this.deps.api.getUnreads(socket, token).catch(() => [] as ChatUnreadState[]);
+    const unreads = await this.deps.api.getUnreads(socket, token).catch((error) => {
+      logger.warn("Action: chat_room_session_unreads_fetch_failed", { error: String(error) });
+      return [] as ChatUnreadState[];
+    });
     if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
 
     const unreadByCid: Record<string, { unread: number; lastReadTime: number }> = {};

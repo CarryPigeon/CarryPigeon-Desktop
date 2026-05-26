@@ -4,6 +4,7 @@
 //! - 注释统一使用中文，便于团队维护与交接。
 //! - 日志输出统一使用英文，便于跨端检索与与上游/第三方日志对齐。
 
+use anyhow::Context;
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -147,8 +148,23 @@ pub async fn download_avatar_impl(
 }
 
 /// 下载头像的包装函数。
+///
+/// avatar_id 仅允许字母数字、连字符和下划线，防止路径穿越。
 pub async fn download_avatar(avatar_id: &str, url: &str) -> anyhow::Result<()> {
-    let output_path = format!("./avatar/{}.jpg", avatar_id);
+    // 校验 avatar_id，只允许安全字符
+    if avatar_id.is_empty()
+        || !avatar_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        anyhow::bail!("Invalid avatar_id: only alphanumeric, hyphen, and underscore are allowed");
+    }
+
+    let avatar_dir = crate::shared::app_data_dir::get_app_data_dir().join("avatars");
+    tokio::fs::create_dir_all(&avatar_dir)
+        .await
+        .context("Failed to create avatar directory")?;
+    let output_path = avatar_dir.join(format!("{}.jpg", avatar_id));
 
     // 可以添加进度回调来显示下载进度
     let config = DownloadConfig {
@@ -234,18 +250,24 @@ mod tests {
     #[test]
     #[ignore = "requires external network (httpbin.org)"]
     async fn test_download_avatar() {
-        // 使用一个可靠的测试头像URL
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time")
+            .as_millis();
+        let app_dir = std::env::temp_dir().join(format!("carrypigeon-avatar-test-{millis}"));
+        crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
+
         let url = "https://httpbin.org/image/jpeg";
         let avatar_id = "test_avatar";
 
-        // 测试头像下载功能
         let result = download_avatar(avatar_id, url).await;
         assert!(result.is_ok(), "avatar download failed: {:?}", result);
 
         // 清理测试文件
-        let output_path = format!("./avatar/{}.jpg", avatar_id);
+        let output_path = app_dir.join("avatars").join(format!("{}.jpg", avatar_id));
         if let Err(e) = tokio::fs::remove_file(output_path).await {
             tracing::warn!(action = "test_cleanup_avatar_file_failed", error = %e);
         }
+        let _ = std::fs::remove_dir_all(&app_dir);
     }
 }

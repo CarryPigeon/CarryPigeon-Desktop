@@ -8,21 +8,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
-/// 获取插件存储根目录：`{repoRoot}/data/plugins`。
+/// 获取插件存储根目录：`<app_data_dir>/plugins`。
 ///
 /// 说明：
-/// - 运行时工作目录可能位于 `src-tauri/`，这里做一次“向上回退”以对齐仓库根。
+/// - 路径由 setup() 期间初始化的全局 app_data_dir 决定。
 /// - 该目录由上层流程按需创建（本函数不负责创建目录）。
 pub(super) fn base_plugins_dir() -> PathBuf {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let parent = cwd
-        .file_name()
-        .map(|name| name == "src-tauri")
-        .unwrap_or(false)
-        .then(|| cwd.parent().map(|p| p.to_path_buf()))
-        .flatten();
-    let root = parent.unwrap_or(cwd);
-    root.join("data").join("plugins")
+    crate::shared::app_data_dir::get_app_data_dir().join("plugins")
 }
 
 fn sanitize_segment(seg: &str) -> anyhow::Result<String> {
@@ -181,19 +173,11 @@ pub(super) fn resolve_app_plugins_canonical_file_path(
 mod tests {
     use super::resolve_app_plugins_canonical_file_path;
     use std::path::PathBuf;
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    struct CwdGuard(PathBuf);
-
-    impl Drop for CwdGuard {
-        fn drop(&mut self) {
-            let _ = std::env::set_current_dir(&self.0);
-        }
-    }
-
     fn cwd_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        static LOCK: std::sync::OnceLock<Mutex<()>> = std::sync::OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
     }
 
@@ -237,12 +221,11 @@ mod tests {
     #[tokio::test]
     async fn rejects_symlink_escape_when_serving_app_plugins() {
         let _guard = cwd_lock().lock().expect("lock cwd");
-        let original_cwd = std::env::current_dir().expect("current dir");
-        let _cwd_guard = CwdGuard(original_cwd.clone());
-        let repo_root = unique_temp_dir("plugin-path-root");
-        let app_plugins = repo_root.join("data").join("plugins");
+        let app_dir = unique_temp_dir("plugin-path-root");
+        crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
+        let app_plugins = app_dir.join("plugins");
         let version_root = app_plugins.join("server-a").join("plugin-a").join("1.0.0");
-        let outside = repo_root.join("outside");
+        let outside = app_dir.join("outside");
         std::fs::create_dir_all(&version_root).expect("create version root");
         std::fs::create_dir_all(&outside).expect("create outside root");
 
@@ -251,7 +234,6 @@ mod tests {
         let alias_path = version_root.join("alias");
         create_dir_link(&alias_path, &outside);
 
-        std::env::set_current_dir(&repo_root).expect("set cwd");
         let err = resolve_app_plugins_canonical_file_path(
             "server-a",
             "plugin-a",
@@ -261,7 +243,6 @@ mod tests {
         .expect_err("symlink escape must be rejected");
         assert!(err.to_string().contains("escapes canonical root"));
 
-        drop(_cwd_guard);
-        cleanup_dir(&repo_root);
+        cleanup_dir(&app_dir);
     }
 }
