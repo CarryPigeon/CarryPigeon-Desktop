@@ -28,8 +28,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useVoiceCall } from "../composables/useVoiceCall";
-
-const { t } = useI18n();
 import VoiceCallBanner from "./VoiceCallBanner.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
 import { createMockVoiceCallStatePort } from "../../mock";
@@ -38,7 +36,10 @@ import { currentServerSocket } from "@/features/server-connection/api";
 import { readAuthToken } from "@/shared/utils/localState";
 import { currentChatUserId, currentChatUsername } from "../../../composition/chatAccountSession";
 import { getRoomGovernanceCapabilities } from "../../../room-governance/api";
+import { MOCK_MODE } from "@/shared/config/runtime";
 import type { CallParticipant } from "../../domain/contracts";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   roomId: string;
@@ -46,9 +47,10 @@ const props = defineProps<{
   targetUserId?: string;
 }>();
 
-const statePort = import.meta.env.PROD
-  ? createTauriVoiceCallApi()
-  : createMockVoiceCallStatePort();
+const isMock = MOCK_MODE !== "off";
+const statePort = isMock
+  ? createMockVoiceCallStatePort()
+  : createTauriVoiceCallApi();
 
 const {
   callState,
@@ -153,6 +155,7 @@ const participantsWithAvatars = computed(() => {
 
 onMounted(() => {
   initDevices();
+  if (isMock) return;
   const url = wsUrl.value;
   const token = accessToken.value;
   const uid = currentChatUserId.value;

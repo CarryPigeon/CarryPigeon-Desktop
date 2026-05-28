@@ -20,6 +20,7 @@ import ComposerHost from "@/features/chat/presentation/patchbay/components/compo
 import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
 import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components/VoiceCallTrigger.vue";
 import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
+import ForwardDetailDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardDetailDialog.vue";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import ImageLightbox from "@/features/chat/message-flow/message/presentation/components/ImageLightbox.vue";
 import { addFiles as addImageFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
@@ -114,6 +115,30 @@ const lightboxIndex = ref(0);
 /** 拖拽上传高亮状态。 */
 const isDragOver = ref(false);
 let dragCounter = 0;
+
+/** 合并转发详情弹窗状态。 */
+const forwardDetailVisible = ref(false);
+type ForwardedMessageEntry = { messageId: string; channelId: string; userId: string; preview: string; sentTime: number };
+const forwardDetailData = ref<{
+  fromName: string;
+  forwardedMessages: ForwardedMessageEntry[];
+  comment?: string;
+}>({ fromName: "", forwardedMessages: [] });
+
+/**
+ * 打开合并转发详情弹窗。
+ */
+function openForwardDetail(payload: { fromName: string; forwardedMessages: ForwardedMessageEntry[]; comment?: string }): void {
+  forwardDetailData.value = payload;
+  forwardDetailVisible.value = true;
+}
+
+/**
+ * 关闭合并转发详情弹窗。
+ */
+function closeForwardDetail(): void {
+  forwardDetailVisible.value = false;
+}
 
 /**
  * 处理文件拖入。
@@ -384,6 +409,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
               @edit-cancel="props.onEditCancel?.()"
               @openLightbox="openLightbox"
               @viewThread="(messageId) => props.onViewThread?.(messageId)"
+              @viewForwardDetail="openForwardDetail"
             />
           </div>
         </div>
@@ -441,6 +467,14 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       :is-forwarding="props.model.isForwarding"
       @confirm="props.model.handleForwardConfirm"
       @cancel="props.model.closeForwardDialog"
+    />
+
+    <ForwardDetailDialog
+      :visible="forwardDetailVisible"
+      :from-name="forwardDetailData.fromName"
+      :forwarded-messages="forwardDetailData.forwardedMessages"
+      :comment="forwardDetailData.comment"
+      @close="closeForwardDetail"
     />
 
     <ImageLightbox

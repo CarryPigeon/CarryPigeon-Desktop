@@ -108,6 +108,7 @@ export const zh_cn = {
   forward_success: "已转发 {count} 条消息",
   forward_failed: "转发失败: {failed}/{total}",
   forwarded_messages_count: "{name} 转发了 {count} 条消息",
+  forward_detail_title: "转发消息 - {name}",
   delete_message: "删除",
   channel_with_id: "频道 #{id}",
   plugin_default_title: "插件",
