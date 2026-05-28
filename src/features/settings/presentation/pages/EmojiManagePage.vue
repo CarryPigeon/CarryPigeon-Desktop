@@ -54,28 +54,7 @@ watch(emojis, async (newEmojis) => {
  * 因此优先使用 dialog 插件以获得本地路径。
  */
 async function handleFileSelect(): Promise<void> {
-  // 尝试使用 @tauri-apps/plugin-dialog 的原生文件对话框
-  let filePath: string | null = null;
-
-  try {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({
-      multiple: false,
-      filters: [
-        {
-          name: "Images",
-          extensions: ["png", "gif", "webp", "jpg", "jpeg"],
-        },
-      ],
-    });
-    if (selected) {
-      filePath = selected as string;
-    }
-  } catch {
-    // dialog 插件不可用，回退到 <input type="file">
-    logger.info("Action: chat_emoji_dialog_plugin_unavailable, falling back to input-file");
-    filePath = await fallbackFileSelect();
-  }
+  const filePath = await fallbackFileSelect();
 
   if (!filePath) return;
 
