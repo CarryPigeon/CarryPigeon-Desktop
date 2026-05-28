@@ -11,7 +11,7 @@ import { sendDesktopNotification } from "@/features/chat/message-flow/domain/use
 import { createLogger } from "@/shared/utils/logger";
 import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 
-const logger = createLogger("notification_bridge");
+const logger = createLogger("chat_notification_bridge");
 
 /**
  * 创建新消息通知处理器工厂。
@@ -62,7 +62,7 @@ export function createNotificationOnNewMessageHandler(deps: {
       });
 
       if (!decision.shouldNotify) {
-        logger.debug("Action: notification_skipped", { reason: decision.reason });
+        logger.debug("Action: chat_notification_skipped", { reason: decision.reason });
         return;
       }
 
@@ -74,7 +74,7 @@ export function createNotificationOnNewMessageHandler(deps: {
 
       await sendDesktopNotification({ title, body, channelId, messageId: message.id });
     } catch (e) {
-      logger.error("Action: notification_handle_failed", { error: String(e) });
+      logger.error("Action: chat_notification_handle_failed", { error: String(e) });
     }
   };
 }
