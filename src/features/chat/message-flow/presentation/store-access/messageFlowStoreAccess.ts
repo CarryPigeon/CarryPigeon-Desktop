@@ -12,10 +12,12 @@ import type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  EditChatMessageOutcome,
   MentionCandidate,
   MessageMention,
   MessageReplySummary,
   ReactToMessageOutcome,
+  RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
@@ -133,6 +135,20 @@ export function deleteMessage(messageId: string): Promise<DeleteChatMessageOutco
 }
 
 /**
+ * 编辑指定消息。
+ */
+export function editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome> {
+  return resolveMessageFlowStore().editMessage(messageId, request);
+}
+
+/**
+ * 撤回指定消息。
+ */
+export function recallMessage(messageId: string): Promise<RecallChatMessageOutcome> {
+  return resolveMessageFlowStore().recallMessage(messageId);
+}
+
+/**
  * 在指定频道中按 id 查询消息。
  */
 export function getMessageById(channelId: string, messageId: string): ChatMessage | null {
@@ -190,10 +206,17 @@ export function loadContextAroundMessage(messageId: string): Promise<void> {
 }
 
 /**
- * 清除搜索状态。
+ * 清楚搜索状态。
  */
 export function clearSearch(): void {
   return resolveMessageFlowStore().clearSearch();
+}
+
+/**
+ * 在服务器范围内搜索消息。
+ */
+export function searchServerMessages(query: string, channelIds?: string[]): Promise<void> {
+  return resolveMessageFlowStore().searchServerMessages(query, channelIds);
 }
 
 /**

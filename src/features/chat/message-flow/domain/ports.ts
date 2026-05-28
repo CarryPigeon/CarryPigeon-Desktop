@@ -13,6 +13,7 @@ import type {
   MessageReactionSummary,
   MessageReplySummary,
   MessageSearchState,
+  ServerMessageSearchResult,
 } from "@/features/chat/message-flow/domain/contracts";
 
 /**
@@ -20,7 +21,7 @@ import type {
  */
 export type MessageFlowApiPort = Pick<
   ChatApiPort,
-  "sendChannelMessage" | "deleteMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction" | "searchChannelMessages" | "listChannelMessagesAround" | "listChannelMembers"
+  "sendChannelMessage" | "deleteMessage" | "recallMessage" | "editMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction" | "searchChannelMessages" | "searchMessages" | "listChannelMessagesAround" | "listChannelMembers" | "getThreadReplies"
 >;
 
 /**
@@ -65,6 +66,8 @@ export type MessageTimelineStatePort = {
   removeMessage(channelId: string, messageId: string): void;
   /** 更新频道中某条消息的回应列表（用于 WS 事件和乐观更新）。 */
   updateMessageReactions(channelId: string, messageId: string, reactions: MessageReactionSummary[]): void;
+  /** 更新频道中某条消息的全部字段（用于编辑事件和乐观更新）。 */
+  updateMessage(channelId: string, messageId: string, updater: (old: ChatMessage) => ChatMessage): void;
   readNextCursor(channelId: string): string;
   writeNextCursor(channelId: string, nextCursor: string): void;
   readHasMore(channelId: string): boolean;
@@ -73,8 +76,12 @@ export type MessageTimelineStatePort = {
   setLoadingMore(channelId: string, loading: boolean): void;
   writeSearchState(state: MessageSearchState): void;
   readSearchState(): MessageSearchState;
+  writeServerSearchState(state: { query: string; loading: boolean; error: string; results: ServerMessageSearchResult[] }): void;
+  writeSearchScope(scope: "channel" | "server"): void;
   setHighlightedMessageId(messageId: string): void;
   readHighlightedMessageId(): string;
+  /** 将消息标记为已撤回（将内容替换为占位符）。 */
+  markMessageRecalled(channelId: string, messageId: string, recalledAt: number, recalledBy: string): void;
 };
 
 /**

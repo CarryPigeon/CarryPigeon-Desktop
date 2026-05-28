@@ -18,12 +18,14 @@ import type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  EditChatMessageOutcome,
   MentionCandidate,
   MessageDomain,
   MessageMention,
   MessageReplySummary,
   MessageSearchState,
   ReactToMessageOutcome,
+  RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
@@ -87,11 +89,14 @@ export type MessageFlowRuntimeStore = {
   startReply(message: ChatMessage): void;
   cancelReply(): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
+  editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome>;
+  recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   searchCurrentChannel(query: string): Promise<void>;
+  searchServerMessages(query: string, channelIds?: string[]): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
   clearSearch(): void;
 };
@@ -128,7 +133,10 @@ export type RoomGovernanceRuntimeStore = {
 export type ChatRuntimeAggregateStore =
   & RoomSessionRuntimeStore
   & MessageFlowRuntimeStore
-  & RoomGovernanceRuntimeStore;
+  & RoomGovernanceRuntimeStore
+  & {
+    forwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<ChatMessage>;
+  };
 
 /**
  * chat 运行时切片：聚合 store + 各子域公开 store。

@@ -21,6 +21,8 @@ import VoiceCallHost from "@/features/chat/voice-call/presentation/components/Vo
 import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components/VoiceCallTrigger.vue";
 import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
+import ImageLightbox from "@/features/chat/message-flow/message/presentation/components/ImageLightbox.vue";
+import { addFiles as addImageFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -60,7 +62,23 @@ const props = defineProps<{
    * 安装提示：从未知 domain 卡片跳转到插件中心。
    */
   onInstallHint: (pluginId: string | undefined) => void;
+  /**
+   * 打开线程面板。
+   */
+  onViewThread?: (messageId: string) => void;
   channels: readonly ChannelSummary[];
+  /**
+   * 当前正在编辑的消息 ID。
+   */
+  editingMessageId?: string;
+  /**
+   * 编辑确认回调。
+   */
+  onEdit?: (messageId: string, text: string) => void;
+  /**
+   * 编辑取消回调。
+   */
+  onEditCancel?: () => void;
 }>();
 
 const { t } = useI18n();
@@ -88,6 +106,71 @@ const voiceHostRef = ref<{
 
 const currentCallState = computed<CallState>(() => voiceHostRef.value?.callState?.value ?? "idle");
 
+/** 图片灯箱状态。 */
+const lightboxOpen = ref(false);
+const lightboxImages = ref<{ url: string; filename: string }[]>([]);
+const lightboxIndex = ref(0);
+
+/** 拖拽上传高亮状态。 */
+const isDragOver = ref(false);
+let dragCounter = 0;
+
+/**
+ * 处理文件拖入。
+ *
+ * @param e - DragEvent。
+ */
+function handleDragEnter(e: DragEvent): void {
+  if (e.dataTransfer?.types.includes("Files")) {
+    dragCounter++;
+    isDragOver.value = true;
+  }
+}
+
+/**
+ * 处理文件拖出。
+ */
+function handleDragLeave(): void {
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    isDragOver.value = false;
+  }
+}
+
+/**
+ * 处理文件放下。
+ *
+ * @param e - DragEvent。
+ */
+function handleDrop(e: DragEvent): void {
+  e.preventDefault();
+  dragCounter = 0;
+  isDragOver.value = false;
+  if (e.dataTransfer?.files?.length) {
+    addImageFiles(e.dataTransfer.files);
+  }
+}
+
+/**
+ * 打开图片灯箱。
+ *
+ * @param payload - 包含图片 URL 和文件名的对象。
+ */
+function openLightbox(payload: { url: string; filename: string }): void {
+  lightboxImages.value = [payload];
+  lightboxIndex.value = 0;
+  lightboxOpen.value = true;
+}
+
+/**
+ * 关闭图片灯箱。
+ */
+function closeLightbox(): void {
+  lightboxOpen.value = false;
+  lightboxImages.value = [];
+}
+
 function handleDirectCallStart(targetUserId: string): void {
   voiceHostRef.value?.startDirectCall(targetUserId || props.targetUserId || "");
 }
@@ -113,7 +196,14 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
 <template>
   <!-- 组件：ChatCenter｜职责：中央消息区（header / signal pane / composer） -->
   <!-- 区块：<section> .cp-center -->
-  <section class="cp-center">
+  <section
+    class="cp-center"
+    :class="{ 'cp-center--dragOver': isDragOver }"
+    @dragover.prevent
+    @dragenter="handleDragEnter"
+    @dragleave="handleDragLeave"
+    @drop="handleDrop"
+  >
     <header class="cp-topConsole">
       <div class="cp-topConsole__left">
         <div class="cp-topConsole__title">{{ t("messages_title") }}</div>
@@ -166,13 +256,22 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
 
     <section v-if="props.model.searchPanelOpen" class="cp-searchPanel">
       <div class="cp-searchPanel__row">
+        <t-select
+          v-if="props.model.searchScope !== undefined"
+          :value="props.model.searchScope"
+          :options="[{ label: '当前频道', value: 'channel' }, { label: '全部频道', value: 'server' }]"
+          size="small"
+          style="width: 100px; flex-shrink: 0;"
+          @change="(v: string) => props.model.setSearchScope(v as 'channel' | 'server')"
+        />
         <t-input :placeholder="t('search_current_channel')" @enter="props.model.searchMessages" />
         <button type="button" class="cp-searchPanel__close" @click="props.model.closeSearchPanel">&times;</button>
       </div>
       <div v-if="props.model.searchState.loading" class="cp-searchPanel__state">{{ t("searching") }}</div>
       <div v-else-if="props.model.searchState.error" class="cp-searchPanel__state cp-searchPanel__error">{{ props.model.searchState.error }}</div>
-      <div v-else-if="props.model.searchState.query && !props.model.searchState.results.length" class="cp-searchPanel__state">{{ t("no_messages_found") }}</div>
-      <div class="cp-searchPanel__results">
+      <div v-else-if="props.model.searchState.query && props.model.searchScope === 'channel' && !props.model.searchState.results.length" class="cp-searchPanel__state">{{ t("no_messages_found") }}</div>
+      <div v-else-if="props.model.searchState.query && props.model.searchScope === 'server' && !props.model.searchState.serverResults.length" class="cp-searchPanel__state">{{ t("no_messages_found") }}</div>
+      <div v-if="props.model.searchScope === 'channel'" class="cp-searchPanel__results">
         <button
           v-for="result in props.model.searchState.results"
           :key="result.message.id"
@@ -180,6 +279,19 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
           class="cp-searchPanel__result"
           @click="props.model.openSearchResult(result.message.id)"
         >
+          <div class="cp-searchPanel__resultSender">{{ result.message.from.name }}</div>
+          <div class="cp-searchPanel__resultPreview">{{ result.preview }}</div>
+        </button>
+      </div>
+      <div v-if="props.model.searchScope === 'server'" class="cp-searchPanel__results">
+        <button
+          v-for="result in props.model.searchState.serverResults"
+          :key="result.message.id"
+          type="button"
+          class="cp-searchPanel__result"
+          @click="props.model.openSearchResult(result.message.id)"
+        >
+          <div v-if="result.channelId" class="cp-searchPanel__resultChannel">#{{ result.channelName || result.channelId }}</div>
           <div class="cp-searchPanel__resultSender">{{ result.message.from.name }}</div>
           <div class="cp-searchPanel__resultPreview">{{ result.preview }}</div>
         </button>
@@ -265,8 +377,13 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
               :message="m"
               :reply-text="m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, m.replyToId) : ''"
               :domain-registry-store="props.model.domainRegistryStore"
+              :editing-message-id="props.editingMessageId"
               @install="props.onInstallHint"
               @react="(messageId, emoji) => emoji && reactToMessage(messageId, emoji)"
+              @edit="(payload) => props.onEdit?.(payload.messageId, payload.text)"
+              @edit-cancel="props.onEditCancel?.()"
+              @openLightbox="openLightbox"
+              @viewThread="(messageId) => props.onViewThread?.(messageId)"
             />
           </div>
         </div>
@@ -302,6 +419,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         :mention-menu-open="props.model.mentionMenuOpen"
         :current-user-role="props.model.currentUserRole"
         :quote-reply-draft="props.model.quoteReplyDraft"
+        :link-preview="props.model.linkPreview"
         @update:domainId="props.model.setDomainId"
         @update:draft="props.model.setDraft"
         @send="props.model.handleSend"
@@ -310,6 +428,8 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
         @mention-query="props.model.handleMentionQuery"
         @select-mention="props.model.handleSelectMention"
         @close-mention-menu="props.model.handleMentionMenuClose"
+        @url-detected="(url: string) => props.model.fetchLinkPreview(url)"
+        @dismiss-link-preview="props.model.dismissLinkPreview"
       />
     </div>
 
@@ -321,6 +441,13 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       :is-forwarding="props.model.isForwarding"
       @confirm="props.model.handleForwardConfirm"
       @cancel="props.model.closeForwardDialog"
+    />
+
+    <ImageLightbox
+      v-if="lightboxOpen"
+      :images="lightboxImages"
+      :initial-index="lightboxIndex"
+      @close="closeLightbox"
     />
   </section>
 </template>
@@ -393,12 +520,24 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
   font-weight: 600;
   color: var(--cp-text-primary, #222);
 }
+.cp-searchPanel__resultChannel {
+  font-size: 11px;
+  color: var(--cp-accent, #5865f2);
+  font-weight: 500;
+  margin-bottom: 1px;
+}
 .cp-searchPanel__resultPreview {
   color: var(--cp-text-secondary, #888);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.cp-center--dragOver {
+  outline: 3px dashed var(--cp-accent, #5865f2);
+  outline-offset: -3px;
+  background: color-mix(in oklab, var(--cp-accent, #5865f2) 4%, transparent);
+}
+
 .cp-msg__checkbox {
   display: flex;
   align-items: flex-start;

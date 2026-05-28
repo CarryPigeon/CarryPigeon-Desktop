@@ -33,6 +33,13 @@ const props = defineProps<{
   sizeBytes?: number;
 }>();
 
+const emit = defineEmits<{
+  /**
+   * 打开图片灯箱。
+   */
+  (e: "openLightbox", payload: { url: string; filename: string }): void;
+}>();
+
 const { t } = useI18n();
 
 const downloadUrl = computed(() => buildFileDownloadUrl(getActiveChatServerSocket(), props.shareKey));
@@ -101,7 +108,7 @@ function handleDismissTask(): void {
 <template>
   <!-- 组件：FileRefMessageBubble｜职责：渲染文件引用消息 -->
   <div class="cp-fileBubble">
-    <div v-if="isImage && downloadUrl" class="cp-fileBubble__preview">
+    <div v-if="isImage && downloadUrl" class="cp-fileBubble__preview" @click="emit('openLightbox', { url: downloadUrl, filename: props.filename })">
       <img :src="downloadUrl" :alt="props.filename" class="cp-fileBubble__img" />
     </div>
     <div class="cp-fileBubble__info">
@@ -136,6 +143,7 @@ function handleDismissTask(): void {
   margin-bottom: 10px;
   border-radius: 12px;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .cp-fileBubble__img {

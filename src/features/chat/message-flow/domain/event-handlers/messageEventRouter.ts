@@ -22,10 +22,12 @@ export type MessageEventRouterDeps = {
    * - 收到创建/删除事件后，如何更新本地时间线与未读数
    */
   scope: Pick<MessageFlowScopePort, "getActiveServerSocket">;
-  timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions">;
+  timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions" | "updateMessage" | "markMessageRecalled">;
   unreadProjection: ChannelUnreadProjectionPort;
   mapWireMessage: (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
   compareMessages: (a: ChatMessage, b: ChatMessage) => number;
+  /** 新消息到来时的回调（用于桌面通知等）。 */
+  onNewMessage?: (channelId: string, message: ChatMessage) => void;
 };
 
 /**
@@ -50,6 +52,7 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
       const mapped = deps.mapWireMessage(deps.scope.getActiveServerSocket(), msg);
       const inserted = deps.timelineState.appendMessageIfMissing(cid, mapped, deps.compareMessages);
       if (inserted && deps.timelineState.readCurrentChannelId() !== cid) deps.unreadProjection.incrementChannelUnread(cid);
+      deps.onNewMessage?.(cid, mapped);
       return true;
     }
 
@@ -69,6 +72,27 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
       if (!cid || !mid) return true;
 
       deps.timelineState.updateMessageReactions(cid, mid, reactions);
+      return true;
+    }
+
+    if (eventType === "message.updated") {
+      const cid = String(payload?.channelId ?? "").trim();
+      const msg = (payload?.message ?? null) as ChatMessageRecord | null;
+      if (!cid || !msg) return true;
+
+      const mapped = deps.mapWireMessage(deps.scope.getActiveServerSocket(), msg);
+      deps.timelineState.updateMessage(cid, mapped.id, () => mapped);
+      return true;
+    }
+
+    if (eventType === "message.recalled") {
+      const cid = String(payload?.channelId ?? "").trim();
+      const mid = String(payload?.messageId ?? "").trim();
+      const recalledAt = Number(payload?.recalledAt ?? 0);
+      const recalledBy = String(payload?.recalledByUserId ?? "").trim();
+      if (!cid || !mid) return true;
+
+      deps.timelineState.markMessageRecalled(cid, mid, recalledAt, recalledBy);
       return true;
     }
 

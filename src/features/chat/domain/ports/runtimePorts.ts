@@ -54,6 +54,7 @@ export type ChatCoreApiPort = {
     idempotencyKey?: string,
   ): Promise<ChatMessageRecord>;
   deleteMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void>;
+  recallMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void>;
   reactToMessage(
     serverSocket: string,
     accessToken: string,
@@ -105,6 +106,11 @@ export type ChatCoreApiPort = {
     cid: string,
     query: { q: string; cursor?: string; limit?: number; senderUid?: string; domain?: string; beforeMid?: string; afterMid?: string },
   ): Promise<ChatMessagePage>;
+  searchMessages(
+    serverSocket: string,
+    accessToken: string,
+    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
+  ): Promise<ChatMessagePage>;
   listChannelMessagesAround(
     serverSocket: string,
     accessToken: string,
@@ -114,6 +120,13 @@ export type ChatCoreApiPort = {
     after?: number,
   ): Promise<ChatMessagePage>;
   getChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelRecord>;
+  getThreadReplies(
+    serverSocket: string,
+    accessToken: string,
+    rootMessageId: string,
+    cursor?: string,
+    limit?: number,
+  ): Promise<ChatMessagePage>;
 };
 
 /**

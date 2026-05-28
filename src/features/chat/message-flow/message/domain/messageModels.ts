@@ -4,6 +4,8 @@
  * 统一描述消息外壳、内容语义与渲染模型，作为 message-flow 的稳定扩展点。
  */
 
+import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
+
 /**
  * 消息 domain 描述（message 子域独立定义，避免反向依赖 presentation/store）。
  */
@@ -77,6 +79,10 @@ export type RenderableChatMessage =
         preview: string;
         sentTime: number;
       }[];
+      recalledAt?: number;
+      threadRootId?: string;
+      threadReplyCount?: number;
+      linkPreview?: ChatLinkPreview;
     }
   | {
       id: string;
@@ -109,6 +115,10 @@ export type RenderableChatMessage =
         preview: string;
         sentTime: number;
       }[];
+      recalledAt?: number;
+      threadRootId?: string;
+      threadReplyCount?: number;
+      linkPreview?: ChatLinkPreview;
     };
 
 /**

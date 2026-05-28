@@ -13,6 +13,19 @@ import { createWatchedSnapshotObserver } from "@/shared/utils/createWatchedSnaps
 import { currentServerSocket } from "@/features/server-connection/api";
 import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 import {
+  getAttachments,
+  addFiles as addAttachmentFiles,
+  removeAttachment,
+  clearAttachments,
+  getPendingAttachments,
+  markDone,
+  markError,
+  updateProgress,
+} from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { getFileServicePort } from "@/features/chat/message-flow/upload/composition/uploadServices";
+import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
+import { readAuthToken } from "@/shared/utils/localState";
+import {
   addMention,
   availableDomains,
   cancelReply,
@@ -22,6 +35,7 @@ import {
   currentMessages,
   deleteMessage,
   draftMentions,
+  editMessage,
   getMessageById as findMessageByIdInChannel,
   highlightedMessageId,
   listMentionCandidates,
@@ -31,10 +45,12 @@ import {
   messageActionError,
   quoteReplyDraft,
   reactToMessage,
+  recallMessage,
   removeReaction,
   replyDraft,
   replyToMessageId,
   searchCurrentChannel,
+  searchServerMessages,
   searchState,
   selectedDomainId,
   sendComposerMessage,
@@ -76,6 +92,8 @@ function getTimelineSnapshot(): MessageTimelineSnapshot {
     hasMoreHistory: currentChannelHasMore.value,
     isLoadingHistory: loadingMoreMessages.value,
     search: { ...searchState.value },
+    searchScope: searchState.value.searchScope,
+    serverResults: searchState.value.serverResults ?? [],
     highlightedMessageId: highlightedMessageId.value,
   };
 }
@@ -162,6 +180,49 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
     draftStorage.deleteDraft(channelId);
   }
 
+  /**
+   * 发送消息前先上传所有待上传的图片附件。
+   *
+   * 对每个 pending 附件调用两段式上传（requestUpload + performUpload），
+   * 然后将 `[file:shareKey]` token 追加到 composer draft 末尾，再执行发送。
+   *
+   * @param payload - 可选的发送 payload。
+   * @returns 发送结果。
+   */
+  async function sendMessageWithAttachments(
+    payload?: import("./api-types").ComposerSubmitPayload,
+  ): Promise<import("./api-types").SendChatMessageOutcome> {
+    const pending = getPendingAttachments();
+    if (pending.length > 0) {
+      const socket = getActiveChatServerSocket();
+      const token = readAuthToken(socket) || "";
+      const fileService = getFileServicePort();
+
+      for (const att of pending) {
+        try {
+          updateProgress(att.id, 10);
+          // 两段式上传：第一步，请求 upload descriptor
+          const result = await fileService.requestUpload(socket, token, {
+            filename: att.file.name,
+            mimeType: att.file.type || "application/octet-stream",
+            sizeBytes: att.file.size,
+          });
+          updateProgress(att.id, 50);
+          // 第二步，执行实际上传
+          const buffer = await att.file.arrayBuffer();
+          await fileService.performUpload(socket, result.upload, buffer);
+          markDone(att.id, result.shareKey);
+          // 将 shareKey 追加到 draft
+          appendAttachmentShareKey(result.shareKey);
+        } catch (e) {
+          markError(att.id, String(e));
+          // 继续上传其余文件
+        }
+      }
+    }
+    return sendComposerMessage(payload);
+  }
+
   return {
     currentChannel: {
       getSnapshot: getTimelineSnapshot,
@@ -173,9 +234,12 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
         if (message) startReply(message);
       },
       deleteMessage,
+      editMessage,
+      recallMessage,
       reactToMessage,
       removeReaction,
       searchCurrentChannel,
+      searchServerMessages,
       loadContextAroundMessage,
       clearSearch,
     },
@@ -187,9 +251,18 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       setActionError,
       appendAttachmentShareKey,
       cancelReply,
-      sendMessage: sendComposerMessage,
+      sendMessage: sendMessageWithAttachments,
       listMentionCandidates: listMentionCandidates,
       addMention: addMention,
+
+      /** Image attachment management for paste/drag-drop upload. */
+      get attachments(): readonly import("./api-types").FileAttachment[] {
+        return Array.from(getAttachments().values());
+      },
+      addFiles: addAttachmentFiles,
+      removeFile: removeAttachment,
+      clearFiles: clearAttachments,
+
       readChannelDraft,
       saveChannelDraft,
       clearChannelDraft,

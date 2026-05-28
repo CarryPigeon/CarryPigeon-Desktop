@@ -4,3 +4,5 @@
  */
 
 export const SettingsPage = () => import("./presentation/pages/SettingsPage.vue");
+
+export const EmojiManagePage = () => import("./presentation/pages/EmojiManagePage.vue");

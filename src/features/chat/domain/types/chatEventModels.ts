@@ -101,6 +101,21 @@ export type AuditLogCreatedEvent = {
   createdAt: number;
 };
 
+/** 消息线程回复事件。 */
+export type ChatMessageThreadReplyEvent = {
+  channelId: string;
+  rootMessageId: string;
+  reply: import("./chatApiModels").ChatMessageRecord;
+};
+
+/** 消息撤回事件。 */
+export type ChatMessageRecalledEvent = {
+  channelId: string;
+  messageId: string;
+  recalledAt: number;
+  recalledByUserId: string;
+};
+
 /** 频道分类变更事件。 */
 export type ChannelCategoryChangedEvent = {
   channelId: string;
@@ -189,6 +204,18 @@ export type ChatEventEnvelope =
       eventType: "channel.category_changed";
       serverTime: number;
       payload: ChannelCategoryChangedEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "message.recalled";
+      serverTime: number;
+      payload: ChatMessageRecalledEvent;
+    }
+  | {
+      eventId: string;
+      eventType: "message.thread_reply";
+      serverTime: number;
+      payload: ChatMessageThreadReplyEvent;
     }
   | {
       eventId: string;

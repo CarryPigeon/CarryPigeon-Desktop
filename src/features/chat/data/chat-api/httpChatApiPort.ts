@@ -32,6 +32,7 @@ import {
   httpEditMessage,
   httpForwardMessage,
   httpGetChannel,
+  httpGetThreadReplies,
   httpGetUnreads,
   httpKickChannelMember,
   httpListChannelApplications,
@@ -47,9 +48,11 @@ import {
   httpPinMessage,
   httpPutChannelBan,
   httpReactToMessage,
+  httpRecallMessage,
   httpRemoveChannelAdmin,
   httpRemoveReaction,
   httpSearchChannelMessages,
+  httpSearchMessages,
   httpSendChannelMessage,
   httpUnpinMessage,
   httpUpdateReadState,
@@ -110,6 +113,9 @@ export const httpChatApiPort: ChatApiPort = {
   },
   async deleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
     return httpDeleteMessage(serverSocket, accessToken, mid);
+  },
+  async recallMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
+    return httpRecallMessage(serverSocket, accessToken, mid);
   },
   async updateReadState(
     serverSocket: string,
@@ -189,6 +195,16 @@ export const httpChatApiPort: ChatApiPort = {
     const wire = await httpGetChannel(serverSocket, accessToken, cid);
     return mapChatChannelWire(wire);
   },
+  async getThreadReplies(
+    serverSocket: string,
+    accessToken: string,
+    rootMessageId: string,
+    cursor?: string,
+    limit?: number,
+  ): Promise<ChatMessagePage> {
+    const page = await httpGetThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit);
+    return mapChatMessagePageWire(page);
+  },
   async searchChannelMessages(
     serverSocket: string,
     accessToken: string,
@@ -204,6 +220,14 @@ export const httpChatApiPort: ChatApiPort = {
       before_mid: query.beforeMid,
       after_mid: query.afterMid,
     });
+    return mapChatMessagePageWire(page);
+  },
+  async searchMessages(
+    serverSocket: string,
+    accessToken: string,
+    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
+  ): Promise<ChatMessagePage> {
+    const page = await httpSearchMessages(serverSocket, accessToken, query);
     return mapChatMessagePageWire(page);
   },
   async listChannelMessagesAround(

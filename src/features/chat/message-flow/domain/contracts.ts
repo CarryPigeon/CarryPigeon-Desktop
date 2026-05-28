@@ -5,6 +5,7 @@
  */
 
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
+import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { MessageDomainRef, MessageMention, MessageReactionSummary, MessageReplySummary, RenderableChatMessage } from "../message/domain/messageModels";
 
 export type { MessageMention, MessageReactionSummary, MessageReplySummary };
@@ -50,6 +51,7 @@ export type ComposerSubmitPayload = {
     userId: string;
     preview: string;
   };
+  linkPreview?: ChatLinkPreview;
 };
 
 /**
@@ -66,7 +68,9 @@ export type ChatMessageActionErrorCode =
   | "stale_runtime_scope"
   | "send_failed"
   | "delete_failed"
-  | "reaction_failed";
+  | "edit_failed"
+  | "reaction_failed"
+  | "recall_failed";
 
 /**
  * message-flow 命令失败时的稳定错误代数。
@@ -91,6 +95,13 @@ export type DeleteChatMessageOutcome =
   | FailureOutcome<"chat_message_delete_rejected", ChatMessageActionErrorCode>;
 
 /**
+ * 编辑消息显式结果。
+ */
+export type EditChatMessageOutcome =
+  | SuccessOutcome<"chat_message_edited", { message: ChatMessage }>
+  | FailureOutcome<"chat_message_edit_rejected", ChatMessageActionErrorCode>;
+
+/**
  * 添加回应显式结果。
  */
 export type ReactToMessageOutcome =
@@ -105,11 +116,28 @@ export type RemoveReactionOutcome =
   | FailureOutcome<"message_reaction_removal_rejected", ChatMessageActionErrorCode>;
 
 /**
+ * 撤回消息显式结果。
+ */
+export type RecallChatMessageOutcome =
+  | SuccessOutcome<"chat_message_recalled", { messageId: string }>
+  | FailureOutcome<"chat_message_recall_rejected", ChatMessageActionErrorCode>;
+
+/**
  * 消息搜索结果。
  */
 export type MessageSearchResult = {
   message: ChatMessage;
   preview: string;
+};
+
+/**
+ * 服务器级消息搜索结果（包含频道信息）。
+ */
+export type ServerMessageSearchResult = {
+  message: ChatMessage;
+  preview: string;
+  channelId: string;
+  channelName: string;
 };
 
 /**
@@ -120,4 +148,6 @@ export type MessageSearchState = {
   loading: boolean;
   error: string;
   results: MessageSearchResult[];
+  serverResults: ServerMessageSearchResult[];
+  searchScope: "channel" | "server";
 };

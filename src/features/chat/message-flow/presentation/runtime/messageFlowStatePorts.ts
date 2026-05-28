@@ -10,7 +10,7 @@ import type {
   MessageComposerStatePort,
   MessageTimelineStatePort,
 } from "@/features/chat/message-flow/domain/ports";
-import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState, ServerMessageSearchResult } from "@/features/chat/message-flow/api-types";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 
 /**
@@ -24,6 +24,8 @@ export type CreateMessageTimelineStatePortDeps = {
   loadingMoreByChannel: Record<string, boolean>;
   searchState: Ref<MessageSearchState>;
   highlightedMessageId: Ref<string>;
+  serverSearchResults: Ref<ServerMessageSearchResult[]>;
+  searchScope: Ref<"channel" | "server">;
 };
 
 /**
@@ -78,6 +80,13 @@ export function createMessageTimelineStatePort(
         list.splice(idx, 1, { ...list[idx], reactions });
       }
     },
+    updateMessage(channelId: string, messageId: string, updater: (old: ChatMessage) => ChatMessage): void {
+      const list = deps.messagesByChannel[channelId] ?? [];
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx >= 0) {
+        list.splice(idx, 1, updater(list[idx]));
+      }
+    },
     readNextCursor(channelId: string): string {
       return String(deps.nextCursorByChannel[channelId] ?? "").trim();
     },
@@ -102,11 +111,31 @@ export function createMessageTimelineStatePort(
     readSearchState(): MessageSearchState {
       return deps.searchState.value;
     },
+    writeServerSearchState(state: { query: string; loading: boolean; error: string; results: ServerMessageSearchResult[] }): void {
+      deps.serverSearchResults.value = state.results;
+      deps.searchState.value = { ...deps.searchState.value, query: state.query, loading: state.loading, error: state.error, serverResults: state.results };
+    },
+    writeSearchScope(scope: "channel" | "server"): void {
+      deps.searchScope.value = scope;
+      deps.searchState.value = { ...deps.searchState.value, searchScope: scope };
+    },
     setHighlightedMessageId(messageId: string): void {
       deps.highlightedMessageId.value = messageId.trim();
     },
     readHighlightedMessageId(): string {
       return deps.highlightedMessageId.value.trim();
+    },
+    markMessageRecalled(channelId: string, messageId: string, recalledAt: number, _recalledBy: string): void {
+      const list = deps.messagesByChannel[channelId] ?? [];
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx >= 0) {
+        const original = list[idx];
+        if (original.kind === "core_text") {
+          list.splice(idx, 1, { ...original, recalledAt, text: "[该消息已被撤回]" });
+        } else {
+          list.splice(idx, 1, { ...original, recalledAt, preview: "[该消息已被撤回]" });
+        }
+      }
     },
   };
 }

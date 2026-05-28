@@ -23,6 +23,7 @@ interface CallSessionWire {
   participants: Array<{
     user_id: string;
     display_name: string;
+    avatar_url?: string;
     is_muted: boolean;
     is_speaking: boolean;
     audio_level: number;
@@ -67,6 +68,7 @@ function mapCallSessionWire(wire: CallSessionWire): CallSession {
     participants: wire.participants.map((p) => ({
       userId: p.user_id,
       displayName: p.display_name,
+      avatarUrl: p.avatar_url,
       isMuted: p.is_muted,
       isSpeaking: p.is_speaking,
       audioLevel: p.audio_level,

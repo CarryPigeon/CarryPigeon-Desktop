@@ -4,10 +4,19 @@
  * @description chat｜组件：ComposerHost。
  */
 
-import { computed, type Component } from "vue";
+import { computed, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
+import { invoke } from "@tauri-apps/api/core";
+import { createLogger } from "@/shared/utils/logger";
 import DomainSelector from "./DomainSelector.vue";
+import LinkPreviewCard from "./LinkPreviewCard.vue";
+import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-types";
+import AttachmentPreviewBar from "@/features/chat/message-flow/upload/presentation/components/AttachmentPreviewBar.vue";
+import VoiceMessageRecorder from "@/features/chat/message-flow/message/presentation/components/VoiceMessageRecorder.vue";
+import { addFiles, getAttachments, removeAttachment } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+
+const logger = createLogger("VoiceMessage");
 
 const props = defineProps<{
   domainId: string;
@@ -25,6 +34,7 @@ const props = defineProps<{
   mentionMenuOpen?: boolean;
   currentUserRole?: string;
   quoteReplyDraft?: { messageId: string; userId: string; preview: string } | null;
+  linkPreview?: ChatLinkPreview | null;
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +46,8 @@ const emit = defineEmits<{
   (e: "mentionQuery", query: string): void;
   (e: "selectMention", mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void;
   (e: "closeMentionMenu"): void;
+  (e: "urlDetected", url: string): void;
+  (e: "dismissLinkPreview"): void;
 }>();
 
 /**
@@ -65,6 +77,45 @@ function computeCanSend(): boolean {
 
 const canSend = computed(computeCanSend);
 const { t } = useI18n();
+
+/** 附件列表快照（响应式）。 */
+const attachments = computed(() => Array.from(getAttachments().values()));
+
+/**
+ * 处理粘贴事件：检测剪贴板中的图片并添加到附件列表。
+ *
+ * @param e - 原生剪贴板事件。
+ */
+function handlePaste(e: ClipboardEvent): void {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const imageFiles: File[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) imageFiles.push(file);
+    }
+  }
+  if (imageFiles.length > 0) {
+    e.preventDefault();
+    addFiles(imageFiles);
+  }
+}
+
+/**
+ * 重试上传失败的附件（重置为 pending 状态）。
+ *
+ * @param id - 附件 id。
+ */
+function handleRetryAttachment(id: string): void {
+  const att = getAttachments().get(id);
+  if (att) {
+    att.status = "pending";
+    att.error = undefined;
+    att.progress = 0;
+  }
+}
 
 /**
  * 触发发送请求（draft 为空或 sending 时会被禁用）。
@@ -156,6 +207,12 @@ function handleUpdateDraft(v: string): void {
   if (match) {
     emit("mentionQuery", match[2] ?? "");
   }
+  const URL_RE = /https?:\/\/[^\s]+/;
+  const urlMatch = URL_RE.exec(v);
+  if (urlMatch && urlMatch[0]) {
+    const url = urlMatch[0];
+    emit("urlDetected", url);
+  }
 }
 
 /**
@@ -172,6 +229,36 @@ const systemMentions = computed(() => {
 
 function selectSystemMention(type: "everyone" | "here"): void {
   emit("selectMention", { userId: type, displayName: type, type });
+}
+
+/** 语音录制上传状态。 */
+const isUploadingVoice = ref(false);
+
+/**
+ * 处理语音录制完成事件：读取文件、转为 Blob、添加到附件列表。
+ */
+async function onVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
+  isUploadingVoice.value = true;
+  try {
+    // 通过 Tauri 命令读取 WAV 文件内容（Base64 编码）
+    const base64 = await invoke<string>("read_file_base64", { path: payload.filePath });
+
+    // Base64 → ArrayBuffer
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    // 创建 File 对象并添加到附件
+    const blob = new Blob([bytes], { type: "audio/wav" });
+    const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
+    addFiles([file]);
+  } catch (e) {
+    logger.error("Action: chat_voice_message_upload_failed", { error: String(e) });
+  } finally {
+    isUploadingVoice.value = false;
+  }
 }
 </script>
 
@@ -220,15 +307,27 @@ function selectSystemMention(type: "everyone" | "here"): void {
           @submit="handlePluginSubmit"
         />
       </div>
-      <t-textarea
-        v-else
-        :model-value="props.draft"
-        :disabled="props.domainId.trim() !== 'Core:Text' || Boolean(props.disabled) || Boolean(props.sending)"
-        :placeholder="props.domainId.trim() === 'Core:Text' ? t('message_input_placeholder') : t('plugin_composer_placeholder')"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        @keydown="handleKeydown"
-        @update:modelValue="handleUpdateDraft"
-      />
+      <template v-else>
+        <LinkPreviewCard
+          v-if="props.linkPreview"
+          :preview="props.linkPreview"
+          @dismiss="$emit('dismissLinkPreview')"
+        />
+        <AttachmentPreviewBar
+          :attachments="attachments"
+          @remove="removeAttachment"
+          @retry="handleRetryAttachment"
+        />
+        <t-textarea
+          :model-value="props.draft"
+          :disabled="props.domainId.trim() !== 'Core:Text' || Boolean(props.disabled) || Boolean(props.sending)"
+          :placeholder="props.domainId.trim() === 'Core:Text' ? t('message_input_placeholder') : t('plugin_composer_placeholder')"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          @keydown="handleKeydown"
+          @update:modelValue="handleUpdateDraft"
+          @paste="handlePaste"
+        />
+      </template>
     </div>
 
     <div v-if="props.mentionMenuOpen && (props.mentionCandidates?.length || systemMentions.length)" class="cp-mentionMenu" role="listbox">
@@ -255,6 +354,14 @@ function selectSystemMention(type: "everyone" | "here"): void {
       >
         {{ sys.label }}
       </button>
+    </div>
+
+    <div class="cp-composer__row cp-composer__voiceRow">
+      <VoiceMessageRecorder
+        :disabled="Boolean(props.disabled) || Boolean(props.sending) || isUploadingVoice"
+        @recorded="onVoiceRecorded"
+        @error="(msg) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
+      />
     </div>
 
     <div class="cp-composer__actions">
@@ -345,6 +452,13 @@ function selectSystemMention(type: "everyone" | "here"): void {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--cp-border-light);
+}
+
+.cp-composer__voiceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
 }
 
 .cp-composer__plugin {

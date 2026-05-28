@@ -4,13 +4,13 @@
  */
 
 import { ref } from "vue";
-import type { DeleteChatMessageOutcome } from "@/features/chat/message-flow/api-types";
+import type { DeleteChatMessageOutcome, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
 
 /**
  * 消息上下文菜单动作类型。
  */
-export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select";
+export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread";
 
 /**
  * 消息上下文菜单编排依赖。
@@ -21,9 +21,12 @@ export type UseMessageContextMenuDeps = {
   startReply(messageId: string): void;
   startQuoteReply(messageId: string, preview: string): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
+  recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   onAsyncError(action: string, error: unknown): void;
   enterMultiSelectMode(firstMessageId: string): void;
   openForwardDialog(messageId: string): void;
+  startEditing(messageId: string): void;
+  openThread(messageId: string): void;
 };
 
 /**
@@ -65,6 +68,9 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
         deps.startQuoteReply(messageId, text);
         return;
       }
+      case "recall":
+        runAsyncTask(deps.recallMessage(messageId), "chat_recall_menu_failed");
+        return;
       case "delete":
         runAsyncTask(deps.deleteMessage(messageId), "chat_delete_menu_failed");
         return;
@@ -75,6 +81,14 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
         deps.openForwardDialog(messageId);
         return;
       }
+      case "edit": {
+        deps.startEditing(messageId);
+        return;
+      }
+      case "thread":
+      case "viewThread":
+        deps.openThread(messageId);
+        return;
       case "copy": {
         const text = deps.getClipboardText(messageId);
         if (!text) return;
@@ -88,6 +102,7 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
     menuOpen,
     menuX,
     menuY,
+    menuMessageId,
     closeMenu,
     handleMenuAction,
     handleMessageContextMenu,

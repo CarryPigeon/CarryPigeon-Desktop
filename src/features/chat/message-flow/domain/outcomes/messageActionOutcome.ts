@@ -19,7 +19,7 @@ export function createMessageActionError(
   return {
     code,
     message: error instanceof Error ? error.message || fallbackMessage : String(error ?? "") || fallbackMessage,
-    retryable: code === "send_failed" || code === "delete_failed",
+    retryable: code === "send_failed" || code === "delete_failed" || code === "edit_failed",
     details,
   };
 }

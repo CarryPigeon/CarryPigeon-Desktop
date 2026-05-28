@@ -3,25 +3,50 @@
  * @fileoverview 消息回应栏 — 消息下方展示 Emoji 回应列表及添加入口。
  */
 
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { invoke } from "@tauri-apps/api/core";
+import "emoji-picker-element";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/api-types";
 
 const props = defineProps<{
   messageId: string;
   reactions: MessageReactionSummary[];
-  onReact: (messageId: string, emoji: string) => void;
 }>();
 
-const showQuickBar = ref(false);
-const quickEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+const emit = defineEmits<{
+  (e: "react", messageId: string, emoji: string): void;
+}>();
 
-function handleReactionClick(emoji: string) {
-  props.onReact(props.messageId, emoji);
-  showQuickBar.value = false;
+const pickerVisible = ref(false);
+const customEmojis = ref<Array<{ id: string; name: string; filePath: string }>>([]);
+const emojiTab = ref<"standard" | "custom">("standard");
+
+onMounted(async () => {
+  try {
+    customEmojis.value = await invoke("list_custom_emojis");
+  } catch { /* ignore */ }
+});
+
+function handleReactionClick(emoji: string): void {
+  emit("react", props.messageId, emoji);
 }
 
-function toggleQuickBar() {
-  showQuickBar.value = !showQuickBar.value;
+function onPickerVisibleChange(visible: boolean): void {
+  pickerVisible.value = visible;
+}
+
+function onEmojiClick(e: Event): void {
+  const detail = (e as CustomEvent).detail;
+  const emoji = detail?.unicode ?? "";
+  if (emoji) {
+    emit("react", props.messageId, emoji);
+    pickerVisible.value = false;
+  }
+}
+
+function handleCustomEmojiClick(ce: { id: string; name: string }): void {
+  emit("react", props.messageId, `custom:${ce.id}:${ce.name}`);
+  pickerVisible.value = false;
 }
 </script>
 
@@ -37,18 +62,33 @@ function toggleQuickBar() {
       {{ r.emoji }}&nbsp;{{ r.count }}
     </span>
 
-    <button class="cp-reactionAddBtn" @click.stop="toggleQuickBar">+</button>
-
-    <div v-if="showQuickBar" class="cp-quickBar">
-      <span
-        v-for="emoji in quickEmojis"
-        :key="emoji"
-        class="cp-quickBar__item"
-        @click="handleReactionClick(emoji)"
-      >
-        {{ emoji }}
-      </span>
-    </div>
+    <t-popup
+      trigger="click"
+      placement="top"
+      :visible="pickerVisible"
+      @visible-change="onPickerVisibleChange"
+    >
+      <button class="cp-reactionAddBtn" type="button">+</button>
+      <template #content>
+        <div class="cp-emojiTabs">
+          <button :class="{ active: emojiTab === 'standard' }" @click="emojiTab = 'standard'">Emoji</button>
+          <button :class="{ active: emojiTab === 'custom' }" @click="emojiTab = 'custom'">{{ customEmojis.length }}</button>
+        </div>
+        <emoji-picker v-if="emojiTab === 'standard'" @emoji-click="onEmojiClick"></emoji-picker>
+        <div v-else class="cp-customEmojiGrid">
+          <button
+            v-for="ce in customEmojis"
+            :key="ce.id"
+            class="cp-customEmojiBtn"
+            @click="handleCustomEmojiClick(ce)"
+            :title="`:${ce.name}:`"
+          >
+            <img :src="`asset://localhost/${encodeURIComponent(ce.filePath)}`" :alt="ce.name" class="cp-customEmojiImg" />
+          </button>
+          <div v-if="customEmojis.length === 0" class="cp-customEmojiEmpty">No custom emojis</div>
+        </div>
+      </template>
+    </t-popup>
   </div>
 </template>
 
@@ -103,31 +143,62 @@ function toggleQuickBar() {
   transform: translateY(-1px);
 }
 
-.cp-quickBar {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0;
+.cp-emojiTabs {
   display: flex;
-  gap: 2px;
-  background: var(--cp-panel);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.cp-emojiTabs button {
+  flex: 1;
+  padding: 4px 8px;
   border: 1px solid var(--cp-border);
-  border-radius: 16px;
-  padding: 6px 8px;
-  box-shadow: var(--cp-shadow-soft);
-  z-index: 10;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.cp-emojiTabs button.active {
+  background: var(--cp-accent);
+  color: #fff;
+  border-color: var(--cp-accent);
 }
 
-.cp-quickBar__item {
-  font-size: 22px;
+.cp-customEmojiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 4px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.cp-customEmojiBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
   padding: 4px;
-  border-radius: 10px;
-  line-height: 1;
-  transition: background var(--cp-fast) var(--cp-ease), transform var(--cp-fast) var(--cp-ease);
+  transition: background var(--cp-fast) var(--cp-ease);
+}
+.cp-customEmojiBtn:hover {
+  background: var(--cp-hover-bg);
+}
+.cp-customEmojiImg {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.cp-customEmojiEmpty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--cp-text-muted);
+  font-size: 12px;
+  padding: 20px 0;
 }
 
-.cp-quickBar__item:hover {
-  background: var(--cp-hover-bg);
-  transform: scale(1.15);
-}
 </style>
