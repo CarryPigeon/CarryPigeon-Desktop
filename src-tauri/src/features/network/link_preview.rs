@@ -115,7 +115,7 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
     let status = resp.status();
     if !status.is_success() {
         tracing::warn!(
-            action = "link_preview_non_success_status",
+            action = "network_link_preview_non_success_status",
             url = %url,
             status = %status,
         );
@@ -143,7 +143,7 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
     let favicon_url = extract_favicon(&html, &url);
 
     tracing::info!(
-        action = "link_preview_fetched",
+        action = "network_link_preview_fetched",
         url = %url,
         has_title = title.is_some(),
         has_description = description.is_some(),

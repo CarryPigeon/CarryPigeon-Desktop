@@ -35,7 +35,7 @@ async function resolveImagePath(id: string): Promise<string> {
     imagePaths.value.set(id, assetUrl);
     return assetUrl;
   } catch (e) {
-    logger.error("Action: settings_emoji_resolve_image_failed", { id, error: String(e) });
+    logger.error("Action: chat_emoji_resolve_image_failed", { id, error: String(e) });
     return "";
   }
 }
@@ -73,7 +73,7 @@ async function handleFileSelect(): Promise<void> {
     }
   } catch {
     // dialog 插件不可用，回退到 <input type="file">
-    logger.info("Action: settings_emoji_dialog_plugin_unavailable, falling back to input-file");
+    logger.info("Action: chat_emoji_dialog_plugin_unavailable, falling back to input-file");
     filePath = await fallbackFileSelect();
   }
 
@@ -90,7 +90,7 @@ async function handleFileSelect(): Promise<void> {
     nameInput.value = "";
     tagsInput.value = "";
   } catch (e) {
-    logger.error("Action: settings_emoji_add_failed", { error: String(e) });
+    logger.error("Action: chat_emoji_add_failed", { error: String(e) });
   } finally {
     adding.value = false;
   }
