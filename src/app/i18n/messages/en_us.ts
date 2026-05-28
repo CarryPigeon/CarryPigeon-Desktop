@@ -108,6 +108,7 @@ export const en_us = {
   forward_success: "{count} message(s) forwarded",
   forward_failed: "Forward failed: {failed}/{total}",
   forwarded_messages_count: "{name} forwarded {count} messages",
+  forward_detail_title: "Forwarded Messages - {name}",
   delete_message: "Delete",
   channel_with_id: "Channel #{id}",
   plugin_default_title: "Plugin",

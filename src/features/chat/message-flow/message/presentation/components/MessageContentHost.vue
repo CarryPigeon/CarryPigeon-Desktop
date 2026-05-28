@@ -66,6 +66,10 @@ const emit = defineEmits<{
    * 打开线程面板。
    */
   (event: "viewThread", messageId: string): void;
+  /**
+   * 查看合并转发消息详情。
+   */
+  (event: "viewForwardDetail", payload: { fromName: string; forwardedMessages: Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }>; comment?: string }): void;
 }>();
 
 const { t } = useI18n();
@@ -170,6 +174,7 @@ function handleInstall(): void {
       :from-name="mergedForwardData.fromName"
       :forwarded-messages="mergedForwardData.forwardedMessages"
       :comment="mergedForwardData.comment"
+      @viewDetail="emit('viewForwardDetail', { fromName: mergedForwardData.fromName, forwardedMessages: mergedForwardData.forwardedMessages, comment: mergedForwardData.comment })"
     />
     <CoreTextMessageBubble
       v-else-if="renderModel.kind === 'core'"
