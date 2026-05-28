@@ -40,7 +40,7 @@ enum RecorderCommand {
 /// let mut recorder = VoiceRecorder::start(temp_dir)?;
 /// // ... 录制中 ...
 /// let result = recorder.stop()?;
-/// println!("Recorded: {:?}", result.file_path);
+/// // Handle result.file_path, result.duration_ms, result.size_bytes
 /// ```
 pub struct VoiceRecorder {
     command_tx: Option<mpsc::Sender<RecorderCommand>>,
@@ -119,11 +119,15 @@ impl VoiceRecorder {
                 let write_result = Self::write_wav(&pcm_buffer, &file_path);
                 match write_result {
                     Ok(size) => {
-                        *result_clone.lock().unwrap() = Some(RecordingResult {
-                            file_path,
-                            duration_ms: duration.as_millis() as u64,
-                            size_bytes: size,
-                        });
+                        if let Ok(mut guard) = result_clone.lock() {
+                            *guard = Some(RecordingResult {
+                                file_path,
+                                duration_ms: duration.as_millis() as u64,
+                                size_bytes: size,
+                            });
+                        } else {
+                            tracing::error!(action = "app_voice_message_result_lock_failed");
+                        }
                     }
                     Err(e) => {
                         tracing::error!(
@@ -153,7 +157,7 @@ impl VoiceRecorder {
         std::thread::sleep(std::time::Duration::from_millis(300));
         self.result
             .lock()
-            .unwrap()
+            .map_err(|e| anyhow::anyhow!("lock failure: {}", e))?
             .take()
             .context("VOICE_MESSAGE_RESULT_UNAVAILABLE")
     }
