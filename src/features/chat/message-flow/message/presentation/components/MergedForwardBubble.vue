@@ -21,6 +21,10 @@ const props = defineProps<{
   comment?: string;
 }>();
 
+const emit = defineEmits<{
+  (e: "viewDetail"): void;
+}>();
+
 const { t } = useI18n();
 
 function fmtTime(ms: number): string {
@@ -29,7 +33,7 @@ function fmtTime(ms: number): string {
 </script>
 
 <template>
-  <div class="cp-mergedForward">
+  <div class="cp-mergedForward" role="button" tabindex="0" @click="emit('viewDetail')" @keydown.enter="emit('viewDetail')" @keydown.space.prevent="emit('viewDetail')">
     <div class="cp-mergedForward__header">
       <span class="cp-mergedForward__icon">📋</span>
       <span class="cp-mergedForward__title">
@@ -64,6 +68,13 @@ function fmtTime(ms: number): string {
   background: color-mix(in oklab, var(--cp-panel, #1e1e2e) 70%, transparent);
   overflow: hidden;
   max-width: 380px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+
+  &:hover {
+    border-color: var(--cp-accent, #5865f2);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--cp-accent, #5865f2) 30%, transparent);
+  }
 }
 .cp-mergedForward__header {
   display: flex;
