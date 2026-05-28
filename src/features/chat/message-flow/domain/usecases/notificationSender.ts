@@ -47,18 +47,18 @@ export async function sendDesktopNotification(params: {
   try {
     const hasPermission = await ensurePermission();
     if (!hasPermission) {
-      logger.debug("Action: notification_permission_denied");
+      logger.debug("Action: chat_chat_notification_permission_denied");
       return;
     }
 
     if (import.meta.env.VITE_USE_MOCK_API === "true") {
-      logger.debug("Action: notification_mock_send", { title: params.title, body: params.body });
+      logger.debug("Action: chat_notification_mock_send", { title: params.title, body: params.body });
       return;
     }
 
     sendNotification({ title: params.title, body: params.body });
-    logger.debug("Action: notification_sent", { channelId: params.channelId });
+    logger.debug("Action: chat_notification_sent", { channelId: params.channelId });
   } catch (e) {
-    logger.error("Action: notification_send_failed", { error: String(e) });
+    logger.error("Action: chat_notification_send_failed", { error: String(e) });
   }
 }

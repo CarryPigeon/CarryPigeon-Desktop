@@ -28,7 +28,7 @@ export function useEmojiManageModel() {
       emojis.value = await invoke<EmojiEntry[]>("list_custom_emojis");
     } catch (e) {
       error.value = String(e);
-      logger.error("Action: settings_emoji_load_failed", { error: String(e) });
+      logger.error("Action: chat_emoji_load_failed", { error: String(e) });
     } finally {
       loading.value = false;
     }
@@ -39,7 +39,7 @@ export function useEmojiManageModel() {
       await invoke("save_emoji", { sourcePath, name, tags });
       await loadEmojis();
     } catch (e) {
-      logger.error("Action: settings_emoji_save_failed", { error: String(e) });
+      logger.error("Action: chat_emoji_save_failed", { error: String(e) });
       throw e;
     }
   }
@@ -49,13 +49,13 @@ export function useEmojiManageModel() {
       await invoke("delete_emoji", { id });
       await loadEmojis();
     } catch (e) {
-      logger.error("Action: settings_emoji_delete_failed", { error: String(e) });
+      logger.error("Action: chat_emoji_delete_failed", { error: String(e) });
       throw e;
     }
   }
 
   async function getImagePath(id: string): Promise<string> {
-    return invoke<string>("get_settings_emoji_image_path", { id });
+    return invoke<string>("get_chat_emoji_image_path", { id });
   }
 
   onMounted(loadEmojis);

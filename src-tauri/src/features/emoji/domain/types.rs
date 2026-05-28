@@ -17,6 +17,9 @@ pub struct EmojiIndex {
 
 impl Default for EmojiIndex {
     fn default() -> Self {
-        Self { version: 1, items: vec![] }
+        Self {
+            version: 1,
+            items: vec![],
+        }
     }
 }
