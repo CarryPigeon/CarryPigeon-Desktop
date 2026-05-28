@@ -72,6 +72,8 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     draftMentions,
     quoteReplyDraft,
     searchState,
+    serverSearchResults,
+    searchScope,
     highlightedMessageId,
     lastReadMidByChannel,
     lastReadReportAtMsByChannel,
@@ -141,6 +143,8 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     hasMoreByChannel: state.hasMoreByChannel,
     loadingMoreByChannel: state.loadingMoreByChannel,
     searchState,
+    serverSearchResults,
+    searchScope,
     highlightedMessageId,
     selectedDomainId,
     composerDraft,
@@ -160,6 +164,8 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     hasMoreByChannel: state.hasMoreByChannel,
     loadingMoreByChannel: state.loadingMoreByChannel,
     searchState,
+    serverSearchResults,
+    searchScope,
     highlightedMessageId,
   });
   const unreadProjection = createSessionUnreadProjectionPort({

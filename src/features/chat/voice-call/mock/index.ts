@@ -11,8 +11,8 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
   ];
 
   const mockParticipants: CallParticipant[] = [
-    { userId: "user-1", displayName: "张三", isMuted: false, isSpeaking: true, audioLevel: 0.8, joinedAt: Date.now() },
-    { userId: "user-2", displayName: "李四", isMuted: true, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() },
+    { userId: "u-1", displayName: "Operator", isMuted: false, isSpeaking: true, audioLevel: 0.8, joinedAt: Date.now() },
+    { userId: "u-2", displayName: "Relay", isMuted: true, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() },
   ];
 
   return {
@@ -101,7 +101,7 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
         state: "connecting",
         initiator: initiatorId || "host-user",
         participants: [
-          { userId: "host-user", displayName: "主持人", isMuted: false, isSpeaking: true, audioLevel: 0.7, joinedAt: Date.now() },
+          { userId: "u-1", displayName: "Operator", isMuted: false, isSpeaking: true, audioLevel: 0.7, joinedAt: Date.now() },
           { userId: "current-user", displayName: "我", isMuted: false, isSpeaking: false, audioLevel: 0, joinedAt: Date.now() },
         ],
         roomId: "conference-room",
@@ -117,7 +117,7 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
             state: "active",
             participants: [
               ...activeSession.value.participants,
-              { userId: "user-3", displayName: "王五", isMuted: false, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() },
+              { userId: "u-3", displayName: "PatchCable", isMuted: false, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() },
             ],
           };
         }

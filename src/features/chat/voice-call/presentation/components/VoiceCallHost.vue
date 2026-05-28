@@ -8,7 +8,7 @@
   <VoiceCallPanel
     :state="callState"
     :duration="duration"
-    :participants="participants"
+    :participants="participantsWithAvatars"
     :is-muted="isMuted"
     :is-noise-suppression-on="isNoiseSuppressionOn"
     :input-devices="inputDevices"
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useVoiceCall } from "../composables/useVoiceCall";
 
@@ -37,6 +37,7 @@ import { createTauriVoiceCallApi } from "../../data/tauri/tauriVoiceCallApi";
 import { currentServerSocket } from "@/features/server-connection/api";
 import { readAuthToken } from "@/shared/utils/localState";
 import { currentChatUserId, currentChatUsername } from "../../../composition/chatAccountSession";
+import { getRoomGovernanceCapabilities } from "../../../room-governance/api";
 import type { CallParticipant } from "../../domain/contracts";
 
 const props = defineProps<{
@@ -121,6 +122,34 @@ const wsUrl = computed(() => {
 });
 
 const accessToken = computed(() => readAuthToken(currentServerSocket.value ?? ""));
+
+const memberAvatarMap = ref<Map<string, string>>(new Map());
+
+watch(callState, async (s) => {
+  if (s === "active" || s === "connecting") {
+    try {
+      const governance = getRoomGovernanceCapabilities();
+      const channelGov = governance.forChannel(props.roomId);
+      const members = await channelGov.listMembers();
+      const map = new Map<string, string>();
+      for (const m of members) {
+        if (m.avatar) map.set(m.uid, m.avatar);
+      }
+      memberAvatarMap.value = map;
+    } catch {
+      // 成员列表拉取失败时忽略，回退到 AvatarBadge 首字母。
+    }
+  }
+});
+
+const participantsWithAvatars = computed(() => {
+  const avatars = memberAvatarMap.value;
+  if (avatars.size === 0) return participants.value;
+  return participants.value.map((p) => {
+    const avatarUrl = avatars.get(p.userId);
+    return avatarUrl ? { ...p, avatarUrl } : p;
+  });
+});
 
 onMounted(() => {
   initDevices();

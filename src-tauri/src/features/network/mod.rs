@@ -6,6 +6,7 @@
 pub mod data;
 pub mod di;
 pub mod domain;
+pub mod link_preview;
 #[cfg(debug_assertions)]
 pub mod mock;
 pub mod usecases;

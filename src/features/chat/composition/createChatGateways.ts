@@ -62,6 +62,9 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     deleteMessage(serverSocket, accessToken, messageId) {
       return deps.core.deleteMessage(serverSocket, accessToken, messageId);
     },
+    recallMessage(serverSocket, accessToken, messageId) {
+      return deps.core.recallMessage(serverSocket, accessToken, messageId);
+    },
     reactToMessage(serverSocket, accessToken, channelId, messageId, emoji) {
       return deps.core.reactToMessage(serverSocket, accessToken, channelId, messageId, emoji);
     },
@@ -104,11 +107,17 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     searchChannelMessages(serverSocket, accessToken, cid, query) {
       return deps.core.searchChannelMessages(serverSocket, accessToken, cid, query);
     },
+    searchMessages(serverSocket, accessToken, query) {
+      return deps.core.searchMessages(serverSocket, accessToken, query);
+    },
     listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after) {
       return deps.core.listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
     },
     getChannel(serverSocket, accessToken, cid) {
       return deps.core.getChannel(serverSocket, accessToken, cid);
+    },
+    getThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit) {
+      return deps.core.getThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit);
     },
   };
 }

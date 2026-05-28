@@ -445,6 +445,9 @@ async function handleResetDefaults(): Promise<void> {
               <button class="cp-settings__btn" data-testid="settings-open-file-manager" type="button" @click="router.push('/files')">
                 {{ t("file_manager") }}
               </button>
+              <button class="cp-settings__btn" data-testid="settings-open-emoji-manage" type="button" @click="router.push('/settings/emoji')">
+                {{ t("manage_emojis") }}
+              </button>
             </div>
           </div>
         </div>

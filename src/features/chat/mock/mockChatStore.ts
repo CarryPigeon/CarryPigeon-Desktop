@@ -13,11 +13,14 @@ import type {
   MentionCandidate,
   MessageDomain,
   MessageSearchState,
+  ServerMessageSearchResult,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  EditChatMessageOutcome,
   MessageMention,
   MessageReplySummary,
   ReactToMessageOutcome,
+  RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
@@ -155,7 +158,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   const multiSelectMode = ref(false);
   const selectedMessageIds = ref<Set<string>>(new Set());
   const messageActionError = ref<ChatMessageActionErrorInfo | null>(null);
-  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [] });
+  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" });
   const highlightedMessageId = ref<string>("");
   const currentChannelId = ref<string>("cid-prod");
   const sendAttempt = ref<number>(0);
@@ -430,6 +433,77 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   }
 
   /**
+   * 编辑指定的消息（mock）。
+   *
+   * @param messageId - 目标消息 id。
+   * @param request - 编辑请求。
+   * @returns 编辑结果。
+   */
+  async function editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome> {
+    const list = state.messagesByChannel[currentChannelId.value] ?? [];
+    const idx = list.findIndex((m) => m.id === messageId);
+    if (idx < 0) {
+      const error: ChatMessageActionErrorInfo = {
+        code: "edit_failed",
+        message: "Message not found.",
+        retryable: false,
+        details: { messageId },
+      };
+      messageActionError.value = error;
+      return {
+        ok: false,
+        kind: "chat_message_edit_rejected",
+        error,
+      };
+    }
+    const updated = { ...list[idx], text: request.text, updatedAt: Date.now() };
+    list[idx] = updated;
+    messageActionError.value = null;
+    return {
+      ok: true,
+      kind: "chat_message_edited",
+      message: updated,
+    };
+  }
+
+  /**
+   * 撤回指定的消息（mock）。
+   *
+   * @param messageId - 目标消息 id。
+   * @returns 撤回结果。
+   */
+  async function recallMessage(messageId: string): Promise<RecallChatMessageOutcome> {
+    const list = state.messagesByChannel[currentChannelId.value] ?? [];
+    const idx = list.findIndex((m) => m.id === messageId);
+    if (idx < 0) {
+      const error: ChatMessageActionErrorInfo = {
+        code: "recall_failed",
+        message: "Message not found.",
+        retryable: false,
+        details: { messageId },
+      };
+      messageActionError.value = error;
+      return {
+        ok: false,
+        kind: "chat_message_recall_rejected",
+        error,
+      };
+    }
+    const original = list[idx];
+    if (original.kind === "core_text") {
+      list[idx] = { ...original, recalledAt: Date.now(), text: "[该消息已被撤回]" };
+    } else {
+      list[idx] = { ...original, recalledAt: Date.now(), preview: "[该消息已被撤回]" };
+    }
+    messageActionError.value = null;
+    return {
+      ok: true,
+      kind: "chat_message_recalled",
+      messageId,
+    };
+  }
+
+  /**
    * 发送当前作曲器草稿消息（mock）。
    *
    * @param payload - 可选插件 payload（domain composer 提交）。
@@ -657,6 +731,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     return state.members.map((m) => ({
       uid: m.id,
       nickname: m.name,
+      avatar: `https://i.pravatar.cc/80?u=${encodeURIComponent(m.id)}`,
       role: m.role,
       joinTime: Date.now() - 1000 * 60 * 60 * 24,
     }));
@@ -934,12 +1009,12 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   async function searchCurrentChannel(query: string): Promise<void> {
     const q = String(query ?? "").trim();
     if (!q) {
-      searchState.value = { query: "", loading: false, error: "", results: [] };
+      searchState.value = { query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" };
       return;
     }
     const cid = currentChannelId.value.trim();
     if (!cid) return;
-    searchState.value = { query: q, loading: true, error: "", results: [] };
+    searchState.value = { query: q, loading: true, error: "", results: [], serverResults: [], searchScope: "channel" };
     // Simulate search delay
     await new Promise((resolve) => setTimeout(resolve, 300));
     const messages = state.messagesByChannel[cid] ?? [];
@@ -953,7 +1028,37 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         message,
         preview: message.kind === "core_text" ? message.text : message.preview,
       }));
-    searchState.value = { query: q, loading: false, error: "", results };
+    searchState.value = { query: q, loading: false, error: "", results, serverResults: [], searchScope: "channel" };
+  }
+
+  async function searchServerMessages(query: string, channelIds?: string[]): Promise<void> {
+    const q = String(query ?? "").trim();
+    if (!q) {
+      searchState.value = { ...searchState.value, searchScope: "server", serverResults: [], query: "", loading: false, error: "" };
+      return;
+    }
+    searchState.value = { ...searchState.value, searchScope: "server", loading: true, error: "", serverResults: [] };
+    // Simulate search delay
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const needle = q.toLowerCase();
+    const results: ServerMessageSearchResult[] = [];
+    const cids = channelIds?.length ? channelIds : Object.keys(state.messagesByChannel);
+    for (const cid of cids) {
+      const messages = state.messagesByChannel[cid] ?? [];
+      for (const msg of messages) {
+        const text = msg.kind === "core_text" ? msg.text : msg.preview;
+        if (text.toLowerCase().includes(needle)) {
+          const channel = state.channels.find((c) => c.id === cid);
+          results.push({
+            message: msg,
+            preview: msg.kind === "core_text" ? msg.text : msg.preview,
+            channelId: cid,
+            channelName: channel?.name ?? cid,
+          });
+        }
+      }
+    }
+    searchState.value = { query: q, loading: false, error: "", results: [], serverResults: results, searchScope: "server" };
   }
 
   async function loadContextAroundMessage(messageId: string): Promise<void> {
@@ -980,7 +1085,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   }
 
   function clearSearch(): void {
-    searchState.value = { query: "", loading: false, error: "", results: [] };
+    searchState.value = { query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" };
     highlightedMessageId.value = "";
   }
 
@@ -991,6 +1096,96 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
       userId: member.id,
       displayName: member.name || member.id,
     }));
+  }
+
+  /**
+   * 转发消息（mock 内存实现）。
+   *
+   * 支持两种模式：
+   * - 单条转发：通过 forwardedFrom 标记来源；
+   * - 合并转发：通过 forwardedMessages 打包多条原消息预览。
+   */
+  async function forwardMessage(
+    mid: string,
+    req: { targetCid: string; comment?: string; mergedMids?: string[] },
+  ): Promise<ChatMessage> {
+    const now = Date.now();
+    const f = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator" };
+    const targetChannelId = String(req.targetCid ?? "").trim();
+    if (!targetChannelId) throw new Error("Missing target channel id");
+
+    const targetList = state.messagesByChannel[targetChannelId] ?? (state.messagesByChannel[targetChannelId] = []);
+
+    const mergedMids = req.mergedMids && req.mergedMids.length > 0 ? req.mergedMids : undefined;
+
+    if (mergedMids) {
+      const fwds: Array<{
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      }> = [];
+      for (const mergedMid of mergedMids) {
+        let found = false;
+        for (const [cid, msgs] of Object.entries(state.messagesByChannel)) {
+          const original = msgs.find((m) => m.id === mergedMid);
+          if (original) {
+            fwds.push({
+              messageId: original.id,
+              channelId: cid,
+              userId: original.from.id,
+              preview: original.kind === "core_text" ? original.text : original.preview,
+              sentTime: original.timeMs,
+            });
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          fwds.push({ messageId: mergedMid, channelId: "", userId: f.id, preview: "", sentTime: 0 });
+        }
+      }
+
+      const newMsg: ChatMessage = {
+        id: `m-${now}`,
+        kind: "core_text",
+        from: f,
+        timeMs: now,
+        domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+        text: req.comment ?? "",
+        forwardedMessages: fwds,
+      };
+      targetList.push(newMsg);
+      return newMsg;
+    }
+
+    let forwardedFrom: { messageId: string; channelId: string; userId: string; preview: string; sentTime: number } | undefined;
+    for (const [cid, msgs] of Object.entries(state.messagesByChannel)) {
+      const original = msgs.find((m) => m.id === mid);
+      if (original) {
+        forwardedFrom = {
+          messageId: original.id,
+          channelId: cid,
+          userId: original.from.id,
+          preview: original.kind === "core_text" ? original.text : original.preview,
+          sentTime: original.timeMs,
+        };
+        break;
+      }
+    }
+
+    const newMsg: ChatMessage = {
+      id: `m-${now}`,
+      kind: "core_text",
+      from: f,
+      timeMs: now,
+      domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+      text: req.comment ?? "",
+      forwardedFrom,
+    };
+    targetList.push(newMsg);
+    return newMsg;
   }
 
   return {
@@ -1029,11 +1224,15 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     startReply,
     cancelReply,
     deleteMessage,
+    editMessage,
+    recallMessage,
     sendComposerMessage,
+    forwardMessage,
     reactToMessage,
     removeReaction,
     listMentionCandidates,
     searchCurrentChannel,
+    searchServerMessages,
     loadContextAroundMessage,
     clearSearch,
     // 频道管理

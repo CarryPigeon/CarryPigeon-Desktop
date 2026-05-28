@@ -7,12 +7,14 @@
 import { onBeforeUnmount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
-type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select";
+type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread";
 
 const props = defineProps<{
   open: boolean;
   x: number;
   y: number;
+  showRecall?: boolean;
+  showViewThread?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -104,6 +106,18 @@ onBeforeUnmount(handleBeforeUnmount);
         </button>
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
           {{ t("forward_message") }}
+        </button>
+        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('edit')">
+          {{ t("edit_message") }}
+        </button>
+        <button v-if="props.showRecall" class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('recall')">
+          {{ t("recall_message") }}
+        </button>
+        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('thread')">
+          {{ t("reply_in_thread") }}
+        </button>
+        <button v-if="props.showViewThread" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('viewThread')">
+          {{ t("view_thread") }}
         </button>
         <div class="cp-msgmenu__sep" aria-hidden="true"></div>
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('select')">

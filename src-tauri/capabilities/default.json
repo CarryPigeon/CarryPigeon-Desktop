@@ -17,6 +17,7 @@
         "core:window:allow-maximize",
         "core:window:allow-set-focus",
         "core:window:allow-create",
-        "core:window:allow-center"
+        "core:window:allow-center",
+        "notification:default"
     ]
 }

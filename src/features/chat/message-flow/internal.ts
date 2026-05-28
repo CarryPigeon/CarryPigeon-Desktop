@@ -8,3 +8,6 @@ export { MessageFlowApplicationService } from "./domain/usecases/messageFlowServ
 export { createAvailableDomains } from "./domain/services/domains";
 export { compareMessages, createMessageMapper, mergeMessages } from "./domain/mappers/messageModel";
 export { createMessageEventRouter } from "./domain/event-handlers/messageEventRouter";
+export { decideNotification } from "./domain/usecases/notificationDecider";
+export type { NotificationDecision } from "./domain/usecases/notificationDecider";
+export { sendDesktopNotification } from "./domain/usecases/notificationSender";

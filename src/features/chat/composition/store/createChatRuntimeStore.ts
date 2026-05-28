@@ -120,11 +120,17 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     startReply: messageFlow.startReply,
     cancelReply: messageFlow.cancelReply,
     deleteMessage: messageFlow.deleteMessage,
+    editMessage: messageFlow.editMessage,
+    recallMessage: messageFlow.recallMessage,
     sendComposerMessage: messageFlow.sendComposerMessage,
+    forwardMessage: async () => {
+      throw new Error("forwardMessage: not available in live mode — use httpChatApiPort.forwardMessage directly");
+    },
     reactToMessage: messageFlow.reactToMessage,
     removeReaction: messageFlow.removeReaction,
     listMentionCandidates: messageFlow.listMentionCandidates,
     searchCurrentChannel: messageFlow.searchCurrentChannel,
+    searchServerMessages: messageFlow.searchServerMessages,
     loadContextAroundMessage: messageFlow.loadContextAroundMessage,
     clearSearch: messageFlow.clearSearch,
     // 频道管理

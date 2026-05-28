@@ -20,7 +20,7 @@ import {
 } from "@/features/chat/public/routes";
 import { DomainCatalogPage, PluginCenterPage, PluginDetailPage } from "@/features/plugins/routes";
 import { ServerManagerPage } from "@/features/server-connection/routes";
-import { SettingsPage } from "@/features/settings/routes";
+import { SettingsPage, EmojiManagePage } from "@/features/settings/routes";
 import { FileManagerPage } from "@/features/files/routes";
 import { TrayNotificationPopover } from "@/features/tray-notification/routes";
 
@@ -39,6 +39,7 @@ export const router = createRouter({
     { path: "/chat", component: ChatMainPage },
     { path: "/settings", component: SettingsPage },
     { path: "/settings/profile", component: SettingsPage },
+    { path: "/settings/emoji", component: EmojiManagePage },
     { path: "/servers", component: ServerManagerPage },
     { path: "/required-setup", component: RequiredSetupPage },
     { path: "/plugins", component: PluginCenterPage },

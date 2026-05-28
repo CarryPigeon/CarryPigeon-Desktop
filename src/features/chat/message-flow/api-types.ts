@@ -6,19 +6,24 @@
  */
 
 import type { ReadableCapability } from "@/shared/types/capabilities";
+import type { FileAttachment } from "./upload/presentation/runtime/fileAttachmentStore";
+
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  EditChatMessageOutcome,
   MentionCandidate,
   MessageDomain,
   MessageMention,
   MessageReplySummary,
   MessageSearchState,
   ReactToMessageOutcome,
+  RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
+  ServerMessageSearchResult,
 } from "./domain/contracts";
 
 export type {
@@ -26,13 +31,16 @@ export type {
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  EditChatMessageOutcome,
   MessageDomain,
   MessageSearchResult,
   MessageSearchState,
+  ServerMessageSearchResult,
   SendChatMessageOutcome,
 } from "./domain/contracts";
 
-export type { MentionCandidate, MessageMention, MessageReactionSummary, MessageReplySummary, ReactToMessageOutcome, RemoveReactionOutcome } from "./domain/contracts";
+export type { FileAttachment };
+export type { MentionCandidate, MessageMention, MessageReactionSummary, MessageReplySummary, ReactToMessageOutcome, RecallChatMessageOutcome, RemoveReactionOutcome } from "./domain/contracts";
 
 /**
  * 当前频道消息时间线快照。
@@ -43,6 +51,8 @@ export type MessageTimelineSnapshot = {
   hasMoreHistory: boolean;
   isLoadingHistory: boolean;
   search: MessageSearchState;
+  searchScope: "channel" | "server";
+  serverResults: ServerMessageSearchResult[];
   highlightedMessageId: string;
 };
 
@@ -57,9 +67,12 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
   loadMoreHistory(): Promise<void>;
   beginReply(messageId: string): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
+  editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome>;
+  recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   searchCurrentChannel(query: string): Promise<void>;
+  searchServerMessages(query: string, channelIds?: string[]): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
   clearSearch(): void;
 };
@@ -102,6 +115,12 @@ export type MessageComposerCapabilities = ReadableCapability<MessageComposerSnap
   sendMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   addMention(mention: MessageMention): void;
+
+  /** Image attachment management for paste/drag-drop upload. */
+  attachments: readonly FileAttachment[];
+  addFiles(files: FileList | File[]): void;
+  removeFile(id: string): void;
+  clearFiles(): void;
 
   /** Per-channel draft persistence. */
   readChannelDraft(channelId: string): string;

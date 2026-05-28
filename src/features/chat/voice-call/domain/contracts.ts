@@ -16,6 +16,7 @@ export type CallState = "idle" | "dialing" | "ringing" | "connecting" | "active"
 export type CallParticipant = {
   userId: string;
   displayName: string;
+  avatarUrl?: string;
   isMuted: boolean;
   isSpeaking: boolean;
   audioLevel: number; // 0-1, VAD 提供

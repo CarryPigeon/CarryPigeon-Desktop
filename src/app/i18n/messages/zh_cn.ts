@@ -95,6 +95,7 @@ export const zh_cn = {
   bookmark: "收藏",
   selected_count: "已选择 {count} 条",
   recall_message: "撤回",
+  recalled_a_message: "撤回了一条消息",
   forward_message: "转发",
   forward_merged: "合并转发",
   forward_separate: "逐条转发",
@@ -466,9 +467,22 @@ export const zh_cn = {
   file_downloading: "下载中…",
   download_success: "下载成功",
   download_failed: "下载失败",
+  // Custom emoji
+  custom_emoji: "自定义表情",
+  manage_emojis: "管理表情",
+  add_emoji: "添加表情",
+  emoji_name: "表情名称",
+  emoji_tags: "标签（逗号分隔）",
+  no_custom_emojis: "暂无自定义表情",
   // About
   about_version: "版本",
   about_tech_stack: "技术栈",
   about_license: "许可协议",
   about_credits: "致谢",
+  // Thread
+  thread: "线程",
+  reply_in_thread: "在帖子中回复",
+  view_thread: "查看帖子",
+  no_replies_yet: "暂无回复",
+  replies: "条回复",
 };

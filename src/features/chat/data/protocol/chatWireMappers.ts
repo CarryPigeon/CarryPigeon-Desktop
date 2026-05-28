@@ -38,6 +38,7 @@ import type {
   MentionCreatedEvent,
   AuditLogCreatedEvent,
   ChannelCategoryChangedEvent,
+  ChatMessageRecalledEvent,
 } from "@/features/chat/domain/types/chatEventModels";
 import type {
   ChatChannelApplicationWire,
@@ -72,6 +73,7 @@ import type {
   MentionCreatedEventPayloadWire,
   AuditLogCreatedEventPayloadWire,
   ChannelCategoryChangedEventPayloadWire,
+  ChatMessageRecalledEventPayloadWire,
 } from "./chatWireEvents";
 
 import { asTrimmedString, asOptionalString, asSafeNumber } from "@/shared/data/wireMapperUtils";
@@ -439,6 +441,15 @@ function mapMessageUnpinnedPayload(wire: ChatMessageUnpinnedEventPayloadWire): C
   };
 }
 
+function mapMessageRecalledPayload(wire: ChatMessageRecalledEventPayloadWire): ChatMessageRecalledEvent {
+  return {
+    channelId: asTrimmedString(wire.cid),
+    messageId: asTrimmedString(wire.mid),
+    recalledAt: asSafeNumber(wire.recalled_at),
+    recalledByUserId: asTrimmedString(wire.recalled_by_uid),
+  };
+}
+
 function mapMentionCreatedPayload(wire: MentionCreatedEventPayloadWire): MentionCreatedEvent {
   return {
     mentionId: asTrimmedString(wire.mention_id),
@@ -552,6 +563,14 @@ export function mapChatWsEventWire(wire: ChatWsEventWire): ChatEventEnvelope {
       ...base,
       eventType: "message.unpinned",
       payload: mapMessageUnpinnedPayload(wire.payload as ChatMessageUnpinnedEventPayloadWire),
+    };
+  }
+
+  if (base.eventType === "message.recalled") {
+    return {
+      ...base,
+      eventType: "message.recalled",
+      payload: mapMessageRecalledPayload(wire.payload as ChatMessageRecalledEventPayloadWire),
     };
   }
 
