@@ -76,6 +76,16 @@ export type ChatMessagePinnedEventPayloadWire = {
 };
 
 /**
+ * `message.recalled` event payload.
+ */
+export type ChatMessageRecalledEventPayloadWire = {
+  cid: string;
+  mid: string;
+  recalled_at: number;
+  recalled_by_uid: string;
+};
+
+/**
  * `message.unpinned` event payload.
  */
 export type ChatMessageUnpinnedEventPayloadWire = {

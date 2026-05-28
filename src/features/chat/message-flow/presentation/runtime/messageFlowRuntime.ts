@@ -42,6 +42,8 @@ export type ChatMessageFlowRuntimeDeps = {
   hasMoreByChannel: ChatMessageFlowStateSlice["hasMoreByChannel"];
   loadingMoreByChannel: ChatMessageFlowStateSlice["loadingMoreByChannel"];
   searchState: ChatMessageFlowStateSlice["searchState"];
+  serverSearchResults: ChatMessageFlowStateSlice["serverSearchResults"];
+  searchScope: ChatMessageFlowStateSlice["searchScope"];
   highlightedMessageId: ChatMessageFlowStateSlice["highlightedMessageId"];
   selectedDomainId: ChatMessageFlowStateSlice["selectedDomainId"];
   composerDraft: ChatMessageFlowStateSlice["composerDraft"];
@@ -71,6 +73,8 @@ export function createChatMessageFlowRuntime(
     hasMoreByChannel,
     loadingMoreByChannel,
     searchState,
+    serverSearchResults,
+    searchScope,
     highlightedMessageId,
     selectedDomainId,
     composerDraft,
@@ -92,6 +96,8 @@ export function createChatMessageFlowRuntime(
     hasMoreByChannel,
     loadingMoreByChannel,
     searchState,
+    serverSearchResults,
+    searchScope,
     highlightedMessageId,
   });
   const draftStorage = createLocalStorageDraftStorage(
@@ -151,6 +157,8 @@ export function createChatMessageFlowRuntime(
     refreshChannelLatestPage: (channelId) => applicationService.refreshChannelLatestPage(channelId),
     loadMoreMessages: () => applicationService.loadMoreMessages(),
     deleteMessage: (messageId) => applicationService.deleteMessage(messageId),
+    editMessage: (messageId, request) => applicationService.editMessage(messageId, request),
+    recallMessage: (messageId) => applicationService.recallMessage(messageId),
     startReply: (message) => applicationService.startReply(message),
     cancelReply: () => applicationService.cancelReply(),
     sendComposerMessage: (payload) => applicationService.sendComposerMessage(payload),
@@ -158,6 +166,7 @@ export function createChatMessageFlowRuntime(
     removeReaction: (messageId, emoji) => applicationService.removeReaction(messageId, emoji),
     listMentionCandidates: (channelId) => applicationService.listMentionCandidates(channelId),
     searchCurrentChannel: (query) => applicationService.searchCurrentChannel(query),
+    searchServerMessages: (query, channelIds) => applicationService.searchServerMessages(query, channelIds),
     loadContextAroundMessage: (messageId) => applicationService.loadContextAroundMessage(messageId),
     clearSearch: () => applicationService.clearSearch(),
   };

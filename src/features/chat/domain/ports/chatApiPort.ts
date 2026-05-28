@@ -50,6 +50,7 @@ export type ChatApiPort = {
     idempotencyKey?: string,
   ): Promise<ChatMessageRecord>;
   deleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void>;
+  recallMessage(serverSocket: string, accessToken: string, mid: string): Promise<void>;
   updateReadState(serverSocket: string, accessToken: string, cid: string, req: ChatReadStateInput): Promise<void>;
   applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void>;
   patchChannel(
@@ -89,6 +90,11 @@ export type ChatApiPort = {
     cid: string,
     query: { q: string; cursor?: string; limit?: number; senderUid?: string; domain?: string; beforeMid?: string; afterMid?: string },
   ): Promise<ChatMessagePage>;
+  searchMessages(
+    serverSocket: string,
+    accessToken: string,
+    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
+  ): Promise<ChatMessagePage>;
   listChannelMessagesAround(
     serverSocket: string,
     accessToken: string,
@@ -106,6 +112,13 @@ export type ChatApiPort = {
   pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void>;
   unpinMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void>;
   listPins(serverSocket: string, accessToken: string, cid: string, cursor?: string, limit?: number): Promise<{ items: ChatPinRecord[]; nextCursor?: string; hasMore?: boolean }>;
+  getThreadReplies(
+    serverSocket: string,
+    accessToken: string,
+    rootMessageId: string,
+    cursor?: string,
+    limit?: number,
+  ): Promise<ChatMessagePage>;
   forwardMessage(
     serverSocket: string,
     accessToken: string,

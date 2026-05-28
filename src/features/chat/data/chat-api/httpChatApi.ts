@@ -114,6 +114,17 @@ export async function httpDeleteMessage(serverSocket: string, accessToken: strin
   await client.requestJson<void>("DELETE", `/messages/${encodeURIComponent(messageId)}`);
 }
 
+export async function httpRecallMessage(
+  serverSocket: string,
+  accessToken: string,
+  mid: string,
+): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const messageId = String(mid).trim();
+  if (!messageId) throw new Error("Missing mid");
+  await client.requestJson<void>("DELETE", `/messages/${encodeURIComponent(messageId)}/recall`);
+}
+
 export async function httpUpdateReadState(
   serverSocket: string,
   accessToken: string,
@@ -309,6 +320,19 @@ export async function httpGetChannel(serverSocket: string, accessToken: string, 
   return client.requestJson<ChatChannelWire>("GET", `/channels/${encodeURIComponent(channelId)}`);
 }
 
+export async function httpSearchMessages(
+  serverSocket: string,
+  accessToken: string,
+  query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
+): Promise<ChatMessagePageWire> {
+  const params = new URLSearchParams({ q: query.q });
+  if (query.channelIds?.length) params.set("channel_ids", query.channelIds.join(","));
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.limit) params.set("limit", String(Math.min(query.limit, 50)));
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  return client.requestJson<ChatMessagePageWire>("GET", `/messages/search?${params.toString()}`);
+}
+
 export async function httpSearchChannelMessages(
   serverSocket: string,
   accessToken: string,
@@ -451,6 +475,20 @@ export async function httpReactToMessage(
  * DELETE /channels/:cid/messages/:mid/reactions?emoji=:emoji
  * 取消消息回应。
  */
+export async function httpGetThreadReplies(
+  serverSocket: string,
+  accessToken: string,
+  rootMessageId: string,
+  cursor?: string,
+  limit?: number,
+): Promise<ChatMessagePageWire> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  if (limit) params.set("limit", String(limit));
+  return client.requestJson<ChatMessagePageWire>("GET", `/messages/${encodeURIComponent(rootMessageId)}/thread?${params.toString()}`);
+}
+
 export async function httpRemoveReaction(
   serverSocket: string,
   accessToken: string,

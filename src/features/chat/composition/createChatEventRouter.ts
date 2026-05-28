@@ -23,6 +23,9 @@ import { createReadStateEventRouter } from "@/features/chat/room-session/interna
 import { createChatGovernanceEventRouter } from "./createChatGovernanceEventRouter";
 import { createVoiceCallEventRouter } from "@/features/chat/voice-call/domain/event-handlers/voiceCallEventRouter";
 import { resolveState } from "@/features/chat/voice-call/presentation/store-access/voiceCallStoreAccess";
+import { createNotificationOnNewMessageHandler } from "@/app/bootstrap/notificationBridge";
+import { invokeTauri } from "@/shared/tauri/invokeClient";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -37,7 +40,7 @@ export type ChatWsEventRouterDeps = {
   getCurrentUserId: () => string;
   timelineState: Pick<
     MessageTimelineStatePort,
-    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions"
+    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions" | "updateMessage" | "markMessageRecalled"
   >;
   unreadProjection: ChannelUnreadProjectionPort;
   readStateProjection: Pick<
@@ -68,6 +71,15 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     emitChannelProjectionChanged: deps.emitChannelProjectionChanged,
   });
 
+  const handleNewMessage = createNotificationOnNewMessageHandler({
+    getDesktopNotificationsEnabled: () =>
+      invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key: "desktop_notifications" }),
+    getCurrentChannelId: deps.timelineState.readCurrentChannelId,
+    getCurrentUserId: deps.getCurrentUserId,
+    getChannelNotificationPreference: async () => "all",
+    getChannelName: (cid) => cid,
+  });
+
   const routeMessageEvent = createMessageEventRouter({
     scope: {
       getActiveServerSocket: deps.getServerSocket,
@@ -76,6 +88,7 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     unreadProjection: deps.unreadProjection,
     mapWireMessage: deps.mapWireMessage,
     compareMessages: deps.compareMessages,
+    onNewMessage: handleNewMessage,
   });
 
   const routeReadStateEvent = createReadStateEventRouter({

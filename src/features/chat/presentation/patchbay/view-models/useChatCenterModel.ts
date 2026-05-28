@@ -35,6 +35,7 @@ import {
   getSelectedCount,
   getSelectedIds,
 } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
+import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
@@ -88,8 +89,12 @@ type ChatCenterRawModel = {
   currentUserRole: ComputedRef<string>;
   searchPanelOpen: Ref<boolean>;
   searchState: ComputedRef<MessageSearchState>;
+  searchScope: ComputedRef<"channel" | "server">;
   highlightedMessageId: ComputedRef<string>;
   quoteReplyDraft: ComputedRef<{ messageId: string; userId: string; preview: string } | null>;
+  linkPreview: ComputedRef<ChatLinkPreview | null | undefined>;
+  fetchLinkPreview: (url: string) => Promise<void>;
+  dismissLinkPreview: () => void;
   fmtTime(ms: number): string;
   formatReplyMiniText(channelId: string, replyToId: string): string;
   setDomainId(v: string): void;
@@ -108,6 +113,7 @@ type ChatCenterRawModel = {
   openSearchPanel(): void;
   closeSearchPanel(): void;
   searchMessages(query: string): Promise<void>;
+  setSearchScope(scope: "channel" | "server"): void;
   openSearchResult(messageId: string): Promise<void>;
   multiSelectMode: ComputedRef<boolean>;
   selectedCount: ComputedRef<number>;
@@ -153,6 +159,9 @@ export type UseChatCenterModelDeps = {
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
   onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
   chatApi?: ChatApiPort;
+  linkPreview?: Ref<ChatLinkPreview | null | undefined>;
+  fetchLinkPreview?: (url: string) => Promise<void>;
+  dismissLinkPreview?: () => void;
 };
 
 /**
@@ -216,6 +225,16 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
 
   const quoteReplyDraft = computed(() => messageComposerSnapshot.value.quoteReplyDraft);
 
+  const linkPreview = computed(() => deps.linkPreview?.value);
+
+  function dismissLinkPreview(): void {
+    deps.dismissLinkPreview?.();
+  }
+
+  async function fetchLinkPreview(url: string): Promise<void> {
+    await deps.fetchLinkPreview?.(url);
+  }
+
   const currentUserId = computed(() => deps.currentUserId.value || "u-1");
   const currentUserRole = computed(() => deps.currentUserRole.value);
 
@@ -264,6 +283,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
    */
   const searchPanelOpen = ref(false);
   const searchState = computed(() => messageTimelineSnapshot.value.search);
+  const searchScope = computed(() => messageTimelineSnapshot.value.searchScope);
   const highlightedMessageId = computed(() => messageTimelineSnapshot.value.highlightedMessageId);
 
   function openSearchPanel(): void {
@@ -275,8 +295,19 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     deps.currentTimeline.clearSearch();
   }
 
+  function setSearchScope(scope: "channel" | "server"): void {
+    messageTimelineSnapshot.value.search.searchScope = scope;
+    if (scope === "server" && searchState.value.query) {
+      void deps.currentTimeline.searchServerMessages(searchState.value.query);
+    }
+  }
+
   async function searchMessages(query: string): Promise<void> {
-    await deps.currentTimeline.searchCurrentChannel(query);
+    if (messageTimelineSnapshot.value.search.searchScope === "server") {
+      await deps.currentTimeline.searchServerMessages(query);
+    } else {
+      await deps.currentTimeline.searchCurrentChannel(query);
+    }
   }
 
   async function openSearchResult(messageId: string): Promise<void> {
@@ -470,8 +501,21 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
 
   function handleSend(payload?: ComposerSubmitPayload): void {
     if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
-    void deps.messageComposer.sendMessage(payload).then((outcome) => {
-      if (outcome.ok) return;
+    const lp = linkPreview.value;
+    const mergedPayload: ComposerSubmitPayload | undefined = payload
+      ? { ...payload, ...(lp ? { linkPreview: lp } : {}) }
+      : lp
+        // For Core:Text sends, pass a lightweight payload that carries only
+        // the linkPreview. sendComposerMessage detects this via hasRealPayload
+        // and still reads domain/version/data from composer state (so pending
+        // attachment share-keys appended to the draft are not lost).
+        ? { domain: "", domainVersion: "", data: undefined, linkPreview: lp }
+        : undefined;
+    void deps.messageComposer.sendMessage(mergedPayload).then((outcome) => {
+      if (outcome.ok) {
+        deps.dismissLinkPreview?.();
+        return;
+      }
       deps.messageComposer.setActionError(outcome.error);
     });
   }
@@ -547,8 +591,12 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     currentUserRole,
     searchPanelOpen,
     searchState,
+    searchScope,
     highlightedMessageId,
     quoteReplyDraft,
+    linkPreview,
+    fetchLinkPreview,
+    dismissLinkPreview,
     fmtTime,
     formatReplyMiniText,
     setDomainId,
@@ -567,6 +615,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     openSearchPanel,
     closeSearchPanel,
     searchMessages,
+    setSearchScope,
     openSearchResult,
     multiSelectMode,
     selectedCount,

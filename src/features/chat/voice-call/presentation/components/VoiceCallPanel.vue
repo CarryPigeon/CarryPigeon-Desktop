@@ -22,6 +22,8 @@
       <div v-if="!minimized && isConference && participants.length > 0" class="voice-call-panel__roster">
         <div class="voice-call-panel__roster-title">{{ t("voice_call_participants_title") }} ({{ participants.length }})</div>
         <div v-for="p in participants" :key="p.userId" class="voice-call-panel__participant">
+          <img v-if="p.avatarUrl" class="voice-call-panel__participant-avatar" :src="p.avatarUrl" alt="" />
+          <AvatarBadge v-else :name="p.displayName || p.userId" :size="26" />
           <span class="voice-call-panel__participant-name">{{ p.displayName || p.userId }}</span>
           <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><t-icon name="microphone-off" /></span>
           <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon"><t-icon name="sound" /></span>
@@ -91,6 +93,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import type { CallState, AudioDeviceInfo, CallParticipant } from "../../domain/contracts";
 
 const { t } = useI18n();
@@ -282,6 +285,14 @@ const formattedDuration = computed(() => {
     gap: 6px;
     padding: 3px 0;
     font-size: 13px;
+  }
+
+  &__participant-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
   }
 
   &__participant-name {

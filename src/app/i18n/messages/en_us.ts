@@ -95,6 +95,7 @@ export const en_us = {
   bookmark: "Bookmark",
   selected_count: "{count} selected",
   recall_message: "Recall",
+  recalled_a_message: "recalled a message",
   forward_message: "Forward",
   forward_merged: "Merge & Forward",
   forward_separate: "Forward Individually",
@@ -466,9 +467,22 @@ export const en_us = {
   file_downloading: "Downloading…",
   download_success: "Download successful",
   download_failed: "Download failed",
+  // Custom emoji
+  custom_emoji: "Custom Emoji",
+  manage_emojis: "Manage Emojis",
+  add_emoji: "Add Emoji",
+  emoji_name: "Emoji name",
+  emoji_tags: "Tags (comma separated)",
+  no_custom_emojis: "No custom emojis yet",
   // About
   about_version: "Version",
   about_tech_stack: "Tech Stack",
   about_license: "License",
   about_credits: "Credits",
+  // Thread
+  thread: "Thread",
+  reply_in_thread: "Reply in Thread",
+  view_thread: "View Thread",
+  no_replies_yet: "No replies yet",
+  replies: "replies",
 };

@@ -172,7 +172,11 @@ pub fn run() -> anyhow::Result<()> {
             }
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(crate::features::voice_call::di::commands::VoiceCallService::new())
+        .manage(crate::features::voice_message::di::commands::VoiceRecorderState(
+            std::sync::Mutex::new(None),
+        ))
         // 注册对外暴露的事件钩子
         .invoke_handler(tauri::generate_handler![
             // tray
@@ -189,6 +193,8 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::network::di::commands::remove_tcp_service,
             crate::features::network::di::commands::api_request_json,
             crate::features::network::di::commands::download_file,
+            // link_preview
+            crate::features::network::link_preview::fetch_link_preview,
             // temp_file
             crate::shared::temp_file::commands::cleanup_temp_files,
             crate::shared::temp_file::commands::remove_temp_file,
@@ -248,6 +254,15 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::plugins::di::commands::plugins_storage_get,
             crate::features::plugins::di::commands::plugins_storage_set,
             crate::features::plugins::di::commands::plugins_network_fetch,
+            // voice_message
+            crate::features::voice_message::di::commands::start_voice_recording,
+            crate::features::voice_message::di::commands::stop_voice_recording,
+            crate::features::voice_message::di::commands::read_file_base64,
+            // emoji
+            crate::features::emoji::di::commands::list_custom_emojis,
+            crate::features::emoji::di::commands::save_emoji,
+            crate::features::emoji::di::commands::delete_emoji,
+            crate::features::emoji::di::commands::get_emoji_image_path,
             // voice_call
             crate::features::voice_call::di::commands::connect_signaling,
             crate::features::voice_call::di::commands::start_direct_call,

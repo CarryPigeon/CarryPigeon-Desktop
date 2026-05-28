@@ -9,9 +9,11 @@ import type {
   ChatMessage,
   ComposerSubmitPayload,
   DeleteChatMessageOutcome,
+  EditChatMessageOutcome,
   MentionCandidate,
   MessageDomain,
   ReactToMessageOutcome,
+  RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
@@ -30,6 +32,8 @@ export type ChatMessageFlowStateSlice = Pick<
   | "hasMoreByChannel"
   | "loadingMoreByChannel"
   | "searchState"
+  | "serverSearchResults"
+  | "searchScope"
   | "highlightedMessageId"
   | "selectedDomainId"
   | "composerDraft"
@@ -57,6 +61,8 @@ export type ChatMessageFlowRuntimePort = ChatMessageTimelinePort & {
   availableDomains(): MessageDomain[];
   loadMoreMessages(): Promise<void>;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
+  editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome>;
+  recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   startReply(message: ChatMessage): void;
   cancelReply(): void;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
@@ -64,6 +70,7 @@ export type ChatMessageFlowRuntimePort = ChatMessageTimelinePort & {
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   searchCurrentChannel(query: string): Promise<void>;
+  searchServerMessages(query: string, channelIds?: string[]): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
   clearSearch(): void;
 };

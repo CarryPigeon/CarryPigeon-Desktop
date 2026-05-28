@@ -8,6 +8,15 @@
  * - 各类 id 在 JS/TS 中必须始终被视为不透明字符串。
  */
 
+export type ChatLinkPreview = {
+  url: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  faviconUrl?: string;
+  siteName?: string;
+};
+
 export type ChatChannelRecord = {
   id: string;
   name: string;
@@ -126,6 +135,10 @@ export type ChatMessageRecord = {
   editVersion?: number;
   forwardedFrom?: ChatForwardedFromRecord;
   forwardedMessages?: ChatForwardedFromRecord[];
+  recalledAt?: number;   // 非空表示消息已被撤回；值为服务器分配的 Unix 毫秒时间戳
+  threadRootId?: string;      // 非空 = 此消息是线程回复；值 = 根消息 ID
+  threadReplyCount?: number;  // 根消息上的回复计数
+  linkPreview?: ChatLinkPreview;
 };
 
 /** 消息回应领域模型。 */
@@ -156,6 +169,7 @@ export type ChatSendMessageInput = {
   quoteReply?: ChatQuoteReplyRecord;
   mentions?: ChatMessageMentionRecord[];
   clientMessageId?: string;
+  linkPreview?: ChatLinkPreview;
 };
 
 /**

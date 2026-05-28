@@ -8,4 +8,6 @@ pub mod plugins;
 pub mod settings;
 pub mod tray;
 pub mod voice_call;
+pub mod emoji;
+pub mod voice_message;
 pub mod windows;

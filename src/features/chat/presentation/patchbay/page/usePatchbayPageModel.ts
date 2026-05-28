@@ -6,7 +6,9 @@
 
 import { computed, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { invoke } from "@tauri-apps/api/core";
 import { createLogger } from "@/shared/utils/logger";
+import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
   chatConnectionDetail,
@@ -14,7 +16,7 @@ import {
   retryChatConnection,
 } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
-import type { DeleteChatMessageOutcome, MessageFlowCapabilities } from "@/features/chat/message-flow/api-types";
+import type { DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
@@ -33,9 +35,12 @@ import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "../view-models/useChannelRailModel";
 import { useMembersRailModel } from "../view-models/useMembersRailModel";
 import { useChatCenterModel } from "../view-models/useChatCenterModel";
+import { useThreadPanelModel } from "../components/thread/useThreadPanelModel";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
+import { IS_STORE_MOCK } from "@/shared/config/runtime";
+import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import {
@@ -85,6 +90,14 @@ type PatchbayPageRawModel = {
   channelDialogs: PatchbayChannelDialogsModel;
   quickSwitcher: PatchbayQuickSwitcherModel;
   channels: ComputedRef<readonly ChannelSummary[]>;
+  editingMessageId: Ref<string>;
+  handleEditMessage(messageId: string, text: string): void;
+  clearEditingMessageId(): void;
+  linkPreview: Ref<ChatLinkPreview | null>;
+  fetchLinkPreview(url: string): Promise<void>;
+  dismissLinkPreview(): void;
+  threadPanel: ReturnType<typeof useThreadPanelModel>;
+  domainRegistryStore: unknown;
 };
 
 /**
@@ -123,6 +136,21 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     allChannels: computed(() => roomDirectorySnapshot.value.allChannels),
   });
   const flashMessage = ref<string>("");
+  const editingMessageId = ref<string>("");
+  const linkPreview = ref<ChatLinkPreview | null>(null);
+
+  async function fetchLinkPreview(url: string): Promise<void> {
+    try {
+      const result = await invoke<ChatLinkPreview>("fetch_link_preview", { url });
+      linkPreview.value = result;
+    } catch {
+      linkPreview.value = null;
+    }
+  }
+
+  function dismissLinkPreview(): void {
+    linkPreview.value = null;
+  }
 
   function logAsyncError(action: string, error: unknown): void {
     logger.error("Action: chat_patchbay_async_task_failed", {
@@ -274,6 +302,29 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     runAsyncTask(currentChannelMessageFlow.deleteMessage(messageId) as Promise<DeleteChatMessageOutcome>, "chat_delete_shortcut_failed");
   }
 
+  function startEditingMessage(messageId: string): void {
+    editingMessageId.value = messageId;
+  }
+
+  function clearEditingMessageId(): void {
+    editingMessageId.value = "";
+  }
+
+  function handleEditMessage(messageId: string, text: string): void {
+    runAsyncTask(
+      currentChannelMessageFlow.editMessage(messageId, { text }).then((outcome) => {
+        editingMessageId.value = "";
+        if (!outcome.ok) {
+          logger.error("Action: chat_edit_message_failed", {
+            messageId,
+            error: String(outcome.error),
+          });
+        }
+      }),
+      "chat_edit_message_failed",
+    );
+  }
+
   function getMessageClipboardText(messageId: string): string | null {
     const message = currentChannelMessageFlow.findMessageById(messageId);
     if (!message) return null;
@@ -288,6 +339,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     menuOpen,
     menuX,
     menuY,
+    menuMessageId,
     closeMenu,
     handleMenuAction,
     handleMessageContextMenu,
@@ -302,6 +354,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       messageComposer.startQuoteReply(messageId, message.from.id, preview);
     },
     deleteMessage: currentChannelMessageFlow.deleteMessage,
+    recallMessage: (messageId: string) => {
+      return currentChannelMessageFlow.recallMessage(messageId) as Promise<RecallChatMessageOutcome>;
+    },
     onAsyncError: logAsyncError,
     enterMultiSelectMode: (messageId: string) => {
       _enterMultiSelectMode(messageId);
@@ -309,6 +364,56 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openForwardDialog: (messageId: string) => {
       _openForwardDialog(messageId);
     },
+    startEditing: (messageId: string) => {
+      startEditingMessage(messageId);
+    },
+    openThread: (messageId) => threadPanel.openThread(messageId),
+  });
+
+  const showRecall = computed(() => {
+    const mid = menuMessageId.value;
+    if (!mid) return false;
+    const message = currentChannelMessageFlow.findMessageById(mid);
+    if (!message) return false;
+    if (message.from.id !== currentUserId.value) return false;
+    if (message.recalledAt != null && message.recalledAt > 0) return false;
+    return true;
+  });
+
+  const threadPanel = useThreadPanelModel({
+    getThreadReplies: async (rootMessageId, cursor) => {
+      if (IS_STORE_MOCK) {
+        return { items: [], nextCursor: undefined, hasMore: false };
+      }
+      const s = socket.value;
+      if (!s) return { items: [], nextCursor: undefined, hasMore: false };
+      const token = (await ensureValidAccessToken(s)).trim();
+      if (!token) return { items: [], nextCursor: undefined, hasMore: false };
+      return httpChatApiPort.getThreadReplies(s, token, rootMessageId, cursor);
+    },
+    sendThreadReply: async (rootMessageId, text) => {
+      if (IS_STORE_MOCK) return;
+      const s = socket.value;
+      if (!s) return;
+      const token = (await ensureValidAccessToken(s)).trim();
+      if (!token) return;
+      const cid = currentSessionSnapshot.value.currentChannelId;
+      await httpChatApiPort.sendChannelMessage(s, token, cid, {
+        domain: "Core:Text",
+        domainVersion: "1",
+        data: { text, threadRootId: rootMessageId },
+      });
+    },
+    findMessageById: (id) => currentChannelMessageFlow.findMessageById(id) as any,
+    currentChannelId: currentSessionSnapshot.value.currentChannelId,
+  });
+
+  const showViewThread = computed(() => {
+    const mid = menuMessageId.value;
+    if (!mid) return false;
+    const message = currentChannelMessageFlow.findMessageById(mid);
+    if (!message) return false;
+    return (message as { threadReplyCount?: number }).threadReplyCount != null && (message as { threadReplyCount?: number }).threadReplyCount! > 0;
   });
 
   const currentChannelName = computed(() => {
@@ -339,6 +444,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onDeleteShortcut: handleDeleteShortcut,
     onMessageContextMenu: handleMessageContextMenu,
     onForwardMessage: async (mid, req) => {
+      if (IS_STORE_MOCK) {
+        await getChatAggregateStore().forwardMessage(mid, req);
+        return;
+      }
       const s = socket.value;
       if (!s) return;
       const token = (await ensureValidAccessToken(s)).trim();
@@ -349,6 +458,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
         mergedMids: req.mergedMids,
       });
     },
+    linkPreview,
+    fetchLinkPreview,
+    dismissLinkPreview,
   });
 
   // Wire up the circular dependency after chatCenter is created
@@ -451,6 +563,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     open: menuOpen,
     x: menuX,
     y: menuY,
+    showRecall,
+    showViewThread,
     close: closeMenu,
     handleMenuCommand: handleMenuAction,
   });
@@ -510,6 +624,14 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     channelSettingsMenu,
     channelDialogs,
     quickSwitcher,
+    editingMessageId,
+    handleEditMessage,
+    clearEditingMessageId,
+    linkPreview,
+    fetchLinkPreview,
+    dismissLinkPreview,
+    threadPanel,
+    domainRegistryStore: domainRegistryView,
   };
 
   return proxyRefs(rawModel);
