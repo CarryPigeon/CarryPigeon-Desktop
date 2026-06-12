@@ -224,13 +224,17 @@ onMounted(async () => {
 });
 
 // 监听全局 voiceCallStoreAccess 状态（WS 事件路由更新此状态）
-watch([globalCallState, globalActiveSession], ([gState, gSession]) => {
-  if (!gState || gState === "idle") return;
-  // 仅当全局状态与本地状态不一致时同步（避免循环更新）
-  if (gState !== callState.value && gSession) {
-    syncState(gState, gSession);
-  }
-});
+// 使用 getter 形式而非数组 ref 形式，避免对 CallSession 对象进行深度比较
+watch(
+  () => globalCallState.value,
+  (gState) => {
+    if (!gState || gState === "idle") return;
+    const gSession = globalActiveSession.value;
+    if (gState !== callState.value && gSession) {
+      syncState(gState, gSession);
+    }
+  },
+);
 
 onUnmounted(() => {
   unlistenIncoming?.();
