@@ -54,6 +54,7 @@ export type MessageFlowApplicationServiceDeps = {
   mapWireMessage: MapWireMessage;
   mergeMessages: MergeMessages;
   readStateReporter: ReadStateReporterPort;
+  currentUserId: string;
 };
 
 type LatestPage = {
@@ -311,6 +312,12 @@ export class MessageFlowApplicationService {
     // Capture original message for rollback
     const messages = this.deps.timelineState.listMessages(cid);
     const originalMessage = messages.find((m) => m.id === mid) ?? null;
+
+    if (originalMessage && originalMessage.from.id !== this.deps.currentUserId) {
+      const error = createMessageActionError("not_message_author", "You can only edit your own messages.");
+      this.deps.composerState.writeActionError(error);
+      return rejectMessageAction("chat_message_edit_rejected", "not_message_author", "You can only edit your own messages.");
+    }
 
     // Optimistic update: apply new text locally
     if (originalMessage) {

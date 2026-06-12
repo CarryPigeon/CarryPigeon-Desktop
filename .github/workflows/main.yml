@@ -117,6 +117,11 @@ jobs:
             - name: Install frontend dependencies with pnpm
               run: pnpm install --frozen-lockfile
 
+            - name: Extract app version
+              run: |
+                  APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+                  echo "APP_VERSION=${APP_VERSION}" >> $GITHUB_ENV
+
             - name: Build and Release with Tauri Action
               uses: tauri-apps/tauri-action@v0
               env:
@@ -127,3 +132,43 @@ jobs:
                   releaseBody: "Automated build with pnpm."
                   releaseDraft: true
                   prerelease: false
+
+            - name: Generate latest.json for Tauri updater
+              if: matrix.platform == 'ubuntu-latest'
+              run: |
+                  DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${APP_VERSION}"
+
+                  cat > latest.json << EOF
+                  {
+                    "version": "v${APP_VERSION}",
+                    "notes": "Release v${APP_VERSION}",
+                    "pub_date": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+                    "platforms": {
+                      "windows-x86_64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${APP_VERSION}_x64_en-US.msi"
+                      },
+                      "darwin-x86_64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${APP_VERSION}_x64.dmg"
+                      },
+                      "darwin-aarch64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${APP_VERSION}_aarch64.dmg"
+                      },
+                      "linux-x86_64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${APP_VERSION}_amd64.AppImage"
+                      }
+                    }
+                  }
+                  EOF
+
+            - name: Upload latest.json to release
+              if: matrix.platform == 'ubuntu-latest'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v${{ env.APP_VERSION }}
+                  files: latest.json
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -6,6 +6,7 @@
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { invoke } from "@tauri-apps/api/core";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { CallState } from "@/features/chat/voice-call/domain/contracts";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
@@ -15,6 +16,8 @@ import SignalStrip from "@/features/chat/message-flow/message/presentation/compo
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import { reactToMessage } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
+import StickerPickerButton from "@/features/chat/presentation/patchbay/components/composer/StickerPickerButton.vue";
+import VoiceMessageRecorder from "@/features/chat/message-flow/message/presentation/components/VoiceMessageRecorder.vue";
 import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components/menus/MultiSelectToolbar.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
@@ -23,7 +26,9 @@ import ForwardChannelDialog from "@/features/chat/presentation/patchbay/componen
 import ForwardDetailDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardDetailDialog.vue";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import ImageLightbox from "@/features/chat/message-flow/message/presentation/components/ImageLightbox.vue";
-import { addFiles as addImageFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { addFiles as addImageFiles, addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { createLogger } from "@/shared/utils/logger";
+import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -83,6 +88,33 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+const logger = createLogger("ChatCenter");
+
+/** 语音录制上传状态。 */
+const isUploadingVoice = ref(false);
+
+/**
+ * 处理语音录制完成事件：读取文件、转为 Blob、添加到附件列表。
+ */
+async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
+  isUploadingVoice.value = true;
+  try {
+    const base64 = await invoke<string>("read_file_base64", { path: payload.filePath });
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "audio/wav" });
+    const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
+    addFiles([file]);
+  } catch (e) {
+    logger.error("Action: chat_voice_message_upload_failed", { error: String(e) });
+  } finally {
+    isUploadingVoice.value = false;
+  }
+}
+
 const signalPaneEl = ref<HTMLElement | null>(null);
 const connectionLabel = computed(() => {
   switch (props.model.connectionPillState) {
@@ -105,7 +137,11 @@ const voiceHostRef = ref<{
   startConference: () => Promise<unknown>;
 } | null>(null);
 
-const currentCallState = computed<CallState>(() => voiceHostRef.value?.callState?.value ?? "idle");
+const currentCallState = ref<CallState>("idle");
+
+function onVoiceCallStateChange(state: CallState): void {
+  currentCallState.value = state;
+}
 
 /** 图片灯箱状态。 */
 const lightboxOpen = ref(false);
@@ -204,6 +240,15 @@ function handleConferenceStart(): void {
   voiceHostRef.value?.startConference();
 }
 
+function handleStickerSelected(r: { fileId: string; shareKey: string }): void {
+  props.model.handleFileUploaded(r);
+  props.model.handleSend();
+}
+
+function handleStickerText(text: string): void {
+  props.model.handleSend({ domain: "Core:Text", domainVersion: "1.0.0", data: { text } });
+}
+
 /**
  * 将当前 signal pane DOM 引用回传给父级。
  *
@@ -219,6 +264,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
 </script>
 
 <template>
+  <ErrorBoundary>
   <!-- 组件：ChatCenter｜职责：中央消息区（header / signal pane / composer） -->
   <!-- 区块：<section> .cp-center -->
   <section
@@ -277,6 +323,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       :room-id="props.model.currentChannelId"
       :room-name="props.model.currentChannelName"
       :target-user-id="props.targetUserId"
+      @stateChange="onVoiceCallStateChange"
     />
 
     <section v-if="props.model.searchPanelOpen" class="cp-searchPanel">
@@ -314,7 +361,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
           :key="result.message.id"
           type="button"
           class="cp-searchPanel__result"
-          @click="props.model.openSearchResult(result.message.id)"
+          @click="props.model.openSearchResult(result.message.id, result.channelId)"
         >
           <div v-if="result.channelId" class="cp-searchPanel__resultChannel">#{{ result.channelName || result.channelId }}</div>
           <div class="cp-searchPanel__resultSender">{{ result.message.from.name }}</div>
@@ -429,7 +476,17 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
 
     <div class="cp-composerPane">
       <div class="cp-composerActions">
+        <VoiceMessageRecorder
+          :disabled="isUploadingVoice"
+          @recorded="handleVoiceRecorded"
+          @error="(msg) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
+        />
         <FileUploadButton @uploaded="props.model.handleFileUploaded" @error="props.model.handleFileUploadError" />
+        <StickerPickerButton
+          :current-user-id="props.model.currentUserId"
+          @sticker="handleStickerSelected"
+          @send-text="handleStickerText"
+        />
       </div>
       <ComposerHost
         :domain-id="props.model.selectedDomainId"
@@ -484,6 +541,7 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       @close="closeLightbox"
     />
   </section>
+  </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">

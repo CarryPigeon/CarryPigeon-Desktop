@@ -18,9 +18,9 @@ use crate::shared::error::command_error;
 type SharedTcpBackend = Arc<Mutex<Box<dyn TcpBackendPort>>>;
 
 const TCP_SCOPE_REJECTION_CODE: &str = "NETWORK_TCP_SCOPE_REJECTED";
-const TCP_SCOPE_MISSING_SERVER_SOCKET: &str = "Missing server socket.";
-const TCP_SCOPE_MISSING_SOCKET: &str = "Missing socket.";
-const TCP_SCOPE_MOCK_RELEASE_REJECTION: &str = "mock:// socket is only supported in debug builds.";
+const TCP_SCOPE_MISSING_SERVER_SOCKET: &str = "error.network_tcp_scope_missing_server_socket";
+const TCP_SCOPE_MISSING_SOCKET: &str = "error.network_tcp_scope_missing_socket";
+const TCP_SCOPE_MOCK_RELEASE_REJECTION: &str = "error.network_tcp_scope_mock_rejection";
 
 struct TcpEntry {
     backend: SharedTcpBackend,
@@ -56,8 +56,8 @@ fn emit_disconnected_event(
     });
 }
 
-fn tcp_scope_error(message: impl Into<String>) -> anyhow::Error {
-    anyhow!(command_error(TCP_SCOPE_REJECTION_CODE, message))
+fn tcp_scope_error(i18n_key: &str) -> anyhow::Error {
+    anyhow!(command_error(TCP_SCOPE_REJECTION_CODE, i18n_key))
 }
 
 fn normalize_server_socket(server_socket: String) -> anyhow::Result<String> {
@@ -91,21 +91,15 @@ fn normalize_transport_socket(socket: String, allow_mock: bool) -> anyhow::Resul
         return Ok(socket.to_string());
     }
 
-    let scheme = socket
+    let _scheme = socket
         .split_once("://")
         .map(|(scheme, _)| scheme)
         .unwrap_or("<missing>");
-    Err(tcp_scope_error(format!(
-        "Unsupported socket scheme: {}",
-        scheme
-    )))
+    Err(tcp_scope_error("error.network_tcp_scope_unsupported_scheme"))
 }
 
-fn registered_backend_not_found(server_socket: &str) -> anyhow::Error {
-    tcp_scope_error(format!(
-        "TCP service not found for server_socket: {}",
-        server_socket
-    ))
+fn registered_backend_not_found(_server_socket: &str) -> anyhow::Error {
+    tcp_scope_error("error.network_tcp_service_not_found")
 }
 
 /// TCP 注册表服务（可注入状态对象）。
@@ -367,6 +361,7 @@ mod tests {
 
     #[tokio::test]
     async fn tcp_rejects_unregistered_workspace_socket() {
+        rust_i18n::set_locale("zh_cn");
         let service = TcpRegistryService::new();
 
         let send_err = service
@@ -376,7 +371,7 @@ mod tests {
         println!("send error: {}", send_err);
         assert_eq!(
             send_err.to_string(),
-            "[NETWORK_TCP_SCOPE_REJECTED] TCP service not found for server_socket: socket://missing"
+            "[NETWORK_TCP_SCOPE_REJECTED] TCP服务未找到"
         );
 
         let remove_err = service
@@ -389,29 +384,31 @@ mod tests {
         println!("remove error: {}", remove_err);
         assert_eq!(
             remove_err.to_string(),
-            "[NETWORK_TCP_SCOPE_REJECTED] TCP service not found for server_socket: socket://missing"
+            "[NETWORK_TCP_SCOPE_REJECTED] TCP服务未找到"
         );
     }
 
     #[test]
     fn tcp_rejects_mock_socket_outside_debug_builds() {
+        rust_i18n::set_locale("zh_cn");
         let err = normalize_transport_socket("mock://handshake".to_string(), false)
             .expect_err("mock socket should be rejected when debug transport is disabled");
         println!("mock validation error: {}", err);
         assert_eq!(
             err.to_string(),
-            "[NETWORK_TCP_SCOPE_REJECTED] mock:// socket is only supported in debug builds."
+            "[NETWORK_TCP_SCOPE_REJECTED] mock:// 套接字仅在调试构建中支持"
         );
     }
 
     #[test]
     fn tcp_rejects_empty_transport_socket() {
+        rust_i18n::set_locale("zh_cn");
         let err = normalize_transport_socket("   ".to_string(), true)
             .expect_err("empty transport socket should be rejected");
         println!("empty transport socket error: {}", err);
         assert_eq!(
             err.to_string(),
-            "[NETWORK_TCP_SCOPE_REJECTED] Missing socket."
+            "[NETWORK_TCP_SCOPE_REJECTED] 缺少套接字"
         );
     }
 }

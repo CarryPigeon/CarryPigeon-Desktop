@@ -109,19 +109,19 @@ async function install(
   const socket = serverSocket.trim();
   const id = pluginId.trim();
   const v = version.trim();
-  if (!socket) throw createPluginOperationError("missing_server_socket", "缺少 server socket");
-  if (!id) throw createPluginOperationError("missing_plugin_id", "缺少 plugin id");
+  if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
+  if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
 
-  emitProgress(id, "confirm", 0, "准备安装…", onProgress);
+  emitProgress(id, "confirm", 0, "Preparing...", onProgress);
   try {
-    emitProgress(id, "downloading", 18, "下载中…", onProgress);
+    emitProgress(id, "downloading", 18, "Downloading...", onProgress);
     const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsInstallFromServerCatalog, {
       serverSocket: socket,
       pluginId: id,
       version: v || undefined,
       ...buildTauriTlsArgs(socket),
     });
-    emitProgress(id, "installed", 100, "已安装", onProgress);
+    emitProgress(id, "installed", 100, "Installed", onProgress);
     return mapInstalledState(raw);
   } catch (e) {
     logger.error("Action: plugins_install_failed", { serverSocket: socket, pluginId: id, version: v, error: String(e) });
@@ -143,17 +143,17 @@ async function installFromUrl(
   const v = version.trim();
   const u = url.trim();
   const sum = sha256.trim();
-  if (!socket) throw createPluginOperationError("missing_server_socket", "缺少 server socket");
-  if (!id) throw createPluginOperationError("missing_plugin_id", "缺少 plugin id");
-  if (!v) throw createPluginOperationError("missing_plugin_version", "缺少 version", { pluginId: id });
-  if (!u) throw createPluginOperationError("missing_download_url", "缺少 download url", { pluginId: id, version: v });
-  if (!sum) throw createPluginOperationError("missing_sha256", "缺少 sha256", { pluginId: id, version: v });
+  if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
+  if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
+  if (!v) throw createPluginOperationError("missing_plugin_version", "Missing version", { pluginId: id });
+  if (!u) throw createPluginOperationError("missing_download_url", "Missing download URL", { pluginId: id, version: v });
+  if (!sum) throw createPluginOperationError("missing_sha256", "Missing SHA256", { pluginId: id, version: v });
 
-  emitProgress(id, "confirm", 0, "准备安装…", onProgress);
+  emitProgress(id, "confirm", 0, "Preparing...", onProgress);
   try {
-    emitProgress(id, "downloading", 18, "下载中…", onProgress);
-    emitProgress(id, "verifying_sha256", 44, "校验 sha256…", onProgress);
-    emitProgress(id, "unpacking", 70, "解压中…", onProgress);
+    emitProgress(id, "downloading", 18, "Downloading...", onProgress);
+    emitProgress(id, "verifying_sha256", 44, "Verifying SHA256...", onProgress);
+    emitProgress(id, "unpacking", 70, "Unpacking...", onProgress);
     const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsInstallFromUrl, {
       serverSocket: socket,
       pluginId: id,
@@ -162,7 +162,7 @@ async function installFromUrl(
       sha256: sum,
       ...buildTauriTlsArgs(socket),
     });
-    emitProgress(id, "installed", 100, "已安装", onProgress);
+    emitProgress(id, "installed", 100, "Installed", onProgress);
     return mapInstalledState(raw);
   } catch (e) {
     logger.error("Action: plugins_install_from_url_failed", { serverSocket: socket, pluginId: id, version: v, url: u, error: String(e) });
@@ -180,30 +180,30 @@ async function switchVersion(
   const socket = serverSocket.trim();
   const id = pluginId.trim();
   const v = version.trim();
-  if (!socket) throw createPluginOperationError("missing_server_socket", "缺少 server socket");
-  if (!id) throw createPluginOperationError("missing_plugin_id", "缺少 plugin id");
-  if (!v) throw createPluginOperationError("missing_plugin_version", "缺少 version", { pluginId: id });
+  if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
+  if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
+  if (!v) throw createPluginOperationError("missing_plugin_version", "Missing version", { pluginId: id });
 
-  emitProgress(id, "switching", 24, "切换版本…", onProgress);
+  emitProgress(id, "switching", 24, "Switching version...", onProgress);
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsSwitchVersion, {
     serverSocket: socket,
     pluginId: id,
     version: v,
     ...buildTauriTlsArgs(socket),
   });
-  emitProgress(id, "installed", 100, "已切换", onProgress);
+  emitProgress(id, "installed", 100, "Switched", onProgress);
   return mapInstalledState(raw);
 }
 
 async function enable(serverSocket: string, pluginId: string, onProgress?: PluginProgressHandler): Promise<InstalledPluginState> {
   const socket = serverSocket.trim();
   const id = pluginId.trim();
-  if (!socket) throw createPluginOperationError("missing_server_socket", "缺少 server socket");
-  if (!id) throw createPluginOperationError("missing_plugin_id", "缺少 plugin id");
+  if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
+  if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
 
-  emitProgress(id, "enabling", 30, "启用中…", onProgress);
+  emitProgress(id, "enabling", 30, "Enabling...", onProgress);
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsEnable, { serverSocket: socket, pluginId: id, ...buildTauriTlsArgs(socket) });
-  emitProgress(id, "enabled", 100, "已启用", onProgress);
+  emitProgress(id, "enabled", 100, "Enabled", onProgress);
   return mapInstalledState(raw);
 }
 
@@ -219,12 +219,12 @@ async function setFailed(serverSocket: string, pluginId: string, message: string
   const socket = serverSocket.trim();
   const id = pluginId.trim();
   const msg = String(message ?? "").trim();
-  if (!socket) throw createPluginOperationError("missing_server_socket", "缺少 server socket");
-  if (!id) throw createPluginOperationError("missing_plugin_id", "缺少 plugin id");
+  if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
+  if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsSetFailed, {
     serverSocket: socket,
     pluginId: id,
-    message: msg || "插件失败",
+    message: msg || "Plugin failed",
     ...buildTauriTlsArgs(socket),
   });
   return mapInstalledState(raw);
@@ -233,8 +233,8 @@ async function setFailed(serverSocket: string, pluginId: string, message: string
 async function clearError(serverSocket: string, pluginId: string): Promise<InstalledPluginState> {
   const socket = serverSocket.trim();
   const id = pluginId.trim();
-  if (!socket) throw createPluginOperationError("missing_server_socket", "缺少 server socket");
-  if (!id) throw createPluginOperationError("missing_plugin_id", "缺少 plugin id");
+  if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
+  if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsClearError, { serverSocket: socket, pluginId: id, ...buildTauriTlsArgs(socket) });
   return mapInstalledState(raw);
 }

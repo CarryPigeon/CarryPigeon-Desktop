@@ -23,7 +23,7 @@ import { createReadStateEventRouter } from "@/features/chat/room-session/interna
 import { createChatGovernanceEventRouter } from "./createChatGovernanceEventRouter";
 import { createVoiceCallEventRouter } from "@/features/chat/voice-call/domain/event-handlers/voiceCallEventRouter";
 import { resolveState } from "@/features/chat/voice-call/presentation/store-access/voiceCallStoreAccess";
-import { createNotificationOnNewMessageHandler } from "@/app/bootstrap/notificationBridge";
+import { createNotificationOnNewMessageHandler } from "@/app/bootstrap/trayIntegration";
 import { invokeTauri } from "@/shared/tauri/invokeClient";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 

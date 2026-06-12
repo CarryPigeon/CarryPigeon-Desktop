@@ -306,6 +306,7 @@ onBeforeUnmount(() => {
       :open="page.messageContextMenu.open"
       :x="page.messageContextMenu.x"
       :y="page.messageContextMenu.y"
+      :show-edit="page.messageContextMenu.showEdit"
       :show-recall="page.messageContextMenu.showRecall"
       :show-view-thread="page.messageContextMenu.showViewThread"
       @close="page.messageContextMenu.close"

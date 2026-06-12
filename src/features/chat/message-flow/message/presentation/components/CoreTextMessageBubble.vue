@@ -141,7 +141,7 @@ const editInputRef = ref<HTMLTextAreaElement | null>(null);
  * 当 editingMessageId 变为其他值（或清空）且正在编辑时，退出编辑模式。
  */
 watch(() => props.editingMessageId, (newVal) => {
-  if (newVal === props.messageId) {
+  if (newVal === props.messageId && props.isOwn !== false) {
     startEdit();
   } else if (newVal !== undefined && newVal !== props.messageId && isEditing.value) {
     isEditing.value = false;
@@ -375,7 +375,7 @@ function openLink(url: string): void {
   background: color-mix(in oklab, var(--cp-danger) 10%, transparent);
 }
 .cp-mention--here {
-  color: var(--cp-warning, #f0a030);
+  color: var(--cp-warning);
   font-weight: 600;
   background: color-mix(in oklab, var(--cp-warning) 10%, transparent);
 }

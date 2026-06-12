@@ -112,6 +112,10 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     const voiceCall = getVoiceCallCapabilities();
     const wsUrl = `wss://${socket}/signaling`;
     await voiceCall.connectSignaling(wsUrl, token);
+    // 开始监听 Rust 后端发射的 voice_call:incoming Tauri 事件
+    voiceCall.listenForIncomingCalls().catch(() => {
+      // 非 Tauri 环境下 listen 会失败，忽略。
+    });
   }, 2000);
 
   /**
@@ -155,6 +159,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     messageActionError,
     readStateReporter: sessionSharedContext.readStateReporter,
     scope: sessionSharedContext.scope,
+    currentUserId: getCurrentChatUserId(),
   });
 
   const timelineState = createMessageTimelineStatePort({

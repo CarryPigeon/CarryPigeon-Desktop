@@ -21,12 +21,12 @@ use crate::shared::error::{CommandResult, command_error, to_command_error};
 pub fn to_chat_window_size(app: AppHandle) -> CommandResult<()> {
     let window = app.get_webview_window("main").ok_or_else(|| {
         tracing::warn!(action = "windows_chat_window_size_main_window_missing");
-        command_error("WINDOW_MAIN_NOT_FOUND", "Main window not found")
+        command_error("WINDOW_MAIN_NOT_FOUND", "error.window_main_not_found")
     })?;
 
     window.set_size(LogicalSize::new(1211, 702)).map_err(|err| {
         tracing::warn!(action = "windows_chat_window_size_failed", error = %err);
-        to_command_error("WINDOW_RESIZE_FAILED", err)
+        to_command_error("WINDOW_RESIZE_FAILED", "error.window_resize_failed", err)
     })
 }
 
@@ -55,7 +55,7 @@ pub async fn open_popover_window(
 ) -> CommandResult<()> {
     popover_window::open_popover_window_impl(app, query, x, y, width, height)
         .await
-        .map_err(|err| to_command_error("WINDOW_POPOVER_OPEN_FAILED", err))
+        .map_err(|err| to_command_error("WINDOW_POPOVER_OPEN_FAILED", "error.window_popover_open_failed", err))
 }
 
 /// 打开信息展示窗口（Info window）。
@@ -84,7 +84,7 @@ pub async fn open_info_window(
 ) -> CommandResult<()> {
     info_window::open_info_window_impl(app, label, title, query, width, height)
         .await
-        .map_err(|err| to_command_error("WINDOW_INFO_OPEN_FAILED", err))
+        .map_err(|err| to_command_error("WINDOW_INFO_OPEN_FAILED", "error.window_info_open_failed", err))
 }
 
 /// 关闭托盘通知弹窗并聚焦主窗口。
@@ -93,5 +93,5 @@ pub async fn open_info_window(
 #[tauri::command]
 pub async fn close_tray_notification_popover(app: AppHandle) -> CommandResult<()> {
     popover_window::close_notification_popover(&app)
-        .map_err(|err| to_command_error("WINDOW_NOTIFICATION_POPOVER_CLOSE_FAILED", err))
+        .map_err(|err| to_command_error("WINDOW_NOTIFICATION_POPOVER_CLOSE_FAILED", "error.window_notification_popover_close_failed", err))
 }

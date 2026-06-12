@@ -7,6 +7,7 @@
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
+import { UserProfilePopover } from "@/features/account/components";
 import { useChannelMembersPage } from "@/features/chat/room-governance/presentation/page-models/useChannelMembersPage";
 
 const { t } = useI18n();
@@ -41,7 +42,13 @@ const {
     <template #loading>{{ t("loading") }}</template>
     <template #default>
       <div v-for="m in members" :key="m.uid" class="cp-memberCard">
-        <AvatarBadge :name="m.nickname" :size="40" />
+        <UserProfilePopover
+          :user-id="m.uid"
+          :username="m.nickname"
+          trigger="hover"
+        >
+          <AvatarBadge :name="m.nickname" :size="40" />
+        </UserProfilePopover>
         <div class="cp-memberCard__info">
           <div class="cp-memberCard__name">{{ m.nickname }}</div>
           <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>

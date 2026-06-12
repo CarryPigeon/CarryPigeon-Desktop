@@ -9,9 +9,11 @@
 ///
 /// # 返回值
 /// 固定 2 个菜单项的 `[(id, label)]` 数组。
-pub fn tray_labels(locale: &str) -> [(&str, &str); 2] {
-    match locale {
-        "zh_cn" => [("show_window", "显示主窗口"), ("quit", "退出")],
-        _ => [("show_window", "Show Main Window"), ("quit", "Quit")],
-    }
+pub fn tray_labels(locale: &str) -> [(&str, String); 2] {
+    let prev = rust_i18n::locale();
+    rust_i18n::set_locale(locale);
+    let show_label = rust_i18n::t!("tray.show_window").to_string();
+    let quit_label = rust_i18n::t!("tray.quit").to_string();
+    rust_i18n::set_locale(&prev);
+    [("show_window", show_label), ("quit", quit_label)]
 }

@@ -6,17 +6,30 @@
 
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEmojiManageModel } from "../composables/useEmojiManageModel";
 import { createLogger } from "@/shared/utils/logger";
+import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
 
 const logger = createLogger("emoji");
 
 const { t } = useI18n();
-const { emojis, loading, addEmoji, deleteEmoji, getImagePath } = useEmojiManageModel();
+const { emojis, loading, loadEmojis, addEmoji, deleteEmoji, getImagePath } = useEmojiManageModel();
 
 const nameInput = ref("");
 const tagsInput = ref("");
 const adding = ref(false);
+const uid = ref(getCurrentChatUserId());
+
+watch(() => getCurrentChatUserId(), (newUid) => {
+  uid.value = newUid;
+});
+
+watch(uid, (newUid) => {
+  if (newUid) {
+    loadEmojis(newUid);
+  }
+}, { immediate: true });
 
 /**
  * 图片路径缓存：id -> 可显示的 asset URL
@@ -30,8 +43,7 @@ async function resolveImagePath(id: string): Promise<string> {
   if (imagePaths.value.has(id)) return imagePaths.value.get(id)!;
   try {
     const path = await getImagePath(id);
-    // Tauri asset protocol: asset://localhost/<absolute-path>
-    const assetUrl = `https://asset.localhost/${encodeURIComponent(path)}`;
+    const assetUrl = convertFileSrc(path, "asset");
     imagePaths.value.set(id, assetUrl);
     return assetUrl;
   } catch (e) {
@@ -65,13 +77,21 @@ async function handleFileSelect(): Promise<void> {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    await addEmoji(filePath, name, tags);
+    await addEmoji(filePath, name, tags, uid.value);
     nameInput.value = "";
     tagsInput.value = "";
   } catch (e) {
     logger.error("Action: chat_emoji_add_failed", { error: String(e) });
   } finally {
     adding.value = false;
+  }
+}
+
+async function handleDelete(id: string): Promise<void> {
+  try {
+    await deleteEmoji(id, uid.value);
+  } catch (e) {
+    logger.error("Action: chat_emoji_delete_failed", { error: String(e) });
   }
 }
 
@@ -83,7 +103,7 @@ function fallbackFileSelect(): Promise<string | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/png,image/gif,image/webp,image/jpeg";
+    input.accept = "image/png,image/gif,image/webp,image/jpeg,image/apng,image/avif";
     input.onchange = () => {
       const file = input.files?.[0];
       if (file) {
@@ -158,7 +178,7 @@ function extractNameFromPath(filePath: string): string {
         <button
           class="cp-emojiManage__del"
           :title="t('delete')"
-          @click="deleteEmoji(emoji.id)"
+          @click="handleDelete(emoji.id)"
         >
           &times;
         </button>
@@ -174,9 +194,9 @@ function extractNameFromPath(filePath: string): string {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .cp-emojiManage {
-  padding: 16px;
+  padding: 14px;
 }
 
 .cp-emojiManage__title {
@@ -195,7 +215,7 @@ function extractNameFromPath(filePath: string): string {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid var(--cp-border);
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   background: var(--cp-panel);
   color: var(--cp-text);
   font-size: 13px;
@@ -203,7 +223,7 @@ function extractNameFromPath(filePath: string): string {
 
 .cp-emojiManage__btn {
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text);
@@ -228,7 +248,7 @@ function extractNameFromPath(filePath: string): string {
   text-align: center;
   padding: 8px;
   border: 1px solid var(--cp-border);
-  border-radius: 12px;
+  border-radius: var(--cp-radius);
 }
 
 .cp-emojiManage__img {
@@ -244,7 +264,7 @@ function extractNameFromPath(filePath: string): string {
   align-items: center;
   justify-content: center;
   background: var(--cp-panel-muted);
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   font-size: 20px;
   color: var(--cp-text-muted);
 }
@@ -263,7 +283,7 @@ function extractNameFromPath(filePath: string): string {
   top: 4px;
   right: 4px;
   border: none;
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--cp-hover-bg);
   color: var(--cp-danger);
   cursor: pointer;
   font-size: 16px;

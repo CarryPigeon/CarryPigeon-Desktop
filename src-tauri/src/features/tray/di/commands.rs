@@ -58,7 +58,7 @@ pub fn set_tray_unread_flashing<R: Runtime>(
     let _guard = state
         .lifecycle_lock
         .lock()
-        .map_err(|err| command_error("TRAY_UNREAD_LOCK_FAILED", err.to_string()))?;
+        .map_err(|err| to_command_error("TRAY_UNREAD_LOCK_FAILED", "error.tray_unread_lock_failed", err))?;
 
     state.has_unread.store(has_unread, Ordering::SeqCst);
 
@@ -134,33 +134,34 @@ fn start_flashing<R: Runtime>(app: AppHandle<R>, state: &TrayUnreadState) {
 /// 根据前端语言偏好更新托盘菜单标签。
 #[tauri::command]
 pub fn set_tray_locale<R: Runtime>(app: AppHandle<R>, locale: String) -> CommandResult<()> {
+    rust_i18n::set_locale(&locale);
     let labels = tray_labels(&locale);
-    let show_i = MenuItem::with_id(&app, labels[0].0, labels[0].1, true, None::<&str>)
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+    let show_i = MenuItem::with_id(&app, labels[0].0, labels[0].1.clone(), true, None::<&str>)
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
     let sep = PredefinedMenuItem::separator(&app)
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
-    let quit_i = MenuItem::with_id(&app, labels[1].0, labels[1].1, true, None::<&str>)
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
+    let quit_i = MenuItem::with_id(&app, labels[1].0, labels[1].1.clone(), true, None::<&str>)
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
 
     let menu = Menu::with_items(&app, &[&show_i, &sep, &quit_i])
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", err))?;
+        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
 
     let tray = app
         .tray_by_id(TRAY_ID)
-        .ok_or_else(|| command_error("TRAY_MENU_MISSING", "Main tray icon is missing"))?;
+        .ok_or_else(|| command_error("TRAY_MENU_MISSING", "error.tray_menu_missing"))?;
 
     tray.set_menu(Some(menu))
-        .map_err(|err| to_command_error("TRAY_MENU_SET_FAILED", err))
+        .map_err(|err| to_command_error("TRAY_MENU_SET_FAILED", "error.tray_menu_set_failed", err))
 }
 
 /// 设置主托盘图标。
 fn set_tray_icon<R: Runtime>(app: &AppHandle<R>, icon: &Image<'static>) -> CommandResult<()> {
     let tray = app
         .tray_by_id(TRAY_ID)
-        .ok_or_else(|| command_error("TRAY_ICON_MISSING", "Main tray icon is missing"))?;
+        .ok_or_else(|| command_error("TRAY_ICON_MISSING", "error.tray_icon_missing"))?;
 
     tray.set_icon(Some(icon.clone()))
-        .map_err(|err| to_command_error("TRAY_ICON_SET_FAILED", err))
+        .map_err(|err| to_command_error("TRAY_ICON_SET_FAILED", "error.tray_icon_set_failed", err))
 }
 
 /// 启动托盘悬停计时器（500ms 后弹出通知弹窗）。

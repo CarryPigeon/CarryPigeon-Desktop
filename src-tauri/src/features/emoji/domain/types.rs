@@ -7,6 +7,8 @@ pub struct EmojiEntry {
     pub file_path: String,
     pub added_at: u64,
     pub tags: Vec<String>,
+    pub owner_uid: String,
+    pub is_animated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
