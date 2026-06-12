@@ -30,7 +30,7 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    logger.warn('Action: update_check_failed', { error: message });
+    logger.warn('Action: http_update_check_failed', { error: message });
     return { kind: 'error', message };
   }
 }

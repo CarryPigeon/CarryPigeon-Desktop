@@ -17,7 +17,7 @@ const errorMessage = ref('');
 
 onErrorCaptured((err: unknown, _instance: ComponentPublicInstance | null, _info: string) => {
   const message = err instanceof Error ? err.message : String(err);
-  logger.error('Action: boundary_error_captured', { error: message });
+  logger.error('Action: plugins_boundary_error_captured', { error: message });
   errorMessage.value = message;
   hasError.value = true;
   return false;
