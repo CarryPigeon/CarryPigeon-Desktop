@@ -47,7 +47,7 @@ async function handleInstall(): Promise<void> {
     // Install (requires app restart)
     await result.install();
   } catch (e) {
-    logger.error('Action: update_download_failed', { error: String(e) });
+    logger.error('Action: http_update_download_failed', { error: String(e) });
     downloading.value = false;
   }
 }
