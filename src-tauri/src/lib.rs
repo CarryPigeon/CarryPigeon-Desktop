@@ -5,6 +5,9 @@ pub mod app;
 pub mod features;
 pub mod shared;
 
+// 初始化 rust-i18n，加载 locales/ 目录下的翻译文件
+rust_i18n::i18n!("locales");
+
 /// 运行 Tauri 应用。
 ///
 /// # 返回值

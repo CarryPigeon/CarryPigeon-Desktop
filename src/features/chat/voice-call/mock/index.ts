@@ -1,9 +1,8 @@
-import { ref } from "vue";
 import type { CallSession, CallKind, CallParticipant, AudioDeviceInfo, MediaSettings } from "../domain/contracts";
 import type { VoiceCallStatePort } from "../domain/ports";
 
 export function createMockVoiceCallStatePort(): VoiceCallStatePort {
-  const activeSession = ref<CallSession | null>(null);
+  let _activeSession: CallSession | null = null;
 
   const mockDevices: AudioDeviceInfo[] = [
     { deviceId: "default-mic", name: "Default Microphone", isDefault: true },
@@ -32,17 +31,17 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
         endedAt: null,
         mediaSettings: { inputDeviceId: "default-mic", outputDeviceId: null, noiseSuppression: true, echoCancellation: true },
       };
-      activeSession.value = session;
+      _activeSession = session;
 
       // Simulate call progression: dialing → connecting → active
       setTimeout(() => {
-        if (activeSession.value?.sessionId === session.sessionId) {
-          activeSession.value = { ...activeSession.value, state: "connecting", participants: mockParticipants };
+        if (_activeSession?.sessionId === session.sessionId) {
+          _activeSession = { ..._activeSession, state: "connecting", participants: mockParticipants };
         }
       }, 1500);
       setTimeout(() => {
-        if (activeSession.value?.sessionId === session.sessionId) {
-          activeSession.value = { ...activeSession.value, state: "active", startedAt: Date.now() };
+        if (_activeSession?.sessionId === session.sessionId) {
+          _activeSession = { ..._activeSession, state: "active", startedAt: Date.now() };
         }
       }, 3000);
 
@@ -50,44 +49,49 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
     },
 
     async acceptCall(sessionId: string) {
-      if (!activeSession.value || activeSession.value.sessionId !== sessionId) throw new Error("call_not_found");
-      activeSession.value = { ...activeSession.value, state: "connecting", participants: mockParticipants };
+      if (!_activeSession || _activeSession.sessionId !== sessionId) throw new Error("call_not_found");
+      const isConference = _activeSession.kind === "conference";
+      const participants = isConference ? _activeSession.participants : mockParticipants;
+      _activeSession = { ..._activeSession, state: "connecting", participants };
       setTimeout(() => {
-        if (activeSession.value) {
-          activeSession.value = { ...activeSession.value, state: "active", startedAt: Date.now() };
+        if (_activeSession) {
+          const finalParticipants = isConference
+            ? [..._activeSession.participants, { userId: "u-3", displayName: "PatchCable", isMuted: false, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() }]
+            : _activeSession.participants;
+          _activeSession = { ..._activeSession, state: "active", startedAt: Date.now(), participants: finalParticipants };
         }
       }, 1000);
     },
 
     async rejectCall(sessionId: string, _reason?: string) {
-      if (!activeSession.value || activeSession.value.sessionId !== sessionId) return;
-      activeSession.value = { ...activeSession.value, state: "ended", endedAt: Date.now() };
-      setTimeout(() => { activeSession.value = null; }, 500);
+      if (!_activeSession || _activeSession.sessionId !== sessionId) return;
+      _activeSession = { ..._activeSession, state: "ended", endedAt: Date.now() };
+      setTimeout(() => { _activeSession = null; }, 500);
     },
 
     async cancelCall(_sessionId: string) {
-      activeSession.value = null;
+      _activeSession = null;
     },
 
     async toggleMute(_sessionId: string) {
-      if (!activeSession.value) throw new Error("call_not_found");
-      const muted = !activeSession.value.participants[0]?.isMuted;
+      if (!_activeSession) throw new Error("call_not_found");
+      const muted = !_activeSession.participants[0]?.isMuted;
       return muted;
     },
 
     async toggleNoiseSuppression(_sessionId: string) {
-      if (!activeSession.value) throw new Error("call_not_found");
-      const ns = !activeSession.value.mediaSettings.noiseSuppression;
-      activeSession.value = { ...activeSession.value, mediaSettings: { ...activeSession.value.mediaSettings, noiseSuppression: ns } };
+      if (!_activeSession) throw new Error("call_not_found");
+      const ns = !_activeSession.mediaSettings.noiseSuppression;
+      _activeSession = { ..._activeSession, mediaSettings: { ..._activeSession.mediaSettings, noiseSuppression: ns } };
       return ns;
     },
 
     async updateMediaSettings(sessionId: string, settings: Partial<MediaSettings>) {
-      if (!activeSession.value || activeSession.value.sessionId !== sessionId) throw new Error("call_not_found");
-      activeSession.value = { ...activeSession.value, mediaSettings: { ...activeSession.value.mediaSettings, ...settings } };
+      if (!_activeSession || _activeSession.sessionId !== sessionId) throw new Error("call_not_found");
+      _activeSession = { ..._activeSession, mediaSettings: { ..._activeSession.mediaSettings, ...settings } };
     },
 
-    getActiveSession() { return activeSession.value; },
+    getActiveSession() { return _activeSession; },
     getParticipants(_sessionId: string) { return mockParticipants; },
 
     async enumerateDevices() {
@@ -98,35 +102,23 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
       const session: CallSession = {
         sessionId,
         kind: "conference",
-        state: "connecting",
+        state: "ringing",
         initiator: initiatorId || "host-user",
         participants: [
           { userId: "u-1", displayName: "Operator", isMuted: false, isSpeaking: true, audioLevel: 0.7, joinedAt: Date.now() },
           { userId: "current-user", displayName: "我", isMuted: false, isSpeaking: false, audioLevel: 0, joinedAt: Date.now() },
         ],
         roomId: "conference-room",
-        startedAt: Date.now(),
+        startedAt: null,
         endedAt: null,
         mediaSettings: { inputDeviceId: "default-mic", outputDeviceId: null, noiseSuppression: true, echoCancellation: true },
       };
-      activeSession.value = session;
-      setTimeout(() => {
-        if (activeSession.value) {
-          activeSession.value = {
-            ...activeSession.value,
-            state: "active",
-            participants: [
-              ...activeSession.value.participants,
-              { userId: "u-3", displayName: "PatchCable", isMuted: false, isSpeaking: false, audioLevel: 0.0, joinedAt: Date.now() },
-            ],
-          };
-        }
-      }, 2000);
+      _activeSession = session;
       return session;
     },
 
     async leaveConference(_sessionId: string) {
-      activeSession.value = null;
+      _activeSession = null;
     },
   };
 }

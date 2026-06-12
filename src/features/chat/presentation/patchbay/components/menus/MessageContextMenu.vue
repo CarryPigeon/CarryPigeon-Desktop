@@ -13,6 +13,7 @@ const props = defineProps<{
   open: boolean;
   x: number;
   y: number;
+  showEdit?: boolean;
   showRecall?: boolean;
   showViewThread?: boolean;
 }>();
@@ -107,7 +108,7 @@ onBeforeUnmount(handleBeforeUnmount);
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
           {{ t("forward_message") }}
         </button>
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('edit')">
+        <button v-if="props.showEdit" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('edit')">
           {{ t("edit_message") }}
         </button>
         <button v-if="props.showRecall" class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('recall')">

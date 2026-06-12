@@ -54,6 +54,7 @@ export type ChatMessageFlowRuntimeDeps = {
   messageActionError: ChatMessageFlowStateSlice["messageActionError"];
   readStateReporter: ChatReadStateReporterPort;
   scope: ChatRuntimeScopePort;
+  currentUserId: string;
 };
 
 /**
@@ -85,6 +86,7 @@ export function createChatMessageFlowRuntime(
     messageActionError,
     readStateReporter,
     scope,
+    currentUserId,
   } = deps;
   const { mapWireMessage } = createMessageMapper({
     resolveDomainPluginHint: resolveChatDomainPluginHint,
@@ -141,6 +143,7 @@ export function createChatMessageFlowRuntime(
     composerState,
     mergeMessages,
     readStateReporter,
+    currentUserId,
   });
 
   // 可用 domain 列表来自 Core domain + plugin runtime 暴露的扩展 domain。

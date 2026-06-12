@@ -370,6 +370,15 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openThread: (messageId) => threadPanel.openThread(messageId),
   });
 
+  const showEdit = computed(() => {
+    const mid = menuMessageId.value;
+    if (!mid) return false;
+    const message = currentChannelMessageFlow.findMessageById(mid);
+    if (!message) return false;
+    if (message.from.id !== currentUserId.value) return false;
+    return true;
+  });
+
   const showRecall = computed(() => {
     const mid = menuMessageId.value;
     if (!mid) return false;
@@ -461,6 +470,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     linkPreview,
     fetchLinkPreview,
     dismissLinkPreview,
+    selectChannel: async (channelId: string) => {
+      await currentSession.selectChannel(channelId);
+    },
   });
 
   // Wire up the circular dependency after chatCenter is created
@@ -563,6 +575,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     open: menuOpen,
     x: menuX,
     y: menuY,
+    showEdit,
     showRecall,
     showViewThread,
     close: closeMenu,

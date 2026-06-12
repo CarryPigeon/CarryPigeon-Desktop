@@ -6,10 +6,13 @@
 
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
 import { emit } from "@tauri-apps/api/event";
 import { createLogger } from "@/shared/utils/logger";
 import type { UnreadMessagePreview } from "@/features/chat/public/api-types";
+
+const { t } = useI18n();
 
 const logger = createLogger("TrayNotificationPopover");
 
@@ -31,9 +34,9 @@ const sortedItems = computed(() => {
 function formatTime(ms: number): string {
   if (!ms) return "";
   const diff = Date.now() - ms;
-  if (diff < 60000) return "刚刚";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`;
+  if (diff < 60000) return t("time_just_now");
+  if (diff < 3600000) return t("time_minutes_ago", { n: Math.floor(diff / 60000) });
+  if (diff < 86400000) return t("time_hours_ago", { n: Math.floor(diff / 3600000) });
   return new Date(ms).toLocaleDateString("zh-CN", {
     month: "short",
     day: "numeric",
@@ -52,7 +55,7 @@ async function handleClick(channelId: string) {
 
 <template>
   <main class="cp-notif">
-    <div class="cp-notif__header">{{ items.length }} 条未读消息</div>
+    <div class="cp-notif__header">{{ t("tray_unread_count", { n: items.length }) }}</div>
     <div
       v-for="(item, idx) in sortedItems"
       :key="item.messageId || idx"

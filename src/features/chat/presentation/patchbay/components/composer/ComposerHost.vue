@@ -4,19 +4,14 @@
  * @description chat｜组件：ComposerHost。
  */
 
-import { computed, ref, type Component } from "vue";
+import { computed, type Component } from "vue";
 import { useI18n } from "vue-i18n";
-import { invoke } from "@tauri-apps/api/core";
-import { createLogger } from "@/shared/utils/logger";
 import DomainSelector from "./DomainSelector.vue";
 import LinkPreviewCard from "./LinkPreviewCard.vue";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-types";
 import AttachmentPreviewBar from "@/features/chat/message-flow/upload/presentation/components/AttachmentPreviewBar.vue";
-import VoiceMessageRecorder from "@/features/chat/message-flow/message/presentation/components/VoiceMessageRecorder.vue";
 import { addFiles, getAttachments, removeAttachment } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
-
-const logger = createLogger("VoiceMessage");
 
 const props = defineProps<{
   domainId: string;
@@ -231,35 +226,6 @@ function selectSystemMention(type: "everyone" | "here"): void {
   emit("selectMention", { userId: type, displayName: type, type });
 }
 
-/** 语音录制上传状态。 */
-const isUploadingVoice = ref(false);
-
-/**
- * 处理语音录制完成事件：读取文件、转为 Blob、添加到附件列表。
- */
-async function onVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
-  isUploadingVoice.value = true;
-  try {
-    // 通过 Tauri 命令读取 WAV 文件内容（Base64 编码）
-    const base64 = await invoke<string>("read_file_base64", { path: payload.filePath });
-
-    // Base64 → ArrayBuffer
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-
-    // 创建 File 对象并添加到附件
-    const blob = new Blob([bytes], { type: "audio/wav" });
-    const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
-    addFiles([file]);
-  } catch (e) {
-    logger.error("Action: chat_voice_message_upload_failed", { error: String(e) });
-  } finally {
-    isUploadingVoice.value = false;
-  }
-}
 </script>
 
 <template>
@@ -356,14 +322,6 @@ async function onVoiceRecorded(payload: { filePath: string; durationMs: number; 
       </button>
     </div>
 
-    <div class="cp-composer__row cp-composer__voiceRow">
-      <VoiceMessageRecorder
-        :disabled="Boolean(props.disabled) || Boolean(props.sending) || isUploadingVoice"
-        @recorded="onVoiceRecorded"
-        @error="(msg) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
-      />
-    </div>
-
     <div class="cp-composer__actions">
       <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
       <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">{{ t("no_composer_available") }}</div>
@@ -452,13 +410,6 @@ async function onVoiceRecorded(payload: { filePath: string; durationMs: number; 
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--cp-border-light);
-}
-
-.cp-composer__voiceRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
 }
 
 .cp-composer__plugin {

@@ -47,6 +47,7 @@ const IMAGE_TYPES = [
   "image/webp",
   "image/bmp",
   "image/svg+xml",
+  "image/avif",
 ];
 
 /**

@@ -133,8 +133,8 @@ const formattedDuration = computed(() => {
 
 <style scoped lang="scss">
 .voice-call-panel {
-  border-top: 1px solid var(--td-border-level-1-color);
-  background: var(--td-bg-color-container);
+  border-top: 1px solid var(--cp-border);
+  background: var(--cp-surface);
   overflow: hidden;
 
   &__bar {
@@ -147,7 +147,7 @@ const formattedDuration = computed(() => {
     user-select: none;
 
     &:hover {
-      background: var(--td-bg-color-component-hover);
+      background: var(--cp-hover-bg);
     }
   }
 
@@ -156,7 +156,7 @@ const formattedDuration = computed(() => {
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: var(--td-text-color-primary);
+    color: var(--cp-text);
     flex: 1;
     min-width: 0;
   }
@@ -165,49 +165,49 @@ const formattedDuration = computed(() => {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--td-gray-color-5);
+    background: var(--cp-border);
     flex-shrink: 0;
 
     &.is-active {
-      background: var(--td-success-color);
+      background: var(--cp-success);
       animation: blink 1.5s ease-in-out infinite;
     }
 
     &.is-connecting {
-      background: var(--td-warning-color);
+      background: var(--cp-warn);
       animation: blink 0.8s ease-in-out infinite;
     }
   }
 
   &__participant-count {
     font-size: 12px;
-    color: var(--td-text-color-secondary);
+    color: var(--cp-text-muted);
   }
 
   &__bar-hangup {
     width: 32px;
     height: 32px;
-    border: 1px solid var(--td-error-color);
+    border: 1px solid var(--cp-danger);
     border-radius: 50%;
-    background: var(--td-bg-color-component);
+    background: var(--cp-panel);
     cursor: pointer;
     font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--td-error-color);
+    color: var(--cp-danger);
     flex-shrink: 0;
     transition: all 0.2s;
 
     &:hover {
-      background: var(--td-error-color);
+      background: var(--cp-danger);
       color: #fff;
     }
   }
 
   &__toggle {
     font-size: 10px;
-    color: var(--td-text-color-placeholder);
+    color: var(--cp-text-light);
   }
 
   &__controls {
@@ -215,15 +215,15 @@ const formattedDuration = computed(() => {
     align-items: center;
     padding: 8px 16px;
     gap: 8px;
-    border-top: 1px solid var(--td-border-level-2-color);
+    border-top: 1px solid var(--cp-border);
   }
 
   &__ctrl-btn {
     width: 36px;
     height: 36px;
-    border: 1px solid var(--td-border-level-1-color);
+    border: 1px solid var(--cp-border);
     border-radius: 50%;
-    background: var(--td-bg-color-component);
+    background: var(--cp-panel);
     cursor: pointer;
     font-size: 16px;
     display: flex;
@@ -232,27 +232,27 @@ const formattedDuration = computed(() => {
     transition: all 0.2s;
 
     &:hover {
-      background: var(--td-bg-color-component-hover);
+      background: var(--cp-hover-bg);
     }
 
     &.is-muted {
-      background: var(--td-warning-color);
-      border-color: var(--td-warning-color);
+      background: var(--cp-warn);
+      border-color: var(--cp-warn);
     }
 
     &.is-off {
-      background: var(--td-error-color);
-      border-color: var(--td-error-color);
+      background: var(--cp-danger);
+      border-color: var(--cp-danger);
       color: #fff;
     }
 
     &--hangup {
       margin-left: auto;
-      border-color: var(--td-error-color);
-      color: var(--td-error-color);
+      border-color: var(--cp-danger);
+      color: var(--cp-danger);
 
       &:hover {
-        background: var(--td-error-color);
+        background: var(--cp-danger);
         color: #fff;
       }
     }
@@ -260,22 +260,22 @@ const formattedDuration = computed(() => {
 
   &__device-select {
     padding: 4px 8px;
-    border: 1px solid var(--td-border-level-1-color);
+    border: 1px solid var(--cp-border);
     border-radius: 4px;
     font-size: 12px;
-    background: var(--td-bg-color-container);
-    color: var(--td-text-color-primary);
+    background: var(--cp-surface);
+    color: var(--cp-text);
     max-width: 120px;
   }
 
   &__roster {
     padding: 8px 16px;
-    border-top: 1px solid var(--td-border-level-2-color);
+    border-top: 1px solid var(--cp-border);
   }
 
   &__roster-title {
     font-size: 11px;
-    color: var(--td-text-color-secondary);
+    color: var(--cp-text-muted);
     margin-bottom: 6px;
   }
 
@@ -301,7 +301,7 @@ const formattedDuration = computed(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--td-text-color-primary);
+    color: var(--cp-text);
   }
 
   &__participant-icon {
@@ -312,7 +312,7 @@ const formattedDuration = computed(() => {
   &__participant-level {
     width: 40px;
     height: 4px;
-    background: var(--td-gray-color-3);
+    background: var(--cp-border-light);
     border-radius: 2px;
     overflow: hidden;
     flex-shrink: 0;
@@ -321,7 +321,7 @@ const formattedDuration = computed(() => {
   &__level-bar {
     display: block;
     height: 100%;
-    background: var(--td-success-color);
+    background: var(--cp-success);
     border-radius: 2px;
     transition: width 0.2s;
   }

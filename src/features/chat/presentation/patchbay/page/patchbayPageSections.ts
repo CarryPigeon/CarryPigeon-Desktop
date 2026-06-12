@@ -43,6 +43,7 @@ type PatchbayMessageContextMenuRawModel = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
+  showEdit: RefLike<boolean>;
   showRecall: RefLike<boolean>;
   showViewThread: RefLike<boolean>;
   close(): void;
@@ -159,6 +160,7 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
+  showEdit: RefLike<boolean>;
   showRecall: RefLike<boolean>;
   showViewThread: RefLike<boolean>;
   close(): void;
@@ -175,6 +177,7 @@ export function createPatchbayMessageContextMenuSection(
     open: deps.open,
     x: deps.x,
     y: deps.y,
+    showEdit: deps.showEdit,
     showRecall: deps.showRecall,
     showViewThread: deps.showViewThread,
     close: deps.close,

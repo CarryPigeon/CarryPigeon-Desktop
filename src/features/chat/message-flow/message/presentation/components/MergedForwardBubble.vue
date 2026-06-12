@@ -84,7 +84,7 @@ function fmtTime(ms: number): string {
   border-bottom: 1px solid var(--cp-border-light, rgba(49, 50, 68, 0.4));
   font-size: 13px;
   color: var(--cp-text-secondary, #a6adc8);
-  background: color-mix(in oklab, var(--cp-primary, #0052d9) 6%, transparent);
+  background: color-mix(in oklab, var(--cp-primary) 6%, transparent);
 }
 .cp-mergedForward__icon {
   flex-shrink: 0;

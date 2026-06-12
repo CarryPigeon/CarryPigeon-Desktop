@@ -1,6 +1,5 @@
 <template>
   <button
-    v-if="callState === 'idle' || callState === 'ended'"
     class="voice-call-button"
     :disabled="callState !== 'idle' && callState !== 'ended'"
     :title="conference ? t('voice_call_conference') : t('voice_call_start')"
