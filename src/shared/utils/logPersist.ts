@@ -65,7 +65,7 @@ export function startLogPersistence(): void {
   flushTimer = setInterval(() => {
     void flushBuffer();
   }, 5000);
-  logger.info('Action: log_persist_started');
+  logger.info('Action: api_log_persist_started');
 }
 
 /**

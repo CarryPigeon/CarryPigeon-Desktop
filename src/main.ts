@@ -140,7 +140,7 @@ if (!isSubWindow && hasTauriRuntime) {
       // 启动后 5 秒静默检查更新
       window.setTimeout(() => {
         void checkForUpdateSilently((version, body) => {
-          logger.info('Action: update_available', { version });
+          logger.info('Action: http_update_available', { version });
           // 动态挂载 UpdatePrompt 组件
           import('@/shared/updater/UpdatePrompt.vue').then(async ({ default: UpdatePrompt }) => {
             const { createApp } = await import('vue');
