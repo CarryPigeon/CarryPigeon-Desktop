@@ -95,7 +95,9 @@ fn normalize_transport_socket(socket: String, allow_mock: bool) -> anyhow::Resul
         .split_once("://")
         .map(|(scheme, _)| scheme)
         .unwrap_or("<missing>");
-    Err(tcp_scope_error("error.network_tcp_scope_unsupported_scheme"))
+    Err(tcp_scope_error(
+        "error.network_tcp_scope_unsupported_scheme",
+    ))
 }
 
 fn registered_backend_not_found(_server_socket: &str) -> anyhow::Error {
@@ -411,10 +413,7 @@ mod tests {
         let err = normalize_transport_socket("   ".to_string(), true)
             .expect_err("empty transport socket should be rejected");
         println!("empty transport socket error: {}", err);
-        assert_eq!(
-            err.to_string(),
-            "[NETWORK_TCP_SCOPE_REJECTED] 缺少套接字"
-        );
+        assert_eq!(err.to_string(), "[NETWORK_TCP_SCOPE_REJECTED] 缺少套接字");
         rust_i18n::set_locale(&prev_locale);
     }
 }

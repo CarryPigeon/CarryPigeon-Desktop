@@ -271,17 +271,21 @@ async fn load_all_rows() -> Result<Vec<sea_orm::prelude::QueryResult>> {
 
 #[tauri::command]
 pub async fn chat_cache_load_all() -> CommandResult<HashMap<String, String>> {
-    ensure_schema()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e))?;
-    let rows = load_all_rows()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_QUERY_FAILED", "error.chat_cache_query_failed", e))?;
+    ensure_schema().await.map_err(|e| {
+        to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
+    })?;
+    let rows = load_all_rows().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_QUERY_FAILED",
+            "error.chat_cache_query_failed",
+            e,
+        )
+    })?;
     if rows.is_empty() {
         return Ok(HashMap::new());
     }
-    let Some(key_bytes) =
-        master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", "error.chat_cache_key_failed", e))?
+    let Some(key_bytes) = master_key(false)
+        .map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", "error.chat_cache_key_failed", e))?
     else {
         return Ok(HashMap::new());
     };
@@ -314,47 +318,70 @@ pub async fn chat_cache_load_all() -> CommandResult<HashMap<String, String>> {
 
 #[tauri::command]
 pub async fn chat_cache_clear_all() -> CommandResult<()> {
-    ensure_schema()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e))?;
+    ensure_schema().await.map_err(|e| {
+        to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
+    })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
-    let txn = conn
-        .begin()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_TXN_BEGIN_FAILED", "error.chat_cache_txn_begin_failed", e))?;
+    let txn = conn.begin().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_TXN_BEGIN_FAILED",
+            "error.chat_cache_txn_begin_failed",
+            e,
+        )
+    })?;
     let stmt = RawStatement::new("DELETE FROM chat_cache".to_string(), Vec::new());
-    txn.execute(&stmt)
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_DELETE_FAILED", "error.chat_cache_delete_failed", e))?;
-    txn.commit()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_TXN_COMMIT_FAILED", "error.chat_cache_txn_commit_failed", e))?;
-    forget_master_key().map_err(|e| to_command_error("CHAT_CACHE_KEY_CLEAR_FAILED", "error.chat_cache_key_clear_failed", e))?;
+    txn.execute(&stmt).await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_DELETE_FAILED",
+            "error.chat_cache_delete_failed",
+            e,
+        )
+    })?;
+    txn.commit().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_TXN_COMMIT_FAILED",
+            "error.chat_cache_txn_commit_failed",
+            e,
+        )
+    })?;
+    forget_master_key().map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_KEY_CLEAR_FAILED",
+            "error.chat_cache_key_clear_failed",
+            e,
+        )
+    })?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn chat_cache_get(key: String) -> CommandResult<Option<String>> {
-    ensure_schema()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e))?;
+    ensure_schema().await.map_err(|e| {
+        to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
+    })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
     let key = key.trim();
     if key.is_empty() {
-        return Err(command_error("CHAT_CACHE_KEY_REQUIRED", "error.chat_cache_key_required"));
+        return Err(command_error(
+            "CHAT_CACHE_KEY_REQUIRED",
+            "error.chat_cache_key_required",
+        ));
     }
     let stmt = RawStatement::new(
         "SELECT nonce_hex, value_hex FROM chat_cache WHERE key = ?".to_string(),
         vec![Value::String(Some(key.to_string()))],
     );
-    let rows = conn
-        .query_all(&stmt)
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_QUERY_FAILED", "error.chat_cache_query_failed", e))?;
+    let rows = conn.query_all(&stmt).await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_QUERY_FAILED",
+            "error.chat_cache_query_failed",
+            e,
+        )
+    })?;
     if rows.is_empty() {
         return Ok(None);
     }
@@ -372,42 +399,58 @@ pub async fn chat_cache_get(key: String) -> CommandResult<Option<String>> {
     if nonce_hex.is_empty() || value_hex.is_empty() {
         return Ok(None);
     }
-    let Some(key_bytes) =
-        master_key(false).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", "error.chat_cache_key_failed", e))?
+    let Some(key_bytes) = master_key(false)
+        .map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", "error.chat_cache_key_failed", e))?
     else {
         return Ok(None);
     };
-    let value = decrypt_value(&key_bytes, &nonce_hex, &value_hex)
-        .map_err(|e| to_command_error("CHAT_CACHE_DECRYPT_FAILED", "error.chat_cache_decrypt_failed", e))?;
+    let value = decrypt_value(&key_bytes, &nonce_hex, &value_hex).map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_DECRYPT_FAILED",
+            "error.chat_cache_decrypt_failed",
+            e,
+        )
+    })?;
     Ok(Some(value))
 }
 
 #[tauri::command]
 pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
-    ensure_schema()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e))?;
+    ensure_schema().await.map_err(|e| {
+        to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
+    })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
     let key = req.key.trim();
     if key.is_empty() {
-        return Err(command_error("CHAT_CACHE_KEY_REQUIRED", "error.chat_cache_key_required"));
+        return Err(command_error(
+            "CHAT_CACHE_KEY_REQUIRED",
+            "error.chat_cache_key_required",
+        ));
     }
-    let Some(key_bytes) =
-        master_key(true).map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", "error.chat_cache_key_failed", e))?
+    let Some(key_bytes) = master_key(true)
+        .map_err(|e| to_command_error("CHAT_CACHE_KEY_FAILED", "error.chat_cache_key_failed", e))?
     else {
         return Err(command_error(
             "CHAT_CACHE_KEY_FAILED",
             "error.chat_cache_key_failed",
         ));
     };
-    let (nonce_hex, value_hex) = encrypt_value(&key_bytes, &req.value)
-        .map_err(|e| to_command_error("CHAT_CACHE_ENCRYPT_FAILED", "error.chat_cache_encrypt_failed", e))?;
-    let txn = conn
-        .begin()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_TXN_BEGIN_FAILED", "error.chat_cache_txn_begin_failed", e))?;
+    let (nonce_hex, value_hex) = encrypt_value(&key_bytes, &req.value).map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_ENCRYPT_FAILED",
+            "error.chat_cache_encrypt_failed",
+            e,
+        )
+    })?;
+    let txn = conn.begin().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_TXN_BEGIN_FAILED",
+            "error.chat_cache_txn_begin_failed",
+            e,
+        )
+    })?;
     let stmt = RawStatement::new(
         "INSERT INTO chat_cache (key, nonce_hex, value_hex, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET nonce_hex = excluded.nonce_hex, value_hex = excluded.value_hex, updated_at = excluded.updated_at".to_string(),
         vec![
@@ -417,49 +460,67 @@ pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
             Value::BigInt(Some(now_ms())),
         ],
     );
-    txn.execute(&stmt)
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_WRITE_FAILED", "error.chat_cache_write_failed", e))?;
-    txn.commit()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_TXN_COMMIT_FAILED", "error.chat_cache_txn_commit_failed", e))?;
+    txn.execute(&stmt).await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_WRITE_FAILED",
+            "error.chat_cache_write_failed",
+            e,
+        )
+    })?;
+    txn.commit().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_TXN_COMMIT_FAILED",
+            "error.chat_cache_txn_commit_failed",
+            e,
+        )
+    })?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn chat_cache_remove(req: ChatCacheRemoveRequest) -> CommandResult<()> {
-    ensure_schema()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e))?;
+    ensure_schema().await.map_err(|e| {
+        to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
+    })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
     let key = req.key.trim();
     if key.is_empty() {
-        return Err(command_error("CHAT_CACHE_KEY_REQUIRED", "error.chat_cache_key_required"));
+        return Err(command_error(
+            "CHAT_CACHE_KEY_REQUIRED",
+            "error.chat_cache_key_required",
+        ));
     }
     let stmt = RawStatement::new(
         "DELETE FROM chat_cache WHERE key = ?".to_string(),
         vec![Value::String(Some(key.to_string()))],
     );
-    conn.execute(&stmt)
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_DELETE_FAILED", "error.chat_cache_delete_failed", e))?;
+    conn.execute(&stmt).await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_DELETE_FAILED",
+            "error.chat_cache_delete_failed",
+            e,
+        )
+    })?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn chat_cache_remove_many(req: ChatCacheRemoveManyRequest) -> CommandResult<()> {
-    ensure_schema()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e))?;
+    ensure_schema().await.map_err(|e| {
+        to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
+    })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
-    let txn = conn
-        .begin()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_TXN_BEGIN_FAILED", "error.chat_cache_txn_begin_failed", e))?;
+    let txn = conn.begin().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_TXN_BEGIN_FAILED",
+            "error.chat_cache_txn_begin_failed",
+            e,
+        )
+    })?;
     for key in req.keys {
         let key = key.trim().to_string();
         if key.is_empty() {
@@ -469,13 +530,21 @@ pub async fn chat_cache_remove_many(req: ChatCacheRemoveManyRequest) -> CommandR
             "DELETE FROM chat_cache WHERE key = ?".to_string(),
             vec![Value::String(Some(key))],
         );
-        txn.execute(&stmt)
-            .await
-            .map_err(|e| to_command_error("CHAT_CACHE_DELETE_FAILED", "error.chat_cache_delete_failed", e))?;
+        txn.execute(&stmt).await.map_err(|e| {
+            to_command_error(
+                "CHAT_CACHE_DELETE_FAILED",
+                "error.chat_cache_delete_failed",
+                e,
+            )
+        })?;
     }
-    txn.commit()
-        .await
-        .map_err(|e| to_command_error("CHAT_CACHE_TXN_COMMIT_FAILED", "error.chat_cache_txn_commit_failed", e))?;
+    txn.commit().await.map_err(|e| {
+        to_command_error(
+            "CHAT_CACHE_TXN_COMMIT_FAILED",
+            "error.chat_cache_txn_commit_failed",
+            e,
+        )
+    })?;
     Ok(())
 }
 

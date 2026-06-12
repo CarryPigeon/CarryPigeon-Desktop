@@ -104,13 +104,21 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
         .timeout(std::time::Duration::from_secs(5))
         .user_agent("Mozilla/5.0 (compatible; CarryPigeon/1.0)")
         .build()
-        .map_err(|e| to_command_error("LINK_PREVIEW_CLIENT_BUILD_FAILED", "error.link_preview_client_build_failed", e))?;
+        .map_err(|e| {
+            to_command_error(
+                "LINK_PREVIEW_CLIENT_BUILD_FAILED",
+                "error.link_preview_client_build_failed",
+                e,
+            )
+        })?;
 
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| to_command_error("LINK_PREVIEW_FETCH_FAILED", "error.link_preview_fetch_failed", e))?;
+    let resp = client.get(&url).send().await.map_err(|e| {
+        to_command_error(
+            "LINK_PREVIEW_FETCH_FAILED",
+            "error.link_preview_fetch_failed",
+            e,
+        )
+    })?;
 
     let status = resp.status();
     if !status.is_success() {
@@ -130,10 +138,13 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
     }
 
     // Read up to 512KB
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| to_command_error("LINK_PREVIEW_READ_BODY_FAILED", "error.link_preview_read_body_failed", e))?;
+    let bytes = resp.bytes().await.map_err(|e| {
+        to_command_error(
+            "LINK_PREVIEW_READ_BODY_FAILED",
+            "error.link_preview_read_body_failed",
+            e,
+        )
+    })?;
     let html = String::from_utf8_lossy(&bytes[..bytes.len().min(512 * 1024)]);
 
     let title = extract_title(&html).map(|s| truncate(&s, 200));
