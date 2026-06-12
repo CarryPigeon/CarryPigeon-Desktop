@@ -18,7 +18,13 @@ pub async fn cleanup_temp_files(
     temp_files
         .cleanup(namespace.as_deref(), older_than_hours.unwrap_or(24))
         .await
-        .map_err(|e| to_command_error("TEMP_FILE_CLEANUP_FAILED", "error.temp_file_cleanup_failed", e))
+        .map_err(|e| {
+            to_command_error(
+                "TEMP_FILE_CLEANUP_FAILED",
+                "error.temp_file_cleanup_failed",
+                e,
+            )
+        })
 }
 
 /// 删除单个临时文件。
@@ -27,10 +33,13 @@ pub async fn remove_temp_file(
     temp_files: State<'_, TempFileManager>,
     file_id: String,
 ) -> CommandResult<()> {
-    temp_files
-        .remove(&file_id)
-        .await
-        .map_err(|e| to_command_error("TEMP_FILE_REMOVE_FAILED", "error.temp_file_remove_failed", e))
+    temp_files.remove(&file_id).await.map_err(|e| {
+        to_command_error(
+            "TEMP_FILE_REMOVE_FAILED",
+            "error.temp_file_remove_failed",
+            e,
+        )
+    })
 }
 
 /// 将已完成文件复制到用户指定位置。

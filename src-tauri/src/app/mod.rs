@@ -44,7 +44,7 @@ pub fn run() -> anyhow::Result<()> {
                     .unwrap_or("<non-string>")
             });
         tracing::error!(
-            action = "rust_panic",
+            action = "app_rust_panic",
             payload = %payload,
             location = ?info.location(),
         );
@@ -93,7 +93,7 @@ pub fn run() -> anyhow::Result<()> {
                 .try_init()
             {
                 // 如果 subscriber 已经设定，file_layer 会失败 — 用 warn 记录（会写入现有 subscriber）
-                tracing::warn!(action = "file_logger_already_set", error = %e);
+                tracing::warn!(action = "app_file_logger_already_set", error = %e);
             }
             std::mem::forget(guard);
 

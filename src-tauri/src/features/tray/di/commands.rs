@@ -55,10 +55,13 @@ pub fn set_tray_unread_flashing<R: Runtime>(
     state: State<'_, TrayUnreadState>,
     has_unread: bool,
 ) -> CommandResult<()> {
-    let _guard = state
-        .lifecycle_lock
-        .lock()
-        .map_err(|err| to_command_error("TRAY_UNREAD_LOCK_FAILED", "error.tray_unread_lock_failed", err))?;
+    let _guard = state.lifecycle_lock.lock().map_err(|err| {
+        to_command_error(
+            "TRAY_UNREAD_LOCK_FAILED",
+            "error.tray_unread_lock_failed",
+            err,
+        )
+    })?;
 
     state.has_unread.store(has_unread, Ordering::SeqCst);
 
@@ -137,14 +140,36 @@ pub fn set_tray_locale<R: Runtime>(app: AppHandle<R>, locale: String) -> Command
     rust_i18n::set_locale(&locale);
     let labels = tray_labels(&locale);
     let show_i = MenuItem::with_id(&app, labels[0].0, labels[0].1.clone(), true, None::<&str>)
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
-    let sep = PredefinedMenuItem::separator(&app)
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
+        .map_err(|err| {
+            to_command_error(
+                "TRAY_MENU_BUILD_FAILED",
+                "error.tray_menu_build_failed",
+                err,
+            )
+        })?;
+    let sep = PredefinedMenuItem::separator(&app).map_err(|err| {
+        to_command_error(
+            "TRAY_MENU_BUILD_FAILED",
+            "error.tray_menu_build_failed",
+            err,
+        )
+    })?;
     let quit_i = MenuItem::with_id(&app, labels[1].0, labels[1].1.clone(), true, None::<&str>)
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
+        .map_err(|err| {
+            to_command_error(
+                "TRAY_MENU_BUILD_FAILED",
+                "error.tray_menu_build_failed",
+                err,
+            )
+        })?;
 
-    let menu = Menu::with_items(&app, &[&show_i, &sep, &quit_i])
-        .map_err(|err| to_command_error("TRAY_MENU_BUILD_FAILED", "error.tray_menu_build_failed", err))?;
+    let menu = Menu::with_items(&app, &[&show_i, &sep, &quit_i]).map_err(|err| {
+        to_command_error(
+            "TRAY_MENU_BUILD_FAILED",
+            "error.tray_menu_build_failed",
+            err,
+        )
+    })?;
 
     let tray = app
         .tray_by_id(TRAY_ID)

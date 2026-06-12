@@ -7,7 +7,10 @@ use crate::features::emoji::repository;
 use crate::shared::error::CommandResult;
 
 #[tauri::command]
-pub async fn list_custom_emojis(app_handle: AppHandle, uid: String) -> CommandResult<Vec<EmojiEntry>> {
+pub async fn list_custom_emojis(
+    app_handle: AppHandle,
+    uid: String,
+) -> CommandResult<Vec<EmojiEntry>> {
     let index = repository::load_index(&app_handle);
     let uid_trimmed = uid.trim();
     let items: Vec<EmojiEntry> = index
@@ -54,14 +57,18 @@ pub async fn copy_emoji(
     uid: String,
     name: String,
 ) -> CommandResult<EmojiEntry> {
-    let entry = repository::copy_emoji(&app_handle, &source_id, &uid, &name)
-        .map_err(|e| e.to_string())?;
+    let entry =
+        repository::copy_emoji(&app_handle, &source_id, &uid, &name).map_err(|e| e.to_string())?;
     tracing::info!(action = "app_emoji_copied", source = %source_id, new_id = %entry.id, uid = %uid);
     Ok(entry)
 }
 
 #[tauri::command]
-pub async fn write_temp_emoji_file(app_handle: AppHandle, name: String, data: Vec<u8>) -> CommandResult<String> {
+pub async fn write_temp_emoji_file(
+    app_handle: AppHandle,
+    name: String,
+    data: Vec<u8>,
+) -> CommandResult<String> {
     use std::io::Write;
     let tmp_dir = repository::emoji_dir(&app_handle).join("_upload_tmp");
     std::fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
