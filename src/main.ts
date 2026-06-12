@@ -27,11 +27,20 @@ import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { getPluginsCapabilities } from "@/features/plugins/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { createLogger } from "@/shared/utils/logger";
+import { startLogPersistence, stopLogPersistence } from "@/shared/utils/logPersist";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import type { WatchStopHandle } from "vue";
-import { clearTrayUnreadFlashing, registerTrayUnreadBridge } from "@/app/bootstrap/trayUnreadBridge";
-import { registerTrayHoverBridge } from "@/app/bootstrap/trayHoverBridge";
-import { syncTrayLocaleOnStartup } from "@/app/bootstrap/trayLocaleBridge";
+import {
+  clearTrayUnreadFlashing,
+  registerTrayUnreadBridge,
+  registerTrayHoverBridge,
+  syncTrayLocaleOnStartup,
+} from "@/app/bootstrap/trayIntegration";
+import { checkForUpdateSilently } from "@/shared/updater/checkUpdate";
+
+import { resolveStartup } from '@/app/bootstrap/startupState';
+
+const UPDATE_CHECK_DELAY_MS = 5000;
 
 const app = createApp(App);
 app.use(router).use(i18n);
@@ -70,6 +79,7 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   } catch (e) {
     logger.error("Action: api_main_start_runtime_failed", { error: String(e) });
     releaseMainWindowRuntimes();
+    resolveStartup('failed');
     return false;
   }
 
@@ -83,6 +93,7 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   registerTrayHoverBridge();
   syncTrayLocaleOnStartup();
 
+    resolveStartup('ready');
   return true;
 }
 
@@ -107,10 +118,14 @@ function releaseMainWindowRuntimes(): void {
   }
 }
 
-window.addEventListener("beforeunload", releaseMainWindowRuntimes);
+window.addEventListener("beforeunload", () => {
+  releaseMainWindowRuntimes();
+  stopLogPersistence();
+});
 
 // Mount first to unblock LCP
 app.mount("#app");
+startLogPersistence();
 
 // Async startup after mount (fire-and-forget)
 if (hasTauriRuntime) {
@@ -122,7 +137,35 @@ if (!isSubWindow && hasTauriRuntime) {
   void startMainWindowRuntimes().then((ok) => {
     if (ok) {
       ensureInitialServerSelection();
+      // 启动后 5 秒静默检查更新
+      window.setTimeout(() => {
+        void checkForUpdateSilently((version, body) => {
+          logger.info('Action: update_available', { version });
+          // 动态挂载 UpdatePrompt 组件
+          import('@/shared/updater/UpdatePrompt.vue').then(async ({ default: UpdatePrompt }) => {
+            const { createApp } = await import('vue');
+            const mount = document.createElement('div');
+            mount.id = 'update-prompt-mount';
+            document.body.appendChild(mount);
+            const promptApp = createApp(UpdatePrompt, {
+              version,
+              body,
+              onInstall: () => {
+                // UpdatePrompt handles its own download+install flow
+                // Keep the prompt visible during download (it auto-closes on install success)
+              },
+              onDismiss: () => { promptApp.unmount(); mount.remove(); },
+            });
+            promptApp.mount(mount);
+          }).catch(() => {
+            // 如果 UpdatePrompt 加载失败，静默跳过
+          });
+        });
+      }, UPDATE_CHECK_DELAY_MS);
       void restoreStartupSession(router);
     }
   });
+} else if (!isSubWindow) {
+  // 无 Tauri runtime（纯前端 dev 模式）：立即标记就绪
+  resolveStartup('ready');
 }

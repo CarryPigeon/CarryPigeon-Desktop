@@ -1,68 +1,37 @@
-/**
- * @fileoverview 应用路由表（Web/Tauri 预览构建）。
- *
- * 该文件定义 SPA 路由（Tauri/Vite WebView 预览构建使用）。
- * 按 Clean Architecture 的边界约束：router 仅依赖展示层页面（UI layer），不依赖 domain/data 层细节。
- *
- * 备注：
- * - 主流程：登录（`/`）、聊天主窗口（`/chat`）、插件（`/plugins`）、required gate（`/required-setup`）、设置（`/settings`）。
- * - popover/aux 路由用于多窗口启动（见 `src/main.ts`）。
- */
-import { createRouter, createWebHistory } from "vue-router";
-import { LoginPage, RequiredSetupPage, UserInfoPage, UserPopoverPage } from "@/features/account/routes";
-import {
-  ChannelBansPage,
-  ChannelInfoPage,
-  ChannelInfoPopoverView,
-  ChannelMembersPage,
-  ChatMainPage,
-  JoinApplicationsPage,
-} from "@/features/chat/public/routes";
-import { DomainCatalogPage, PluginCenterPage, PluginDetailPage } from "@/features/plugins/routes";
-import { ServerManagerPage } from "@/features/server-connection/routes";
-import { SettingsPage, EmojiManagePage } from "@/features/settings/routes";
-import { FileManagerPage } from "@/features/files/routes";
-import { TrayNotificationPopover } from "@/features/tray-notification/routes";
+import { createRouter, createWebHistory } from 'vue-router';
+import { LoginPage, RequiredSetupPage, UserInfoPage, UserPopoverPage } from '@/features/account/routes';
+import { ChatMainPage, ChannelInfoPage, ChannelInfoPopoverView, ChannelMembersPage, JoinApplicationsPage, ChannelBansPage } from '@/features/chat/public/routes';
+import { PluginCenterPage, DomainCatalogPage, PluginDetailPage } from '@/features/plugins/routes';
+import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
+import { ServerManagerPage } from '@/features/server-connection/routes';
+import { FileManagerPage } from '@/features/files/routes';
 
-/**
- * 应用全局 Vue Router 实例。
- *
- * - Web 预览构建使用 HTML5 history。
- * - 在合适位置使用懒加载，以减少首屏加载体积。
- *
- * @constant
- */
-export const router = createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", component: LoginPage },
-    { path: "/chat", component: ChatMainPage },
-    { path: "/settings", component: SettingsPage },
-    { path: "/settings/profile", component: SettingsPage },
-    { path: "/settings/emoji", component: EmojiManagePage },
-    { path: "/servers", component: ServerManagerPage },
-    { path: "/required-setup", component: RequiredSetupPage },
-    { path: "/plugins", component: PluginCenterPage },
-    { path: "/domains", component: DomainCatalogPage },
-    {
-      path: "/plugins/detail/:pluginId",
-      component: PluginDetailPage,
-      props: true,
-    },
-    {
-      path: "/user_info",
-      name: "UserInfoPage",
-      component: UserInfoPage,
-    },
-    { path: "/user-info", component: UserInfoPage },
-    { path: "/channel-info", component: ChannelInfoPage },
-    { path: "/user-info-popover", component: UserPopoverPage },
-    { path: "/channel-info-popover", component: ChannelInfoPopoverView },
-    { path: "/tray-notification-popover", component: TrayNotificationPopover },
-    // 频道管理相关路由
-    { path: "/channel-members", component: ChannelMembersPage },
-    { path: "/channel-applications", component: JoinApplicationsPage },
-    { path: "/channel-bans", component: ChannelBansPage },
-    { path: "/files", component: FileManagerPage },
+    { path: '/', redirect: '/chat' },
+    { path: '/chat', component: ChatMainPage, name: 'chat' },
+    { path: '/login', component: LoginPage, name: 'login' },
+    { path: '/required-setup', component: RequiredSetupPage, name: 'required-setup' },
+    { path: '/user-info', component: UserInfoPage, name: 'user-info' },
+    { path: '/servers', component: ServerManagerPage, name: 'servers' },
+    { path: '/settings', component: SettingsPage, name: 'settings' },
+    { path: '/settings/emoji', component: EmojiManagePage, name: 'settings-emoji' },
+    { path: '/plugins', component: PluginCenterPage, name: 'plugins' },
+    { path: '/plugins/domain-catalog', component: DomainCatalogPage, name: 'domain-catalog' },
+    { path: '/plugins/detail/:pluginId', component: PluginDetailPage, name: 'plugin-detail' },
+    { path: '/files', component: FileManagerPage, name: 'files' },
+    { path: '/channel-info', component: ChannelInfoPage, name: 'channel-info' },
+    { path: '/channel-members', component: ChannelMembersPage, name: 'channel-members' },
+    { path: '/channel-applications', component: JoinApplicationsPage, name: 'channel-applications' },
+    { path: '/channel-bans', component: ChannelBansPage, name: 'channel-bans' },
+    // 子窗口路由（保留 subWindowRouting 兼容）
+    { path: '/channel-info-popover', component: ChannelInfoPopoverView, name: 'channel-info-popover' },
+    { path: '/user-info-popover', component: UserPopoverPage, name: 'user-info-popover' },
+    // catch-all 兜底
+    { path: '/:pathMatch(.*)*', redirect: '/chat' },
   ],
 });
+
+export { router };
+

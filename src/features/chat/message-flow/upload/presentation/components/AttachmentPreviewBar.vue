@@ -165,7 +165,7 @@ const emit = defineEmits<{
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--cp-success, #2a8c5a);
+  background: var(--cp-success);
   color: #fff;
   font-size: 11px;
   display: grid;

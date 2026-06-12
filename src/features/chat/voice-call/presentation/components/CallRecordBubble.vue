@@ -62,9 +62,9 @@ const statusText = computed(() => {
 <style scoped lang="scss">
 .call-record-bubble {
   max-width: 240px;
-  border: 1px solid var(--td-border-level-1-color);
+  border: 1px solid var(--cp-border);
   border-radius: 8px;
-  background: var(--td-bg-color-container);
+  background: var(--cp-surface);
   padding: 12px;
   font-size: 13px;
 
@@ -74,7 +74,7 @@ const statusText = computed(() => {
     gap: 6px;
     margin-bottom: 8px;
     font-weight: 500;
-    color: var(--td-text-color-primary);
+    color: var(--cp-text);
   }
 
   &__body {
@@ -88,14 +88,14 @@ const statusText = computed(() => {
   }
 
   &__label {
-    color: var(--td-text-color-secondary);
+    color: var(--cp-text-muted);
   }
 
   &__value {
-    color: var(--td-text-color-primary);
+    color: var(--cp-text);
 
     &--status {
-      color: var(--td-text-color-placeholder);
+      color: var(--cp-text-light);
     }
   }
 
@@ -105,15 +105,15 @@ const statusText = computed(() => {
 
   &__btn {
     padding: 4px 12px;
-    border: 1px solid var(--td-brand-color);
+    border: 1px solid var(--cp-accent);
     border-radius: 4px;
     background: transparent;
-    color: var(--td-brand-color);
+    color: var(--cp-accent);
     font-size: 12px;
     cursor: pointer;
 
     &:hover {
-      background: var(--td-brand-color-light);
+      background: var(--cp-accent-soft);
     }
   }
 }

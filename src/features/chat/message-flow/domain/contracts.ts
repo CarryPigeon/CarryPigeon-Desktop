@@ -61,6 +61,7 @@ export type ChatMessageActionErrorCode =
   | "plugin_composer_required"
   | "not_signed_in"
   | "channel_not_selected"
+  | "not_message_author"
   | "missing_message_payload"
   | "missing_domain"
   | "missing_domain_version"

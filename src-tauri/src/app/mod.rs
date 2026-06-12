@@ -14,6 +14,9 @@ use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tracing_subscriber::prelude::*;
+
+pub mod log_commands;
 
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
@@ -27,8 +30,30 @@ use crate::shared::temp_file::TempFileManager;
 /// # 返回值
 /// 当 Builder 组装或初始化失败时返回错误。
 pub fn run() -> anyhow::Result<()> {
+    // 设置 panic hook，在 panic 时记录到 tracing
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .unwrap_or_else(|| {
+                info.payload()
+                    .downcast_ref::<String>()
+                    .map(|s| s.as_str())
+                    .unwrap_or("<non-string>")
+            });
+        tracing::error!(
+            action = "rust_panic",
+            payload = %payload,
+            location = ?info.location(),
+        );
+        default_hook(info);
+    }));
+
     // Tauri Builder 组装
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // 注册自定义 scheme 处理器，安全地加载本地插件静态资源（如 JS/CSS），避免直接暴露文件系统路径。
         .register_uri_scheme_protocol("app", |_, req| handle_app_scheme(req).unwrap_or_else(|e| {
             tracing::warn!(action = "app_scheme_handler_failed", error = %e);
@@ -52,6 +77,26 @@ pub fn run() -> anyhow::Result<()> {
             // 需要在独立 OS 线程中创建新的 tokio 运行时来执行异步初始化。
             let app_data_dir = app.path().app_data_dir().context("Failed to get app data dir")?;
             crate::shared::app_data_dir::init_app_data_dir(app_data_dir.clone())?;
+
+            // 初始化文件日志
+            let log_dir = app_data_dir.join("logs");
+            std::fs::create_dir_all(&log_dir).ok();
+            let file_appender = tracing_appender::rolling::daily(&log_dir, "app.log");
+            let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+            let file_layer = tracing_subscriber::fmt::layer()
+                .with_writer(non_blocking)
+                .with_ansi(false);
+            // 尝试添加 file_layer 到全局 subscriber
+            if let Err(e) = tracing_subscriber::registry()
+                .with(tracing_subscriber::EnvFilter::from_default_env())
+                .with(file_layer)
+                .try_init()
+            {
+                // 如果 subscriber 已经设定，file_layer 会失败 — 用 warn 记录（会写入现有 subscriber）
+                tracing::warn!(action = "file_logger_already_set", error = %e);
+            }
+            std::mem::forget(guard);
+
             let metadata_db_path = app_data_dir.join("temp_files").join("metadata.db");
             let temp_file_manager = std::thread::spawn({
                 let app_data_dir = app_data_dir.clone();
@@ -79,9 +124,9 @@ pub fn run() -> anyhow::Result<()> {
 
             // 定义托盘菜单行为（默认中文，前端启动后根据 locale 同步更新）
             let labels = tray_labels("zh_cn");
-            let show_i = MenuItem::with_id(app, labels[0].0, labels[0].1, true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, labels[0].0, labels[0].1.clone(), true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
-            let quit_i = MenuItem::with_id(app, labels[1].0, labels[1].1, true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, labels[1].0, labels[1].1.clone(), true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &sep, &quit_i])?;
 
             // 定义托盘图标行为
@@ -215,6 +260,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::shared::chat_cache::commands::chat_cache_remove,
             crate::shared::chat_cache::commands::chat_cache_remove_many,
             // logs
+            crate::app::log_commands::write_app_log,
             crate::shared::log::log_info,
             crate::shared::log::log_error,
             crate::shared::log::log_warning,
@@ -444,3 +490,4 @@ fn handle_app_scheme(
         bytes,
     ))
 }
+pub mod commands;

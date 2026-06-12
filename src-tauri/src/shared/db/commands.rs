@@ -150,7 +150,7 @@ impl ManagedDbKind {
             "server" => Ok(Self::Server),
             _ => Err(command_error(
                 "DB_KIND_INVALID",
-                "kind must be either system or server",
+                "error.db_kind_invalid",
             )),
         }
     }
@@ -180,7 +180,7 @@ fn validate_managed_db_key(key: &str, kind: ManagedDbKind) -> CommandResult<()> 
     } else {
         Err(command_error(
             "DB_KEY_INVALID",
-            format!("invalid {} db key", kind.as_str()),
+            "error.db_key_invalid",
         ))
     }
 }
@@ -283,7 +283,7 @@ fn normalized_sql_head(sql: &str) -> &str {
 fn validate_single_statement_sql(sql: &str) -> CommandResult<()> {
     let trimmed = sql.trim();
     if trimmed.is_empty() {
-        return Err(command_error("DB_SQL_REQUIRED", "sql is required"));
+        return Err(command_error("DB_SQL_REQUIRED", "error.db_sql_required"));
     }
     let mut in_string = false;
     let mut chars = trimmed.chars().peekable();
@@ -293,7 +293,7 @@ fn validate_single_statement_sql(sql: &str) -> CommandResult<()> {
         } else if ch == ';' && !in_string {
             return Err(command_error(
                 "DB_SQL_MULTI_STATEMENT_NOT_ALLOWED",
-                "multiple SQL statements are not allowed",
+                "error.db_sql_multi_statement_not_allowed",
             ));
         }
     }
@@ -308,7 +308,7 @@ fn validate_query_sql(sql: &str) -> CommandResult<()> {
     }
     Err(command_error(
         "DB_SQL_QUERY_ONLY",
-        "db_query only accepts SELECT/WITH statements",
+        "error.db_sql_query_only",
     ))
 }
 
@@ -323,7 +323,7 @@ fn validate_execute_sql(sql: &str) -> CommandResult<()> {
     }
     Err(command_error(
         "DB_SQL_EXECUTE_ONLY",
-        "db_execute only accepts non-query statements",
+        "error.db_sql_execute_only",
     ))
 }
 
@@ -342,29 +342,29 @@ fn validate_execute_sql(sql: &str) -> CommandResult<()> {
 /// - 若 `path` 为空，将使用默认路径 `data/db/{key}.db`。
 pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
     if req.key.trim().is_empty() {
-        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
+        return Err(command_error("DB_KEY_REQUIRED", "error.db_key_required"));
     }
 
     if req.path.is_some() {
         return Err(command_error(
             "DB_PATH_NOT_ALLOWED",
-            "database path is derived internally",
+            "error.db_path_not_allowed",
         ));
     }
 
     let kind = ManagedDbKind::parse(req.kind.as_deref())?;
     validate_managed_db_key(&req.key, kind)?;
 
-    let path = managed_db_path(&req.key).map_err(|e| to_command_error("APP_DATA_DIR", e))?;
+    let path = managed_db_path(&req.key).map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?;
     ensure_parent_dir(&path)
         .await
-        .map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", "error.db_dir_create_failed", e))?;
     connect_named(&req.key, path)
         .await
-        .map_err(|e| to_command_error("DB_CONNECT_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_CONNECT_FAILED", "error.db_connect_failed", e))?;
     run_migrations(&req.key, kind)
         .await
-        .map_err(|e| to_command_error("DB_MIGRATE_FAILED", e))
+        .map_err(|e| to_command_error("DB_MIGRATE_FAILED", "error.db_migrate_failed", e))
 }
 
 #[tauri::command]
@@ -380,13 +380,13 @@ pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
     validate_execute_sql(&req.sql)?;
     let db = get_db(&req.key)
         .await
-        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", "error.db_get_connection_failed", e))?;
     let conn = &db.connection;
     let stmt = RawStatement::new(req.sql, map_values(req.params));
     let result = conn
         .execute(&stmt)
         .await
-        .map_err(|e| to_command_error("DB_EXECUTE_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_EXECUTE_FAILED", "error.db_execute_failed", e))?;
     Ok(exec_result(&result))
 }
 
@@ -405,19 +405,19 @@ pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
 /// - 若 `columns` 为空，直接返回错误。
 pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
     if req.columns.is_empty() {
-        return Err(command_error("DB_COLUMNS_REQUIRED", "columns is required"));
+        return Err(command_error("DB_COLUMNS_REQUIRED", "error.db_columns_required"));
     }
     validate_query_sql(&req.sql)?;
 
     let db = get_db(&req.key)
         .await
-        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", "error.db_get_connection_failed", e))?;
     let conn = &db.connection;
     let stmt = RawStatement::new(req.sql, map_values(req.params));
     let rows = conn
         .query_all(&stmt)
         .await
-        .map_err(|e| to_command_error("DB_QUERY_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_QUERY_FAILED", "error.db_query_failed", e))?;
     let mut result_rows = Vec::with_capacity(rows.len());
 
     for row in rows.iter() {
@@ -446,12 +446,12 @@ pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
 pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbExecResult>> {
     let db = get_db(&req.key)
         .await
-        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", "error.db_get_connection_failed", e))?;
     let conn = &db.connection;
     let txn = conn
         .begin()
         .await
-        .map_err(|e| to_command_error("DB_TRANSACTION_BEGIN_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_TRANSACTION_BEGIN_FAILED", "error.db_transaction_begin_failed", e))?;
     let mut results = Vec::with_capacity(req.statements.len());
 
     for statement in req.statements {
@@ -460,13 +460,13 @@ pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbEx
         let res = txn
             .execute(&stmt)
             .await
-            .map_err(|e| to_command_error("DB_TRANSACTION_EXECUTE_FAILED", e))?;
+            .map_err(|e| to_command_error("DB_TRANSACTION_EXECUTE_FAILED", "error.db_transaction_execute_failed", e))?;
         results.push(exec_result(&res));
     }
 
     txn.commit()
         .await
-        .map_err(|e| to_command_error("DB_TRANSACTION_COMMIT_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_TRANSACTION_COMMIT_FAILED", "error.db_transaction_commit_failed", e))?;
     Ok(results)
 }
 
@@ -484,11 +484,11 @@ pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbEx
 /// 该操作会从内存注册表移除连接；连接对象被 drop 后由底层驱动完成资源释放。
 pub async fn db_close(key: String) -> CommandResult<()> {
     if key.trim().is_empty() {
-        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
+        return Err(command_error("DB_KEY_REQUIRED", "error.db_key_required"));
     }
     close_db(&key)
         .await
-        .map_err(|e| to_command_error("DB_CLOSE_FAILED", e))
+        .map_err(|e| to_command_error("DB_CLOSE_FAILED", "error.db_close_failed", e))
 }
 
 #[tauri::command]
@@ -506,7 +506,7 @@ pub async fn db_close(key: String) -> CommandResult<()> {
 /// - 若注册表中不存在该 key，则使用默认路径作为删除目标兜底。
 pub async fn db_remove(key: String) -> CommandResult<()> {
     if key.trim().is_empty() {
-        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
+        return Err(command_error("DB_KEY_REQUIRED", "error.db_key_required"));
     }
 
     let kind = if key == "system" {
@@ -518,23 +518,23 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
 
     let removed_path = remove_db(&key)
         .await
-        .map_err(|e| to_command_error("DB_REMOVE_FAILED", e))?;
+        .map_err(|e| to_command_error("DB_REMOVE_FAILED", "error.db_remove_failed", e))?;
     let path = match removed_path {
         Some(p) => p,
-        None => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", e))?,
+        None => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?,
     };
 
     if !is_managed_db_path(&path) {
         return Err(command_error(
             "DB_PATH_OUTSIDE_ROOT",
-            "database path must stay under the managed db root",
+            "error.db_path_outside_root",
         ));
     }
 
     if tokio::fs::metadata(&path).await.is_ok() {
         tokio::fs::remove_file(&path)
             .await
-            .map_err(|e| to_command_error("DB_FILE_REMOVE_FAILED", e))?;
+            .map_err(|e| to_command_error("DB_FILE_REMOVE_FAILED", "error.db_file_remove_failed", e))?;
     }
     Ok(())
 }
@@ -554,7 +554,7 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
 /// - 若不存在，则返回默认路径 `data/db/{key}.db`。
 pub async fn db_path(key: String) -> CommandResult<String> {
     if key.trim().is_empty() {
-        return Err(command_error("DB_KEY_REQUIRED", "key is required"));
+        return Err(command_error("DB_KEY_REQUIRED", "error.db_key_required"));
     }
     let kind = if key == "system" {
         ManagedDbKind::System
@@ -565,7 +565,7 @@ pub async fn db_path(key: String) -> CommandResult<String> {
 
     let path = match get_entry_path(&key).await {
         Ok(path) => path,
-        Err(_) => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", e))?,
+        Err(_) => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?,
     };
     Ok(path.to_string_lossy().to_string())
 }

@@ -468,7 +468,17 @@ function handleViewFullProfile() {
 
 function handleEditProfile() {
   closePopover();
-  router.push("/settings/profile");
+  router.push({
+    path: "/user_info",
+    query: {
+      uid: props.userId,
+      name: resolvedUsername.value || undefined,
+      email: resolvedEmail.value || undefined,
+      bio: resolvedBio.value || undefined,
+      avatarUrl: resolvedAvatarUrl.value || undefined,
+      backgroundUrl: resolvedBackgroundUrl.value || undefined,
+    },
+  });
 }
 
 // Edit background

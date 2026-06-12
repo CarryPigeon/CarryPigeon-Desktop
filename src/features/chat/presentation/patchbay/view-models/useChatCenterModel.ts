@@ -114,7 +114,7 @@ type ChatCenterRawModel = {
   closeSearchPanel(): void;
   searchMessages(query: string): Promise<void>;
   setSearchScope(scope: "channel" | "server"): void;
-  openSearchResult(messageId: string): Promise<void>;
+  openSearchResult(messageId: string, channelId?: string): Promise<void>;
   multiSelectMode: ComputedRef<boolean>;
   selectedCount: ComputedRef<number>;
   enterMultiSelectMode(firstMessageId: string): void;
@@ -158,6 +158,7 @@ export type UseChatCenterModelDeps = {
   onDeleteShortcut(messageId: string): void;
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
   onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
+  selectChannel(channelId: string): Promise<void>;
   chatApi?: ChatApiPort;
   linkPreview?: Ref<ChatLinkPreview | null | undefined>;
   fetchLinkPreview?: (url: string) => Promise<void>;
@@ -310,7 +311,10 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     }
   }
 
-  async function openSearchResult(messageId: string): Promise<void> {
+  async function openSearchResult(messageId: string, channelId?: string): Promise<void> {
+    if (channelId && channelId !== currentSessionSnapshot.value.currentChannelId) {
+      await deps.selectChannel(channelId);
+    }
     await deps.currentTimeline.loadContextAroundMessage(messageId);
     await nextTick();
     const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);

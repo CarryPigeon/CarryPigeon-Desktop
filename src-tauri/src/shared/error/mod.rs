@@ -14,31 +14,33 @@ use std::fmt::Display;
 /// - 字符串格式统一为 `[ERROR_CODE] message`。
 pub type CommandResult<T> = Result<T, String>;
 
-/// 构建统一格式的命令错误消息。
+/// 构建统一格式的命令错误消息（i18n版本）。
 ///
 /// # 参数
 /// - `code`：稳定错误码（建议大写下划线风格）。
-/// - `message`：错误消息。
+/// - `i18n_key`：翻译key，格式为 `error.{code_lowercase}`。
 ///
 /// # 返回值
-/// 统一格式字符串：`[ERROR_CODE] message`。
-pub fn command_error(code: &'static str, message: impl Into<String>) -> String {
-    format!("[{code}] {}", message.into())
+/// 统一格式字符串：`[ERROR_CODE] 翻译后的消息`。
+pub fn command_error(code: &'static str, i18n_key: &str) -> String {
+    let message = rust_i18n::t!(i18n_key);
+    format!("[{code}] {message}")
 }
 
-/// 将任意可显示错误转换为统一命令错误，并输出结构化日志。
+/// 将任意可显示错误转换为统一命令错误，并输出结构化日志（i18n版本）。
 ///
 /// # 参数
 /// - `code`：稳定错误码。
-/// - `error`：原始错误对象。
+/// - `i18n_key`：翻译key，格式为 `error.{code_lowercase}`。
+/// - `error`：原始错误对象（仅用于日志记录）。
 ///
 /// # 返回值
-/// 统一格式字符串：`[ERROR_CODE] message`。
-pub fn to_command_error<E>(code: &'static str, error: E) -> String
+/// 统一格式字符串：`[ERROR_CODE] 翻译后的消息`。
+pub fn to_command_error<E>(code: &'static str, i18n_key: &str, error: E) -> String
 where
     E: Display,
 {
-    let message = error.to_string();
-    tracing::error!(action = "tauri_command_failed", code, error = %message);
-    command_error(code, message)
+    let raw_message = error.to_string();
+    tracing::error!(action = "tauri_command_failed", code, error = %raw_message);
+    command_error(code, i18n_key)
 }

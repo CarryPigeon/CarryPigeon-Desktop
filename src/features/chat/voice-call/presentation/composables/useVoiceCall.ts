@@ -46,6 +46,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   }
 
   function startPoll() {
+    if (pollHandle) return;
     pollHandle = setInterval(() => {
       const session = statePort.getActiveSession();
       if (session) {
@@ -60,6 +61,34 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
 
   function stopPoll() {
     if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+  }
+
+  function beginListening() {
+    startPoll();
+  }
+
+  /** 处理来电：外部事件驱动更新本地状态 */
+  function onIncomingCall(session: CallSession) {
+    callState.value = "ringing";
+    activeSession.value = session;
+    participants.value = session.participants;
+    startPoll();
+  }
+
+  /** 外部状态变更同步（被动更新本地状态） */
+  function syncState(state: CallState, session: CallSession | null) {
+    if (state === "ringing" && session) {
+      onIncomingCall(session);
+    } else if (state === "ended" && session) {
+      callState.value = "ended";
+      activeSession.value = session;
+      stopTimer();
+    } else if (session) {
+      callState.value = state;
+      activeSession.value = session;
+      participants.value = session.participants;
+      isMuted.value = session.participants.find(p => p.userId === userId())?.isMuted ?? false;
+    }
   }
 
   async function startDirectCall(targetUserId: string): Promise<CallSession> {
@@ -82,6 +111,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     const session = activeSession.value;
     if (!session) return;
     callState.value = "connecting";
+    startPoll();
     await statePort.acceptCall(session.sessionId);
   }
 
@@ -90,7 +120,6 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     if (!session) return;
     callState.value = "ended";
     await statePort.rejectCall(session.sessionId, reason);
-    stopPoll();
     stopTimer();
     activeSummary.value = {
       sessionId: session.sessionId,
@@ -113,7 +142,6 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     if (!session) return;
     callState.value = "ended";
     await statePort.cancelCall(session.sessionId);
-    stopPoll();
     stopTimer();
     activeSummary.value = {
       sessionId: session.sessionId,
@@ -168,7 +196,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   async function joinConference(sessionId: string, initiatorId?: string): Promise<CallSession | undefined> {
     if (!statePort.joinConference) return;
     const session = await statePort.joinConference(sessionId, initiatorId);
-    callState.value = "connecting";
+    callState.value = session.state;
     activeSession.value = session;
     startPoll();
     return session;
@@ -179,7 +207,6 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     if (!session || !statePort.leaveConference) return;
     callState.value = "ended";
     await statePort.leaveConference(session.sessionId);
-    stopPoll();
     stopTimer();
     activeSummary.value = {
       sessionId: session.sessionId,
@@ -213,7 +240,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   });
 
   return {
-    callState: readonly(callState),
+    callState,
     activeSession: readonly(activeSession),
     participants: readonly(participants),
     duration: readonly(duration),
@@ -237,6 +264,9 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     initDevices,
     joinConference,
     leaveConference,
+    beginListening,
     isConferenceHost,
+    onIncomingCall,
+    syncState,
   };
 }

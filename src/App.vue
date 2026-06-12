@@ -3,11 +3,13 @@
  * @fileoverview 应用根组件（路由容器）。
  */
 defineOptions({ name: "App" });
+import StartupShell from '@/app/bootstrap/StartupShell.vue';
 </script>
 
 <template>
-  <!-- 应用根组件：渲染路由视图（RouterView） -->
-  <router-view></router-view>
+  <StartupShell>
+    <router-view></router-view>
+  </StartupShell>
 </template>
 
 <style lang="scss">
@@ -48,6 +50,10 @@ defineOptions({ name: "App" });
   --cp-info: #0284c7;
   --cp-danger: #b42318;
   --cp-accent-shadow: rgba(15, 118, 110, 0.22);
+  --cp-success: #059669;
+  --cp-primary: #0f766e;
+  --cp-skeleton: rgba(20, 32, 29, 0.08);
+  --cp-warning: var(--cp-warn);
 
   /* 高亮（与主题相关的选中/聚焦强调色） */
   --cp-highlight: var(--cp-info);
@@ -170,6 +176,10 @@ defineOptions({ name: "App" });
   --cp-danger: #ef4444;
   --cp-info: #38bdf8;
   --cp-accent-shadow: rgba(34, 197, 94, 0.22);
+  --cp-success: #22c55e;
+  --cp-primary: #38bdf8;
+  --cp-skeleton: rgba(148, 163, 184, 0.10);
+  --cp-warning: var(--cp-warn);
 
   /* 高亮（与主题相关的选中/聚焦强调色） */
   --cp-highlight: var(--cp-info);

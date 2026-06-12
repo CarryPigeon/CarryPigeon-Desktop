@@ -7,6 +7,7 @@ import { ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import "emoji-picker-element";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/api-types";
+import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
 
 const props = defineProps<{
   messageId: string;
@@ -23,7 +24,10 @@ const emojiTab = ref<"standard" | "custom">("standard");
 
 onMounted(async () => {
   try {
-    customEmojis.value = await invoke("list_custom_emojis");
+    const uid = getCurrentChatUserId();
+    if (uid) {
+      customEmojis.value = await invoke("list_custom_emojis", { uid });
+    }
   } catch { /* ignore */ }
 });
 

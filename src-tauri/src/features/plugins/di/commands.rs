@@ -29,7 +29,7 @@ use std::collections::HashMap;
 pub async fn load_plugin(manifest: PluginManifest) -> CommandResult<PluginLoadResult> {
     plugin_usecases::load_plugin(manifest, PluginLoaderPortAdapter::shared())
         .await
-        .map_err(|e| to_command_error("PLUGINS_LOAD_FAILED", e))
+        .map_err(|e| to_command_error("PLUGINS_LOAD_FAILED", "error.plugins_load_failed", e))
 }
 
 /// 列出本地已保存的插件清单列表。
@@ -41,7 +41,7 @@ pub async fn load_plugin(manifest: PluginManifest) -> CommandResult<PluginLoadRe
 pub async fn list_plugins() -> CommandResult<Vec<PluginManifest>> {
     plugin_usecases::list_plugins(PluginLoaderPortAdapter::shared())
         .await
-        .map_err(|e| to_command_error("PLUGINS_LIST_FAILED", e))
+        .map_err(|e| to_command_error("PLUGINS_LIST_FAILED", "error.plugins_list_failed", e))
 }
 
 /// 查询服务端已安装插件列表（含当前版本/启用态/错误等状态）。
@@ -67,7 +67,7 @@ pub async fn plugins_list_installed(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_LIST_INSTALLED_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_LIST_INSTALLED_FAILED", "error.plugins_list_installed_failed", e))
 }
 
 /// 查询某个插件在服务端的安装状态。
@@ -96,7 +96,7 @@ pub async fn plugins_get_installed_state(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_GET_INSTALLED_STATE_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_GET_INSTALLED_STATE_FAILED", "error.plugins_get_installed_state_failed", e))
 }
 
 /// 获取插件运行时入口（用于前端动态 import 插件模块）。
@@ -124,7 +124,7 @@ pub async fn plugins_get_runtime_entry(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FAILED", "error.plugins_get_runtime_entry_failed", e))
 }
 
 /// 获取指定版本的插件运行时入口。
@@ -155,7 +155,7 @@ pub async fn plugins_get_runtime_entry_for_version(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FOR_VERSION_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_GET_RUNTIME_ENTRY_FOR_VERSION_FAILED", "error.plugins_get_runtime_entry_for_version_failed", e))
 }
 
 /// 从服务端插件目录安装插件。
@@ -186,7 +186,7 @@ pub async fn plugins_install_from_server_catalog(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_SERVER_CATALOG_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_SERVER_CATALOG_FAILED", "error.plugins_install_from_server_catalog_failed", e))
 }
 
 /// 从指定 URL 安装插件（自定义来源）。
@@ -225,7 +225,7 @@ pub async fn plugins_install_from_url(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_URL_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_INSTALL_FROM_URL_FAILED", "error.plugins_install_from_url_failed", e))
 }
 
 /// 启用已安装插件。
@@ -253,7 +253,7 @@ pub async fn plugins_enable(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_ENABLE_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_ENABLE_FAILED", "error.plugins_enable_failed", e))
 }
 
 /// 禁用已安装插件。
@@ -281,7 +281,7 @@ pub async fn plugins_disable(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_DISABLE_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_DISABLE_FAILED", "error.plugins_disable_failed", e))
 }
 
 /// 切换已安装插件的当前版本。
@@ -312,7 +312,7 @@ pub async fn plugins_switch_version(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_SWITCH_VERSION_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_SWITCH_VERSION_FAILED", "error.plugins_switch_version_failed", e))
 }
 
 /// 卸载插件（移除服务端安装记录与本地缓存）。
@@ -340,7 +340,7 @@ pub async fn plugins_uninstall(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_UNINSTALL_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_UNINSTALL_FAILED", "error.plugins_uninstall_failed", e))
 }
 
 /// 将插件状态标记为失败（写入 last_error 等字段）。
@@ -371,7 +371,7 @@ pub async fn plugins_set_failed(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_SET_FAILED_STATE_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_SET_FAILED_STATE_FAILED", "error.plugins_set_failed_state_failed", e))
 }
 
 /// 清除插件的错误信息（从 failed 恢复）。
@@ -399,7 +399,7 @@ pub async fn plugins_clear_error(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_CLEAR_ERROR_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_CLEAR_ERROR_FAILED", "error.plugins_clear_error_failed", e))
 }
 
 /// 读取插件私有存储（KV）。
@@ -431,7 +431,7 @@ pub async fn plugins_storage_get(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_STORAGE_GET_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_STORAGE_GET_FAILED", "error.plugins_storage_get_failed", e))
 }
 
 /// 写入插件私有存储（KV）。
@@ -465,7 +465,7 @@ pub async fn plugins_storage_set(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_STORAGE_SET_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_STORAGE_SET_FAILED", "error.plugins_storage_set_failed", e))
 }
 
 /// 以插件权限边界发起网络请求（供插件 runtime 调用）。
@@ -504,5 +504,5 @@ pub async fn plugins_network_fetch(
         PluginInstallStorePortAdapter::shared(),
     )
     .await
-    .map_err(|e| to_command_error("PLUGINS_NETWORK_FETCH_FAILED", e))
+    .map_err(|e| to_command_error("PLUGINS_NETWORK_FETCH_FAILED", "error.plugins_network_fetch_failed", e))
 }

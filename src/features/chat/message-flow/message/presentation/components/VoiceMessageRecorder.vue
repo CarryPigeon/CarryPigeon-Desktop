@@ -123,9 +123,9 @@ onUnmounted(() => {
     :title="state === 'idle' ? '录制语音' : state === 'recording' ? '停止录制' : '处理中…'"
     @click="toggleRecording"
   >
-    <span v-if="state === 'idle'" class="cp-voiceRecorder__icon">🎤</span>
-    <span v-else-if="state === 'recording'" class="cp-voiceRecorder__icon cp-voiceRecorder__pulse">🔴</span>
-    <span v-else class="cp-voiceRecorder__icon">⏳</span>
+    <t-icon v-if="state === 'idle'" name="microphone" class="cp-voiceRecorder__icon" />
+    <t-icon v-else-if="state === 'recording'" name="microphone" class="cp-voiceRecorder__icon cp-voiceRecorder__icon--recording" />
+    <t-icon v-else name="loading" class="cp-voiceRecorder__icon" />
     <span v-if="state === 'recording'" class="cp-voiceRecorder__timer">
       {{ formatDuration(elapsedMs) }}
     </span>
@@ -137,22 +137,20 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 2px solid var(--cp-border, #d0d5dd);
-  background: var(--cp-panel-muted, #f5f5f5);
-  color: var(--cp-text, #1d1d1f);
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
   border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 8px 12px;
+  font-size: 12px;
   cursor: pointer;
   transition:
-    border-color var(--cp-fast, 0.15s) var(--cp-ease, ease),
-    background-color var(--cp-fast, 0.15s) var(--cp-ease, ease),
-    transform var(--cp-fast, 0.15s) var(--cp-ease, ease);
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease);
 
   &:hover:enabled {
     transform: translateY(-1px);
-    border-color: var(--cp-accent, #666);
-    background: var(--cp-hover-bg, #eaeaea);
+    background: var(--cp-hover-bg);
   }
 
   &:disabled {
@@ -161,22 +159,22 @@ onUnmounted(() => {
   }
 
   &--recording {
-    border-color: var(--cp-danger, #e53935);
-    background: color-mix(in oklab, var(--cp-danger, #e53935) 12%, var(--cp-panel-muted, #f5f5f5));
-    animation: cp-voiceRecorder-pulse 1.5s ease-in-out infinite;
+    border-color: var(--cp-danger);
+    background: color-mix(in oklab, var(--cp-danger) 12%, var(--cp-panel-muted));
   }
 
   &--processing {
-    border-color: var(--cp-warning, #f59e0b);
-    background: color-mix(in oklab, var(--cp-warning, #f59e0b) 12%, var(--cp-panel-muted, #f5f5f5));
+    border-color: var(--cp-warning);
+    background: color-mix(in oklab, var(--cp-warning) 12%, var(--cp-panel-muted));
   }
 
   &__icon {
+    font-size: 16px;
     line-height: 1;
-  }
 
-  &__pulse {
-    animation: cp-voiceRecorder-blink 1s ease-in-out infinite;
+    &--recording {
+      color: var(--cp-danger);
+    }
   }
 
   &__timer {
@@ -188,21 +186,4 @@ onUnmounted(() => {
   }
 }
 
-@keyframes cp-voiceRecorder-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--cp-danger, #e53935) 40%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in oklab, var(--cp-danger, #e53935) 0%, transparent);
-  }
-}
-
-@keyframes cp-voiceRecorder-blink {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
 </style>

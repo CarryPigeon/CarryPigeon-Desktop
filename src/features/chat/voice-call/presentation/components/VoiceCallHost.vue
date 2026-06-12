@@ -1,43 +1,48 @@
 <template>
-  <VoiceCallBanner
-    :caller-name="callerName"
-    :visible="callState === 'ringing'"
-    @accept="handleAccept"
-    @reject="handleReject"
-  />
-  <VoiceCallPanel
-    :state="callState"
-    :duration="duration"
-    :participants="participantsWithAvatars"
-    :is-muted="isMuted"
-    :is-noise-suppression-on="isNoiseSuppressionOn"
-    :input-devices="inputDevices"
-    :current-input-device-id="currentInputDeviceId"
-    :output-devices="outputDevices"
-    :current-output-device-id="currentOutputDeviceId"
-    :is-conference="isConference"
-    @toggle-mute="toggleMute"
-    @toggle-noise-suppression="toggleNoiseSuppression"
-    @select-input-device="selectInputDevice"
-    @select-output-device="selectOutputDevice"
-    @hangup="handleHangup"
-  />
+  <div class="voice-call-host">
+    <VoiceCallBanner
+      :caller-name="callerName"
+      :visible="callState === 'ringing'"
+      @accept="handleAccept"
+      @reject="handleReject"
+    />
+    <VoiceCallPanel
+      :state="callState"
+      :duration="duration"
+      :participants="participantsWithAvatars"
+      :is-muted="isMuted"
+      :is-noise-suppression-on="isNoiseSuppressionOn"
+      :input-devices="inputDevices"
+      :current-input-device-id="currentInputDeviceId"
+      :output-devices="outputDevices"
+      :current-output-device-id="currentOutputDeviceId"
+      :is-conference="isConference"
+      @toggle-mute="toggleMute"
+      @toggle-noise-suppression="toggleNoiseSuppression"
+      @select-input-device="selectInputDevice"
+      @select-output-device="selectOutputDevice"
+      @hangup="handleHangup"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { listen } from "@tauri-apps/api/event";
 import { useVoiceCall } from "../composables/useVoiceCall";
 import VoiceCallBanner from "./VoiceCallBanner.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
 import { createMockVoiceCallStatePort } from "../../mock";
 import { createTauriVoiceCallApi } from "../../data/tauri/tauriVoiceCallApi";
-import { currentServerSocket } from "@/features/server-connection/api";
-import { readAuthToken } from "@/shared/utils/localState";
-import { currentChatUserId, currentChatUsername } from "../../../composition/chatAccountSession";
+import { currentChatUserId } from "../../../composition/chatAccountSession";
 import { getRoomGovernanceCapabilities } from "../../../room-governance/api";
-import { MOCK_MODE } from "@/shared/config/runtime";
-import type { CallParticipant } from "../../domain/contracts";
+import { IS_STORE_MOCK } from "@/shared/config/runtime";
+import {
+  currentState as globalCallState,
+  activeSession as globalActiveSession,
+} from "../../presentation/store-access/voiceCallStoreAccess";
+import type { CallParticipant, CallSession, CallState } from "../../domain/contracts";
 
 const { t } = useI18n();
 
@@ -47,7 +52,11 @@ const props = defineProps<{
   targetUserId?: string;
 }>();
 
-const isMock = MOCK_MODE !== "off";
+const emit = defineEmits<{
+  (e: "stateChange", state: CallState): void;
+}>();
+
+const isMock = IS_STORE_MOCK;
 const statePort = isMock
   ? createMockVoiceCallStatePort()
   : createTauriVoiceCallApi();
@@ -61,7 +70,6 @@ const {
   isNoiseSuppressionOn,
   inputDevices,
   outputDevices,
-  connectSignaling,
   startDirectCall,
   startConference,
   acceptCall,
@@ -75,6 +83,9 @@ const {
   initDevices,
   joinConference,
   leaveConference,
+  beginListening,
+  onIncomingCall,
+  syncState,
 } = useVoiceCall({
   statePort,
   roomId: () => props.roomId,
@@ -116,16 +127,11 @@ function handleHangup() {
   }
 }
 
-const wsUrl = computed(() => {
-  const socket = currentServerSocket.value;
-  if (!socket) return "";
-  const host = socket.startsWith("http") ? socket.replace(/^https?:\/\//, "") : socket;
-  return `wss://${host}/signaling`;
-});
-
-const accessToken = computed(() => readAuthToken(currentServerSocket.value ?? ""));
-
 const memberAvatarMap = ref<Map<string, string>>(new Map());
+
+watch(callState, (s, prev) => {
+  if (s !== prev) emit("stateChange", s);
+});
 
 watch(callState, async (s) => {
   if (s === "active" || s === "connecting") {
@@ -155,14 +161,80 @@ const participantsWithAvatars = computed(() => {
 
 onMounted(() => {
   initDevices();
+  beginListening();
+  // 信令连接已由 assembleChatStoreRuntime 统一管理，此处不再重复连接。
+});
+
+// 监听 Rust 后端发射的 voice_call:incoming Tauri 事件
+let unlistenIncoming: (() => void) | null = null;
+let unlistenStateChange: (() => void) | null = null;
+
+onMounted(async () => {
   if (isMock) return;
-  const url = wsUrl.value;
-  const token = accessToken.value;
-  const uid = currentChatUserId.value;
-  const name = currentChatUsername.value;
-  if (url && token && uid && name) {
-    connectSignaling(url, token, uid, name);
+  try {
+    unlistenIncoming = await listen<{
+      session_id: string;
+      call_kind: string;
+      from_user_id: string;
+      from_display_name: string;
+      room_id: string;
+      timestamp: number;
+    }>("voice_call:incoming", (event) => {
+      const w = event.payload;
+      const session: CallSession = {
+        sessionId: w.session_id,
+        kind: (w.call_kind as CallSession["kind"]) || "direct",
+        state: "ringing",
+        initiator: w.from_user_id,
+        participants: [],
+        roomId: w.room_id,
+        startedAt: w.timestamp,
+        endedAt: null,
+        mediaSettings: {
+          inputDeviceId: null,
+          outputDeviceId: null,
+          noiseSuppression: false,
+          echoCancellation: false,
+        },
+      };
+      onIncomingCall(session);
+    });
+  } catch {
+    // Tauri event listen 在非 Tauri 环境会失败，忽略。
   }
+
+  try {
+    unlistenStateChange = await listen<{
+      session_id: string;
+      new_state: string;
+      reason?: string;
+    }>("voice_call:state_change", (event) => {
+      const s = event.payload;
+      const session = activeSession.value;
+      if (session && session.sessionId === s.session_id) {
+        syncState(s.new_state as CallState, {
+          ...session,
+          state: s.new_state as CallSession["state"],
+        });
+      }
+    });
+  } catch {
+    // 同上，非 Tauri 环境忽略。
+  }
+});
+
+// 监听全局 voiceCallStoreAccess 状态（WS 事件路由更新此状态）
+watch([globalCallState, globalActiveSession], ([gState, gSession]) => {
+  if (!gState || gState === "idle") return;
+  // 仅当全局状态与本地状态不一致时同步（避免循环更新）
+  if (gState !== callState.value && gSession) {
+    syncState(gState, gSession);
+  }
+});
+
+onUnmounted(() => {
+  unlistenIncoming?.();
+  unlistenStateChange?.();
 });
 
 function startCall(targetUserId?: string) {

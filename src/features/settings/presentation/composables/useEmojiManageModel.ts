@@ -3,7 +3,7 @@
  * @description 自定义表情管理数据模型与操作。
  */
 
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { createLogger } from "@/shared/utils/logger";
 
@@ -15,6 +15,8 @@ export type EmojiEntry = {
   filePath: string;
   addedAt: number;
   tags: string[];
+  ownerUid: string;
+  isAnimated: boolean;
 };
 
 export function useEmojiManageModel() {
@@ -22,10 +24,11 @@ export function useEmojiManageModel() {
   const loading = ref(false);
   const error = ref("");
 
-  async function loadEmojis(): Promise<void> {
+  async function loadEmojis(uid: string): Promise<void> {
+    if (!uid) return;
     loading.value = true;
     try {
-      emojis.value = await invoke<EmojiEntry[]>("list_custom_emojis");
+      emojis.value = await invoke<EmojiEntry[]>("list_custom_emojis", { uid });
     } catch (e) {
       error.value = String(e);
       logger.error("Action: chat_emoji_load_failed", { error: String(e) });
@@ -34,20 +37,20 @@ export function useEmojiManageModel() {
     }
   }
 
-  async function addEmoji(sourcePath: string, name: string, tags: string[] = []): Promise<void> {
+  async function addEmoji(sourcePath: string, name: string, tags: string[] = [], uid: string): Promise<void> {
     try {
-      await invoke("save_emoji", { sourcePath, name, tags });
-      await loadEmojis();
+      await invoke("save_emoji", { sourcePath, name, tags, uid });
+      await loadEmojis(uid);
     } catch (e) {
       logger.error("Action: chat_emoji_save_failed", { error: String(e) });
       throw e;
     }
   }
 
-  async function deleteEmoji(id: string): Promise<void> {
+  async function deleteEmoji(id: string, uid: string): Promise<void> {
     try {
-      await invoke("delete_emoji", { id });
-      await loadEmojis();
+      await invoke("delete_emoji", { id, uid });
+      await loadEmojis(uid);
     } catch (e) {
       logger.error("Action: chat_emoji_delete_failed", { error: String(e) });
       throw e;
@@ -55,10 +58,8 @@ export function useEmojiManageModel() {
   }
 
   async function getImagePath(id: string): Promise<string> {
-    return invoke<string>("get_chat_emoji_image_path", { id });
+    return invoke<string>("get_emoji_image_path", { id });
   }
-
-  onMounted(loadEmojis);
 
   return { emojis, loading, error, loadEmojis, addEmoji, deleteEmoji, getImagePath };
 }

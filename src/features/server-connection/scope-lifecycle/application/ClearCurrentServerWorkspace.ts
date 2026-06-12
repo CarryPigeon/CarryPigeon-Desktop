@@ -120,7 +120,7 @@ export class ClearCurrentServerWorkspace {
     if (!socket) {
       throw new ClearCurrentServerWorkspaceError({
         code: "missing_server_socket",
-        message: "缺少服务器 socket 地址",
+        message: "Missing server socket address",
       });
     }
 

@@ -20,16 +20,18 @@ tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
 # tokio
-tokio = { version = "1.48.0", features = ["full"] }
+tokio = { version = "1.48.0", features = ["rt-multi-thread", "sync", "net", "io-util", "time", "macros", "fs"] }
 
 # tauri
 tauri = { version = "2.10.1", features = [ "tray-icon" ] }
 tauri-plugin-opener = "2.5.2"
 tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
 
 # 日志输出
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter", "registry"] }
 regex = "1.11.2"
 
 # bytes
@@ -65,6 +67,9 @@ getrandom = "0.4.2"
 # zip 解压（插件包安装）
 zip = "8.6.0"
 async-trait = "0.1.89"
+
+# 国际化
+rust-i18n = "3"
 cpal = "0.17.3"
 
 # WebRTC P2P
@@ -75,8 +80,21 @@ opus-wave = "3.0.1"
 tokio-tungstenite = { version = "0.29.0", features = ["native-tls"] }
 
 # 自定义表情（emoji 模块）
-image = "0.25"
+image = { version = "0.25", default-features = false, features = ["gif", "png"] }
 uuid = { version = "1", features = ["v4"] }
+gif = "0.14"
+
+[profile.dev]
+opt-level = 0             # 不优化，最快编译
+incremental = true        # 增量编译
+codegen-units = 256       # 最大并行编译单元
+lto = false               # 关闭 LTO
+
+[profile.release]
+opt-level = "z"          # 优先优化体积
+lto = true               # 跨 crate 死代码消除
+strip = true             # 去除调试符号
+panic = "abort"          # 移除 unwind 回滚表
 
 [dev-dependencies]
 tempfile = "3"

@@ -11,6 +11,7 @@ import MonoTag from "@/shared/ui/MonoTag.vue";
 import { IS_MOCK_ENABLED, MOCK_MODE } from "@/shared/config/runtime";
 import { getAboutCapabilities } from "@/features/about/api";
 import type { AppInfo } from "@/features/about/api-types";
+import { checkForUpdate, type UpdateStatus } from "@/shared/updater/checkUpdate";
 import { useSettingsPageModel } from "@/features/settings/presentation/composables/useSettingsPageModel";
 import { DEFAULT_APP_THEME, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
 import { DEFAULT_APP_LOCALE } from "@/shared/utils/locale";
@@ -95,6 +96,12 @@ onBeforeUnmount(() => {
 });
 
 const appInfo = ref<AppInfo | null>(null);
+const updateCheckState = ref<UpdateStatus | { kind: 'checking' }>({ kind: 'checking' });
+
+async function handleCheckUpdate(): Promise<void> {
+  updateCheckState.value = { kind: 'checking' };
+  updateCheckState.value = await checkForUpdate();
+}
 
 onMounted(async () => {
   appInfo.value = await getAboutCapabilities().getAppInfo();
@@ -468,6 +475,19 @@ async function handleResetDefaults(): Promise<void> {
                 <span class="cp-settings__muted">{{ appInfo.name }}</span>
                 <MonoTag :value="appInfo.version" title="version" />
               </div>
+            </div>
+          </div>
+          <div class="cp-settings__card">
+            <div class="cp-settings__k">{{ t("check_for_updates") }}</div>
+            <div class="cp-settings__v">
+              <button class="cp-settings__btn" data-testid="settings-check-update-now" type="button" @click="handleCheckUpdate" :disabled="updateCheckState.kind === 'checking'">
+                {{ updateCheckState.kind === 'checking' ? t('checking') : t('check_for_updates') }}
+              </button>
+              <div v-if="updateCheckState.kind === 'up_to_date'" class="cp-settings__hint">{{ t('settings_up_to_date') }}</div>
+              <div v-else-if="updateCheckState.kind === 'update_available'" class="cp-settings__hint">
+                {{ t('settings_update_available') }} v{{ updateCheckState.version }}
+              </div>
+              <div v-else-if="updateCheckState.kind === 'error'" class="cp-settings__err">{{ updateCheckState.message }}</div>
             </div>
           </div>
           <div class="cp-settings__card">

@@ -516,7 +516,7 @@
 /* 频道行：草稿指示器 */
 .cp-channel__draft-indicator {
   font-size: 11px;
-  color: var(--cp-warning, #f0a030);
+  color: var(--cp-warning);
   margin-left: auto;
   opacity: 0.8;
 }
@@ -583,10 +583,10 @@
   transform: none;
 }
 
-/* 中间栏布局（top console / messages / composer） */
+/* 中间栏布局（top console / voice-call / messages / composer） */
 .cp-center {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 顶部控制台栏 */
@@ -625,6 +625,8 @@
 
 /* 消息面板：可滚动消息列表 */
 .cp-signalPane {
+  flex: 1;
+  min-height: 0;
   padding: 14px;
   overflow: auto;
   display: flex;

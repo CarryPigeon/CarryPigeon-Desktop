@@ -40,7 +40,7 @@ pub async fn add_tcp_service(
             socket,
         )
         .await
-        .map_err(|e| to_command_error("NETWORK_TCP_ADD_FAILED", e))
+        .map_err(|e| to_command_error("NETWORK_TCP_ADD_FAILED", "error.network_tcp_add_failed", e))
 }
 
 #[tauri::command]
@@ -61,7 +61,7 @@ pub async fn remove_tcp_service(
     tcp_registry
         .remove_tcp_service(server_socket, TauriTcpEventSink::shared(app))
         .await
-        .map_err(|e| to_command_error("NETWORK_TCP_REMOVE_FAILED", e))
+        .map_err(|e| to_command_error("NETWORK_TCP_REMOVE_FAILED", "error.network_tcp_remove_failed", e))
 }
 
 #[tauri::command]
@@ -82,7 +82,7 @@ pub async fn send_tcp_service(
     tcp_registry
         .send_tcp_service(server_socket, data)
         .await
-        .map_err(|e| to_command_error("NETWORK_TCP_SEND_FAILED", e))
+        .map_err(|e| to_command_error("NETWORK_TCP_SEND_FAILED", "error.network_tcp_send_failed", e))
 }
 
 /// 使用 Rust `reqwest` 执行 `/api/*` JSON 请求（支持 TLS 策略）。
@@ -110,7 +110,7 @@ pub async fn api_request_json(args: ApiRequestJsonArgs) -> CommandResult<ApiRequ
             body: result.body,
             error: result.error,
         })
-        .map_err(|e| to_command_error("NETWORK_API_REQUEST_FAILED", e))
+        .map_err(|e| to_command_error("NETWORK_API_REQUEST_FAILED", "error.network_api_request_failed", e))
 }
 
 /// 使用 Rust `reqwest` 下载文件，通过 Tauri event 推送下载进度。
@@ -137,9 +137,9 @@ pub async fn download_file(
         .header("Authorization", format!("Bearer {token}"))
         .send()
         .await
-        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", e))?
+        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?
         .error_for_status()
-        .map_err(|e| to_command_error("DOWNLOAD_HTTP_ERROR", e))?;
+        .map_err(|e| to_command_error("DOWNLOAD_HTTP_ERROR", "error.download_http_error", e))?;
 
     let total = response.content_length().unwrap_or(0);
     let mime_type = response
@@ -151,17 +151,17 @@ pub async fn download_file(
     let mut file = temp_files
         .create_download(&task_id, &url, mime_type.as_deref(), total)
         .await
-        .map_err(|e| to_command_error("TEMP_FILE_CREATE_FAILED", e))?;
+        .map_err(|e| to_command_error("TEMP_FILE_CREATE_FAILED", "error.temp_file_create_failed", e))?;
 
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
 
     let stream_result: Result<(), _> = async {
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| to_command_error("DOWNLOAD_STREAM_ERROR", e))?;
+            let chunk = chunk.map_err(|e| to_command_error("DOWNLOAD_STREAM_ERROR", "error.download_stream_error", e))?;
             file.write_all(&chunk)
                 .await
-                .map_err(|e| to_command_error("TEMP_FILE_WRITE_FAILED", e))?;
+                .map_err(|e| to_command_error("TEMP_FILE_WRITE_FAILED", "error.temp_file_write_failed", e))?;
             downloaded += chunk.len() as u64;
 
             if let Err(e) = temp_files
@@ -195,7 +195,7 @@ pub async fn download_file(
     let final_path = temp_files
         .mark_complete(&task_id, &ext)
         .await
-        .map_err(|e| to_command_error("TEMP_FILE_MOVE_FAILED", e))?;
+        .map_err(|e| to_command_error("TEMP_FILE_MOVE_FAILED", "error.temp_file_move_failed", e))?;
 
     tracing::info!(
         action = "network_download_completed",

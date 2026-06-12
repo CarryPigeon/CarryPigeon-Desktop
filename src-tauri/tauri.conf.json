@@ -44,5 +44,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ShirasawaTopaz/carrypigeon-desktop/releases/latest/download/latest.json"
+      ],
+      "pubkey": "PLACEHOLDER_PUBLIC_KEY_BASE64",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

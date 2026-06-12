@@ -6,7 +6,7 @@ import type { AboutCapabilities, AppInfo } from "./api-types";
 
 const BASE_INFO: Omit<AppInfo, "version"> = {
   name: "CarryPigeon Desktop",
-  description: "CarryPigeon 桌面客户端 — 自建服务器聊天与协作平台。",
+  description: "CarryPigeon Desktop — Self-hosted chat and collaboration platform.",
   techStack: [
     "Tauri 2 (Rust + WebView)",
     "Vue 3 + TypeScript",

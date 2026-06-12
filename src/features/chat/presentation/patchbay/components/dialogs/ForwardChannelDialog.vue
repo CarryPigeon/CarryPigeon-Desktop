@@ -166,7 +166,7 @@ watch(() => props.visible, (v) => {
   &:hover { background: var(--cp-hover-bg, rgba(255,255,255,0.04)); }
 
   &[data-selected="true"] {
-    background: color-mix(in oklab, var(--cp-primary, #0052d9) 12%, transparent);
+    background: color-mix(in oklab, var(--cp-primary) 12%, transparent);
   }
 }
 .cp-forwardDialog__channelHash {
@@ -195,8 +195,8 @@ watch(() => props.visible, (v) => {
   }
 }
 .cp-forwardDialog__btn--primary {
-  background: var(--cp-primary, #0052d9);
-  border-color: var(--cp-primary, #0052d9);
+  background: var(--cp-primary);
+  border-color: var(--cp-primary);
   color: #fff;
 }
 </style>
