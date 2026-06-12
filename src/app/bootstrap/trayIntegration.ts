@@ -24,18 +24,18 @@ import { sendDesktopNotification } from "@/features/chat/message-flow/domain/use
 import type { UnreadMessagePreview } from "@/features/chat/public/api-types";
 import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 
-// ============ 托盘未读闪烁 ============
+const logger = createLogger("trayIntegration");
 
-const loggerUnread = createLogger("trayUnreadBridge");
+let chatPromise: Promise<unknown> | null = null;
 
-let chatPromiseUnread: Promise<unknown> | null = null;
-
-async function getChatLazyUnread() {
-  if (!chatPromiseUnread) {
-    chatPromiseUnread = import("@/features/chat/public/api").then((m) => m.getChatCapabilities());
+async function getChatLazy() {
+  if (!chatPromise) {
+    chatPromise = import("@/features/chat/public/api").then((m) => m.getChatCapabilities());
   }
-  return chatPromiseUnread;
+  return chatPromise;
 }
+
+// ============ 托盘未读闪烁 ============
 
 /**
  * 注册主窗口托盘未读状态同步。
@@ -46,7 +46,7 @@ export function registerTrayUnreadBridge(): WatchStopHandle | null {
   let lastState: boolean | null = null;
   let innerStop: WatchStopHandle | null = null;
 
-  void getChatLazyUnread().then((raw) => {
+  void getChatLazy().then((raw) => {
     const chat = raw as { session: { directory: { totalUnreadCount: { value: number } } } };
     innerStop = watch(
       () => chat.session.directory.totalUnreadCount.value > 0,
@@ -76,22 +76,11 @@ async function setTrayUnreadFlashing(hasUnread: boolean): Promise<void> {
   try {
     await invokeTauri<void>(TAURI_COMMANDS.setTrayUnreadFlashing, { hasUnread });
   } catch (error) {
-    loggerUnread.warn("Action: chat_tray_unread_state_sync_failed", { error: String(error), hasUnread });
+    logger.warn("Action: chat_tray_unread_state_sync_failed", { error: String(error), hasUnread });
   }
 }
 
 // ============ 托盘悬停通知 ============
-
-const loggerHover = createLogger("trayHoverBridge");
-
-let chatPromiseHover: Promise<unknown> | null = null;
-
-async function getChatLazyHover() {
-  if (!chatPromiseHover) {
-    chatPromiseHover = import("@/features/chat/public/api").then((m) => m.getChatCapabilities());
-  }
-  return chatPromiseHover;
-}
 
 /**
  * 注册托盘悬停通知监听。
@@ -103,7 +92,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
 
   const unlisteners: (() => void)[] = [];
 
-  void getChatLazyHover().then(async (raw) => {
+  void getChatLazy().then(async (raw) => {
     const chat = raw as {
       getUnreadMessagePreviews(maxCount: number): UnreadMessagePreview[];
       session: {
@@ -129,7 +118,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
           height: Math.min(previews.length * 64 + 40, 320),
         });
       } catch (err) {
-        loggerHover.warn("Action: chat_tray_hover_popover_open_failed", { error: String(err) });
+        logger.warn("Action: chat_tray_hover_popover_open_failed", { error: String(err) });
       }
     });
     unlisteners.push(unlistenHover);
@@ -138,7 +127,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
       try {
         await chat.session.currentChannel.selectChannel(event.payload.channelId);
       } catch (err) {
-        loggerHover.warn("Action: chat_tray_hover_jump_channel_failed", { error: String(err) });
+        logger.warn("Action: chat_tray_hover_jump_channel_failed", { error: String(err) });
       }
     });
     unlisteners.push(unlistenJump);
@@ -152,8 +141,6 @@ export function registerTrayHoverBridge(): (() => void) | null {
 }
 
 // ============ 托盘菜单语言同步 ============
-
-const loggerLocale = createLogger("trayLocaleBridge");
 
 /**
  * 启动时同步语言偏好到托盘菜单。
@@ -171,13 +158,11 @@ async function applyTrayLocale(locale: string): Promise<void> {
   try {
     await invokeTauri<void>(TAURI_COMMANDS.setTrayLocale, { locale });
   } catch (error) {
-    loggerLocale.warn("Action: chat_tray_locale_sync_failed", { error: String(error), locale });
+    logger.warn("Action: chat_tray_locale_sync_failed", { error: String(error), locale });
   }
 }
 
 // ============ 桌面通知桥接 ============
-
-const loggerNotification = createLogger("chat_notification_bridge");
 
 /**
  * 创建新消息通知处理器工厂。
@@ -228,7 +213,7 @@ export function createNotificationOnNewMessageHandler(deps: {
       });
 
       if (!decision.shouldNotify) {
-        loggerNotification.debug("Action: chat_notification_skipped", { reason: decision.reason });
+        logger.debug("Action: chat_notification_skipped", { reason: decision.reason });
         return;
       }
 
@@ -240,7 +225,7 @@ export function createNotificationOnNewMessageHandler(deps: {
 
       await sendDesktopNotification({ title, body, channelId, messageId: message.id });
     } catch (e) {
-      loggerNotification.error("Action: chat_notification_handle_failed", { error: String(e) });
+      logger.error("Action: chat_notification_handle_failed", { error: String(e) });
     }
   };
 }

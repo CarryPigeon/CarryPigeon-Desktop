@@ -4,7 +4,7 @@
  * @description 自定义表情管理页面：添加 / 删除 / 展示。
  */
 
-import { ref, watch } from "vue";
+import { ref, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEmojiManageModel } from "../composables/useEmojiManageModel";
@@ -19,13 +19,9 @@ const { emojis, loading, loadEmojis, addEmoji, deleteEmoji, getImagePath } = use
 const nameInput = ref("");
 const tagsInput = ref("");
 const adding = ref(false);
-const uid = ref(getCurrentChatUserId());
 
+// 监听用户 ID 变化，自动加载表情
 watch(() => getCurrentChatUserId(), (newUid) => {
-  uid.value = newUid;
-});
-
-watch(uid, (newUid) => {
   if (newUid) {
     loadEmojis(newUid);
   }
@@ -33,18 +29,19 @@ watch(uid, (newUid) => {
 
 /**
  * 图片路径缓存：id -> 可显示的 asset URL
+ * 使用 reactive 对象而非 ref<Map> 以确保模板中读取时触发响应式追踪。
  */
-const imagePaths = ref<Map<string, string>>(new Map());
+const imagePaths = reactive<Record<string, string>>({});
 
 /**
  * 将后端返回的绝对路径转换为 asset:// 协议的 URL，供 <img> 使用。
  */
 async function resolveImagePath(id: string): Promise<string> {
-  if (imagePaths.value.has(id)) return imagePaths.value.get(id)!;
+  if (imagePaths[id]) return imagePaths[id];
   try {
     const path = await getImagePath(id);
     const assetUrl = convertFileSrc(path, "asset");
-    imagePaths.value.set(id, assetUrl);
+    imagePaths[id] = assetUrl;
     return assetUrl;
   } catch (e) {
     logger.error("Action: chat_emoji_resolve_image_failed", { id, error: String(e) });
@@ -77,7 +74,7 @@ async function handleFileSelect(): Promise<void> {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    await addEmoji(filePath, name, tags, uid.value);
+    await addEmoji(filePath, name, tags, getCurrentChatUserId());
     nameInput.value = "";
     tagsInput.value = "";
   } catch (e) {
@@ -89,7 +86,7 @@ async function handleFileSelect(): Promise<void> {
 
 async function handleDelete(id: string): Promise<void> {
   try {
-    await deleteEmoji(id, uid.value);
+    await deleteEmoji(id, getCurrentChatUserId());
   } catch (e) {
     logger.error("Action: chat_emoji_delete_failed", { error: String(e) });
   }
@@ -163,8 +160,8 @@ function extractNameFromPath(filePath: string): string {
         class="cp-emojiManage__item"
       >
         <img
-          v-if="imagePaths.get(emoji.id)"
-          :src="imagePaths.get(emoji.id)"
+          v-if="imagePaths[emoji.id]"
+          :src="imagePaths[emoji.id]"
           :alt="emoji.name"
           class="cp-emojiManage__img"
         />

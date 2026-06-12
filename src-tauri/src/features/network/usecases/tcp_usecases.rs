@@ -361,6 +361,7 @@ mod tests {
 
     #[tokio::test]
     async fn tcp_rejects_unregistered_workspace_socket() {
+        let prev_locale = rust_i18n::locale();
         rust_i18n::set_locale("zh_cn");
         let service = TcpRegistryService::new();
 
@@ -386,10 +387,12 @@ mod tests {
             remove_err.to_string(),
             "[NETWORK_TCP_SCOPE_REJECTED] TCP服务未找到"
         );
+        rust_i18n::set_locale(&prev_locale);
     }
 
     #[test]
     fn tcp_rejects_mock_socket_outside_debug_builds() {
+        let prev_locale = rust_i18n::locale();
         rust_i18n::set_locale("zh_cn");
         let err = normalize_transport_socket("mock://handshake".to_string(), false)
             .expect_err("mock socket should be rejected when debug transport is disabled");
@@ -398,10 +401,12 @@ mod tests {
             err.to_string(),
             "[NETWORK_TCP_SCOPE_REJECTED] mock:// 套接字仅在调试构建中支持"
         );
+        rust_i18n::set_locale(&prev_locale);
     }
 
     #[test]
     fn tcp_rejects_empty_transport_socket() {
+        let prev_locale = rust_i18n::locale();
         rust_i18n::set_locale("zh_cn");
         let err = normalize_transport_socket("   ".to_string(), true)
             .expect_err("empty transport socket should be rejected");
@@ -410,5 +415,6 @@ mod tests {
             err.to_string(),
             "[NETWORK_TCP_SCOPE_REJECTED] 缺少套接字"
         );
+        rust_i18n::set_locale(&prev_locale);
     }
 }

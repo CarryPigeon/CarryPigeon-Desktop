@@ -308,6 +308,8 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::emoji::di::commands::list_custom_emojis,
             crate::features::emoji::di::commands::save_emoji,
             crate::features::emoji::di::commands::delete_emoji,
+            crate::features::emoji::di::commands::copy_emoji,
+            crate::features::emoji::di::commands::write_temp_emoji_file,
             crate::features::emoji::di::commands::get_emoji_image_path,
             // voice_call
             crate::features::voice_call::di::commands::connect_signaling,

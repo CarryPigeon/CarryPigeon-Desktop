@@ -77,16 +77,34 @@ fn is_animated_image(source_path: &Path) -> bool {
         }
         "webp" => {
             // WebP: 检查 RIFF 头中的 ANIM chunk
-            if let Ok(data) = fs::read(source_path) {
-                if data.len() > 30
-                    && &data[0..4] == b"RIFF"
-                    && &data[8..12] == b"WEBP"
-                {
-                    for i in (12..data.len() - 8).step_by(1) {
-                        if &data[i..i + 4] == b"VP8X" && i + 8 <= data.len() {
-                            let flags = data[i + 4];
-                            return (flags & 0x02) != 0;
+            // VP8X chunk 始终在文件头部附近，仅需读取前 4KB 即可检测。
+            let mut buf = [0u8; 4096];
+            let n = match std::fs::File::open(source_path)
+                .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut buf).map(|_| buf.len()))
+            {
+                Ok(n) => n,
+                Err(_) => {
+                    // 文件小于 4KB 时尝试全部读取
+                    match fs::read(source_path) {
+                        Ok(data) if data.len() > 30 => {
+                            let end = data.len() - 8;
+                            for i in (12..end).step_by(1) {
+                                if &data[i..i + 4] == b"VP8X" && i + 8 <= data.len() {
+                                    let flags = data[i + 4];
+                                    return (flags & 0x02) != 0;
+                                }
+                            }
                         }
+                        _ => {}
+                    }
+                    return false;
+                }
+            };
+            if n > 30 && &buf[0..4] == b"RIFF" && &buf[8..12] == b"WEBP" {
+                for i in (12..n - 8).step_by(1) {
+                    if &buf[i..i + 4] == b"VP8X" {
+                        let flags = buf[i + 4];
+                        return (flags & 0x02) != 0;
                     }
                 }
             }
