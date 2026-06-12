@@ -5,6 +5,7 @@ import { PluginCenterPage, DomainCatalogPage, PluginDetailPage } from '@/feature
 import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
 import { ServerManagerPage } from '@/features/server-connection/routes';
 import { FileManagerPage } from '@/features/files/routes';
+import { TrayNotificationPopover } from '@/features/tray-notification/routes';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -28,6 +29,7 @@ const router = createRouter({
     // 子窗口路由（保留 subWindowRouting 兼容）
     { path: '/channel-info-popover', component: ChannelInfoPopoverView, name: 'channel-info-popover' },
     { path: '/user-info-popover', component: UserPopoverPage, name: 'user-info-popover' },
+    { path: '/tray-notification-popover', component: TrayNotificationPopover, name: 'tray-notification-popover' },
     // catch-all 兜底
     { path: '/:pathMatch(.*)*', redirect: '/chat' },
   ],

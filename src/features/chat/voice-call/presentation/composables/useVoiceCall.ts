@@ -83,6 +83,17 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
       callState.value = "ended";
       activeSession.value = session;
       stopTimer();
+      stopPoll();
+      activeSummary.value = {
+        sessionId: session.sessionId,
+        kind: session.kind,
+        duration: duration.value,
+        disconnectReason: "remotely_ended",
+      };
+      setTimeout(() => {
+        callState.value = "idle";
+        activeSession.value = null;
+      }, 500);
     } else if (session) {
       callState.value = state;
       activeSession.value = session;
@@ -121,6 +132,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     callState.value = "ended";
     await statePort.rejectCall(session.sessionId, reason);
     stopTimer();
+    stopPoll();
     activeSummary.value = {
       sessionId: session.sessionId,
       kind: session.kind,
@@ -143,6 +155,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     callState.value = "ended";
     await statePort.cancelCall(session.sessionId);
     stopTimer();
+    stopPoll();
     activeSummary.value = {
       sessionId: session.sessionId,
       kind: session.kind,
@@ -208,6 +221,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     callState.value = "ended";
     await statePort.leaveConference(session.sessionId);
     stopTimer();
+    stopPoll();
     activeSummary.value = {
       sessionId: session.sessionId,
       kind: session.kind,
@@ -240,7 +254,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   });
 
   return {
-    callState,
+    callState: readonly(callState),
     activeSession: readonly(activeSession),
     participants: readonly(participants),
     duration: readonly(duration),

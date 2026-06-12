@@ -4,7 +4,7 @@
  * @description 表情选择面板：收藏 Tab（自定义表情） + Emoji Tab（标准 Unicode Emoji）。
  */
 
-import { ref, onMounted, watch } from "vue";
+import { ref, reactive, onMounted, watch } from "vue";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useI18n } from "vue-i18n";
 import { createLogger } from "@/shared/utils/logger";
@@ -148,14 +148,14 @@ async function handleDeleteSticker(id: string): Promise<void> {
   }
 }
 
-const imageUrlCache = ref<Map<string, string>>(new Map());
+const imageUrlCache = reactive<Record<string, string>>({});
 
 async function resolveImageUrl(id: string): Promise<string> {
-  if (imageUrlCache.value.has(id)) return imageUrlCache.value.get(id)!;
+  if (imageUrlCache[id]) return imageUrlCache[id];
   try {
     const absPath = await invoke<string>("get_emoji_image_path", { id });
     const url = convertFileSrc(absPath, "asset");
-    imageUrlCache.value.set(id, url);
+    imageUrlCache[id] = url;
     return url;
   } catch {
     return "";
@@ -202,7 +202,7 @@ watch(customEmojis, async (newEmojis) => {
           @contextmenu.prevent="handleDeleteSticker(sticker.id)"
         >
           <img
-            :src="imageUrlCache.get(sticker.id) || ''"
+            :src="imageUrlCache[sticker.id] || ''"
             :alt="sticker.name"
             class="cp-stickerPanel__img"
           />

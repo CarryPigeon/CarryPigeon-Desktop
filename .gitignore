@@ -45,3 +45,6 @@ data/db/*.db
 AGENTS.md
 CLAUDE.md
 .claude/
+
+.codegraph/*
+.codegraph/daemon.pid
