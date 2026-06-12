@@ -148,10 +148,7 @@ impl ManagedDbKind {
         match kind.as_str() {
             "system" => Ok(Self::System),
             "server" => Ok(Self::Server),
-            _ => Err(command_error(
-                "DB_KIND_INVALID",
-                "error.db_kind_invalid",
-            )),
+            _ => Err(command_error("DB_KIND_INVALID", "error.db_kind_invalid")),
         }
     }
 
@@ -178,10 +175,7 @@ fn validate_managed_db_key(key: &str, kind: ManagedDbKind) -> CommandResult<()> 
     if valid {
         Ok(())
     } else {
-        Err(command_error(
-            "DB_KEY_INVALID",
-            "error.db_key_invalid",
-        ))
+        Err(command_error("DB_KEY_INVALID", "error.db_key_invalid"))
     }
 }
 
@@ -355,7 +349,8 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
     let kind = ManagedDbKind::parse(req.kind.as_deref())?;
     validate_managed_db_key(&req.key, kind)?;
 
-    let path = managed_db_path(&req.key).map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?;
+    let path = managed_db_path(&req.key)
+        .map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?;
     ensure_parent_dir(&path)
         .await
         .map_err(|e| to_command_error("DB_DIR_CREATE_FAILED", "error.db_dir_create_failed", e))?;
@@ -378,9 +373,13 @@ pub async fn db_init(req: DbInitRequest) -> CommandResult<()> {
 /// - `Err(String)`：执行失败原因。
 pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
     validate_execute_sql(&req.sql)?;
-    let db = get_db(&req.key)
-        .await
-        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", "error.db_get_connection_failed", e))?;
+    let db = get_db(&req.key).await.map_err(|e| {
+        to_command_error(
+            "DB_GET_CONNECTION_FAILED",
+            "error.db_get_connection_failed",
+            e,
+        )
+    })?;
     let conn = &db.connection;
     let stmt = RawStatement::new(req.sql, map_values(req.params));
     let result = conn
@@ -405,13 +404,20 @@ pub async fn db_execute(req: DbExecuteRequest) -> CommandResult<DbExecResult> {
 /// - 若 `columns` 为空，直接返回错误。
 pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
     if req.columns.is_empty() {
-        return Err(command_error("DB_COLUMNS_REQUIRED", "error.db_columns_required"));
+        return Err(command_error(
+            "DB_COLUMNS_REQUIRED",
+            "error.db_columns_required",
+        ));
     }
     validate_query_sql(&req.sql)?;
 
-    let db = get_db(&req.key)
-        .await
-        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", "error.db_get_connection_failed", e))?;
+    let db = get_db(&req.key).await.map_err(|e| {
+        to_command_error(
+            "DB_GET_CONNECTION_FAILED",
+            "error.db_get_connection_failed",
+            e,
+        )
+    })?;
     let conn = &db.connection;
     let stmt = RawStatement::new(req.sql, map_values(req.params));
     let rows = conn
@@ -444,29 +450,43 @@ pub async fn db_query(req: DbQueryRequest) -> CommandResult<DbQueryResult> {
 /// - `Ok(Vec<DbExecResult>)`：每条语句的执行结果列表（与输入 statements 顺序一致）。
 /// - `Err(String)`：执行失败原因。
 pub async fn db_transaction(req: DbTransactionRequest) -> CommandResult<Vec<DbExecResult>> {
-    let db = get_db(&req.key)
-        .await
-        .map_err(|e| to_command_error("DB_GET_CONNECTION_FAILED", "error.db_get_connection_failed", e))?;
+    let db = get_db(&req.key).await.map_err(|e| {
+        to_command_error(
+            "DB_GET_CONNECTION_FAILED",
+            "error.db_get_connection_failed",
+            e,
+        )
+    })?;
     let conn = &db.connection;
-    let txn = conn
-        .begin()
-        .await
-        .map_err(|e| to_command_error("DB_TRANSACTION_BEGIN_FAILED", "error.db_transaction_begin_failed", e))?;
+    let txn = conn.begin().await.map_err(|e| {
+        to_command_error(
+            "DB_TRANSACTION_BEGIN_FAILED",
+            "error.db_transaction_begin_failed",
+            e,
+        )
+    })?;
     let mut results = Vec::with_capacity(req.statements.len());
 
     for statement in req.statements {
         validate_execute_sql(&statement.sql)?;
         let stmt = RawStatement::new(statement.sql, map_values(statement.params));
-        let res = txn
-            .execute(&stmt)
-            .await
-            .map_err(|e| to_command_error("DB_TRANSACTION_EXECUTE_FAILED", "error.db_transaction_execute_failed", e))?;
+        let res = txn.execute(&stmt).await.map_err(|e| {
+            to_command_error(
+                "DB_TRANSACTION_EXECUTE_FAILED",
+                "error.db_transaction_execute_failed",
+                e,
+            )
+        })?;
         results.push(exec_result(&res));
     }
 
-    txn.commit()
-        .await
-        .map_err(|e| to_command_error("DB_TRANSACTION_COMMIT_FAILED", "error.db_transaction_commit_failed", e))?;
+    txn.commit().await.map_err(|e| {
+        to_command_error(
+            "DB_TRANSACTION_COMMIT_FAILED",
+            "error.db_transaction_commit_failed",
+            e,
+        )
+    })?;
     Ok(results)
 }
 
@@ -521,7 +541,8 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
         .map_err(|e| to_command_error("DB_REMOVE_FAILED", "error.db_remove_failed", e))?;
     let path = match removed_path {
         Some(p) => p,
-        None => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?,
+        None => managed_db_path(&key)
+            .map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?,
     };
 
     if !is_managed_db_path(&path) {
@@ -532,9 +553,9 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
     }
 
     if tokio::fs::metadata(&path).await.is_ok() {
-        tokio::fs::remove_file(&path)
-            .await
-            .map_err(|e| to_command_error("DB_FILE_REMOVE_FAILED", "error.db_file_remove_failed", e))?;
+        tokio::fs::remove_file(&path).await.map_err(|e| {
+            to_command_error("DB_FILE_REMOVE_FAILED", "error.db_file_remove_failed", e)
+        })?;
     }
     Ok(())
 }
@@ -565,7 +586,8 @@ pub async fn db_path(key: String) -> CommandResult<String> {
 
     let path = match get_entry_path(&key).await {
         Ok(path) => path,
-        Err(_) => managed_db_path(&key).map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?,
+        Err(_) => managed_db_path(&key)
+            .map_err(|e| to_command_error("APP_DATA_DIR", "error.app_data_dir", e))?,
     };
     Ok(path.to_string_lossy().to_string())
 }

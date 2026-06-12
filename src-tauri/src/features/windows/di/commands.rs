@@ -55,7 +55,13 @@ pub async fn open_popover_window(
 ) -> CommandResult<()> {
     popover_window::open_popover_window_impl(app, query, x, y, width, height)
         .await
-        .map_err(|err| to_command_error("WINDOW_POPOVER_OPEN_FAILED", "error.window_popover_open_failed", err))
+        .map_err(|err| {
+            to_command_error(
+                "WINDOW_POPOVER_OPEN_FAILED",
+                "error.window_popover_open_failed",
+                err,
+            )
+        })
 }
 
 /// 打开信息展示窗口（Info window）。
@@ -84,7 +90,13 @@ pub async fn open_info_window(
 ) -> CommandResult<()> {
     info_window::open_info_window_impl(app, label, title, query, width, height)
         .await
-        .map_err(|err| to_command_error("WINDOW_INFO_OPEN_FAILED", "error.window_info_open_failed", err))
+        .map_err(|err| {
+            to_command_error(
+                "WINDOW_INFO_OPEN_FAILED",
+                "error.window_info_open_failed",
+                err,
+            )
+        })
 }
 
 /// 关闭托盘通知弹窗并聚焦主窗口。
@@ -92,6 +104,11 @@ pub async fn open_info_window(
 /// 点击通知弹窗中的消息时由前端触发。
 #[tauri::command]
 pub async fn close_tray_notification_popover(app: AppHandle) -> CommandResult<()> {
-    popover_window::close_notification_popover(&app)
-        .map_err(|err| to_command_error("WINDOW_NOTIFICATION_POPOVER_CLOSE_FAILED", "error.window_notification_popover_close_failed", err))
+    popover_window::close_notification_popover(&app).map_err(|err| {
+        to_command_error(
+            "WINDOW_NOTIFICATION_POPOVER_CLOSE_FAILED",
+            "error.window_notification_popover_close_failed",
+            err,
+        )
+    })
 }
