@@ -53,7 +53,6 @@ pub fn run() -> anyhow::Result<()> {
 
     // Tauri Builder 组装
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
         // 注册自定义 scheme 处理器，安全地加载本地插件静态资源（如 JS/CSS），避免直接暴露文件系统路径。
         .register_uri_scheme_protocol("app", |_, req| handle_app_scheme(req).unwrap_or_else(|e| {
             tracing::warn!(action = "app_scheme_handler_failed", error = %e);

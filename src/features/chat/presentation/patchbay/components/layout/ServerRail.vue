@@ -48,6 +48,7 @@ const emit = defineEmits<{
    */
   (e: "open-settings"): void;
   (e: "open-files"): void;
+  (e: "open-contacts"): void;
 }>();
 </script>
 
@@ -72,6 +73,7 @@ const emit = defineEmits<{
     </div>
     <div class="cp-rail__foot">
       <button class="cp-rail__btn" type="button" @click="emit('open-servers')">{{ t("manage") }}</button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-contacts')">{{ t("contacts_title") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-files')">{{ t("file_manager") }}</button>

@@ -18,7 +18,6 @@
         "core:window:allow-set-focus",
         "core:window:allow-create",
         "core:window:allow-center",
-        "notification:default",
-        "updater:default"
+        "notification:default"
     ]
 }

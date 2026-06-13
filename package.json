@@ -25,7 +25,6 @@
         "@tauri-apps/api": "^2.10.1",
         "@tauri-apps/plugin-notification": "^2.3.3",
         "@tauri-apps/plugin-opener": "^2.5.3",
-        "@tauri-apps/plugin-updater": "^2.10.1",
         "crypto-js": "^4.2.0",
         "emoji-picker-element": "^1.29.1",
         "tdesign-vue-next": "^1.18.0",

@@ -489,9 +489,9 @@ export const zh_cn = {
   about_credits: "致谢",
   // Updater
   updater_new_version: "发现新版本 v{version}",
-  updater_install: "立即更新",
   updater_later: "稍后提醒",
-  updater_downloading: "下载中 {percent}%",
+  updater_manual_hint: "新版本已发布，请前往 GitHub Releases 页面下载安装",
+  updater_download_page: "前往下载页",
   // ErrorBoundary
   error_boundary_title: "出了点问题",
   error_boundary_unknown: "未知错误",
@@ -543,4 +543,13 @@ export const zh_cn = {
   shortcut_settings: "打开设置",
   shortcut_close: "关闭弹窗/面板",
   shortcut_help: "快捷键帮助",
+  contacts_title: "联系人",
+  contacts_search_placeholder: "搜索用户昵称、邮箱或 ID…",
+  contacts_no_results: "未找到匹配的用户",
+  contacts_start_chat: "开始聊天",
+  contacts_chat: "发消息",
+  contacts_view_profile: "查看资料",
+  contacts_profile: "资料",
+  contacts_empty_hint: "输入用户昵称或邮箱搜索联系人，快速发起私聊",
+  contacts_go_chat: "回到聊天",
 };

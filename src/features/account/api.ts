@@ -64,6 +64,12 @@ export function createAccountCapabilities(): AccountCapabilities {
         updateUserProfile(input) {
           return profileCapabilities.updateUserProfile(serverSocket, input);
         },
+        getUser(accessToken, uid) {
+          return profileCapabilities.getUser(serverSocket, accessToken, uid);
+        },
+        listUsers(accessToken, ids) {
+          return profileCapabilities.listUsers(serverSocket, accessToken, ids);
+        },
       };
     },
   };

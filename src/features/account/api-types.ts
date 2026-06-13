@@ -12,12 +12,14 @@ import type {
   RevokeTokenOutcome,
   SendVerificationCodeOutcome,
 } from "./auth-flow/api";
+import type { UserPublic } from "./profile/domain/types/UserTypes";
 import type {
   UpdateUserEmailOutcome,
   UpdateUserProfileOutcome,
 } from "./profile/api";
 
 export type { CurrentUser, CurrentUserProfilePatch, CurrentUserTrustLevel };
+export type { UserPublic } from "./profile/domain/types/UserTypes";
 
 /**
  * account/current-user 对外能力分组。
@@ -151,6 +153,24 @@ export type AccountServerCapabilities = {
    * @returns 显式资料更新结果；失败时返回结构化资料错误信息。
    */
   updateUserProfile(input: UpdateUserProfileInput): Promise<UpdateUserProfileOutcome>;
+
+  /**
+   * 按 uid 获取用户公开资料。
+   *
+   * @param accessToken - 访问令牌。
+   * @param uid - 用户 id。
+   * @returns 用户公开资料。
+   */
+  getUser(accessToken: string, uid: string): Promise<UserPublic>;
+
+  /**
+   * 批量获取用户公开资料。
+   *
+   * @param accessToken - 访问令牌。
+   * @param ids - 用户 id 列表。
+   * @returns 用户公开资料列表。
+   */
+  listUsers(accessToken: string, ids: string[]): Promise<UserPublic[]>;
 };
 
 /**

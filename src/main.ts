@@ -139,7 +139,7 @@ if (!isSubWindow && hasTauriRuntime) {
       ensureInitialServerSelection();
       // 启动后 5 秒静默检查更新
       window.setTimeout(() => {
-        void checkForUpdateSilently((version, body) => {
+        void checkForUpdateSilently((version, releaseUrl) => {
           logger.info('Action: http_update_available', { version });
           // 动态挂载 UpdatePrompt 组件
           import('@/shared/updater/UpdatePrompt.vue').then(async ({ default: UpdatePrompt }) => {
@@ -149,11 +149,7 @@ if (!isSubWindow && hasTauriRuntime) {
             document.body.appendChild(mount);
             const promptApp = createApp(UpdatePrompt, {
               version,
-              body,
-              onInstall: () => {
-                // UpdatePrompt handles its own download+install flow
-                // Keep the prompt visible during download (it auto-closes on install success)
-              },
+              releaseUrl,
               onDismiss: () => { promptApp.unmount(); mount.remove(); },
             });
             promptApp.mount(mount);

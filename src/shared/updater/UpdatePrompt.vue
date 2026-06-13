@@ -1,55 +1,26 @@
 <script setup lang="ts">
 /**
  * @fileoverview 更新提示弹窗组件。
+ * @description 检测到新版本时提示用户，点击跳转 GitHub Releases 手动下载。
  */
-import { ref } from 'vue';
-import { check } from '@tauri-apps/plugin-updater';
-import { createLogger } from '@/shared/utils/logger';
 import { useI18n } from 'vue-i18n';
-
-const logger = createLogger('updater');
+import { invoke } from '@tauri-apps/api/core';
 const { t } = useI18n();
 
 const props = defineProps<{
   version: string;
-  body?: string;
+  releaseUrl: string;
 }>();
 
 const emit = defineEmits<{
-  (e: 'install'): void;
   (e: 'dismiss'): void;
 }>();
 
-const downloading = ref(false);
-const downloadProgress = ref(0);
-
-async function handleInstall(): Promise<void> {
-  downloading.value = true;
-  try {
-    const result = await check();
-    if (!result) {
-      downloading.value = false;
-      return;
-    }
-    // Track download progress manually from events
-    let contentLength = 0;
-    let downloadedBytes = 0;
-    await result.download((progress) => {
-      if (progress.event === 'Started' && progress.data.contentLength) {
-        contentLength = progress.data.contentLength;
-      } else if (progress.event === 'Progress') {
-        downloadedBytes += progress.data.chunkLength;
-        if (contentLength > 0) {
-          downloadProgress.value = Math.round((downloadedBytes / contentLength) * 100);
-        }
-      }
-    });
-    // Install (requires app restart)
-    await result.install();
-  } catch (e) {
-    logger.error('Action: http_update_download_failed', { error: String(e) });
-    downloading.value = false;
-  }
+function handleOpenRelease(): void {
+  invoke('plugin:opener|open_url', { url: props.releaseUrl }).catch(() => {
+    window.open(props.releaseUrl, '_blank');
+  });
+  emit('dismiss');
 }
 </script>
 
@@ -58,16 +29,20 @@ async function handleInstall(): Promise<void> {
     <div class="update-prompt-card">
       <div class="update-prompt-icon">🔄</div>
       <h3 class="update-prompt-title">{{ t('updater_new_version', { version: props.version }) }}</h3>
-      <p v-if="props.body" class="update-prompt-body">{{ props.body }}</p>
+      <p class="update-prompt-body">{{ t('updater_manual_hint') }}</p>
       <div class="update-prompt-actions">
         <button
           class="cp-field update-prompt-btn update-prompt-btn--primary"
-          :disabled="downloading"
-          @click="handleInstall"
+          type="button"
+          @click="handleOpenRelease"
         >
-          {{ downloading ? (downloadProgress > 0 ? t('updater_downloading', { percent: downloadProgress }) : t('updater_downloading', { percent: 0 })) : t('updater_install') }}
+          {{ t('updater_download_page') }}
         </button>
-        <button class="update-prompt-btn update-prompt-btn--secondary" @click="emit('dismiss')">
+        <button
+          class="update-prompt-btn update-prompt-btn--secondary"
+          type="button"
+          @click="emit('dismiss')"
+        >
           {{ t('updater_later') }}
         </button>
       </div>
@@ -115,7 +90,6 @@ async function handleInstall(): Promise<void> {
   color: var(--cp-text-muted);
   margin: 0 0 24px;
   line-height: 1.5;
-  white-space: pre-wrap;
 }
 
 .update-prompt-actions {
@@ -137,7 +111,6 @@ async function handleInstall(): Promise<void> {
     color: #fff;
     border-color: var(--cp-accent);
     &:hover { background: var(--cp-accent-hover); }
-    &:disabled { opacity: 0.6; cursor: wait; }
   }
 
   &--secondary {

@@ -18,6 +18,7 @@ type PatchbayServerRailRawModel = {
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
+  handleOpenContacts(): void;
 };
 /**
  * Patchbay 页面服务器侧栏 section model。
@@ -117,6 +118,7 @@ type CreatePatchbayServerRailSectionDeps = {
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
+  handleOpenContacts(): void;
 };
 
 export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSectionDeps): PatchbayServerRailModel {
@@ -128,6 +130,7 @@ export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSe
     handleOpenSettings: deps.handleOpenSettings,
     goPlugins: deps.goPlugins,
     handleOpenFiles: deps.handleOpenFiles,
+    handleOpenContacts: deps.handleOpenContacts,
   });
 }
 
