@@ -81,7 +81,7 @@ impl AudioPipeline {
         let stream: cpal::Stream = match config.sample_format() {
             cpal::SampleFormat::F32 => device
                 .build_input_stream(
-                    &config.into(),
+                    config.into(),
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         process_capture(
                             data,
@@ -144,7 +144,7 @@ impl AudioPipeline {
 
         let stream = device
             .build_output_stream(
-                &stream_config,
+                stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     process_playback(
                         data,

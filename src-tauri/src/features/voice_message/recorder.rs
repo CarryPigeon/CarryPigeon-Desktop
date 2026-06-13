@@ -89,7 +89,7 @@ impl VoiceRecorder {
         // 构建音频输入流
         let stream = device
             .build_input_stream(
-                &config,
+                config,
                 move |data: &[f32], _: &cpal::InputCallbackInfo| {
                     // 累积 PCM 样本
                     if let Ok(mut buf) = pcm_buffer_clone.lock() {
