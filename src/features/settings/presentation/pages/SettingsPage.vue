@@ -488,6 +488,7 @@ async function handleResetDefaults(): Promise<void> {
                 <div v-if="updateCheckState.kind === 'up_to_date'" class="cp-settings__hint">{{ t('settings_up_to_date') }}</div>
                 <div v-else-if="updateCheckState.kind === 'update_available'" class="cp-settings__hint">
                   {{ t('settings_update_available') }} v{{ updateCheckState.version }}
+                  <a :href="updateCheckState.releaseUrl" target="_blank" class="cp-settings__link" rel="noopener noreferrer">{{ t('updater_download_page') }}</a>
                 </div>
                 <div v-else-if="updateCheckState.kind === 'error'" class="cp-settings__err">{{ updateCheckState.message }}</div>
               </div>

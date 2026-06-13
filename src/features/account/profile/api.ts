@@ -10,6 +10,8 @@
 
 import {
   getCurrentUserProfile,
+  getUserPublicProfile,
+  listUsersPublicProfiles,
   isProfileError,
   isProfileMutationUnsupportedError,
   supportsProfileMutationCapability,
@@ -17,11 +19,13 @@ import {
   updateCurrentUserEmail,
   updateCurrentUserProfile,
 } from "./application/profileService";
-import type { UpdateUserProfileInput } from "./domain/types/UserTypes";
+import type { UpdateUserProfileInput, UserPublic } from "./domain/types/UserTypes";
 import type { UpdateUserEmailOutcome, UpdateUserProfileOutcome } from "./application/profileMutationOutcome";
 
 export type ProfileCapabilities = {
   getCurrentUser(serverSocket: string, accessToken: string): ReturnType<typeof getCurrentUserProfile>;
+  getUser(serverSocket: string, accessToken: string, uid: string): Promise<UserPublic>;
+  listUsers(serverSocket: string, accessToken: string, ids: string[]): Promise<UserPublic[]>;
   updateUserEmail(serverSocket: string, email: string, code: string): Promise<UpdateUserEmailOutcome>;
   updateUserProfile(serverSocket: string, input: UpdateUserProfileInput): Promise<UpdateUserProfileOutcome>;
   supportsMutation(): boolean;
@@ -37,6 +41,12 @@ export function createProfileCapabilities(): ProfileCapabilities {
   return {
     getCurrentUser(serverSocket: string, accessToken: string) {
       return getCurrentUserProfile(serverSocket, accessToken);
+    },
+    getUser(serverSocket: string, accessToken: string, uid: string) {
+      return getUserPublicProfile(serverSocket, accessToken, uid);
+    },
+    listUsers(serverSocket: string, accessToken: string, ids: string[]) {
+      return listUsersPublicProfiles(serverSocket, accessToken, ids);
     },
     updateUserEmail(serverSocket: string, email: string, code: string): Promise<UpdateUserEmailOutcome> {
       return updateCurrentUserEmail(serverSocket, email, code);

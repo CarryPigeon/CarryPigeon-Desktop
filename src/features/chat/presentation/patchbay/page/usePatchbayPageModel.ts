@@ -681,6 +681,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleOpenFiles: () => {
       void router.push("/files");
     },
+    handleOpenContacts: () => {
+      void router.push("/contacts");
+    },
   });
 
   const chatViewport = createPatchbayChatViewportSection({
