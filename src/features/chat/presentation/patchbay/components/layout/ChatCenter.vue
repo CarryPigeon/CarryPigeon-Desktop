@@ -6,6 +6,7 @@
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { CallState } from "@/features/chat/voice-call/domain/contracts";
@@ -29,6 +30,10 @@ import ImageLightbox from "@/features/chat/message-flow/message/presentation/com
 import { addFiles as addImageFiles, addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 import { createLogger } from "@/shared/utils/logger";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
+import SearchPanel from "@/features/chat/presentation/patchbay/components/search/SearchPanel.vue";
+import AnnouncementBanner from "@/features/chat/presentation/channel-info/AnnouncementBanner.vue";
+import ShortcutHelp from "@/features/chat/presentation/patchbay/components/help/ShortcutHelp.vue";
+import type { ShortcutBinding } from "@/features/chat/presentation/patchbay/interactions/usePatchbayHotkeys";
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -85,10 +90,52 @@ const props = defineProps<{
    * 编辑取消回调。
    */
   onEditCancel?: () => void;
+  /**
+   * 快捷键帮助面板可见性。
+   */
+  shortcutHelpVisible?: boolean;
+  /**
+   * 快捷键绑定列表（供帮助面板展示）。
+   */
+  shortcutBindings?: ShortcutBinding[];
+  /**
+   * 关闭快捷键帮助面板。
+   */
+  onCloseShortcutHelp?: () => void;
 }>();
 
 const { t } = useI18n();
+const router = useRouter();
 const logger = createLogger("ChatCenter");
+
+/** 频道公告已被用户关闭。 */
+const dismissedAnnouncement = ref(false);
+
+/** 当前频道 id，用于在切换时重置公告关闭状态。 */
+const previousChannelId = ref(props.model.currentChannelId);
+
+/** 频道切换时重置公告关闭状态。 */
+watch(() => props.model.currentChannelId, (newId, oldId) => {
+  if (newId !== oldId) {
+    dismissedAnnouncement.value = false;
+    previousChannelId.value = newId;
+  }
+});
+
+/**
+ * 当前频道摘要（从 channels 列表中匹配 currentChannelId）。
+ */
+const currentChannel = computed(() => {
+  const cid = props.model.currentChannelId;
+  if (!cid) return null;
+  return props.channels.find((c) => c.id === cid) ?? null;
+});
+
+/** 当前频道公告（如果存在且未被关闭）。 */
+const channelAnnouncement = computed(() => {
+  if (dismissedAnnouncement.value) return null;
+  return currentChannel.value?.announcement ?? null;
+});
 
 /** 语音录制上传状态。 */
 const isUploadingVoice = ref(false);
@@ -261,6 +308,25 @@ function registerSignalPaneEl(el: HTMLElement | null): void {
 watch(signalPaneEl, registerSignalPaneEl, { immediate: true });
 onMounted(() => registerSignalPaneEl(signalPaneEl.value));
 onBeforeUnmount(() => registerSignalPaneEl(null));
+
+/** 搜索面板中当前高亮的结果索引。 */
+const searchActiveIndex = ref(0);
+
+/**
+ * 处理搜索结果导航：根据索引打开对应消息。
+ *
+ * @param index - 搜索结果列表中的索引。
+ */
+function handleSearchNavigate(index: number): void {
+  const isServer = props.model.searchScope === "server";
+  const results = isServer
+    ? props.model.searchState.serverResults
+    : props.model.searchState.results;
+  const result = results[index];
+  if (result) {
+    props.model.openSearchResult(result.message.id, isServer ? (result as any).channelId : undefined);
+  }
+}
 </script>
 
 <template>
@@ -326,49 +392,27 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       @stateChange="onVoiceCallStateChange"
     />
 
-    <section v-if="props.model.searchPanelOpen" class="cp-searchPanel">
-      <div class="cp-searchPanel__row">
-        <t-select
-          v-if="props.model.searchScope !== undefined"
-          :value="props.model.searchScope"
-          :options="[{ label: '当前频道', value: 'channel' }, { label: '全部频道', value: 'server' }]"
-          size="small"
-          style="width: 100px; flex-shrink: 0;"
-          @change="(v: string) => props.model.setSearchScope(v as 'channel' | 'server')"
-        />
-        <t-input :placeholder="t('search_current_channel')" @enter="props.model.searchMessages" />
-        <button type="button" class="cp-searchPanel__close" @click="props.model.closeSearchPanel">&times;</button>
-      </div>
-      <div v-if="props.model.searchState.loading" class="cp-searchPanel__state">{{ t("searching") }}</div>
-      <div v-else-if="props.model.searchState.error" class="cp-searchPanel__state cp-searchPanel__error">{{ props.model.searchState.error }}</div>
-      <div v-else-if="props.model.searchState.query && props.model.searchScope === 'channel' && !props.model.searchState.results.length" class="cp-searchPanel__state">{{ t("no_messages_found") }}</div>
-      <div v-else-if="props.model.searchState.query && props.model.searchScope === 'server' && !props.model.searchState.serverResults.length" class="cp-searchPanel__state">{{ t("no_messages_found") }}</div>
-      <div v-if="props.model.searchScope === 'channel'" class="cp-searchPanel__results">
-        <button
-          v-for="result in props.model.searchState.results"
-          :key="result.message.id"
-          type="button"
-          class="cp-searchPanel__result"
-          @click="props.model.openSearchResult(result.message.id)"
-        >
-          <div class="cp-searchPanel__resultSender">{{ result.message.from.name }}</div>
-          <div class="cp-searchPanel__resultPreview">{{ result.preview }}</div>
-        </button>
-      </div>
-      <div v-if="props.model.searchScope === 'server'" class="cp-searchPanel__results">
-        <button
-          v-for="result in props.model.searchState.serverResults"
-          :key="result.message.id"
-          type="button"
-          class="cp-searchPanel__result"
-          @click="props.model.openSearchResult(result.message.id, result.channelId)"
-        >
-          <div v-if="result.channelId" class="cp-searchPanel__resultChannel">#{{ result.channelName || result.channelId }}</div>
-          <div class="cp-searchPanel__resultSender">{{ result.message.from.name }}</div>
-          <div class="cp-searchPanel__resultPreview">{{ result.preview }}</div>
-        </button>
-      </div>
-    </section>
+    <AnnouncementBanner
+      v-if="channelAnnouncement"
+      :announcement="channelAnnouncement"
+      @view-detail="router.push('/channel-info')"
+      @dismiss="dismissedAnnouncement = true"
+    />
+
+    <SearchPanel
+      v-if="props.model.searchPanelOpen"
+      :visible="props.model.searchPanelOpen"
+      :loading="props.model.searchState.loading"
+      :error="props.model.searchState.error || null"
+      :results="props.model.searchScope === 'server' ? props.model.searchState.serverResults : props.model.searchState.results"
+      :active-index="searchActiveIndex"
+      :query="props.model.searchState.query"
+      :scope="props.model.searchScope"
+      @search="(q: string) => props.model.searchMessages(q)"
+      @update:scope="(s: 'channel' | 'server') => props.model.setSearchScope(s)"
+      @navigate="handleSearchNavigate"
+      @close="props.model.closeSearchPanel"
+    />
 
     <MultiSelectToolbar
       v-if="props.model.multiSelectMode"
@@ -457,6 +501,8 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
               @openLightbox="openLightbox"
               @viewThread="(messageId) => props.onViewThread?.(messageId)"
               @viewForwardDetail="openForwardDetail"
+              @retry="(mid: string) => logger.warn('Action: chat_retry_message not yet implemented', { messageId: mid })"
+              @remove="(mid: string) => logger.warn('Action: chat_remove_message not yet implemented', { messageId: mid })"
             />
           </div>
         </div>
@@ -540,6 +586,12 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
       :initial-index="lightboxIndex"
       @close="closeLightbox"
     />
+
+    <ShortcutHelp
+      :visible="!!props.shortcutHelpVisible"
+      :bindings="props.shortcutBindings || []"
+      @close="props.onCloseShortcutHelp?.()"
+    />
   </section>
   </ErrorBoundary>
 </template>
@@ -554,75 +606,6 @@ onBeforeUnmount(() => registerSignalPaneEl(null));
   border-radius: 14px;
   outline: 2px solid var(--cp-primary);
   outline-offset: -2px;
-}
-.cp-searchPanel {
-  border-bottom: 1px solid var(--cp-border-color, #e0e0e0);
-  background: var(--cp-bg-secondary, #fafafa);
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 240px;
-  overflow: hidden;
-}
-.cp-searchPanel__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cp-searchPanel__close {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-}
-.cp-searchPanel__state {
-  font-size: 13px;
-  color: var(--cp-text-secondary, #888);
-  padding: 4px 0;
-}
-.cp-searchPanel__error {
-  color: var(--cp-danger, #e34);
-}
-.cp-searchPanel__results {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
-  max-height: 160px;
-}
-.cp-searchPanel__result {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 8px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: left;
-  font-size: 13px;
-}
-.cp-searchPanel__result:hover {
-  background: color-mix(in oklab, var(--cp-primary) 8%, transparent);
-}
-.cp-searchPanel__resultSender {
-  font-weight: 600;
-  color: var(--cp-text-primary, #222);
-}
-.cp-searchPanel__resultChannel {
-  font-size: 11px;
-  color: var(--cp-accent, #5865f2);
-  font-weight: 500;
-  margin-bottom: 1px;
-}
-.cp-searchPanel__resultPreview {
-  color: var(--cp-text-secondary, #888);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .cp-center--dragOver {
   outline: 3px dashed var(--cp-accent, #5865f2);

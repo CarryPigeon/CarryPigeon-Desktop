@@ -27,6 +27,7 @@ import {
   usePluginCenterCatalogView,
 } from "@/features/plugins/presentation/composables/usePluginCenterCatalogView";
 import { runPluginTask } from "@/features/plugins/presentation/composables/usePluginTaskRunner";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 type PluginCatalogViewEntry = PluginCatalogEntryLike;
 
 const route = useRoute();
@@ -397,69 +398,71 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   <!-- 页面：PluginCenterPage｜职责：插件中心（模块机柜） -->
   <!-- 区块：<main> .cp-plugins -->
   <main class="cp-plugins">
-    <PluginCenterFilterRail
-      v-model:q="q"
-      v-model:filter="filter"
-      v-model:source="source"
-      v-model:show-repo-manager="showRepoManager"
-      v-model:repo-draft="repoDraft"
-      v-model:repo-note-draft="repoNoteDraft"
-      :enabled-repo-count="enabledRepoSources.length"
-      :repo-sources="repoSources"
-      :repo-error="repoError"
-      :missing-required-count="installStore.missingRequiredIds.value.length"
-      @add-repo="handleAddRepo"
-      @toggle-repo="handleToggleRepo"
-      @remove-repo="handleRemoveRepo"
-      @open-required="filter = 'required'"
-      @recheck-required="ensureData"
-    />
-
-    <section class="cp-plugins__gridWrap">
-      <PluginCenterGridHeader
-        :server-socket="serverSocket"
-        :server-id="serverId"
-        :modules-count="filtered.length"
-        @refresh="ensureData"
-        @open-domains="router.push('/domains')"
-        @back-to-chat="router.push('/chat')"
+    <ErrorBoundary>
+      <PluginCenterFilterRail
+        v-model:q="q"
+        v-model:filter="filter"
+        v-model:source="source"
+        v-model:show-repo-manager="showRepoManager"
+        v-model:repo-draft="repoDraft"
+        v-model:repo-note-draft="repoNoteDraft"
+        :enabled-repo-count="enabledRepoSources.length"
+        :repo-sources="repoSources"
+        :repo-error="repoError"
+        :missing-required-count="installStore.missingRequiredIds.value.length"
+        @add-repo="handleAddRepo"
+        @toggle-repo="handleToggleRepo"
+        @remove-repo="handleRemoveRepo"
+        @open-required="filter = 'required'"
+        @recheck-required="ensureData"
       />
 
-      <PluginCenterCatalogGrid
-        :server-socket="serverSocket"
-        :server-id="serverId"
-        :loading="catalogStore.loading.value"
-        :error="catalogStore.error.value || ''"
-        :plugins="filtered"
-        :installed-by-id="installStore.installedById"
-        :progress-by-id="installStore.progressById"
-        :selected-id="selectedId"
-        :focus-plugin-id="focusPluginId"
-        :has-update="hasUpdate"
-        @install="handleCardInstall"
-        @update="handleCardUpdate"
-        @enable="handleCardEnable"
-        @disable="handleCardDisable"
-        @uninstall="handleCardUninstall"
-        @detail="openDetail"
-      />
-    </section>
+      <section class="cp-plugins__gridWrap">
+        <PluginCenterGridHeader
+          :server-socket="serverSocket"
+          :server-id="serverId"
+          :modules-count="filtered.length"
+          @refresh="ensureData"
+          @open-domains="router.push('/domains')"
+          @back-to-chat="router.push('/chat')"
+        />
 
-    <ModuleDetailDrawer
-      :open="drawerOpen"
-      :plugin="selectedPlugin"
-      :installed="selectedInstalled"
-      :has-update="selectedPlugin ? hasUpdate(selectedPlugin.pluginId) : false"
-      :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-      disabled-reason="Missing server_id — plugin operations are disabled"
-      @close="closeDetail"
-      @install="handleDrawerInstall"
-      @update="handleDrawerUpdate"
-      @enable="handleDrawerEnable"
-      @disable="handleDrawerDisable"
-      @switchVersion="handleDrawerSwitchVersion"
-      @rollback="handleDrawerRollback"
-    />
+        <PluginCenterCatalogGrid
+          :server-socket="serverSocket"
+          :server-id="serverId"
+          :loading="catalogStore.loading.value"
+          :error="catalogStore.error.value || ''"
+          :plugins="filtered"
+          :installed-by-id="installStore.installedById"
+          :progress-by-id="installStore.progressById"
+          :selected-id="selectedId"
+          :focus-plugin-id="focusPluginId"
+          :has-update="hasUpdate"
+          @install="handleCardInstall"
+          @update="handleCardUpdate"
+          @enable="handleCardEnable"
+          @disable="handleCardDisable"
+          @uninstall="handleCardUninstall"
+          @detail="openDetail"
+        />
+      </section>
+
+      <ModuleDetailDrawer
+        :open="drawerOpen"
+        :plugin="selectedPlugin"
+        :installed="selectedInstalled"
+        :has-update="selectedPlugin ? hasUpdate(selectedPlugin.pluginId) : false"
+        :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+        disabled-reason="Missing server_id — plugin operations are disabled"
+        @close="closeDetail"
+        @install="handleDrawerInstall"
+        @update="handleDrawerUpdate"
+        @enable="handleDrawerEnable"
+        @disable="handleDrawerDisable"
+        @switchVersion="handleDrawerSwitchVersion"
+        @rollback="handleDrawerRollback"
+      />
+    </ErrorBoundary>
   </main>
 </template>
 

@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { useRequiredSetupModel } from "@/features/account/auth-flow/presentation/composables/useRequiredSetupModel";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -32,130 +33,132 @@ const {
   <!-- 页面：RequiredSetupPage｜职责：必需插件门禁向导（Power Latch） -->
   <!-- 区块：<main> .cp-required -->
   <main class="cp-required">
-    <header class="cp-required__banner" :data-ok="latchClosed" :data-just-closed="justClosedLatch">
-      <div class="cp-required__title">
-        <span class="cp-required__mono">{{ latchClosed ? "POWER LATCH CLOSED" : "POWER LATCH OPEN" }}</span>
-        <div class="cp-required__titleZh">{{ latchClosed ? t("power_latch_closed") : t("power_latch_open") }}</div>
-      </div>
-      <div class="cp-required__desc">
-        <div v-if="!latchClosed">
-          {{ t("required_setup_desc") }}
+    <ErrorBoundary>
+      <header class="cp-required__banner" :data-ok="latchClosed" :data-just-closed="justClosedLatch">
+        <div class="cp-required__title">
+          <span class="cp-required__mono">{{ latchClosed ? "POWER LATCH CLOSED" : "POWER LATCH OPEN" }}</span>
+          <div class="cp-required__titleZh">{{ latchClosed ? t("power_latch_closed") : t("power_latch_open") }}</div>
         </div>
-        <div v-else>
-          {{ t("required_setup_ready") }}
-        </div>
-        <div class="cp-required__socket">
-          <MonoTag :value="serverSocket || 'no-server'" title="server socket" :copyable="true" />
-          <MonoTag :value="serverId || 'missing-server_id'" title="server_id" :copyable="true" />
-          <LabelBadge v-if="!latchClosed" variant="required" label="BLOCKED" />
-          <LabelBadge v-else variant="info" label="READY" />
-        </div>
-      </div>
-      <div v-if="serverSocket && !serverId" class="cp-required__hint">
-        <div class="cp-required__hintTitle">Locked</div>
-        <div class="cp-required__hintTags">
-          <MonoTag value="missing server_id" />
-          <MonoTag value="plugins disabled" />
-        </div>
-      </div>
-      <div v-if="missingIdsHint.length > 0" class="cp-required__hint">
-        <div class="cp-required__hintTitle">{{ t("why_blocked") }}</div>
-        <div class="cp-required__hintTags">
-          <MonoTag v-for="id in missingIdsHint" :key="id" :value="id" :copyable="true" />
-        </div>
-      </div>
-    </header>
-
-    <section class="cp-required__body">
-      <div class="cp-required__bodyHead">
-        <div class="cp-required__bodyTitle">{{ t("required_setup_title") }}</div>
-        <div class="cp-required__bodyMeta">
-          <span class="cp-required__muted">missing</span>
-          <span class="cp-required__mono">{{ plugins.missingRequiredIds.value.length }}</span>
-          <span class="cp-required__dot"></span>
-          <span class="cp-required__muted">required</span>
-          <span class="cp-required__mono">{{ requiredEntries.length }}</span>
-        </div>
-      </div>
-
-      <div v-if="plugins.catalogLoading.value" class="cp-required__state">Loading…</div>
-      <div v-else-if="plugins.catalogError.value" class="cp-required__state err">{{ plugins.catalogError.value }}</div>
-      <div v-else class="cp-required__list">
-        <article v-for="p in requiredEntries" :key="p.pluginId" class="cp-required__item" :data-ok="Boolean(plugins.installedById.value[p.pluginId]?.enabled && plugins.installedById.value[p.pluginId]?.status === 'ok')">
-          <header class="cp-required__itemHead">
-            <div class="cp-required__itemLeft">
-              <div class="cp-required__itemName">{{ p.name }}</div>
-              <div class="cp-required__itemMeta">
-                <MonoTag :value="p.pluginId" title="plugin_id" :copyable="true" />
-                <span class="cp-required__mini">{{ latestVersion(p) || "—" }}</span>
-              </div>
-            </div>
-            <div class="cp-required__itemBadges">
-              <LabelBadge variant="required" label="REQUIRED" />
-              <LabelBadge
-                v-if="plugins.installedById.value[p.pluginId]?.status === 'failed'"
-                variant="failed"
-                label="FAILED"
-              />
-              <LabelBadge
-                v-else-if="plugins.installedById.value[p.pluginId]?.enabled"
-                variant="info"
-                label="ENABLED"
-              />
-              <LabelBadge v-else-if="plugins.installedById.value[p.pluginId]?.currentVersion" variant="info" label="INSTALLED" />
-              <LabelBadge v-else variant="info" label="MISSING" />
-            </div>
-          </header>
-
-          <div class="cp-required__itemDesc">{{ p.tagline }}</div>
-          <div v-if="plugins.installedById.value[p.pluginId]?.lastError" class="cp-required__itemErr">
-            {{ plugins.installedById.value[p.pluginId]?.lastError }}
+        <div class="cp-required__desc">
+          <div v-if="!latchClosed">
+            {{ t("required_setup_desc") }}
           </div>
+          <div v-else>
+            {{ t("required_setup_ready") }}
+          </div>
+          <div class="cp-required__socket">
+            <MonoTag :value="serverSocket || 'no-server'" title="server socket" :copyable="true" />
+            <MonoTag :value="serverId || 'missing-server_id'" title="server_id" :copyable="true" />
+            <LabelBadge v-if="!latchClosed" variant="required" label="BLOCKED" />
+            <LabelBadge v-else variant="info" label="READY" />
+          </div>
+        </div>
+        <div v-if="serverSocket && !serverId" class="cp-required__hint">
+          <div class="cp-required__hintTitle">Locked</div>
+          <div class="cp-required__hintTags">
+            <MonoTag value="missing server_id" />
+            <MonoTag value="plugins disabled" />
+          </div>
+        </div>
+        <div v-if="missingIdsHint.length > 0" class="cp-required__hint">
+          <div class="cp-required__hintTitle">{{ t("why_blocked") }}</div>
+          <div class="cp-required__hintTags">
+            <MonoTag v-for="id in missingIdsHint" :key="id" :value="id" :copyable="true" />
+          </div>
+        </div>
+      </header>
 
-          <footer class="cp-required__itemActions">
-            <button
-              v-if="!plugins.installedById.value[p.pluginId]?.currentVersion"
-              class="cp-required__btn primary"
-              type="button"
-              :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-              @click="plugins.install(p, latestVersion(p))"
-            >
-              {{ t("install") }}
-            </button>
-            <button
-              v-else-if="!plugins.installedById.value[p.pluginId]?.enabled"
-              class="cp-required__btn primary"
-              type="button"
-              :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-              @click="plugins.enable(p.pluginId)"
-            >
-              {{ t("enable") }}
-            </button>
-            <button
-              v-else
-              class="cp-required__btn"
-              type="button"
-              :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-              @click="plugins.disable(p.pluginId)"
-            >
-              {{ t("disable") }}
-            </button>
+      <section class="cp-required__body">
+        <div class="cp-required__bodyHead">
+          <div class="cp-required__bodyTitle">{{ t("required_setup_title") }}</div>
+          <div class="cp-required__bodyMeta">
+            <span class="cp-required__muted">missing</span>
+            <span class="cp-required__mono">{{ plugins.missingRequiredIds.value.length }}</span>
+            <span class="cp-required__dot"></span>
+            <span class="cp-required__muted">required</span>
+            <span class="cp-required__mono">{{ requiredEntries.length }}</span>
+          </div>
+        </div>
 
-            <button class="cp-required__btn" type="button" @click="$router.push({ path: '/plugins', query: { focus_plugin_id: p.pluginId, filter: 'required' } })">
-              {{ t("plugin_center") }}
-            </button>
-          </footer>
-        </article>
-      </div>
-    </section>
+        <div v-if="plugins.catalogLoading.value" class="cp-required__state">Loading…</div>
+        <div v-else-if="plugins.catalogError.value" class="cp-required__state err">{{ plugins.catalogError.value }}</div>
+        <div v-else class="cp-required__list">
+          <article v-for="p in requiredEntries" :key="p.pluginId" class="cp-required__item" :data-ok="Boolean(plugins.installedById.value[p.pluginId]?.enabled && plugins.installedById.value[p.pluginId]?.status === 'ok')">
+            <header class="cp-required__itemHead">
+              <div class="cp-required__itemLeft">
+                <div class="cp-required__itemName">{{ p.name }}</div>
+                <div class="cp-required__itemMeta">
+                  <MonoTag :value="p.pluginId" title="plugin_id" :copyable="true" />
+                  <span class="cp-required__mini">{{ latestVersion(p) || "—" }}</span>
+                </div>
+              </div>
+              <div class="cp-required__itemBadges">
+                <LabelBadge variant="required" label="REQUIRED" />
+                <LabelBadge
+                  v-if="plugins.installedById.value[p.pluginId]?.status === 'failed'"
+                  variant="failed"
+                  label="FAILED"
+                />
+                <LabelBadge
+                  v-else-if="plugins.installedById.value[p.pluginId]?.enabled"
+                  variant="info"
+                  label="ENABLED"
+                />
+                <LabelBadge v-else-if="plugins.installedById.value[p.pluginId]?.currentVersion" variant="info" label="INSTALLED" />
+                <LabelBadge v-else variant="info" label="MISSING" />
+              </div>
+            </header>
 
-    <footer class="cp-required__footer">
-      <button class="cp-required__footerBtn primary" type="button" @click="openPluginCenterRequired">
-        {{ t("open_plugin_center_required") }}
-      </button>
-      <button class="cp-required__footerBtn" type="button" @click="ensureData">{{ t("recheck_required") }}</button>
-      <button class="cp-required__footerBtn" type="button" @click="switchServer">{{ t("switch_server") }}</button>
-    </footer>
+            <div class="cp-required__itemDesc">{{ p.tagline }}</div>
+            <div v-if="plugins.installedById.value[p.pluginId]?.lastError" class="cp-required__itemErr">
+              {{ plugins.installedById.value[p.pluginId]?.lastError }}
+            </div>
+
+            <footer class="cp-required__itemActions">
+              <button
+                v-if="!plugins.installedById.value[p.pluginId]?.currentVersion"
+                class="cp-required__btn primary"
+                type="button"
+                :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+                @click="plugins.install(p, latestVersion(p))"
+              >
+                {{ t("install") }}
+              </button>
+              <button
+                v-else-if="!plugins.installedById.value[p.pluginId]?.enabled"
+                class="cp-required__btn primary"
+                type="button"
+                :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+                @click="plugins.enable(p.pluginId)"
+              >
+                {{ t("enable") }}
+              </button>
+              <button
+                v-else
+                class="cp-required__btn"
+                type="button"
+                :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+                @click="plugins.disable(p.pluginId)"
+              >
+                {{ t("disable") }}
+              </button>
+
+              <button class="cp-required__btn" type="button" @click="$router.push({ path: '/plugins', query: { focus_plugin_id: p.pluginId, filter: 'required' } })">
+                {{ t("plugin_center") }}
+              </button>
+            </footer>
+          </article>
+        </div>
+      </section>
+
+      <footer class="cp-required__footer">
+        <button class="cp-required__footerBtn primary" type="button" @click="openPluginCenterRequired">
+          {{ t("open_plugin_center_required") }}
+        </button>
+        <button class="cp-required__footerBtn" type="button" @click="ensureData">{{ t("recheck_required") }}</button>
+        <button class="cp-required__footerBtn" type="button" @click="switchServer">{{ t("switch_server") }}</button>
+      </footer>
+    </ErrorBoundary>
   </main>
 </template>
 

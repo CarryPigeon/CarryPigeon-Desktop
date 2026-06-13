@@ -4,12 +4,15 @@
  */
 defineOptions({ name: "App" });
 import StartupShell from '@/app/bootstrap/StartupShell.vue';
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 </script>
 
 <template>
-  <StartupShell>
-    <router-view></router-view>
-  </StartupShell>
+  <ErrorBoundary>
+    <StartupShell>
+      <router-view></router-view>
+    </StartupShell>
+  </ErrorBoundary>
 </template>
 
 <style lang="scss">
@@ -565,6 +568,25 @@ select.cp-field {
   box-shadow: var(--cp-shadow-soft) !important;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+}
+
+/* emoji-picker-element 主题适配：跟随应用主题而非系统 prefers-color-scheme */
+emoji-picker {
+  --background: var(--cp-panel-solid);
+  --border-color: var(--cp-border);
+  --border-radius: 8px;
+  --button-active-background: var(--cp-hover-bg-2);
+  --button-hover-background: var(--cp-hover-bg);
+  --category-font-color: var(--cp-text);
+  --indicator-color: var(--cp-accent);
+  --input-background: var(--cp-field-bg);
+  --input-border-color: var(--cp-field-border);
+  --input-font-color: var(--cp-text);
+  --input-placeholder-color: var(--cp-field-placeholder);
+  --outline-color: var(--cp-focus-border);
+  /* 防止弹出窗口过高时超出视口被 Windows 窗口栏遮挡 */
+  height: 360px;
+  max-height: min(360px, calc(100vh - 180px));
 }
 
 /* 原生输入控件 */

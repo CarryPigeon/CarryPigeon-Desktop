@@ -91,3 +91,11 @@ export const MOCK_LATENCY_MS = Number(
 export const MOCK_SERVER_SOCKET = String(
   import.meta.env.VITE_MOCK_SERVER_SOCKET ?? "mock://handshake",
 );
+
+/**
+ * 是否启用消息置顶功能（pin/unpin）。
+ * 可通过环境变量 VITE_ENABLE_PIN_MESSAGE 控制，默认关闭以避免未经验证的功能提前暴露。
+ *
+ * @constant
+ */
+export const ENABLE_PIN_MESSAGE = import.meta.env.VITE_ENABLE_PIN_MESSAGE === "true";

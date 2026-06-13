@@ -3,7 +3,7 @@
  * @fileoverview 消息回应栏 — 消息下方展示 Emoji 回应列表及添加入口。
  */
 
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import "emoji-picker-element";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/api-types";
@@ -35,8 +35,38 @@ function handleReactionClick(emoji: string): void {
   emit("react", props.messageId, emoji);
 }
 
+/** 弹出位置修正计时器，用于组件卸载时清理。 */
+let _popupFixTimer: ReturnType<typeof setInterval> | null = null;
+
+onBeforeUnmount(() => {
+  if (_popupFixTimer !== null) clearInterval(_popupFixTimer);
+});
+
 function onPickerVisibleChange(visible: boolean): void {
   pickerVisible.value = visible;
+  if (visible) {
+    // 持续修正位置：emoji-picker 异步加载后可能触发 Popper.js 重新定位，
+    // 如果超出视口则强制固定在视口内，防止被 Windows 窗口栏遮挡
+    _popupFixTimer = setInterval(() => {
+      const popup = document.querySelector('[data-td-popup] > .t-popup__content');
+      if (!popup) return;
+      const rect = popup.getBoundingClientRect();
+      if (rect.top < 0) {
+        const parent = popup.closest('[data-td-popup]') as HTMLElement | null;
+        if (parent) {
+          parent.style.setProperty('top', '8px', 'important');
+          parent.style.setProperty('bottom', 'auto', 'important');
+        }
+      }
+    }, 100);
+    // 3 秒后停止检查（此时内容应已完全加载）
+    setTimeout(() => {
+      if (_popupFixTimer !== null) {
+        clearInterval(_popupFixTimer);
+        _popupFixTimer = null;
+      }
+    }, 3000);
+  }
 }
 
 function onEmojiClick(e: Event): void {
@@ -71,6 +101,10 @@ function handleCustomEmojiClick(ce: { id: string; name: string }): void {
       placement="top"
       :visible="pickerVisible"
       @visible-change="onPickerVisibleChange"
+      :overlayInnerStyle="{
+        maxHeight: 'calc(100vh - 80px)',
+        overflowY: 'auto',
+      }"
     >
       <button class="cp-reactionAddBtn" type="button">+</button>
       <template #content>

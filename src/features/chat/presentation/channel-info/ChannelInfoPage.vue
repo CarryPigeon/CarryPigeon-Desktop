@@ -12,6 +12,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { useChannelInfoPage } from "@/features/chat/presentation/channel-info/useChannelInfoPage";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const { t } = useI18n();
 const {
@@ -50,72 +51,74 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
   <!-- 页面：ChannelInfoPage｜职责：频道信息展示/编辑（mock）｜交互：编辑保存、申请加入、跳转回插线板 -->
   <!-- 区块：<main> .cp-info -->
   <main class="cp-info">
-    <header class="cp-info__head">
-      <button class="cp-info__back" type="button" @click="goBack">Back</button>
-      <div class="cp-info__title">
-        <div class="cp-info__name">{{ channelName }}</div>
-        <div class="cp-info__sub">Channel</div>
-      </div>
-      <div class="cp-info__headRight">
-        <button class="cp-info__btn" type="button" @click="openInPatchbay">{{ t("back_to_patchbay") }}</button>
-      </div>
-    </header>
+    <ErrorBoundary>
+      <header class="cp-info__head">
+        <button class="cp-info__back" type="button" @click="goBack">Back</button>
+        <div class="cp-info__title">
+          <div class="cp-info__name">{{ channelName }}</div>
+          <div class="cp-info__sub">Channel</div>
+        </div>
+        <div class="cp-info__headRight">
+          <button class="cp-info__btn" type="button" @click="openInPatchbay">{{ t("back_to_patchbay") }}</button>
+        </div>
+      </header>
 
-    <section class="cp-info__body">
-      <div class="cp-info__card">
-        <div class="cp-info__k">channel_id</div>
-        <div class="cp-info__v"><MonoTag :value="channelId || '—'" :copyable="true" /></div>
-      </div>
-      <div class="cp-info__card wide">
-        <div class="cp-info__k">{{ t("channel_brief") }}</div>
-        <div v-if="!isEditing" class="cp-info__v">{{ channelBrief || t("channel_brief_placeholder") }}</div>
-        <div v-else class="cp-info__edit">
-          <div class="cp-info__editField">
-            <div class="cp-info__editLabel">name</div>
-            <t-input v-model="draftChannelName" clearable />
+      <section class="cp-info__body">
+        <div class="cp-info__card">
+          <div class="cp-info__k">channel_id</div>
+          <div class="cp-info__v"><MonoTag :value="channelId || '—'" :copyable="true" /></div>
+        </div>
+        <div class="cp-info__card wide">
+          <div class="cp-info__k">{{ t("channel_brief") }}</div>
+          <div v-if="!isEditing" class="cp-info__v">{{ channelBrief || t("channel_brief_placeholder") }}</div>
+          <div v-else class="cp-info__edit">
+            <div class="cp-info__editField">
+              <div class="cp-info__editLabel">name</div>
+              <t-input v-model="draftChannelName" clearable />
+            </div>
+            <div class="cp-info__editField">
+              <div class="cp-info__editLabel">brief</div>
+              <t-textarea v-model="draftChannelBrief" :autosize="{ minRows: 3, maxRows: 6 }" />
+            </div>
+            <div v-if="actionError" class="cp-info__error">{{ actionError }}</div>
+            <div class="cp-info__editActions">
+              <button class="cp-info__btn primary" type="button" :disabled="isSavingMeta" @click="saveEdit">
+                {{ isSavingMeta ? t("loading") : t("save") }}
+              </button>
+              <button class="cp-info__btn" type="button" :disabled="isSavingMeta" @click="cancelEdit">{{ t("cancel") }}</button>
+            </div>
           </div>
-          <div class="cp-info__editField">
-            <div class="cp-info__editLabel">brief</div>
-            <t-textarea v-model="draftChannelBrief" :autosize="{ minRows: 3, maxRows: 6 }" />
-          </div>
-          <div v-if="actionError" class="cp-info__error">{{ actionError }}</div>
-          <div class="cp-info__editActions">
-            <button class="cp-info__btn primary" type="button" :disabled="isSavingMeta" @click="saveEdit">
-              {{ isSavingMeta ? t("loading") : t("save") }}
+        </div>
+        <div class="cp-info__card wide">
+          <div class="cp-info__k">membership</div>
+          <div class="cp-info__v">
+            <span class="cp-info__pill" :data-ok="membershipStatus === 'joined'">{{ membershipStatusText }}</span>
+            <button v-if="canRequestJoin" class="cp-info__btn primary" type="button" :disabled="joinRequested || isRequestingJoin" @click="handleJoin">
+              {{ joinRequested ? t("channel_join_request_sent") : isRequestingJoin ? t("loading") : t("apply_join") }}
             </button>
-            <button class="cp-info__btn" type="button" :disabled="isSavingMeta" @click="cancelEdit">{{ t("cancel") }}</button>
+            <button v-if="mayEditChannelMeta" class="cp-info__btn" type="button" @click="beginEdit">{{ t("edit") }}</button>
           </div>
+          <div v-if="!isEditing && actionError" class="cp-info__error">{{ actionError }}</div>
         </div>
-      </div>
-      <div class="cp-info__card wide">
-        <div class="cp-info__k">membership</div>
-        <div class="cp-info__v">
-          <span class="cp-info__pill" :data-ok="membershipStatus === 'joined'">{{ membershipStatusText }}</span>
-          <button v-if="canRequestJoin" class="cp-info__btn primary" type="button" :disabled="joinRequested || isRequestingJoin" @click="handleJoin">
-            {{ joinRequested ? t("channel_join_request_sent") : isRequestingJoin ? t("loading") : t("apply_join") }}
-          </button>
-          <button v-if="mayEditChannelMeta" class="cp-info__btn" type="button" @click="beginEdit">{{ t("edit") }}</button>
-        </div>
-        <div v-if="!isEditing && actionError" class="cp-info__error">{{ actionError }}</div>
-      </div>
-      <div class="cp-info__card wide">
-        <div class="cp-info__k">Announcement</div>
-        <div v-if="!isEditingAnnouncement" class="cp-info__v">
-          {{ channelAnnouncement || 'No announcement' }}
-        </div>
-        <div v-else class="cp-info__edit">
-          <t-textarea v-model="draftChannelAnnouncement" :maxlength="2000" :autosize="{ minRows: 4, maxRows: 8 }" />
-          <div v-if="actionError" class="cp-info__error">{{ actionError }}</div>
-          <div class="cp-info__editActions">
-            <button class="cp-info__btn primary" type="button" :disabled="isSavingAnnouncement" @click="saveAnnouncement">
-              {{ isSavingAnnouncement ? 'Saving…' : 'Save' }}
-            </button>
-            <button class="cp-info__btn" type="button" :disabled="isSavingAnnouncement" @click="cancelAnnouncementEdit">Cancel</button>
+        <div class="cp-info__card wide">
+          <div class="cp-info__k">Announcement</div>
+          <div v-if="!isEditingAnnouncement" class="cp-info__v">
+            {{ channelAnnouncement || 'No announcement' }}
           </div>
+          <div v-else class="cp-info__edit">
+            <t-textarea v-model="draftChannelAnnouncement" :maxlength="2000" :autosize="{ minRows: 4, maxRows: 8 }" />
+            <div v-if="actionError" class="cp-info__error">{{ actionError }}</div>
+            <div class="cp-info__editActions">
+              <button class="cp-info__btn primary" type="button" :disabled="isSavingAnnouncement" @click="saveAnnouncement">
+                {{ isSavingAnnouncement ? 'Saving…' : 'Save' }}
+              </button>
+              <button class="cp-info__btn" type="button" :disabled="isSavingAnnouncement" @click="cancelAnnouncementEdit">Cancel</button>
+            </div>
+          </div>
+          <button v-if="mayEditChannelMeta && !isEditingAnnouncement" class="cp-info__btn" type="button" @click="changeAnnouncement">Edit announcement</button>
         </div>
-        <button v-if="mayEditChannelMeta && !isEditingAnnouncement" class="cp-info__btn" type="button" @click="changeAnnouncement">Edit announcement</button>
-      </div>
-    </section>
+      </section>
+    </ErrorBoundary>
   </main>
 </template>
 

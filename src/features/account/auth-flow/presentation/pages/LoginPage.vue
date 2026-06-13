@@ -17,6 +17,7 @@ import MonoTag from "@/shared/ui/MonoTag.vue";
 import { useLoginConnection } from "@/features/account/auth-flow/presentation/composables/useLoginConnection";
 import { useLoginEmailAuth } from "@/features/account/auth-flow/presentation/composables/useLoginEmailAuth";
 import { useLoginHotkeys } from "@/features/account/auth-flow/presentation/composables/useLoginHotkeys";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const router = useRouter();
 
@@ -35,125 +36,127 @@ useLoginHotkeys(router);
   <!-- 页面：LoginPage｜职责：连接阶段（Handshake）+ 验证码登录（Auth） -->
   <!-- 区块：<main> .cp-login -->
   <main class="cp-login">
-    <section class="cp-login__left">
-      <header class="cp-login__leftHead">
-        <div class="cp-login__brand">
-          <div class="cp-login__brandMark" aria-hidden="true"></div>
-          <div class="cp-login__brandText">
-            <div class="cp-login__brandName">CarryPigeon</div>
-            <div class="cp-login__brandSub">Modular Patchbay</div>
+    <ErrorBoundary>
+      <section class="cp-login__left">
+        <header class="cp-login__leftHead">
+          <div class="cp-login__brand">
+            <div class="cp-login__brandMark" aria-hidden="true"></div>
+            <div class="cp-login__brandText">
+              <div class="cp-login__brandName">CarryPigeon</div>
+              <div class="cp-login__brandSub">Modular Patchbay</div>
+            </div>
           </div>
-        </div>
-        <div class="cp-login__stageWrap">
-          <div class="cp-login__stage">
-            <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">Handshake</span>
-            <span class="cp-login__stageSep">→</span>
-            <span class="cp-login__stageItem" :data-active="stage === 'Auth'">Auth</span>
+          <div class="cp-login__stageWrap">
+            <div class="cp-login__stage">
+              <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">Handshake</span>
+              <span class="cp-login__stageSep">→</span>
+              <span class="cp-login__stageItem" :data-active="stage === 'Auth'">Auth</span>
+            </div>
+            <div class="cp-login__kbdHint">Ctrl/Cmd+P: Plugins · Ctrl/Cmd+,: Settings</div>
           </div>
-          <div class="cp-login__kbdHint">Ctrl/Cmd+P: Plugins · Ctrl/Cmd+,: Settings</div>
-        </div>
-      </header>
+        </header>
 
-      <div class="cp-login__rack">
-        <div class="cp-login__label">Rack Overview</div>
+        <div class="cp-login__rack">
+          <div class="cp-login__label">Rack Overview</div>
 
-        <div class="cp-login__field">
-          <div class="cp-login__fieldLabel">server_socket</div>
-          <t-input v-model="socketDraft" placeholder="tls://host:port or mock://handshake" clearable />
-          <div class="cp-login__fieldHint">
-            <MonoTag :value="currentServerSocket || '—'" title="current socket" :copyable="true" />
-            <button class="cp-login__miniBtn" type="button" @click="handleConnect">Connect</button>
-          </div>
-        </div>
-
-        <div class="cp-login__field">
-          <div class="cp-login__fieldLabel">transport</div>
-          <div class="cp-login__seg">
-            <button class="cp-login__segBtn" :data-active="transport === 'tls_strict'" type="button" @click="transport = 'tls_strict'">
-              TLS Strict
-            </button>
-            <button class="cp-login__segBtn" :data-active="transport === 'tls_insecure'" type="button" @click="transport = 'tls_insecure'">
-              TLS Insecure
-            </button>
-            <button class="cp-login__segBtn" :data-active="transport === 'tcp_legacy'" type="button" @click="transport = 'tcp_legacy'">
-              TCP Legacy
-            </button>
-          </div>
-          <div class="cp-login__transportHint">
-            (Mock preview ignores transport; real mode should enforce TLS policies.)
-          </div>
-        </div>
-
-        <div class="cp-login__field">
-          <div class="cp-login__fieldLabel">connection</div>
-          <ConnectionPill
-            :state="connectionPillState"
-            label="Server link"
-            :detail="connectionDetail"
-            :action-label="connectionPhase === 'failed' ? 'Retry' : ''"
-            @action="retryLast"
-          />
-        </div>
-
-        <div class="cp-login__field">
-          <div class="cp-login__fieldLabel">server_id</div>
-          <div class="cp-login__fieldHint">
-            <MonoTag :value="serverInfo?.serverId || '—'" title="server_id" :copyable="true" />
-          </div>
-          <div class="cp-login__transportHint">
-            server_id is required for plugin isolation. If missing, Plugin Center will be disabled.
-          </div>
-        </div>
-      </div>
-
-      <div class="cp-login__leftFoot">
-        <div class="cp-login__monoBlock">
-          <div class="cp-login__monoTitle">Tip</div>
-          <div class="cp-login__monoText">
-            In mock mode, any email + code works — unless required modules are missing. Install them via the Power Latch.
-          </div>
-        </div>
-        <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">Open Server Manager</button>
-        <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
-      </div>
-    </section>
-
-    <section class="cp-login__right">
-      <div class="cp-login__panel">
-        <div class="cp-login__panelTitle">Auth Panel</div>
-        <div class="cp-login__panelSub">Email code session (login / register)</div>
-
-        <div v-if="banner" class="cp-login__banner">{{ banner }}</div>
-
-        <div class="cp-login__form">
-          <div class="cp-login__formRow">
-            <div class="cp-login__fieldLabel">email</div>
-            <t-input v-model="email" placeholder="you@domain.com" clearable />
-          </div>
-
-          <div class="cp-login__formRow">
-            <div class="cp-login__fieldLabel">code</div>
-            <div class="cp-login__codeRow">
-              <t-input v-model="code" placeholder="123456" clearable />
-              <button
-                class="cp-login__sendBtn"
-                type="button"
-                :disabled="sending || countdown > 0"
-                @click="handleSendCode"
-              >
-                {{ countdown > 0 ? `Resend (${countdown})` : sending ? "Sending…" : "Send Code" }}
-              </button>
+          <div class="cp-login__field">
+            <div class="cp-login__fieldLabel">server_socket</div>
+            <t-input v-model="socketDraft" placeholder="tls://host:port or mock://handshake" clearable />
+            <div class="cp-login__fieldHint">
+              <MonoTag :value="currentServerSocket || '—'" title="current socket" :copyable="true" />
+              <button class="cp-login__miniBtn" type="button" @click="handleConnect">Connect</button>
             </div>
           </div>
 
-          <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
-            {{ loggingIn ? "Signing in…" : "Sign In / Register" }}
-          </button>
+          <div class="cp-login__field">
+            <div class="cp-login__fieldLabel">transport</div>
+            <div class="cp-login__seg">
+              <button class="cp-login__segBtn" :data-active="transport === 'tls_strict'" type="button" @click="transport = 'tls_strict'">
+                TLS Strict
+              </button>
+              <button class="cp-login__segBtn" :data-active="transport === 'tls_insecure'" type="button" @click="transport = 'tls_insecure'">
+                TLS Insecure
+              </button>
+              <button class="cp-login__segBtn" :data-active="transport === 'tcp_legacy'" type="button" @click="transport = 'tcp_legacy'">
+                TCP Legacy
+              </button>
+            </div>
+            <div class="cp-login__transportHint">
+              (Mock preview ignores transport; real mode should enforce TLS policies.)
+            </div>
+          </div>
 
+          <div class="cp-login__field">
+            <div class="cp-login__fieldLabel">connection</div>
+            <ConnectionPill
+              :state="connectionPillState"
+              label="Server link"
+              :detail="connectionDetail"
+              :action-label="connectionPhase === 'failed' ? 'Retry' : ''"
+              @action="retryLast"
+            />
+          </div>
+
+          <div class="cp-login__field">
+            <div class="cp-login__fieldLabel">server_id</div>
+            <div class="cp-login__fieldHint">
+              <MonoTag :value="serverInfo?.serverId || '—'" title="server_id" :copyable="true" />
+            </div>
+            <div class="cp-login__transportHint">
+              server_id is required for plugin isolation. If missing, Plugin Center will be disabled.
+            </div>
+          </div>
+        </div>
+
+        <div class="cp-login__leftFoot">
+          <div class="cp-login__monoBlock">
+            <div class="cp-login__monoTitle">Tip</div>
+            <div class="cp-login__monoText">
+              In mock mode, any email + code works — unless required modules are missing. Install them via the Power Latch.
+            </div>
+          </div>
+          <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">Open Server Manager</button>
           <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section class="cp-login__right">
+        <div class="cp-login__panel">
+          <div class="cp-login__panelTitle">Auth Panel</div>
+          <div class="cp-login__panelSub">Email code session (login / register)</div>
+
+          <div v-if="banner" class="cp-login__banner">{{ banner }}</div>
+
+          <div class="cp-login__form">
+            <div class="cp-login__formRow">
+              <div class="cp-login__fieldLabel">email</div>
+              <t-input v-model="email" placeholder="you@domain.com" clearable />
+            </div>
+
+            <div class="cp-login__formRow">
+              <div class="cp-login__fieldLabel">code</div>
+              <div class="cp-login__codeRow">
+                <t-input v-model="code" placeholder="123456" clearable />
+                <button
+                  class="cp-login__sendBtn"
+                  type="button"
+                  :disabled="sending || countdown > 0"
+                  @click="handleSendCode"
+                >
+                  {{ countdown > 0 ? `Resend (${countdown})` : sending ? "Sending…" : "Send Code" }}
+                </button>
+              </div>
+            </div>
+
+            <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
+              {{ loggingIn ? "Signing in…" : "Sign In / Register" }}
+            </button>
+
+            <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
+          </div>
+        </div>
+      </section>
+    </ErrorBoundary>
   </main>
 </template>
 

@@ -7,6 +7,7 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const route = useRoute();
 
@@ -46,9 +47,11 @@ const bio = computed(computeBio);
   <!-- 页面：UserPopoverPage｜职责：用户信息 Popover -->
   <!-- 区块：<main> .cp-pop -->
   <main class="cp-pop">
-    <div class="cp-pop__title">{{ name || "User" }}</div>
-    <div class="cp-pop__row"><MonoTag :value="email || '—'" :copyable="true" /></div>
-    <div class="cp-pop__bio">{{ bio || "—" }}</div>
+    <ErrorBoundary>
+      <div class="cp-pop__title">{{ name || "User" }}</div>
+      <div class="cp-pop__row"><MonoTag :value="email || '—'" :copyable="true" /></div>
+      <div class="cp-pop__bio">{{ bio || "—" }}</div>
+    </ErrorBoundary>
   </main>
 </template>
 

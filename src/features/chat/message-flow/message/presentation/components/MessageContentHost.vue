@@ -11,7 +11,9 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import UnknownDomainCard from "./UnknownDomainCard.vue";
+import ImageMessageBubble from "./ImageMessageBubble.vue";
 import VoiceMessageBubble from "./VoiceMessageBubble.vue";
+import MessageFailedIndicator from "./MessageFailedIndicator.vue";
 import {
   resolveMessageRenderModel,
   type MessageRendererRegistry,
@@ -70,6 +72,14 @@ const emit = defineEmits<{
    * 查看合并转发消息详情。
    */
   (event: "viewForwardDetail", payload: { fromName: string; forwardedMessages: Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }>; comment?: string }): void;
+  /**
+   * 发送失败后重试。
+   */
+  (event: "retry", messageId: string): void;
+  /**
+   * 移除发送失败的消息。
+   */
+  (event: "remove", messageId: string): void;
 }>();
 
 const { t } = useI18n();
@@ -89,28 +99,50 @@ const isOwn = computed(() => props.message.from.id === currentChatUserId.value);
  * 消息是否已被编辑过（通过 editedAt 时间戳判断）。
  */
 const isEdited = computed(() => {
-  const msg = props.message as { editedAt?: number };
-  return msg.editedAt != null && msg.editedAt > 0;
+  if (props.message.kind !== "core_text" && props.message.kind !== "domain_message") return false;
+  return "editedAt" in props.message && props.message.editedAt != null && props.message.editedAt > 0;
 });
 
 /**
  * 判断消息是否已被撤回。
  */
 const isRecalled = computed(() => {
-  const msg = props.message as { recalledAt?: number };
-  return msg.recalledAt != null && msg.recalledAt > 0;
+  return "recalledAt" in props.message && props.message.recalledAt != null && props.message.recalledAt > 0;
+});
+
+/**
+ * 判断消息发送是否失败。
+ * 仅 image 类消息携带 status 字段，其余类型无发送状态。
+ */
+const isFailed = computed(() => {
+  return "status" in props.message && props.message.status === "failed";
+});
+
+/**
+ * 获取发送失败的错误信息。
+ */
+const sendFailedError = computed<string | undefined>(() => {
+  if (!isFailed.value) return undefined;
+  return "sendError" in props.message ? props.message.sendError : undefined;
+});
+
+/**
+ * 消息是否已置顶。
+ * 初始实现通过消息属性判断，后续接入 pin 列表时填充真实数据。
+ */
+const isPinned = computed(() => {
+  return (props.message as { isPinned?: boolean }).isPinned ?? false;
 });
 
 const isMergedForward = computed(() => {
-  const fms = (props.message as { forwardedMessages?: unknown[] }).forwardedMessages;
-  return Array.isArray(fms) && fms.length > 0;
+  return "forwardedMessages" in props.message && Array.isArray(props.message.forwardedMessages) && props.message.forwardedMessages.length > 0;
 });
 
 const mergedForwardData = computed(() => {
   if (!isMergedForward.value) return null;
   return {
     fromName: props.message.from.name,
-    forwardedMessages: (props.message as { forwardedMessages?: Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }> }).forwardedMessages!,
+    forwardedMessages: props.message.forwardedMessages as Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }>,
     comment: props.message.kind === "core_text" ? props.message.text : undefined,
   };
 });
@@ -119,8 +151,9 @@ const mergedForwardData = computed(() => {
  * 线程回复计数。
  */
 const threadReplyCount = computed(() => {
-  const msg = props.message as { threadReplyCount?: number };
-  return msg.threadReplyCount ?? 0;
+  return "threadReplyCount" in props.message
+    ? Number(props.message.threadReplyCount) || 0
+    : 0;
 });
 
 /**
@@ -135,12 +168,21 @@ const isVoiceMessage = computed(() => {
  */
 const voiceMessageData = computed<{ shareKey?: string; durationMs?: number } | null>(() => {
   if (!isVoiceMessage.value) return null;
-  const data = (props.message as { data?: Record<string, unknown> }).data;
-  if (!data) return null;
+  if (!("data" in props.message) || !props.message.data) return null;
+  const data = props.message.data as Record<string, unknown>;
+  if (!data || typeof data !== 'object') return null;
   return {
     shareKey: String(data.shareKey ?? ""),
     durationMs: Number(data.durationMs ?? 0),
   };
+});
+
+/**
+ * 链接预览数据（从消息中提取）。
+ */
+const messageLinkPreview = computed(() => {
+  if ("linkPreview" in props.message) return props.message.linkPreview ?? null;
+  return null;
 });
 
 /**
@@ -162,8 +204,11 @@ function handleInstall(): void {
     </div>
   </template>
   <template v-else>
-    <!-- 语音消息（Voice:Message） -->
-    <VoiceMessageBubble
+    <div class="cp-messageContent">
+      <!-- 置顶标记 -->
+      <span v-if="isPinned" class="cp-pinBadge" :title="t('pinned_message')">📌</span>
+      <!-- 语音消息（Voice:Message） -->
+      <VoiceMessageBubble
       v-if="isVoiceMessage && voiceMessageData && voiceMessageData.shareKey"
       :share-key="voiceMessageData.shareKey"
       :duration-ms="voiceMessageData.durationMs ?? 0"
@@ -175,6 +220,17 @@ function handleInstall(): void {
       :forwarded-messages="mergedForwardData.forwardedMessages"
       :comment="mergedForwardData.comment"
       @viewDetail="emit('viewForwardDetail', { fromName: mergedForwardData.fromName, forwardedMessages: mergedForwardData.forwardedMessages, comment: mergedForwardData.comment })"
+    />
+    <!-- 图片消息 -->
+    <ImageMessageBubble
+      v-else-if="props.message.kind === 'image'"
+      :url="props.message.url"
+      :thumb-url="props.message.thumbUrl"
+      :file-name="props.message.fileName"
+      :file-size="props.message.fileSize"
+      :width="props.message.width"
+      :height="props.message.height"
+      @openLightbox="(payload) => emit('openLightbox', payload)"
     />
     <CoreTextMessageBubble
       v-else-if="renderModel.kind === 'core'"
@@ -188,7 +244,7 @@ function handleInstall(): void {
       :is-edited="isEdited"
       :is-own="isOwn"
       :editing-message-id="props.editingMessageId"
-      :link-preview="(props.message as any).linkPreview ?? null"
+      :link-preview="messageLinkPreview"
       @edit="(payload) => emit('edit', payload)"
       @edit-cancel="(messageId) => emit('edit-cancel', messageId)"
       @openLightbox="(payload) => emit('openLightbox', payload)"
@@ -208,12 +264,20 @@ function handleInstall(): void {
       />
     </div>
     <UnknownDomainCard
-      v-else
+      v-else-if="renderModel.kind === 'unknown'"
       :domain-id="renderModel.domainId"
       :domain-version="renderModel.domainVersion"
       :plugin-id-hint="renderModel.pluginIdHint || ''"
       :preview="renderModel.preview"
       @install="handleInstall"
+    />
+    <!-- 发送失败指示器 -->
+    <MessageFailedIndicator
+      v-if="isFailed"
+      :message-id="props.message.id"
+      :error="sendFailedError"
+      @retry="(mid: string) => emit('retry', mid)"
+      @remove="(mid: string) => emit('remove', mid)"
     />
     <ReactionBar
       :message-id="props.message.id"
@@ -227,6 +291,7 @@ function handleInstall(): void {
     >
       {{ threadReplyCount }} {{ threadReplyCount === 1 ? t('reply') : t('replies') }} &mdash; {{ t('view_thread') }}
     </button>
+    </div>
   </template>
 </template>
 
@@ -259,5 +324,20 @@ function handleInstall(): void {
 
 .cp-threadLink:hover {
   background: color-mix(in oklab, var(--cp-accent, #5865f2) 10%, transparent);
+}
+
+/* 消息内容包装容器，为置顶标记提供定位上下文 */
+.cp-messageContent {
+  position: relative;
+}
+
+/* 置顶标记（📌） */
+.cp-pinBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 12px;
+  user-select: none;
+  pointer-events: none;
 }
 </style>

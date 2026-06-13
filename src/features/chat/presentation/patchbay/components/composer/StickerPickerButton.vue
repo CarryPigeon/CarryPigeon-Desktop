@@ -4,7 +4,7 @@
  * @description 编辑工具栏"表情"按钮，点击弹出表情选择面板。
  */
 
-import { ref } from "vue";
+import { ref, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import StickerPickerPanel from "./StickerPickerPanel.vue";
 
@@ -19,10 +19,38 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+/** 弹出位置修正计时器，用于组件卸载时清理。 */
+let _popupFixTimer: ReturnType<typeof setInterval> | null = null;
+
+onBeforeUnmount(() => {
+  if (_popupFixTimer !== null) clearInterval(_popupFixTimer);
+});
+
 const popupVisible = ref(false);
 
 function onPopupVisibleChange(visible: boolean): void {
   popupVisible.value = visible;
+  if (visible) {
+    // 防止 popup 超出视口顶部被 Windows 窗口栏遮挡
+    _popupFixTimer = setInterval(() => {
+      const popup = document.querySelector('[data-td-popup] > .t-popup__content');
+      if (!popup) return;
+      const rect = popup.getBoundingClientRect();
+      if (rect.top < 0) {
+        const parent = popup.closest('[data-td-popup]') as HTMLElement | null;
+        if (parent) {
+          parent.style.setProperty('top', '8px', 'important');
+          parent.style.setProperty('bottom', 'auto', 'important');
+        }
+      }
+    }, 100);
+    setTimeout(() => {
+      if (_popupFixTimer !== null) {
+        clearInterval(_popupFixTimer);
+        _popupFixTimer = null;
+      }
+    }, 3000);
+  }
 }
 
 function onStickerSelect(shareKey: string): void {
@@ -42,6 +70,10 @@ function onEmojiSelect(emoji: string): void {
     placement="top"
     :visible="popupVisible"
     @visible-change="onPopupVisibleChange"
+    :overlayInnerStyle="{
+      maxHeight: 'calc(100vh - 80px)',
+      overflowY: 'auto',
+    }"
   >
     <button class="cp-stickerBtn" type="button">
       <span class="cp-stickerBtn__icon">😊</span>

@@ -7,7 +7,7 @@
 import { onBeforeUnmount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
-type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread";
+type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin";
 
 const props = defineProps<{
   open: boolean;
@@ -16,6 +16,8 @@ const props = defineProps<{
   showEdit?: boolean;
   showRecall?: boolean;
   showViewThread?: boolean;
+  canPin?: boolean;
+  isPinned?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -107,6 +109,9 @@ onBeforeUnmount(handleBeforeUnmount);
         </button>
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
           {{ t("forward_message") }}
+        </button>
+        <button v-if="props.canPin" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isPinned ? 'unpin' : 'pin')">
+          {{ props.isPinned ? t("unpin_message") : t("pin_message") }}
         </button>
         <button v-if="props.showEdit" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('edit')">
           {{ t("edit_message") }}

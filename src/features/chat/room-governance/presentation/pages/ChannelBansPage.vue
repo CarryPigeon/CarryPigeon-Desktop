@@ -8,6 +8,7 @@ import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useChannelBansPage } from "@/features/chat/room-governance/presentation/page-models/useChannelBansPage";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const { t } = useI18n();
 const {
@@ -35,64 +36,66 @@ const {
 
 <template>
   <!-- 页面：ChannelBansPage｜职责：频道封禁管理 -->
-  <GovernancePageShell
-    :channel-name="channelName"
-    :subtitle="`${t('channel_bans')} (${banCount})`"
-    :is-loading="isLoading"
-    :error-message="pageError"
-    @back="goBack"
-  >
-    <template #back-label>{{ t("back") }}</template>
-    <template #loading>{{ t("loading") }}</template>
-    <template #actions>
-        <button class="cp-bans__btn primary" type="button" :disabled="!canOpenAddBanDialog" @click="openAddBanDialog">{{ t("add_ban") }}</button>
-    </template>
-    <template #default>
-      <div v-if="bans.length === 0" class="cp-bans__empty">{{ t("no_bans") }}</div>
-      <div v-for="b in bans" :key="b.uid" class="cp-banCard">
-        <AvatarBadge :name="b.nickname || b.uid" :size="40" />
-        <div class="cp-banCard__info">
-          <div class="cp-banCard__name">{{ b.nickname || b.uid }}</div>
-          <div class="cp-banCard__reason">
-            <span class="cp-banCard__label">{{ t("ban_reason") }}:</span>
-            {{ b.reason || "—" }}
+  <ErrorBoundary>
+    <GovernancePageShell
+      :channel-name="channelName"
+      :subtitle="`${t('channel_bans')} (${banCount})`"
+      :is-loading="isLoading"
+      :error-message="pageError"
+      @back="goBack"
+    >
+      <template #back-label>{{ t("back") }}</template>
+      <template #loading>{{ t("loading") }}</template>
+      <template #actions>
+          <button class="cp-bans__btn primary" type="button" :disabled="!canOpenAddBanDialog" @click="openAddBanDialog">{{ t("add_ban") }}</button>
+      </template>
+      <template #default>
+        <div v-if="bans.length === 0" class="cp-bans__empty">{{ t("no_bans") }}</div>
+        <div v-for="b in bans" :key="b.uid" class="cp-banCard">
+          <AvatarBadge :name="b.nickname || b.uid" :size="40" />
+          <div class="cp-banCard__info">
+            <div class="cp-banCard__name">{{ b.nickname || b.uid }}</div>
+            <div class="cp-banCard__reason">
+              <span class="cp-banCard__label">{{ t("ban_reason") }}:</span>
+              {{ b.reason || "—" }}
+            </div>
+            <div class="cp-banCard__until">{{ t("ban_until") }}: {{ formatBanUntil(b.until) }}</div>
           </div>
-          <div class="cp-banCard__until">{{ t("ban_until") }}: {{ formatBanUntil(b.until) }}</div>
+          <div class="cp-banCard__actions">
+            <button class="cp-banCard__btn" type="button" @click="handleRemoveBan(b.uid)">
+              {{ t("remove_ban") }}
+            </button>
+          </div>
         </div>
-        <div class="cp-banCard__actions">
-          <button class="cp-banCard__btn" type="button" @click="handleRemoveBan(b.uid)">
-            {{ t("remove_ban") }}
-          </button>
-        </div>
-      </div>
-    </template>
-  </GovernancePageShell>
+      </template>
+    </GovernancePageShell>
 
-  <!-- Add Ban Dialog -->
-  <t-dialog v-model:visible="addBanDialogVisible" :header="t('add_ban')" :footer="false">
-    <div class="cp-addBan">
-      <div class="cp-addBan__field">
-        <label class="cp-addBan__label">{{ t("select_user") }}</label>
-        <t-select v-model="selectedUid" :placeholder="t('select_user')">
-          <t-option v-for="m in bannableMembers" :key="m.uid" :value="m.uid" :label="m.nickname" />
-        </t-select>
+    <!-- Add Ban Dialog -->
+    <t-dialog v-model:visible="addBanDialogVisible" :header="t('add_ban')" :footer="false">
+      <div class="cp-addBan">
+        <div class="cp-addBan__field">
+          <label class="cp-addBan__label">{{ t("select_user") }}</label>
+          <t-select v-model="selectedUid" :placeholder="t('select_user')">
+            <t-option v-for="m in bannableMembers" :key="m.uid" :value="m.uid" :label="m.nickname" />
+          </t-select>
+        </div>
+        <div class="cp-addBan__field">
+          <label class="cp-addBan__label">{{ t("ban_duration") }}</label>
+          <t-select v-model="banDuration">
+            <t-option v-for="d in durationOptions" :key="d.value" :value="d.value" :label="t(d.label)" />
+          </t-select>
+        </div>
+        <div class="cp-addBan__field">
+          <label class="cp-addBan__label">{{ t("ban_reason") }}</label>
+          <t-textarea v-model="banReason" :placeholder="t('ban_reason')" :autosize="{ minRows: 2, maxRows: 4 }" />
+        </div>
+        <div class="cp-addBan__actions">
+          <button class="cp-addBan__btn" type="button" @click="closeAddBanDialog">{{ t("cancel") }}</button>
+          <button class="cp-addBan__btn primary" type="button" :disabled="!canSubmitAddBan" @click="handleAddBan">{{ t("confirm") }}</button>
+        </div>
       </div>
-      <div class="cp-addBan__field">
-        <label class="cp-addBan__label">{{ t("ban_duration") }}</label>
-        <t-select v-model="banDuration">
-          <t-option v-for="d in durationOptions" :key="d.value" :value="d.value" :label="t(d.label)" />
-        </t-select>
-      </div>
-      <div class="cp-addBan__field">
-        <label class="cp-addBan__label">{{ t("ban_reason") }}</label>
-        <t-textarea v-model="banReason" :placeholder="t('ban_reason')" :autosize="{ minRows: 2, maxRows: 4 }" />
-      </div>
-      <div class="cp-addBan__actions">
-        <button class="cp-addBan__btn" type="button" @click="closeAddBanDialog">{{ t("cancel") }}</button>
-        <button class="cp-addBan__btn primary" type="button" :disabled="!canSubmitAddBan" @click="handleAddBan">{{ t("confirm") }}</button>
-      </div>
-    </div>
-  </t-dialog>
+    </t-dialog>
+  </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">

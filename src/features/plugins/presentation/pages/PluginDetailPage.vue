@@ -14,6 +14,7 @@ import { resolveLatestPluginCatalogVersion } from "@/features/plugins/domain/typ
 import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
 import { createPluginContext } from "@/features/plugins/presentation/composables/usePluginContext";
 import { runPluginTask } from "@/features/plugins/presentation/composables/usePluginTaskRunner";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 type PluginCatalogViewEntry = PluginCatalogEntryLike;
 
 const route = useRoute();
@@ -141,120 +142,122 @@ onMounted(handleMounted);
   <!-- 页面：PluginDetailPage｜职责：插件详情页 -->
   <!-- 区块：<main> .cp-plugin-detail -->
   <main class="cp-plugin-detail">
-    <header class="cp-plugin-detail__head">
-      <button class="cp-plugin-detail__back" type="button" @click="router.back()">{{ t("back") }}</button>
-      <div class="cp-plugin-detail__title">
-        <div class="cp-plugin-detail__name">{{ plugin?.name || pluginId }}</div>
-        <div class="cp-plugin-detail__meta">
-          <span class="cp-plugin-detail__mono">{{ serverSocket || "no-server" }}</span>
-          <span class="cp-plugin-detail__dot"></span>
-          <span class="cp-plugin-detail__mono">{{ serverId || "missing-server_id" }}</span>
-          <span class="cp-plugin-detail__dot"></span>
-          <span class="cp-plugin-detail__mono">{{ pluginId || "—" }}</span>
-        </div>
-      </div>
-      <div class="cp-plugin-detail__badges">
-        <LabelBadge v-if="plugin?.required" variant="required" label="REQUIRED" />
-        <LabelBadge v-if="hasUpdate" variant="update" label="UPDATE" />
-        <LabelBadge v-if="installed?.status === 'failed'" variant="failed" label="FAILED" />
-      </div>
-    </header>
-
-    <section v-if="plugin" class="cp-plugin-detail__body">
-      <div v-if="serverSocket && !serverId" class="cp-plugin-detail__card danger">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_locked") }}</div>
-        <div class="cp-plugin-detail__v">{{ t("module_detail_locked_desc") }}</div>
-      </div>
-      <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_tagline") }}</div>
-        <div class="cp-plugin-detail__v">{{ plugin.tagline }}</div>
-      </div>
-      <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_description") }}</div>
-        <div class="cp-plugin-detail__v">{{ plugin.description }}</div>
-      </div>
-
-      <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_source") }}</div>
-        <div class="cp-plugin-detail__vRow">
-          <span class="cp-plugin-detail__pill">{{ plugin.source }}</span>
-          <MonoTag :value="plugin.sha256" title="sha256" :copyable="true" />
-        </div>
-      </div>
-
-      <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_domains") }}</div>
-        <div class="cp-plugin-detail__ports">
-          <span v-for="d in plugin.providesDomains" :key="d.id" class="cp-plugin-detail__port" :style="{ background: `var(${d.colorVar})` }"></span>
-          <span class="cp-plugin-detail__portsText">{{ domainLabelsText }}</span>
-        </div>
-      </div>
-
-      <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_permissions") }}</div>
-        <div class="cp-plugin-detail__perms">
-          <div v-for="p in plugin.permissions" :key="p.key" class="cp-plugin-detail__perm" :data-risk="p.risk">
-            <span class="cp-plugin-detail__permKey">{{ p.key }}</span>
-            <span class="cp-plugin-detail__permLabel">{{ p.label }}</span>
-            <span class="cp-plugin-detail__permRisk">{{ p.risk }}</span>
+    <ErrorBoundary>
+      <header class="cp-plugin-detail__head">
+        <button class="cp-plugin-detail__back" type="button" @click="router.back()">{{ t("back") }}</button>
+        <div class="cp-plugin-detail__title">
+          <div class="cp-plugin-detail__name">{{ plugin?.name || pluginId }}</div>
+          <div class="cp-plugin-detail__meta">
+            <span class="cp-plugin-detail__mono">{{ serverSocket || "no-server" }}</span>
+            <span class="cp-plugin-detail__dot"></span>
+            <span class="cp-plugin-detail__mono">{{ serverId || "missing-server_id" }}</span>
+            <span class="cp-plugin-detail__dot"></span>
+            <span class="cp-plugin-detail__mono">{{ pluginId || "—" }}</span>
           </div>
         </div>
-      </div>
+        <div class="cp-plugin-detail__badges">
+          <LabelBadge v-if="plugin?.required" variant="required" label="REQUIRED" />
+          <LabelBadge v-if="hasUpdate" variant="update" label="UPDATE" />
+          <LabelBadge v-if="installed?.status === 'failed'" variant="failed" label="FAILED" />
+        </div>
+      </header>
 
-      <div v-if="installed?.lastError" class="cp-plugin-detail__card danger">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_last_error") }}</div>
-        <div class="cp-plugin-detail__v">{{ installed.lastError }}</div>
-      </div>
+      <section v-if="plugin" class="cp-plugin-detail__body">
+        <div v-if="serverSocket && !serverId" class="cp-plugin-detail__card danger">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_locked") }}</div>
+          <div class="cp-plugin-detail__v">{{ t("module_detail_locked_desc") }}</div>
+        </div>
+        <div class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_tagline") }}</div>
+          <div class="cp-plugin-detail__v">{{ plugin.tagline }}</div>
+        </div>
+        <div class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_description") }}</div>
+          <div class="cp-plugin-detail__v">{{ plugin.description }}</div>
+        </div>
 
-      <div class="cp-plugin-detail__card">
-        <div class="cp-plugin-detail__k">{{ t("module_detail_installed_heading") }}</div>
-        <div class="cp-plugin-detail__kv">
-          <div class="cp-plugin-detail__kvItem">
-            <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_current") }}</div>
-            <div class="cp-plugin-detail__kvV">{{ installed?.currentVersion || "—" }}</div>
-          </div>
-          <div class="cp-plugin-detail__kvItem">
-            <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_enabled") }}</div>
-            <div class="cp-plugin-detail__kvV">{{ installed?.enabled ? "true" : "false" }}</div>
-          </div>
-          <div class="cp-plugin-detail__kvItem">
-            <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_status") }}</div>
-            <div class="cp-plugin-detail__kvV">{{ installed?.status || "—" }}</div>
+        <div class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_source") }}</div>
+          <div class="cp-plugin-detail__vRow">
+            <span class="cp-plugin-detail__pill">{{ plugin.source }}</span>
+            <MonoTag :value="plugin.sha256" title="sha256" :copyable="true" />
           </div>
         </div>
-      </div>
 
-      <div class="cp-plugin-detail__actions">
-        <button
-          v-if="!installed?.currentVersion"
-          class="cp-plugin-detail__btn primary"
-          type="button"
-          :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-          @click="handleInstallLatest"
-        >
-          {{ t("install_latest") }}
-        </button>
-        <button
-          v-else-if="!installed.enabled"
-          class="cp-plugin-detail__btn primary"
-          type="button"
-          :disabled="Boolean(serverSocket) && !Boolean(serverId)"
-          @click="handleEnablePlugin"
-        >
-          Enable
-        </button>
-        <button v-else class="cp-plugin-detail__btn" type="button" :disabled="Boolean(serverSocket) && !Boolean(serverId)" @click="handleDisablePlugin">
-          Disable
-        </button>
+        <div class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_domains") }}</div>
+          <div class="cp-plugin-detail__ports">
+            <span v-for="d in plugin.providesDomains" :key="d.id" class="cp-plugin-detail__port" :style="{ background: `var(${d.colorVar})` }"></span>
+            <span class="cp-plugin-detail__portsText">{{ domainLabelsText }}</span>
+          </div>
+        </div>
 
-        <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">{{ t("open_center") }}</button>
-      </div>
-    </section>
+        <div class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_permissions") }}</div>
+          <div class="cp-plugin-detail__perms">
+            <div v-for="p in plugin.permissions" :key="p.key" class="cp-plugin-detail__perm" :data-risk="p.risk">
+              <span class="cp-plugin-detail__permKey">{{ p.key }}</span>
+              <span class="cp-plugin-detail__permLabel">{{ p.label }}</span>
+              <span class="cp-plugin-detail__permRisk">{{ p.risk }}</span>
+            </div>
+          </div>
+        </div>
 
-    <section v-else class="cp-plugin-detail__empty">
-      <div class="cp-plugin-detail__emptyText">{{ t("module_not_found") }}</div>
-      <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">{{ t("back_to_center") }}</button>
-    </section>
+        <div v-if="installed?.lastError" class="cp-plugin-detail__card danger">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_last_error") }}</div>
+          <div class="cp-plugin-detail__v">{{ installed.lastError }}</div>
+        </div>
+
+        <div class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_detail_installed_heading") }}</div>
+          <div class="cp-plugin-detail__kv">
+            <div class="cp-plugin-detail__kvItem">
+              <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_current") }}</div>
+              <div class="cp-plugin-detail__kvV">{{ installed?.currentVersion || "—" }}</div>
+            </div>
+            <div class="cp-plugin-detail__kvItem">
+              <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_enabled") }}</div>
+              <div class="cp-plugin-detail__kvV">{{ installed?.enabled ? "true" : "false" }}</div>
+            </div>
+            <div class="cp-plugin-detail__kvItem">
+              <div class="cp-plugin-detail__kvK">{{ t("module_detail_installed_status") }}</div>
+              <div class="cp-plugin-detail__kvV">{{ installed?.status || "—" }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cp-plugin-detail__actions">
+          <button
+            v-if="!installed?.currentVersion"
+            class="cp-plugin-detail__btn primary"
+            type="button"
+            :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+            @click="handleInstallLatest"
+          >
+            {{ t("install_latest") }}
+          </button>
+          <button
+            v-else-if="!installed.enabled"
+            class="cp-plugin-detail__btn primary"
+            type="button"
+            :disabled="Boolean(serverSocket) && !Boolean(serverId)"
+            @click="handleEnablePlugin"
+          >
+            Enable
+          </button>
+          <button v-else class="cp-plugin-detail__btn" type="button" :disabled="Boolean(serverSocket) && !Boolean(serverId)" @click="handleDisablePlugin">
+            Disable
+          </button>
+
+          <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">{{ t("open_center") }}</button>
+        </div>
+      </section>
+
+      <section v-else class="cp-plugin-detail__empty">
+        <div class="cp-plugin-detail__emptyText">{{ t("module_not_found") }}</div>
+        <button class="cp-plugin-detail__btn" type="button" @click="$router.push('/plugins')">{{ t("back_to_center") }}</button>
+      </section>
+    </ErrorBoundary>
   </main>
 </template>
 

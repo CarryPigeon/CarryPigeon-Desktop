@@ -8,6 +8,7 @@ import { computed, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwra
 import { useRoute, useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import { createLogger } from "@/shared/utils/logger";
+import { MessagePlugin } from "tdesign-vue-next";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
@@ -30,6 +31,7 @@ import { useChannelSettingsMenu } from "../interactions/useChannelSettingsMenu";
 import { useChannelDialogs } from "../interactions/useChannelDialogs";
 import { createAsyncTaskRunner } from "../interactions/asyncTaskRunner";
 import { usePatchbayHotkeys } from "../interactions/usePatchbayHotkeys";
+import type { ShortcutBinding } from "../interactions/usePatchbayHotkeys";
 import { usePluginNavigation } from "../navigation/usePluginNavigation";
 import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "../view-models/useChannelRailModel";
@@ -39,6 +41,7 @@ import { useThreadPanelModel } from "../components/thread/useThreadPanelModel";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
+import { ENABLE_PIN_MESSAGE } from "@/shared/config/runtime";
 import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
@@ -98,6 +101,12 @@ type PatchbayPageRawModel = {
   dismissLinkPreview(): void;
   threadPanel: ReturnType<typeof useThreadPanelModel>;
   domainRegistryStore: unknown;
+  /** 快捷键帮助面板可见性。 */
+  shortcutHelpOpen: Ref<boolean>;
+  /** 关闭快捷键帮助面板。 */
+  closeShortcutHelp: () => void;
+  /** 快捷键绑定列表。 */
+  bindings: ShortcutBinding[];
 };
 
 /**
@@ -325,6 +334,50 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     );
   }
 
+  /**
+   * 置顶消息。
+   *
+   * @param messageId - 要置顶的消息 ID。
+   * @returns 无返回值。
+   */
+  async function handlePinMessage(messageId: string): Promise<void> {
+    const cid = currentSessionSnapshot.value.currentChannelId;
+    if (!cid) return;
+    const s = socket.value;
+    if (!s) return;
+    const token = (await ensureValidAccessToken(s)).trim();
+    if (!token) return;
+    try {
+      await httpChatApiPort.pinMessage(s, token, cid, messageId);
+      void MessagePlugin.success("消息已置顶");
+    } catch (error) {
+      logger.error("Action: chat_pin_message_failed", { messageId, error: String(error) });
+      void MessagePlugin.error(`置顶失败：${String(error)}`);
+    }
+  }
+
+  /**
+   * 取消置顶消息。
+   *
+   * @param messageId - 要取消置顶的消息 ID。
+   * @returns 无返回值。
+   */
+  async function handleUnpinMessage(messageId: string): Promise<void> {
+    const cid = currentSessionSnapshot.value.currentChannelId;
+    if (!cid) return;
+    const s = socket.value;
+    if (!s) return;
+    const token = (await ensureValidAccessToken(s)).trim();
+    if (!token) return;
+    try {
+      await httpChatApiPort.unpinMessage(s, token, cid, messageId);
+      void MessagePlugin.success("消息已取消置顶");
+    } catch (error) {
+      logger.error("Action: chat_unpin_message_failed", { messageId, error: String(error) });
+      void MessagePlugin.error(`取消置顶失败：${String(error)}`);
+    }
+  }
+
   function getMessageClipboardText(messageId: string): string | null {
     const message = currentChannelMessageFlow.findMessageById(messageId);
     if (!message) return null;
@@ -368,6 +421,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       startEditingMessage(messageId);
     },
     openThread: (messageId) => threadPanel.openThread(messageId),
+    pinMessage: (messageId: string) => handlePinMessage(messageId),
+    unpinMessage: (messageId: string) => handleUnpinMessage(messageId),
   });
 
   const showEdit = computed(() => {
@@ -423,6 +478,31 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     const message = currentChannelMessageFlow.findMessageById(mid);
     if (!message) return false;
     return (message as { threadReplyCount?: number }).threadReplyCount != null && (message as { threadReplyCount?: number }).threadReplyCount! > 0;
+  });
+
+  /**
+   * 是否显示 Pin/Unpin 菜单项。
+   * 由 VITE_ENABLE_PIN_MESSAGE 环境变量控制，默认关闭。
+   */
+  const canPin = computed(() => {
+    if (!ENABLE_PIN_MESSAGE) return false;
+    const mid = menuMessageId.value;
+    if (!mid) return false;
+    const message = currentChannelMessageFlow.findMessageById(mid);
+    if (!message) return false;
+    return true;
+  });
+
+  /**
+   * 当前消息是否已置顶。
+   * 初始实现通过消息模型的 `isPinned` 字段判断，后续接入 pin 列表时填充真实数据。
+   */
+  const isPinned = computed(() => {
+    const mid = menuMessageId.value;
+    if (!mid) return false;
+    const message = currentChannelMessageFlow.findMessageById(mid);
+    if (!message) return false;
+    return (message as { isPinned?: boolean }).isPinned ?? false;
   });
 
   const currentChannelName = computed(() => {
@@ -507,7 +587,44 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onAsyncError: logAsyncError,
   });
 
-  const { onKeydown } = usePatchbayHotkeys({
+  /** 快捷键帮助面板可见性。 */
+  const shortcutHelpOpen = ref(false);
+
+  function openShortcutHelp(): void {
+    shortcutHelpOpen.value = true;
+  }
+
+  function closeShortcutHelp(): void {
+    shortcutHelpOpen.value = false;
+  }
+
+  /**
+   * 切换到上一个可见频道。
+   */
+  function previousChannel(): void {
+    const channels = roomDirectorySnapshot.value.visibleChannels;
+    const currentId = currentSessionSnapshot.value.currentChannelId;
+    if (!channels.length || !currentId) return;
+    const idx = channels.findIndex((c) => c.id === currentId);
+    if (idx > 0) {
+      void currentSession.selectChannel(channels[idx - 1].id);
+    }
+  }
+
+  /**
+   * 切换到下一个可见频道。
+   */
+  function nextChannel(): void {
+    const channels = roomDirectorySnapshot.value.visibleChannels;
+    const currentId = currentSessionSnapshot.value.currentChannelId;
+    if (!channels.length || !currentId) return;
+    const idx = channels.findIndex((c) => c.id === currentId);
+    if (idx >= 0 && idx < channels.length - 1) {
+      void currentSession.selectChannel(channels[idx + 1].id);
+    }
+  }
+
+  const { onKeydown, bindings } = usePatchbayHotkeys({
     quickSwitcherOpen,
     menuOpen,
     showChannelMenu,
@@ -525,6 +642,12 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     setShowDeleteChannel,
     goPlugins,
     openSettings: handleOpenSettings,
+    openSearchPanel: () => chatCenter.openSearchPanel(),
+    openShortcutHelp,
+    closeShortcutHelp,
+    shortcutHelpOpen,
+    previousChannel,
+    nextChannel,
   });
 
   usePatchbayLifecycle({
@@ -578,6 +701,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     showEdit,
     showRecall,
     showViewThread,
+    canPin,
+    isPinned,
     close: closeMenu,
     handleMenuCommand: handleMenuAction,
   });
@@ -645,6 +770,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     dismissLinkPreview,
     threadPanel,
     domainRegistryStore: domainRegistryView,
+    shortcutHelpOpen,
+    closeShortcutHelp,
+    bindings,
   };
 
   return proxyRefs(rawModel);

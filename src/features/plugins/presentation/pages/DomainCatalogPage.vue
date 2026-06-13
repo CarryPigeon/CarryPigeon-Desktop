@@ -16,6 +16,7 @@ import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
 import { createDomainCatalogContext } from "@/features/plugins/presentation/composables/useDomainCatalogContext";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -55,81 +56,83 @@ onMounted(() => {
 <template>
   <!-- 页面：DomainCatalogPage｜职责：Domain Catalog（providers/constraints/contract）展示与复制 -->
   <main class="cp-domains">
-    <header class="cp-domains__head">
-      <button class="cp-domains__back" type="button" @click="router.back()">{{ t("back") }}</button>
-      <div class="cp-domains__title">
-        <div class="cp-domains__name">{{ t("domain_catalog") }}</div>
-        <div class="cp-domains__sub">{{ t("domain_catalog_sub") }}</div>
-      </div>
-      <div class="cp-domains__meta">
-        <MonoTag :value="socket || 'no-server'" title="server socket" :copyable="true" />
-        <MonoTag :value="serverId || 'missing-server_id'" title="server_id" :copyable="true" />
-      </div>
-    </header>
-
-    <section class="cp-domains__controls">
-      <div class="cp-domains__field">
-        <div class="cp-domains__label">{{ t("domain_search_label") }}</div>
-        <t-input v-model="q" :placeholder="t('domain_search_placeholder')" clearable />
-      </div>
-      <div class="cp-domains__actions">
-        <button class="cp-domains__btn" type="button" @click="refresh">{{ t("domain_refresh") }}</button>
-        <button class="cp-domains__btn" type="button" @click="$router.push('/plugins')">{{ t("plugin_center") }}</button>
-      </div>
-    </section>
-
-    <div v-if="socket && !serverId" class="cp-domains__state warn" v-text="t('domain_missing_id')"></div>
-
-    <div v-if="domainCatalogStore.loading.value" class="cp-domains__state">{{ t("domain_loading") }}</div>
-    <div v-else-if="domainCatalogStore.error.value" class="cp-domains__state err">{{ domainCatalogStore.error.value }}</div>
-
-    <section v-else class="cp-domains__list">
-      <div v-if="filtered.length === 0" class="cp-domains__state">{{ t("domain_no_items") }}</div>
-
-      <article v-for="it in filtered" :key="it.domain" class="cp-domainCard">
-        <div class="cp-domainCard__top">
-          <div class="cp-domainCard__domain">{{ it.domain }}</div>
-          <div class="cp-domainCard__versions">
-            <span class="cp-domainCard__pill">recommended: {{ it.recommendedVersion || "—" }}</span>
-            <span class="cp-domainCard__pill">supported: {{ (it.supportedVersions || []).length }}</span>
-          </div>
+    <ErrorBoundary>
+      <header class="cp-domains__head">
+        <button class="cp-domains__back" type="button" @click="router.back()">{{ t("back") }}</button>
+        <div class="cp-domains__title">
+          <div class="cp-domains__name">{{ t("domain_catalog") }}</div>
+          <div class="cp-domains__sub">{{ t("domain_catalog_sub") }}</div>
         </div>
+        <div class="cp-domains__meta">
+          <MonoTag :value="socket || 'no-server'" title="server socket" :copyable="true" />
+          <MonoTag :value="serverId || 'missing-server_id'" title="server_id" :copyable="true" />
+        </div>
+      </header>
 
-        <div class="cp-domainCard__grid">
-          <div class="cp-domainCard__kv">
-            <div class="cp-domainCard__k">constraints</div>
-            <div class="cp-domainCard__v">
-              <span class="cp-domainCard__mono">max_payload_bytes={{ it.constraints?.maxPayloadBytes ?? "—" }}</span>
-              <span class="cp-domainCard__mono">max_depth={{ it.constraints?.maxDepth ?? "—" }}</span>
+      <section class="cp-domains__controls">
+        <div class="cp-domains__field">
+          <div class="cp-domains__label">{{ t("domain_search_label") }}</div>
+          <t-input v-model="q" :placeholder="t('domain_search_placeholder')" clearable />
+        </div>
+        <div class="cp-domains__actions">
+          <button class="cp-domains__btn" type="button" @click="refresh">{{ t("domain_refresh") }}</button>
+          <button class="cp-domains__btn" type="button" @click="$router.push('/plugins')">{{ t("plugin_center") }}</button>
+        </div>
+      </section>
+
+      <div v-if="socket && !serverId" class="cp-domains__state warn" v-text="t('domain_missing_id')"></div>
+
+      <div v-if="domainCatalogStore.loading.value" class="cp-domains__state">{{ t("domain_loading") }}</div>
+      <div v-else-if="domainCatalogStore.error.value" class="cp-domains__state err">{{ domainCatalogStore.error.value }}</div>
+
+      <section v-else class="cp-domains__list">
+        <div v-if="filtered.length === 0" class="cp-domains__state">{{ t("domain_no_items") }}</div>
+
+        <article v-for="it in filtered" :key="it.domain" class="cp-domainCard">
+          <div class="cp-domainCard__top">
+            <div class="cp-domainCard__domain">{{ it.domain }}</div>
+            <div class="cp-domainCard__versions">
+              <span class="cp-domainCard__pill">recommended: {{ it.recommendedVersion || "—" }}</span>
+              <span class="cp-domainCard__pill">supported: {{ (it.supportedVersions || []).length }}</span>
             </div>
           </div>
 
-          <div class="cp-domainCard__kv">
-            <div class="cp-domainCard__k">providers</div>
-            <div class="cp-domainCard__v">
-              <template v-if="(it.providers || []).length === 0">—</template>
-              <div v-for="(p, idx) in it.providers || []" :key="`${it.domain}-${idx}`" class="cp-domainCard__provider">
-                <span class="cp-domainCard__pill">{{ p.type }}</span>
-                <span v-if="p.type === 'plugin'" class="cp-domainCard__mono">
-                  {{ p.pluginId }} (min {{ p.minPluginVersion || "—" }})
-                </span>
+          <div class="cp-domainCard__grid">
+            <div class="cp-domainCard__kv">
+              <div class="cp-domainCard__k">constraints</div>
+              <div class="cp-domainCard__v">
+                <span class="cp-domainCard__mono">max_payload_bytes={{ it.constraints?.maxPayloadBytes ?? "—" }}</span>
+                <span class="cp-domainCard__mono">max_depth={{ it.constraints?.maxDepth ?? "—" }}</span>
+              </div>
+            </div>
+
+            <div class="cp-domainCard__kv">
+              <div class="cp-domainCard__k">providers</div>
+              <div class="cp-domainCard__v">
+                <template v-if="(it.providers || []).length === 0">—</template>
+                <div v-for="(p, idx) in it.providers || []" :key="`${it.domain}-${idx}`" class="cp-domainCard__provider">
+                  <span class="cp-domainCard__pill">{{ p.type }}</span>
+                  <span v-if="p.type === 'plugin'" class="cp-domainCard__mono">
+                    {{ p.pluginId }} (min {{ p.minPluginVersion || "—" }})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="cp-domainCard__kv wide">
+              <div class="cp-domainCard__k">contract</div>
+              <div class="cp-domainCard__v">
+                <div v-if="it.contract?.schemaUrl" class="cp-domainCard__contract">
+                  <MonoTag :value="it.contract.schemaUrl" title="schema_url" :copyable="true" />
+                  <span class="cp-domainCard__mono">sha256={{ it.contract.sha256 || "—" }}</span>
+                </div>
+                <div v-else class="cp-domainCard__muted">—</div>
               </div>
             </div>
           </div>
-
-          <div class="cp-domainCard__kv wide">
-            <div class="cp-domainCard__k">contract</div>
-            <div class="cp-domainCard__v">
-              <div v-if="it.contract?.schemaUrl" class="cp-domainCard__contract">
-                <MonoTag :value="it.contract.schemaUrl" title="schema_url" :copyable="true" />
-                <span class="cp-domainCard__mono">sha256={{ it.contract.sha256 || "—" }}</span>
-              </div>
-              <div v-else class="cp-domainCard__muted">—</div>
-            </div>
-          </div>
-        </div>
-      </article>
-    </section>
+        </article>
+      </section>
+    </ErrorBoundary>
   </main>
 </template>
 

@@ -112,7 +112,7 @@ type ChatCenterRawModel = {
   isMentioned(message: ChatMessage): boolean;
   openSearchPanel(): void;
   closeSearchPanel(): void;
-  searchMessages(query: string): Promise<void>;
+  searchMessages(query?: string): Promise<void>;
   setSearchScope(scope: "channel" | "server"): void;
   openSearchResult(messageId: string, channelId?: string): Promise<void>;
   multiSelectMode: ComputedRef<boolean>;
@@ -303,11 +303,13 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     }
   }
 
-  async function searchMessages(query: string): Promise<void> {
+  async function searchMessages(query?: string): Promise<void> {
+    const q = (query ?? searchState.value.query ?? "").trim();
+    if (!q) return;
     if (messageTimelineSnapshot.value.search.searchScope === "server") {
-      await deps.currentTimeline.searchServerMessages(query);
+      await deps.currentTimeline.searchServerMessages(q);
     } else {
-      await deps.currentTimeline.searchCurrentChannel(query);
+      await deps.currentTimeline.searchCurrentChannel(q);
     }
   }
 
