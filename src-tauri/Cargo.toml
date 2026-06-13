@@ -23,8 +23,8 @@ tauri-build = { version = "2.5.1", features = [] }
 tokio = { version = "1.48.0", features = ["rt-multi-thread", "sync", "net", "io-util", "time", "macros", "fs"] }
 
 # tauri
-tauri = { version = "2.10.1", features = [ "tray-icon" ] }
-tauri-plugin-opener = "2.5.2"
+tauri = { version = "2.11.2", features = [ "tray-icon" ] }
+tauri-plugin-opener = "2.5.4"
 tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 
@@ -69,8 +69,8 @@ zip = "8.6.0"
 async-trait = "0.1.89"
 
 # 国际化
-rust-i18n = "3"
-cpal = "0.17.3"
+rust-i18n = "4.1.0"
+cpal = "0.18.1"
 
 # WebRTC P2P
 webrtc = "0.17.1"
