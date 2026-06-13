@@ -7,43 +7,55 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const route = useRoute();
 
+const props = defineProps<{
+  /** 频道显示名。 */
+  name?: string;
+  /** 频道简介/描述。 */
+  bio?: string;
+  /** 频道 owner 标识。 */
+  owner?: string;
+  /** 频道公告内容。 */
+  announcement?: string;
+}>();
+
 /**
- * 从 query 参数中读取频道显示名。
+ * 从 props（优先）或 route.query 中读取频道显示名。
  *
  * @returns 频道名称字符串。
  */
 function computeName(): string {
-  return String(route.query.name ?? "Channel");
+  return props.name || String(route.query.name ?? "Channel");
 }
 
 /**
- * 从 query 参数中读取频道简介/描述。
+ * 从 props（优先）或 route.query 中读取频道简介/描述。
  *
  * @returns 频道简介字符串（可能为空）。
  */
 function computeBio(): string {
-  return String(route.query.bio ?? route.query.description ?? "");
+  return props.bio || String(route.query.bio ?? route.query.description ?? "");
 }
 
 /**
- * 从 query 参数中读取频道 owner 标识。
+ * 从 props（优先）或 route.query 中读取频道 owner 标识。
  *
  * @returns owner 显示字符串。
  */
 function computeOwner(): string {
-  return String(route.query.owner ?? "—");
+  return props.owner || String(route.query.owner ?? "—");
 }
 
 /**
- * 从 query 参数中读取频道公告。
+ * 从 props（优先）或 route.query 中读取频道公告。
  *
  * @returns 公告内容字符串。
  */
 function computeAnnouncement(): string {
-  return String(route.query.announcement ?? "");
+  return props.announcement || String(route.query.announcement ?? "");
 }
 
 const name = computed(computeName);
@@ -56,13 +68,15 @@ const announcement = computed(computeAnnouncement);
   <!-- 视图：ChannelInfoPopoverView｜职责：频道信息 Popover -->
   <!-- 区块：<main> .cp-pop -->
   <main class="cp-pop">
-    <div class="cp-pop__title">{{ name }}</div>
-    <div class="cp-pop__row"><MonoTag :value="owner" :copyable="true" title="owner" /></div>
-    <div class="cp-pop__bio">{{ bio || "—" }}</div>
-    <div v-if="announcement" class="cp-pop__announcement">
-      <div class="cp-pop__label">Announcement</div>
-      <div class="cp-pop__anncText">{{ announcement }}</div>
-    </div>
+    <ErrorBoundary>
+      <div class="cp-pop__title">{{ name }}</div>
+      <div class="cp-pop__row"><MonoTag :value="owner" :copyable="true" title="owner" /></div>
+      <div class="cp-pop__bio">{{ bio || "—" }}</div>
+      <div v-if="announcement" class="cp-pop__announcement">
+        <div class="cp-pop__label">Announcement</div>
+        <div class="cp-pop__anncText">{{ announcement }}</div>
+      </div>
+    </ErrorBoundary>
   </main>
 </template>
 

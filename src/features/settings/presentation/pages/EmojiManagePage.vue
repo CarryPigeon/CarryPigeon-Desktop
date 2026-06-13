@@ -10,6 +10,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEmojiManageModel } from "../composables/useEmojiManageModel";
 import { createLogger } from "@/shared/utils/logger";
 import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const logger = createLogger("emoji");
 
@@ -126,69 +127,71 @@ function extractNameFromPath(filePath: string): string {
 </script>
 
 <template>
-  <div class="cp-emojiManage">
-    <h2 class="cp-emojiManage__title">{{ t("custom_emoji") }}</h2>
+  <ErrorBoundary>
+    <div class="cp-emojiManage">
+      <h2 class="cp-emojiManage__title">{{ t("custom_emoji") }}</h2>
 
-    <div class="cp-emojiManage__add">
-      <input
-        v-model="nameInput"
-        :placeholder="t('emoji_name')"
-        class="cp-emojiManage__input"
-      />
-      <input
-        v-model="tagsInput"
-        :placeholder="t('emoji_tags')"
-        class="cp-emojiManage__input"
-      />
-      <button
-        class="cp-emojiManage__btn"
-        :disabled="adding"
-        @click="handleFileSelect"
-      >
-        {{ adding ? t("loading") : t("add_emoji") }}
-      </button>
-    </div>
-
-    <div v-if="loading" class="cp-emojiManage__loading">
-      {{ t("loading") }}
-    </div>
-
-    <div v-else class="cp-emojiManage__grid">
-      <div
-        v-for="emoji in emojis"
-        :key="emoji.id"
-        class="cp-emojiManage__item"
-      >
-        <img
-          v-if="imagePaths[emoji.id]"
-          :src="imagePaths[emoji.id]"
-          :alt="emoji.name"
-          class="cp-emojiManage__img"
+      <div class="cp-emojiManage__add">
+        <input
+          v-model="nameInput"
+          :placeholder="t('emoji_name')"
+          class="cp-emojiManage__input"
         />
-        <div
-          v-else
-          class="cp-emojiManage__imgPlaceholder"
-        >
-          {{ emoji.name.charAt(0) }}
-        </div>
-        <div class="cp-emojiManage__name">{{ emoji.name }}</div>
+        <input
+          v-model="tagsInput"
+          :placeholder="t('emoji_tags')"
+          class="cp-emojiManage__input"
+        />
         <button
-          class="cp-emojiManage__del"
-          :title="t('delete')"
-          @click="handleDelete(emoji.id)"
+          class="cp-emojiManage__btn"
+          :disabled="adding"
+          @click="handleFileSelect"
         >
-          &times;
+          {{ adding ? t("loading") : t("add_emoji") }}
         </button>
       </div>
 
-      <div
-        v-if="emojis.length === 0"
-        class="cp-emojiManage__empty"
-      >
-        {{ t("no_custom_emojis") }}
+      <div v-if="loading" class="cp-emojiManage__loading">
+        {{ t("loading") }}
+      </div>
+
+      <div v-else class="cp-emojiManage__grid">
+        <div
+          v-for="emoji in emojis"
+          :key="emoji.id"
+          class="cp-emojiManage__item"
+        >
+          <img
+            v-if="imagePaths[emoji.id]"
+            :src="imagePaths[emoji.id]"
+            :alt="emoji.name"
+            class="cp-emojiManage__img"
+          />
+          <div
+            v-else
+            class="cp-emojiManage__imgPlaceholder"
+          >
+            {{ emoji.name.charAt(0) }}
+          </div>
+          <div class="cp-emojiManage__name">{{ emoji.name }}</div>
+          <button
+            class="cp-emojiManage__del"
+            :title="t('delete')"
+            @click="handleDelete(emoji.id)"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div
+          v-if="emojis.length === 0"
+          class="cp-emojiManage__empty"
+        >
+          {{ t("no_custom_emojis") }}
+        </div>
       </div>
     </div>
-  </div>
+  </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">

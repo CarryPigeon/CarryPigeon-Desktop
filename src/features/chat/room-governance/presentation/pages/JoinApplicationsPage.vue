@@ -8,6 +8,7 @@ import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useJoinApplicationsPage } from "@/features/chat/room-governance/presentation/page-models/useJoinApplicationsPage";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const { t } = useI18n();
 const {
@@ -24,38 +25,40 @@ const {
 
 <template>
   <!-- 页面：JoinApplicationsPage｜职责：入群申请管理 -->
-  <GovernancePageShell
-    :channel-name="channelName"
-    :subtitle="`${t('join_applications')} (${pendingCount})`"
-    :is-loading="isLoading"
-    :error-message="pageError"
-    @back="goBack"
-  >
-    <template #back-label>{{ t("back") }}</template>
-    <template #loading>{{ t("loading") }}</template>
-    <template #default>
-      <div v-if="pendingApplications.length === 0" class="cp-apps__empty">{{ t("no_applications") }}</div>
-      <div v-for="a in pendingApplications" :key="a.applicationId" class="cp-appCard">
-        <AvatarBadge :name="a.nickname || a.uid" :size="40" />
-        <div class="cp-appCard__info">
-          <div class="cp-appCard__name">{{ a.nickname || a.uid }}</div>
-          <div class="cp-appCard__reason">
-            <span class="cp-appCard__label">{{ t("application_reason") }}:</span>
-            {{ a.reason || "—" }}
+  <ErrorBoundary>
+    <GovernancePageShell
+      :channel-name="channelName"
+      :subtitle="`${t('join_applications')} (${pendingCount})`"
+      :is-loading="isLoading"
+      :error-message="pageError"
+      @back="goBack"
+    >
+      <template #back-label>{{ t("back") }}</template>
+      <template #loading>{{ t("loading") }}</template>
+      <template #default>
+        <div v-if="pendingApplications.length === 0" class="cp-apps__empty">{{ t("no_applications") }}</div>
+        <div v-for="a in pendingApplications" :key="a.applicationId" class="cp-appCard">
+          <AvatarBadge :name="a.nickname || a.uid" :size="40" />
+          <div class="cp-appCard__info">
+            <div class="cp-appCard__name">{{ a.nickname || a.uid }}</div>
+            <div class="cp-appCard__reason">
+              <span class="cp-appCard__label">{{ t("application_reason") }}:</span>
+              {{ a.reason || "—" }}
+            </div>
+            <div class="cp-appCard__time">{{ t("applied_at") }}: {{ formatApplyTime(a.applyTime) }}</div>
           </div>
-          <div class="cp-appCard__time">{{ t("applied_at") }}: {{ formatApplyTime(a.applyTime) }}</div>
+          <div class="cp-appCard__actions">
+            <button class="cp-appCard__btn approve" type="button" @click="handleDecide(a.applicationId, true)">
+              {{ t("approve") }}
+            </button>
+            <button class="cp-appCard__btn reject" type="button" @click="handleDecide(a.applicationId, false)">
+              {{ t("reject") }}
+            </button>
+          </div>
         </div>
-        <div class="cp-appCard__actions">
-          <button class="cp-appCard__btn approve" type="button" @click="handleDecide(a.applicationId, true)">
-            {{ t("approve") }}
-          </button>
-          <button class="cp-appCard__btn reject" type="button" @click="handleDecide(a.applicationId, false)">
-            {{ t("reject") }}
-          </button>
-        </div>
-      </div>
-    </template>
-  </GovernancePageShell>
+      </template>
+    </GovernancePageShell>
+  </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">

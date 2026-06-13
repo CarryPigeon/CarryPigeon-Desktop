@@ -106,11 +106,61 @@ export function createMessageMapper(deps: MessageModelDeps) {
 
     if (domainLabel === "Core:Text") {
       const text = tryReadText(m.data) ?? String(m.preview ?? "");
-      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages };
+
+      // 判定：消息内容只有一条 [file:xxx] 标记且附件是图片
+      const fileRefMatch = text.match(/^\[file:([^\]]+)\]$/);
+      if (fileRefMatch) {
+        const data = (m.data ?? {}) as Record<string, unknown>;
+        const attachments = data.attachments;
+        if (Array.isArray(attachments) && attachments.length === 1) {
+          const att = attachments[0];
+          const mime = String(att.mimeType ?? "").trim().toLowerCase();
+          if (mime.startsWith("image/")) {
+            const fileName = String(att.name ?? "image").trim();
+            const rawSize = att.size;
+            const parsedSize = typeof rawSize === "number" && !Number.isNaN(rawSize) ? rawSize : Number(rawSize);
+            const safeFileSize = Number.isFinite(parsedSize) ? Math.max(0, parsedSize) : 0;
+            return {
+              id: mid,
+              kind: "image" as const,
+              from: { id: uid, name: fromName },
+              timeMs,
+              domain,
+              fileKey: String(att.shareKey ?? att.key ?? fileRefMatch[1]).trim(),
+              thumbKey: String(att.thumbKey ?? "").trim() || undefined,
+              fileName,
+              fileSize: safeFileSize,
+              width: att.width ? Number(att.width) : undefined,
+              height: att.height ? Number(att.height) : undefined,
+              mimeType: mime,
+              url: String(att.url ?? "").trim(),
+              thumbUrl: String(att.thumbUrl ?? "").trim() || undefined,
+              localPath: String(att.localPath ?? "").trim() || undefined,
+              replyToId,
+              replyTo,
+              quoteReply,
+              mentions,
+              reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })),
+              forwardedFrom,
+              forwardedMessages,
+              preview: String(m.preview ?? "").trim() || `[图片] ${fileName}`,
+              data: m.data,
+              editedAt: m.editedAt ? Number(m.editedAt) : undefined,
+              recalledAt: m.recalledAt ? Number(m.recalledAt) : undefined,
+              threadRootId: String(m.threadRootId ?? "").trim() || undefined,
+              threadReplyCount: Number(m.threadReplyCount ?? 0) || undefined,
+              linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined,
+              status: "sent" as const,
+            };
+          }
+        }
+      }
+
+      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: Number(m.threadReplyCount ?? 0) || undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, };
     }
 
     const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${domainLabel}${domain.version ? `@${domain.version}` : ""}`;
-    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages };
+    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: Number(m.threadReplyCount ?? 0) || undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, };
   }
 
   return { mapWireMessage };

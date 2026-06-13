@@ -15,6 +15,7 @@ import { downloadFile } from "@/shared/file-transfer";
 import FileSearchBar from "../components/FileSearchBar.vue";
 import FileListTable from "../components/FileListTable.vue";
 import type { FileListQuery, FileRecord } from "../../domain/contracts";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -54,13 +55,15 @@ onMounted(() => {
 
 <template>
   <main class="cp-fileManager">
-    <header class="cp-fileManager__head">
-      <button class="cp-fileManager__back" type="button" @click="router.back()">{{ t("back") }}</button>
-      <div class="cp-fileManager__title">{{ t("file_manager") }}</div>
-    </header>
-    <FileSearchBar @search="handleSearch" />
-    <div v-if="loading" class="cp-fileManager__loading">{{ t("loading") }}</div>
-    <FileListTable v-else :files="files" @download="handleDownload" />
+    <ErrorBoundary>
+      <header class="cp-fileManager__head">
+        <button class="cp-fileManager__back" type="button" @click="router.back()">{{ t("back") }}</button>
+        <div class="cp-fileManager__title">{{ t("file_manager") }}</div>
+      </header>
+      <FileSearchBar @search="handleSearch" />
+      <div v-if="loading" class="cp-fileManager__loading">{{ t("loading") }}</div>
+      <FileListTable v-else :files="files" @download="handleDownload" />
+    </ErrorBoundary>
   </main>
 </template>
 

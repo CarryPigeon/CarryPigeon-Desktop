@@ -80,6 +80,7 @@ export type RenderableChatMessage =
         sentTime: number;
       }[];
       recalledAt?: number;
+      editedAt?: number;
       threadRootId?: string;
       threadReplyCount?: number;
       linkPreview?: ChatLinkPreview;
@@ -116,9 +117,59 @@ export type RenderableChatMessage =
         sentTime: number;
       }[];
       recalledAt?: number;
+      editedAt?: number;
       threadRootId?: string;
       threadReplyCount?: number;
       linkPreview?: ChatLinkPreview;
+    }
+  | {
+      id: string;
+      kind: "image";
+      from: { id: string; name: string };
+      timeMs: number;
+      domain: MessageDomainRef;
+      fileKey: string;
+      thumbKey?: string;
+      fileName: string;
+      fileSize: number;
+      width?: number;
+      height?: number;
+      mimeType: string;
+      url: string;
+      thumbUrl?: string;
+      localPath?: string;
+      replyToId?: string;
+      replyTo?: MessageReplySummary;
+      quoteReply?: {
+        messageId: string;
+        userId: string;
+        preview: string;
+      };
+      mentions?: MessageMention[];
+      reactions?: MessageReactionSummary[];
+      forwardedFrom?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      };
+      forwardedMessages?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      }[];
+      editedAt?: number;
+      recalledAt?: number;
+      threadRootId?: string;
+      threadReplyCount?: number;
+      linkPreview?: ChatLinkPreview;
+      preview: string;
+      data?: unknown;
+      status: "sending" | "sent" | "failed";
+      sendError?: string;
     };
 
 /**
@@ -142,6 +193,14 @@ export type MessageContentModel =
       replyToId?: string;
     }
   | {
+      kind: "image";
+      url: string;
+      fileName: string;
+      fileSize: number;
+      preview: string;
+      replyToId?: string;
+    }
+  | {
       kind: "plugin";
       domainId: string;
       domainVersion: string;
@@ -160,6 +219,17 @@ export type MessageRenderModel =
       messageId: string;
       text: string;
       replyText?: string;
+    }
+  | {
+      kind: "image";
+      messageId: string;
+      url: string;
+      fileName: string;
+      fileSize: number;
+      preview: string;
+      from: { id: string; name: string };
+      timeMs: number;
+      replyToMid?: string;
     }
   | {
       kind: "plugin";
