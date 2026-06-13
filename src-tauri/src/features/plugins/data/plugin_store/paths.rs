@@ -221,6 +221,8 @@ mod tests {
     #[tokio::test]
     async fn rejects_symlink_escape_when_serving_app_plugins() {
         let _guard = cwd_lock().lock().expect("lock cwd");
+        // 重置全局 app_data_dir，避免被其他测试的旧值污染
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let app_dir = unique_temp_dir("plugin-path-root");
         let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
         let app_plugins = app_dir.join("plugins");
