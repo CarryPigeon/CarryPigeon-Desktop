@@ -22,9 +22,9 @@
         "lint:logs:std": "bash scripts/check-log-standards.sh"
     },
     "dependencies": {
-        "@tauri-apps/api": "^2.10.1",
+        "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-notification": "^2.3.3",
-        "@tauri-apps/plugin-opener": "^2.5.3",
+        "@tauri-apps/plugin-opener": "^2.5.4",
         "crypto-js": "^4.2.0",
         "emoji-picker-element": "^1.29.1",
         "tdesign-vue-next": "^1.18.0",
@@ -32,7 +32,7 @@
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.8",
-        "@tauri-apps/cli": "^2.9.6",
+        "@tauri-apps/cli": "^2.11.2",
         "@tdesign-vue-next/auto-import-resolver": "^0.1.4",
         "@types/crypto-js": "^4.2.2",
         "@types/node": "^25.0.9",
