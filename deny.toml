@@ -44,7 +44,6 @@ ignore = [
     { id = "RUSTSEC-2024-0418", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
     { id = "RUSTSEC-2024-0419", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
     { id = "RUSTSEC-2024-0420", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0436", reason = "Transitive dependency from image crate via ravif → rav1e → paste; no safe upgrade is available." },
     { id = "RUSTSEC-2025-0075", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
     { id = "RUSTSEC-2025-0080", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
     { id = "RUSTSEC-2025-0081", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },

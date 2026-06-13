@@ -3,6 +3,7 @@ import { LoginPage, RequiredSetupPage, UserInfoPage, UserPopoverPage } from '@/f
 import { ChatMainPage, ChannelInfoPage, ChannelInfoPopoverView, ChannelMembersPage, JoinApplicationsPage, ChannelBansPage } from '@/features/chat/public/routes';
 import { PluginCenterPage, DomainCatalogPage, PluginDetailPage } from '@/features/plugins/routes';
 import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
+const ContactsPage = () => import('@/features/chat/presentation/patchbay/contacts/ContactsPage.vue');
 import { ServerManagerPage } from '@/features/server-connection/routes';
 import { FileManagerPage } from '@/features/files/routes';
 import { TrayNotificationPopover } from '@/features/tray-notification/routes';
@@ -22,6 +23,7 @@ const router = createRouter({
     { path: '/plugins/domain-catalog', component: DomainCatalogPage, name: 'domain-catalog' },
     { path: '/plugins/detail/:pluginId', component: PluginDetailPage, name: 'plugin-detail' },
     { path: '/files', component: FileManagerPage, name: 'files' },
+    { path: '/contacts', component: ContactsPage, name: 'contacts' },
     { path: '/channel-info', component: ChannelInfoPage, name: 'channel-info' },
     { path: '/channel-members', component: ChannelMembersPage, name: 'channel-members' },
     { path: '/channel-applications', component: JoinApplicationsPage, name: 'channel-applications' },

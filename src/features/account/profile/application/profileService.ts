@@ -6,6 +6,8 @@
 
 import {
   getCurrentUserUsecase,
+  getUserUsecase,
+  getListUsersUsecase,
   getUpdateUserEmailUsecase,
   getUpdateUserProfileUsecase,
   supportsProfileMutation,
@@ -21,6 +23,14 @@ import {
 
 export function getCurrentUserProfile(serverSocket: string, accessToken: string) {
   return getCurrentUserUsecase(serverSocket).execute(accessToken);
+}
+
+export function getUserPublicProfile(serverSocket: string, accessToken: string, uid: string) {
+  return getUserUsecase(serverSocket).execute(accessToken, uid);
+}
+
+export async function listUsersPublicProfiles(serverSocket: string, accessToken: string, ids: string[]) {
+  return getListUsersUsecase(serverSocket).execute(accessToken, ids);
 }
 
 export async function updateCurrentUserEmail(

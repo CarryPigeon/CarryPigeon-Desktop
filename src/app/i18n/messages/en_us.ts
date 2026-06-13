@@ -489,9 +489,9 @@ export const en_us = {
   about_credits: "Credits",
   // Updater
   updater_new_version: "New version v{version} available",
-  updater_install: "Install Now",
   updater_later: "Remind Later",
-  updater_downloading: "Downloading {percent}%",
+  updater_manual_hint: "A new version is available. Go to the GitHub Releases page to download it.",
+  updater_download_page: "Go to Download Page",
   // ErrorBoundary
   error_boundary_title: "Something went wrong",
   error_boundary_unknown: "Unknown error",
@@ -543,4 +543,13 @@ export const en_us = {
   shortcut_settings: "Open Settings",
   shortcut_close: "Close Panel / Overlay",
   shortcut_help: "Keyboard Shortcuts Help",
+  contacts_title: "Contacts",
+  contacts_search_placeholder: "Search by nickname, email or ID…",
+  contacts_no_results: "No matching users found",
+  contacts_start_chat: "Start Chat",
+  contacts_chat: "Message",
+  contacts_view_profile: "View Profile",
+  contacts_profile: "Profile",
+  contacts_empty_hint: "Search for users by nickname or email to start a private chat",
+  contacts_go_chat: "Back to Chat",
 };
