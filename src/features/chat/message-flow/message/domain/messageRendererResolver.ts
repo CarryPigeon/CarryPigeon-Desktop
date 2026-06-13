@@ -49,6 +49,16 @@ export function toMessageContentModel(envelope: MessageEnvelope): MessageContent
       replyToId: message.replyToId,
     };
   }
+  if (message.kind === "image") {
+    return {
+      kind: "image",
+      url: message.url,
+      fileName: message.fileName,
+      fileSize: message.fileSize,
+      preview: message.preview,
+      replyToId: message.replyToId,
+    };
+  }
   return {
     kind: "plugin",
     domainId: message.domain.id,
@@ -82,6 +92,20 @@ export function resolveMessageRenderModel(
       messageId: envelope.messageId,
       text: content.text,
       replyText: replyText || "",
+    };
+  }
+
+  if (content.kind === "image") {
+    return {
+      kind: "image",
+      messageId: envelope.messageId,
+      url: content.url,
+      fileName: content.fileName,
+      fileSize: content.fileSize,
+      preview: content.preview,
+      from: envelope.from,
+      timeMs: envelope.timeMs,
+      replyToMid: content.replyToId,
     };
   }
 

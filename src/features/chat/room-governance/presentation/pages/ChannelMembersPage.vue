@@ -9,6 +9,7 @@ import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import { useChannelMembersPage } from "@/features/chat/room-governance/presentation/page-models/useChannelMembersPage";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const { t } = useI18n();
 const {
@@ -31,43 +32,45 @@ const {
 
 <template>
   <!-- 页面：ChannelMembersPage｜职责：频道成员管理 -->
-  <GovernancePageShell
-    :channel-name="channelName"
-    :subtitle="`${t('channel_members')} (${memberCount})`"
-    :is-loading="isLoading"
-    :error-message="pageError"
-    @back="goBack"
-  >
-    <template #back-label>{{ t("back") }}</template>
-    <template #loading>{{ t("loading") }}</template>
-    <template #default>
-      <div v-for="m in members" :key="m.uid" class="cp-memberCard">
-        <UserProfilePopover
-          :user-id="m.uid"
-          :username="m.nickname"
-          trigger="hover"
-        >
-          <AvatarBadge :name="m.nickname" :size="40" />
-        </UserProfilePopover>
-        <div class="cp-memberCard__info">
-          <div class="cp-memberCard__name">{{ m.nickname }}</div>
-          <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>
-          <div class="cp-memberCard__time">{{ t("joined_at") }}: {{ formatJoinTime(m.joinTime) }}</div>
+  <ErrorBoundary>
+    <GovernancePageShell
+      :channel-name="channelName"
+      :subtitle="`${t('channel_members')} (${memberCount})`"
+      :is-loading="isLoading"
+      :error-message="pageError"
+      @back="goBack"
+    >
+      <template #back-label>{{ t("back") }}</template>
+      <template #loading>{{ t("loading") }}</template>
+      <template #default>
+        <div v-for="m in members" :key="m.uid" class="cp-memberCard">
+          <UserProfilePopover
+            :user-id="m.uid"
+            :username="m.nickname"
+            trigger="hover"
+          >
+            <AvatarBadge :name="m.nickname" :size="40" />
+          </UserProfilePopover>
+          <div class="cp-memberCard__info">
+            <div class="cp-memberCard__name">{{ m.nickname }}</div>
+            <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>
+            <div class="cp-memberCard__time">{{ t("joined_at") }}: {{ formatJoinTime(m.joinTime) }}</div>
+          </div>
+          <div class="cp-memberCard__actions">
+            <button v-if="canPromoteMember(m)" class="cp-memberCard__btn" type="button" @click="handleSetAdmin(m.uid)">
+              {{ t("set_admin") }}
+            </button>
+            <button v-if="canDemoteAdmin(m)" class="cp-memberCard__btn" type="button" @click="handleRemoveAdmin(m.uid)">
+              {{ t("remove_admin") }}
+            </button>
+            <button v-if="canKickMember(m)" class="cp-memberCard__btn danger" type="button" @click="handleKick(m.uid)">
+              {{ t("kick_member") }}
+            </button>
+          </div>
         </div>
-        <div class="cp-memberCard__actions">
-          <button v-if="canPromoteMember(m)" class="cp-memberCard__btn" type="button" @click="handleSetAdmin(m.uid)">
-            {{ t("set_admin") }}
-          </button>
-          <button v-if="canDemoteAdmin(m)" class="cp-memberCard__btn" type="button" @click="handleRemoveAdmin(m.uid)">
-            {{ t("remove_admin") }}
-          </button>
-          <button v-if="canKickMember(m)" class="cp-memberCard__btn danger" type="button" @click="handleKick(m.uid)">
-            {{ t("kick_member") }}
-          </button>
-        </div>
-      </div>
-    </template>
-  </GovernancePageShell>
+      </template>
+    </GovernancePageShell>
+  </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">

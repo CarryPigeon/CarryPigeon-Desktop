@@ -10,7 +10,7 @@ import { createAsyncTaskRunner } from "./asyncTaskRunner";
 /**
  * 消息上下文菜单动作类型。
  */
-export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread";
+export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin";
 
 /**
  * 消息上下文菜单编排依赖。
@@ -27,6 +27,8 @@ export type UseMessageContextMenuDeps = {
   openForwardDialog(messageId: string): void;
   startEditing(messageId: string): void;
   openThread(messageId: string): void;
+  pinMessage(messageId: string): Promise<void>;
+  unpinMessage(messageId: string): Promise<void>;
 };
 
 /**
@@ -95,6 +97,12 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
         runAsyncTask(deps.copyTextToClipboard(text), "chat_copy_message_failed");
         return;
       }
+      case "pin":
+        runAsyncTask(deps.pinMessage(messageId), "chat_pin_message_failed");
+        return;
+      case "unpin":
+        runAsyncTask(deps.unpinMessage(messageId), "chat_unpin_message_failed");
+        return;
     }
   }
 

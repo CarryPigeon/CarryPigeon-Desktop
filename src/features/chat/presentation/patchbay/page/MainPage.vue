@@ -19,6 +19,7 @@ import CreateChannelDialog from "@/features/chat/presentation/patchbay/component
 import CreateFriendPrivateChatDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateFriendPrivateChatDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
 import "@/features/chat/public/styles";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const page = usePatchbayPageModel();
 
@@ -217,148 +218,155 @@ onBeforeUnmount(() => {
   <!-- 页面：MainPage｜职责：Patchbay 主窗口四栏布局 -->
   <!-- 区块：<main> .cp-main -->
   <main ref="mainEl" class="cp-main" :style="mainStyle">
-    <div v-if="page.flashMessage" class="cp-flash">{{ page.flashMessage }}</div>
-    <ServerRail
-      :racks="page.serverRail.racks"
-      :active-socket="page.serverRail.activeSocket"
-      @switch="page.serverRail.handleSwitchServer"
-      @open-servers="page.serverRail.handleOpenServers"
-      @open-plugins="page.serverRail.goPlugins"
-      @open-settings="page.serverRail.handleOpenSettings"
-      @open-files="page.serverRail.handleOpenFiles"
-    />
+    <ErrorBoundary>
+      <div v-if="page.flashMessage" class="cp-flash">{{ page.flashMessage }}</div>
+      <ServerRail
+        :racks="page.serverRail.racks"
+        :active-socket="page.serverRail.activeSocket"
+        @switch="page.serverRail.handleSwitchServer"
+        @open-servers="page.serverRail.handleOpenServers"
+        @open-plugins="page.serverRail.goPlugins"
+        @open-settings="page.serverRail.handleOpenSettings"
+        @open-files="page.serverRail.handleOpenFiles"
+      />
 
-    <button
-      class="cp-resizer"
-      :data-active="activeResizer === 'server-channel'"
-      type="button"
-      role="separator"
-      aria-label="Resize servers and channels"
-      aria-orientation="vertical"
-      :aria-valuemin="railBounds.server.min"
-      :aria-valuemax="railBounds.server.max"
-      :aria-valuenow="serverWidth"
-      @pointerdown="startResize('server-channel', $event)"
-      @keydown="handleResizeKeydown('server-channel', $event)"
-    ></button>
+      <button
+        class="cp-resizer"
+        :data-active="activeResizer === 'server-channel'"
+        type="button"
+        role="separator"
+        aria-label="Resize servers and channels"
+        aria-orientation="vertical"
+        :aria-valuemin="railBounds.server.min"
+        :aria-valuemax="railBounds.server.max"
+        :aria-valuenow="serverWidth"
+        @pointerdown="startResize('server-channel', $event)"
+        @keydown="handleResizeKeydown('server-channel', $event)"
+      ></button>
 
-    <ChannelRail :model="page.channelRail" />
+      <ChannelRail :model="page.channelRail" />
 
-    <button
-      class="cp-resizer"
-      :data-active="activeResizer === 'channel-message'"
-      type="button"
-      role="separator"
-      aria-label="Resize channels and messages"
-      aria-orientation="vertical"
-      :aria-valuemin="railBounds.channel.min"
-      :aria-valuemax="railBounds.channel.max"
-      :aria-valuenow="channelWidth"
-      @pointerdown="startResize('channel-message', $event)"
-      @keydown="handleResizeKeydown('channel-message', $event)"
-    ></button>
+      <button
+        class="cp-resizer"
+        :data-active="activeResizer === 'channel-message'"
+        type="button"
+        role="separator"
+        aria-label="Resize channels and messages"
+        aria-orientation="vertical"
+        :aria-valuemin="railBounds.channel.min"
+        :aria-valuemax="railBounds.channel.max"
+        :aria-valuenow="channelWidth"
+        @pointerdown="startResize('channel-message', $event)"
+        @keydown="handleResizeKeydown('channel-message', $event)"
+      ></button>
 
-    <ChatCenter
-      :model="page.chatCenter"
-      :channels="page.channels"
-      :show-jump-to-bottom="page.chatViewport.showJumpToBottom"
-      :on-jump-to-bottom="page.chatViewport.handleJumpToBottom"
-      :on-signal-scroll="page.chatViewport.handleSignalScroll"
-      :register-signal-pane="page.chatViewport.setSignalPaneRef"
-      :on-open-channel-settings-menu="page.chatViewport.openChannelSettingsMenu"
-      :on-message-context-menu="page.chatViewport.handleMessageContextMenu"
-      :on-more-click="page.chatViewport.handleMoreClick"
-      :on-install-hint="page.chatViewport.handleInstallHint"
-      :editing-message-id="page.editingMessageId"
-      :on-edit="page.handleEditMessage"
-      :on-edit-cancel="page.clearEditingMessageId"
-      :on-view-thread="(messageId: string) => page.threadPanel.openThread(messageId)"
-    />
+      <ChatCenter
+        :model="page.chatCenter"
+        :channels="page.channels"
+        :show-jump-to-bottom="page.chatViewport.showJumpToBottom"
+        :on-jump-to-bottom="page.chatViewport.handleJumpToBottom"
+        :on-signal-scroll="page.chatViewport.handleSignalScroll"
+        :register-signal-pane="page.chatViewport.setSignalPaneRef"
+        :on-open-channel-settings-menu="page.chatViewport.openChannelSettingsMenu"
+        :on-message-context-menu="page.chatViewport.handleMessageContextMenu"
+        :on-more-click="page.chatViewport.handleMoreClick"
+        :on-install-hint="page.chatViewport.handleInstallHint"
+        :editing-message-id="page.editingMessageId"
+        :on-edit="page.handleEditMessage"
+        :on-edit-cancel="page.clearEditingMessageId"
+        :on-view-thread="(messageId: string) => page.threadPanel.openThread(messageId)"
+        :shortcut-help-visible="page.shortcutHelpOpen"
+        :shortcut-bindings="page.bindings"
+        :on-close-shortcut-help="page.closeShortcutHelp"
+      />
 
-    <button
-      class="cp-resizer"
-      :data-active="activeResizer === 'message-members'"
-      type="button"
-      role="separator"
-      aria-label="Resize messages and members"
-      aria-orientation="vertical"
-      :aria-valuemin="railBounds.members.min"
-      :aria-valuemax="railBounds.members.max"
-      :aria-valuenow="membersWidth"
-      @pointerdown="startResize('message-members', $event)"
-      @keydown="handleResizeKeydown('message-members', $event)"
-    ></button>
+      <button
+        class="cp-resizer"
+        :data-active="activeResizer === 'message-members'"
+        type="button"
+        role="separator"
+        aria-label="Resize messages and members"
+        aria-orientation="vertical"
+        :aria-valuemin="railBounds.members.min"
+        :aria-valuemax="railBounds.members.max"
+        :aria-valuenow="membersWidth"
+        @pointerdown="startResize('message-members', $event)"
+        @keydown="handleResizeKeydown('message-members', $event)"
+      ></button>
 
-    <MembersRail :model="page.membersRail" />
+      <MembersRail :model="page.membersRail" />
 
-    <QuickSwitcher
-      :open="page.quickSwitcher.open"
-      :query="page.quickSwitcher.query"
-      :items="page.quickSwitcher.items"
-      :active-index="page.quickSwitcher.activeIndex"
-      @update:open="page.quickSwitcher.setOpen"
-      @update:query="page.quickSwitcher.setQuery"
-      @update:activeIndex="page.quickSwitcher.setActiveIndex"
-      @select="page.quickSwitcher.handleSelect"
-    />
+      <QuickSwitcher
+        :open="page.quickSwitcher.open"
+        :query="page.quickSwitcher.query"
+        :items="page.quickSwitcher.items"
+        :active-index="page.quickSwitcher.activeIndex"
+        @update:open="page.quickSwitcher.setOpen"
+        @update:query="page.quickSwitcher.setQuery"
+        @update:activeIndex="page.quickSwitcher.setActiveIndex"
+        @select="page.quickSwitcher.handleSelect"
+      />
 
-    <MessageContextMenu
-      :open="page.messageContextMenu.open"
-      :x="page.messageContextMenu.x"
-      :y="page.messageContextMenu.y"
-      :show-edit="page.messageContextMenu.showEdit"
-      :show-recall="page.messageContextMenu.showRecall"
-      :show-view-thread="page.messageContextMenu.showViewThread"
-      @close="page.messageContextMenu.close"
-      @action="page.messageContextMenu.handleMenuCommand"
-    />
+      <MessageContextMenu
+        :open="page.messageContextMenu.open"
+        :x="page.messageContextMenu.x"
+        :y="page.messageContextMenu.y"
+        :show-edit="page.messageContextMenu.showEdit"
+        :show-recall="page.messageContextMenu.showRecall"
+        :show-view-thread="page.messageContextMenu.showViewThread"
+        :can-pin="page.messageContextMenu.canPin"
+        :is-pinned="page.messageContextMenu.isPinned"
+        @close="page.messageContextMenu.close"
+        @action="page.messageContextMenu.handleMenuCommand"
+      />
 
-    <ChannelSettingsMenu
-      :open="page.channelSettingsMenu.open"
-      :x="page.channelSettingsMenu.x"
-      :y="page.channelSettingsMenu.y"
-      @close="page.channelSettingsMenu.close"
-      @members="page.channelSettingsMenu.openMembers(page.chatCenter.currentChannelId)"
-      @applications="page.channelSettingsMenu.openJoinApplications(page.chatCenter.currentChannelId)"
-      @bans="page.channelSettingsMenu.openChannelBans(page.chatCenter.currentChannelId)"
-      @delete="page.channelSettingsMenu.openDeleteChannelDialog"
-    />
+      <ChannelSettingsMenu
+        :open="page.channelSettingsMenu.open"
+        :x="page.channelSettingsMenu.x"
+        :y="page.channelSettingsMenu.y"
+        @close="page.channelSettingsMenu.close"
+        @members="page.channelSettingsMenu.openMembers(page.chatCenter.currentChannelId)"
+        @applications="page.channelSettingsMenu.openJoinApplications(page.chatCenter.currentChannelId)"
+        @bans="page.channelSettingsMenu.openChannelBans(page.chatCenter.currentChannelId)"
+        @delete="page.channelSettingsMenu.openDeleteChannelDialog"
+      />
 
-    <CreateChatMenu
-      :open="page.channelDialogs.showCreateChatMenu"
-      :x="page.channelDialogs.createChatMenuX"
-      :y="page.channelDialogs.createChatMenuY"
-      @close="page.channelDialogs.closeCreateChatMenu"
-      @group="page.channelDialogs.openCreateChannelDialog"
-      @private="page.channelDialogs.openCreateFriendPrivateChatDialog"
-    />
+      <CreateChatMenu
+        :open="page.channelDialogs.showCreateChatMenu"
+        :x="page.channelDialogs.createChatMenuX"
+        :y="page.channelDialogs.createChatMenuY"
+        @close="page.channelDialogs.closeCreateChatMenu"
+        @group="page.channelDialogs.openCreateChannelDialog"
+        @private="page.channelDialogs.openCreateFriendPrivateChatDialog"
+      />
 
-    <!-- 区块：创建频道弹窗（Create Channel Dialog） -->
-    <CreateChannelDialog
-      :visible="page.channelDialogs.showCreateChannel"
-      @update:visible="page.channelDialogs.setShowCreateChannel($event)"
-      @created="page.channelDialogs.handleChannelCreated"
-    />
+      <!-- 区块：创建频道弹窗（Create Channel Dialog） -->
+      <CreateChannelDialog
+        :visible="page.channelDialogs.showCreateChannel"
+        @update:visible="page.channelDialogs.setShowCreateChannel($event)"
+        @created="page.channelDialogs.handleChannelCreated"
+      />
 
-    <!-- 区块：创建好友私聊弹窗（Create Friend Private Chat Dialog） -->
-    <CreateFriendPrivateChatDialog
-      :visible="page.channelDialogs.showCreateFriendPrivateChat"
-      @update:visible="page.channelDialogs.setShowCreateFriendPrivateChat($event)"
-    />
+      <!-- 区块：创建好友私聊弹窗（Create Friend Private Chat Dialog） -->
+      <CreateFriendPrivateChatDialog
+        :visible="page.channelDialogs.showCreateFriendPrivateChat"
+        @update:visible="page.channelDialogs.setShowCreateFriendPrivateChat($event)"
+      />
 
-    <!-- 区块：删除频道弹窗（Delete Channel Dialog） -->
-    <DeleteChannelDialog
-      :visible="page.channelDialogs.showDeleteChannel"
-      :channel-id="page.channelDialogs.deleteChannelId"
-      :channel-name="page.channelDialogs.deleteChannelName"
-      @update:visible="page.channelDialogs.setShowDeleteChannel($event)"
-      @deleted="page.channelDialogs.handleChannelDeleted"
-    />
+      <!-- 区块：删除频道弹窗（Delete Channel Dialog） -->
+      <DeleteChannelDialog
+        :visible="page.channelDialogs.showDeleteChannel"
+        :channel-id="page.channelDialogs.deleteChannelId"
+        :channel-name="page.channelDialogs.deleteChannelName"
+        @update:visible="page.channelDialogs.setShowDeleteChannel($event)"
+        @deleted="page.channelDialogs.handleChannelDeleted"
+      />
 
-    <ThreadPanel
-      :model="page.threadPanel"
-      :domain-registry-store="page.domainRegistryStore"
-      @close="page.threadPanel.closeThread()"
-    />
+      <ThreadPanel
+        :model="page.threadPanel"
+        :domain-registry-store="page.domainRegistryStore"
+        @close="page.threadPanel.closeThread()"
+      />
+    </ErrorBoundary>
   </main>
 </template>

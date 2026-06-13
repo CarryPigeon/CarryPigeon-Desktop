@@ -46,8 +46,10 @@ type PatchbayMessageContextMenuRawModel = {
   showEdit: RefLike<boolean>;
   showRecall: RefLike<boolean>;
   showViewThread: RefLike<boolean>;
+  canPin: RefLike<boolean>;
+  isPinned: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread"): void;
+  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -163,8 +165,10 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   showEdit: RefLike<boolean>;
   showRecall: RefLike<boolean>;
   showViewThread: RefLike<boolean>;
+  canPin: RefLike<boolean>;
+  isPinned: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread"): void;
+  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin"): void;
 };
 
 /**
@@ -180,6 +184,8 @@ export function createPatchbayMessageContextMenuSection(
     showEdit: deps.showEdit,
     showRecall: deps.showRecall,
     showViewThread: deps.showViewThread,
+    canPin: deps.canPin,
+    isPinned: deps.isPinned,
     close: deps.close,
     handleMenuCommand: deps.handleMenuCommand,
   });

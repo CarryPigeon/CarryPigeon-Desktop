@@ -15,6 +15,7 @@ import { getUserMutationPort } from "@/features/account/profile/di/user.di";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { createLogger } from "@/shared/utils/logger";
 import { MessagePlugin } from "tdesign-vue-next";
+import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 type ProfileDraft = {
   username: string;
@@ -324,95 +325,97 @@ async function handleSaveEdit(): Promise<void> {
   <!-- 页面：UserInfoPage｜职责：用户资料展示 -->
   <!-- 区块：<main> .cp-info -->
   <main class="cp-info">
-    <header class="cp-info__hero" :style="heroStyle">
-      <div class="cp-info__hero-overlay"></div>
-      <div class="cp-info__hero-top">
-        <button class="cp-info__back" type="button" @click="router.back()">Back</button>
-        <button v-if="isOwnProfile && !isEditing" class="cp-info__edit" type="button" @click="handleStartEdit">Edit Profile</button>
-        <button v-else-if="isOwnProfile" class="cp-info__edit" type="button" @click="handleCancelEdit">Cancel</button>
-      </div>
-      <div v-if="isEditing" class="cp-info__hero-edit">
-        <label class="cp-info__field">
-          <span class="cp-info__fieldLabel">Name</span>
-          <input v-model="draft.username" class="cp-info__input" type="text" autocomplete="name" />
-        </label>
-        <label class="cp-info__field">
-          <span class="cp-info__fieldLabel">Email</span>
-          <input v-model="draft.email" class="cp-info__input" type="email" autocomplete="email" />
-        </label>
-        <label v-if="isEmailChanged" class="cp-info__field">
-          <span class="cp-info__fieldLabel">Email Code</span>
-          <span class="cp-info__inline">
-            <input v-model="draft.emailCode" class="cp-info__input" type="text" inputmode="numeric" />
-            <button class="cp-info__smallBtn" :disabled="isSendingEmailCode" type="button" @click="handleSendEmailCode">
-              {{ isSendingEmailCode ? "Sending..." : "Send Code" }}
-            </button>
-          </span>
-        </label>
-        <label class="cp-info__field">
-          <span class="cp-info__fieldLabel">Avatar</span>
-          <input ref="avatarFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleAvatarFileChange" />
-          <span class="cp-info__inline">
-            <input v-model="draft.avatarUrl" class="cp-info__input" type="url" placeholder="Avatar URL (or click Upload)" />
-            <button class="cp-info__smallBtn" :disabled="isUploadingAvatar" type="button" @click="handleUploadAvatar">
-              {{ isUploadingAvatar ? "Uploading..." : "Upload" }}
-            </button>
-          </span>
-        </label>
-        <label class="cp-info__field">
-          <span class="cp-info__fieldLabel">Background</span>
-          <input ref="backgroundFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleBackgroundFileChange" />
-          <span class="cp-info__inline">
-            <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" placeholder="Background URL (or click Upload)" />
-            <button class="cp-info__smallBtn" :disabled="isUploadingBackground" type="button" @click="handleUploadBackground">
-              {{ isUploadingBackground ? "Uploading..." : "Upload" }}
-            </button>
-          </span>
-        </label>
-        <label class="cp-info__field cp-info__field--wide">
-          <span class="cp-info__fieldLabel">Bio</span>
-          <textarea v-model="draft.brief" class="cp-info__textarea" rows="4"></textarea>
-        </label>
-        <div v-if="formError" class="cp-info__status cp-info__status--error">{{ formError }}</div>
-        <div v-if="formSuccess" class="cp-info__status cp-info__status--success">{{ formSuccess }}</div>
-        <div class="cp-info__editActions">
-          <button class="cp-info__back" type="button" @click="handleCancelEdit">Cancel</button>
-          <button class="cp-info__edit" :disabled="isSaving" type="button" @click="handleSaveEdit">
-            {{ isSaving ? "Saving..." : "Save" }}
-          </button>
+    <ErrorBoundary>
+      <header class="cp-info__hero" :style="heroStyle">
+        <div class="cp-info__hero-overlay"></div>
+        <div class="cp-info__hero-top">
+          <button class="cp-info__back" type="button" @click="router.back()">Back</button>
+          <button v-if="isOwnProfile && !isEditing" class="cp-info__edit" type="button" @click="handleStartEdit">Edit Profile</button>
+          <button v-else-if="isOwnProfile" class="cp-info__edit" type="button" @click="handleCancelEdit">Cancel</button>
         </div>
-      </div>
-      <div v-else class="cp-info__hero-content">
-        <div class="cp-info__avatar">
-          <img v-if="avatarUrl" class="cp-info__avatar-image" :src="avatarUrl" :alt="name || 'User'" />
-          <div v-else class="cp-info__avatar-fallback">{{ (name || "U").slice(0, 1).toUpperCase() }}</div>
-        </div>
-        <div class="cp-info__hero-text">
-          <div class="cp-info__name">{{ name || "User" }}</div>
-          <div class="cp-info__sub">Profile · Full details</div>
-          <div class="cp-info__hero-meta">
-            <span class="cp-info__hero-pill">uid available</span>
-            <span class="cp-info__hero-pill">email available</span>
-            <span class="cp-info__hero-pill">bio available</span>
+        <div v-if="isEditing" class="cp-info__hero-edit">
+          <label class="cp-info__field">
+            <span class="cp-info__fieldLabel">Name</span>
+            <input v-model="draft.username" class="cp-info__input" type="text" autocomplete="name" />
+          </label>
+          <label class="cp-info__field">
+            <span class="cp-info__fieldLabel">Email</span>
+            <input v-model="draft.email" class="cp-info__input" type="email" autocomplete="email" />
+          </label>
+          <label v-if="isEmailChanged" class="cp-info__field">
+            <span class="cp-info__fieldLabel">Email Code</span>
+            <span class="cp-info__inline">
+              <input v-model="draft.emailCode" class="cp-info__input" type="text" inputmode="numeric" />
+              <button class="cp-info__smallBtn" :disabled="isSendingEmailCode" type="button" @click="handleSendEmailCode">
+                {{ isSendingEmailCode ? "Sending..." : "Send Code" }}
+              </button>
+            </span>
+          </label>
+          <label class="cp-info__field">
+            <span class="cp-info__fieldLabel">Avatar</span>
+            <input ref="avatarFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleAvatarFileChange" />
+            <span class="cp-info__inline">
+              <input v-model="draft.avatarUrl" class="cp-info__input" type="url" placeholder="Avatar URL (or click Upload)" />
+              <button class="cp-info__smallBtn" :disabled="isUploadingAvatar" type="button" @click="handleUploadAvatar">
+                {{ isUploadingAvatar ? "Uploading..." : "Upload" }}
+              </button>
+            </span>
+          </label>
+          <label class="cp-info__field">
+            <span class="cp-info__fieldLabel">Background</span>
+            <input ref="backgroundFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleBackgroundFileChange" />
+            <span class="cp-info__inline">
+              <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" placeholder="Background URL (or click Upload)" />
+              <button class="cp-info__smallBtn" :disabled="isUploadingBackground" type="button" @click="handleUploadBackground">
+                {{ isUploadingBackground ? "Uploading..." : "Upload" }}
+              </button>
+            </span>
+          </label>
+          <label class="cp-info__field cp-info__field--wide">
+            <span class="cp-info__fieldLabel">Bio</span>
+            <textarea v-model="draft.brief" class="cp-info__textarea" rows="4"></textarea>
+          </label>
+          <div v-if="formError" class="cp-info__status cp-info__status--error">{{ formError }}</div>
+          <div v-if="formSuccess" class="cp-info__status cp-info__status--success">{{ formSuccess }}</div>
+          <div class="cp-info__editActions">
+            <button class="cp-info__back" type="button" @click="handleCancelEdit">Cancel</button>
+            <button class="cp-info__edit" :disabled="isSaving" type="button" @click="handleSaveEdit">
+              {{ isSaving ? "Saving..." : "Save" }}
+            </button>
           </div>
         </div>
-      </div>
-    </header>
+        <div v-else class="cp-info__hero-content">
+          <div class="cp-info__avatar">
+            <img v-if="avatarUrl" class="cp-info__avatar-image" :src="avatarUrl" :alt="name || 'User'" />
+            <div v-else class="cp-info__avatar-fallback">{{ (name || "U").slice(0, 1).toUpperCase() }}</div>
+          </div>
+          <div class="cp-info__hero-text">
+            <div class="cp-info__name">{{ name || "User" }}</div>
+            <div class="cp-info__sub">Profile · Full details</div>
+            <div class="cp-info__hero-meta">
+              <span class="cp-info__hero-pill">uid available</span>
+              <span class="cp-info__hero-pill">email available</span>
+              <span class="cp-info__hero-pill">bio available</span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-    <section class="cp-info__body">
-      <div class="cp-info__card">
-        <div class="cp-info__k">uid</div>
-        <div class="cp-info__v"><MonoTag :value="uid" :copyable="true" /></div>
-      </div>
-      <div class="cp-info__card">
-        <div class="cp-info__k">email</div>
-        <div class="cp-info__v"><MonoTag :value="email" :copyable="true" /></div>
-      </div>
-      <div class="cp-info__card wide">
-        <div class="cp-info__k">bio</div>
-        <div class="cp-info__v cp-info__bio">{{ bio || "—" }}</div>
-      </div>
-    </section>
+      <section class="cp-info__body">
+        <div class="cp-info__card">
+          <div class="cp-info__k">uid</div>
+          <div class="cp-info__v"><MonoTag :value="uid" :copyable="true" /></div>
+        </div>
+        <div class="cp-info__card">
+          <div class="cp-info__k">email</div>
+          <div class="cp-info__v"><MonoTag :value="email" :copyable="true" /></div>
+        </div>
+        <div class="cp-info__card wide">
+          <div class="cp-info__k">bio</div>
+          <div class="cp-info__v cp-info__bio">{{ bio || "—" }}</div>
+        </div>
+      </section>
+    </ErrorBoundary>
   </main>
 </template>
 
