@@ -118,6 +118,7 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Extract app version
+              shell: bash
               run: |
                   APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
                   echo "APP_VERSION=${APP_VERSION}" >> $GITHUB_ENV
