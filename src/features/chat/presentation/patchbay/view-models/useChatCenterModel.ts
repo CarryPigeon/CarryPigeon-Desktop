@@ -8,7 +8,7 @@ import { computed, nextTick, onBeforeUnmount, proxyRefs, ref, watch, type Compon
 import { useI18n } from "vue-i18n";
 import { createMessageActionError } from "@/features/chat/message-flow/domain/outcomes/messageActionOutcome";
 import { createLogger } from "@/shared/utils/logger";
-import { MessagePlugin } from "tdesign-vue-next";
+import { toast } from "@/shared/utils/toast";
 import type {
   ChannelMessageLookupCapabilities,
   ChatMessage,
@@ -37,6 +37,7 @@ import {
 } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
+import type { PinSummary } from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChatConnectionPillStateView = "connected" | "reconnecting" | "offline";
@@ -91,6 +92,22 @@ type ChatCenterRawModel = {
   searchState: ComputedRef<MessageSearchState>;
   searchScope: ComputedRef<"channel" | "server">;
   highlightedMessageId: ComputedRef<string>;
+  /** 置顶消息摘要列表。 */
+  pins: Ref<PinSummary[]>;
+  /** 是否正在加载置顶消息。 */
+  pinsLoading: Ref<boolean>;
+  /** 加载置顶消息时的错误信息。 */
+  pinsError: Ref<string | null>;
+  /** 置顶栏是否已被用户关闭。 */
+  pinsDismissed: Ref<boolean>;
+  /** 加载当前频道的置顶消息。 */
+  loadPins(): Promise<void>;
+  /** 关闭置顶栏。 */
+  dismissPins(): void;
+  /** 选中某条置顶消息，跳转到其位置。 */
+  selectPinnedMessage(messageId: string): Promise<void>;
+  /** 取消某条消息的置顶。 */
+  unpinFromBar(messageId: string): Promise<void>;
   quoteReplyDraft: ComputedRef<{ messageId: string; userId: string; preview: string } | null>;
   linkPreview: ComputedRef<ChatLinkPreview | null | undefined>;
   fetchLinkPreview: (url: string) => Promise<void>;
@@ -160,6 +177,10 @@ export type UseChatCenterModelDeps = {
   onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
   selectChannel(channelId: string): Promise<void>;
   chatApi?: ChatApiPort;
+  /** 当前服务器 socket（用于 API 调用）。 */
+  serverSocket?: RefLike<string>;
+  /** 获取有效 access token。 */
+  getAccessToken?: (socket: string) => Promise<string | undefined>;
   linkPreview?: Ref<ChatLinkPreview | null | undefined>;
   fetchLinkPreview?: (url: string) => Promise<void>;
   dismissLinkPreview?: () => void;
@@ -287,6 +308,87 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   const searchScope = computed(() => messageTimelineSnapshot.value.searchScope);
   const highlightedMessageId = computed(() => messageTimelineSnapshot.value.highlightedMessageId);
 
+  /**
+   * Pin state.
+   */
+  const pins = ref<PinSummary[]>([]);
+  const pinsLoading = ref(false);
+  const pinsError = ref<string | null>(null);
+  const pinsDismissed = ref(false);
+
+  /** Reset pin state when channel changes. */
+  watch(() => currentSessionSnapshot.value.currentChannelId, () => {
+    pins.value = [];
+    pinsLoading.value = false;
+    pinsError.value = null;
+    pinsDismissed.value = false;
+  });
+
+  /**
+   * Load pins for the current channel.
+   */
+  async function loadPins(): Promise<void> {
+    const cid = currentSessionSnapshot.value.currentChannelId;
+    if (!cid) return;
+    const api = deps.chatApi;
+    const socket = deps.serverSocket?.value;
+    if (!api || !socket || !deps.getAccessToken) return;
+    pinsLoading.value = true;
+    pinsError.value = null;
+    try {
+      const token = (await deps.getAccessToken(socket))?.trim();
+      if (!token) {
+        pinsLoading.value = false;
+        return;
+      }
+      const result = await api.listPins(socket, token, cid);
+      const summaries: PinSummary[] = result.items.map((pin) => ({
+        pin,
+        preview: pin.note ?? `Message ${pin.messageId.slice(-8)}`,
+        pinnedByName: pin.pinnedByUserId ? `u:${pin.pinnedByUserId.slice(-6)}` : t("unknown"),
+        senderName: "—",
+        senderId: undefined,
+      }));
+      pins.value = summaries;
+      pinsDismissed.value = false;
+    } catch (err) {
+      pinsError.value = String(err);
+      logger.error("Action: chat_load_pins_failed", { channelId: cid, error: String(err) });
+    } finally {
+      pinsLoading.value = false;
+    }
+  }
+
+  function dismissPins(): void {
+    pinsDismissed.value = true;
+    pins.value = [];
+  }
+
+  async function selectPinnedMessage(messageId: string): Promise<void> {
+    await deps.currentTimeline.loadContextAroundMessage(messageId);
+    await nextTick();
+    const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+    if (el) el.scrollIntoView({ block: "center" });
+  }
+
+  async function unpinFromBar(messageId: string): Promise<void> {
+    const cid = currentSessionSnapshot.value.currentChannelId;
+    if (!cid) return;
+    const api = deps.chatApi;
+    const socket = deps.serverSocket?.value;
+    if (!api || !socket || !deps.getAccessToken) return;
+    try {
+      const token = (await deps.getAccessToken(socket))?.trim();
+      if (!token) return;
+      await api.unpinMessage(socket, token, cid, messageId);
+      pins.value = pins.value.filter((p) => p.pin.messageId !== messageId);
+      toast.success(t("unpin_message"));
+    } catch (err) {
+      logger.error("Action: chat_unpin_message_failed", { messageId, error: String(err) });
+      toast.warning(t("unpin_failed"));
+    }
+  }
+
   function openSearchPanel(): void {
     searchPanelOpen.value = true;
   }
@@ -393,14 +495,14 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
         clearSelection();
         showForwardDialog.value = false;
         isForwarding.value = false;
-        MessagePlugin.success(t("forward_success", { count: ids.length }));
+        toast.success(t("forward_success", { count: ids.length }));
         return;
       } catch (err) {
         clearSelection();
         showForwardDialog.value = false;
         isForwarding.value = false;
         logger.error("Action: chat_forward_message_failed", { mid: ids[0], error: String(err) });
-        MessagePlugin.warning(t("forward_failed", { failed: 1, total: ids.length }));
+        toast.warning(t("forward_failed", { failed: 1, total: ids.length }));
         return;
       }
     }
@@ -423,9 +525,9 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     isForwarding.value = false;
 
     if (failed > 0) {
-      MessagePlugin.warning(t("forward_failed", { failed, total: ids.length }));
+      toast.warning(t("forward_failed", { failed, total: ids.length }));
     } else {
-      MessagePlugin.success(t("forward_success", { count: ids.length - failed }));
+      toast.success(t("forward_success", { count: ids.length - failed }));
     }
   }
 
@@ -599,6 +701,14 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     searchState,
     searchScope,
     highlightedMessageId,
+    pins,
+    pinsLoading,
+    pinsError,
+    pinsDismissed,
+    loadPins,
+    dismissPins,
+    selectPinnedMessage,
+    unpinFromBar,
     quoteReplyDraft,
     linkPreview,
     fetchLinkPreview,

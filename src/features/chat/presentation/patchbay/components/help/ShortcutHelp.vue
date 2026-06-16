@@ -4,9 +4,10 @@
  * @description 快捷键帮助面板：展示所有注册的键盘快捷键及其组合键。
  */
 
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ShortcutBinding } from "@/features/chat/presentation/patchbay/interactions/usePatchbayHotkeys";
+import { useFocusTrap } from "@/shared/utils/useFocusTrap";
 
 const props = defineProps<{
   /** 面板可见性。 */
@@ -20,6 +21,22 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+/** 面板容器 ref，用于 focus trap。 */
+const panelRef = ref<HTMLElement | null>(null);
+const { trapFocus, releaseFocus } = useFocusTrap(panelRef);
+
+/** 面板可见时激活焦点捕获，关闭时释放。 */
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) {
+      trapFocus();
+    } else {
+      releaseFocus();
+    }
+  },
+);
 
 /**
  * 按 category 分组的快捷键列表。
@@ -77,6 +94,7 @@ const metaSymbol = computed(() => {
     <Transition name="cp-shortcut-fade">
       <div
         v-if="visible"
+        ref="panelRef"
         class="cp-shortcut-overlay"
         role="dialog"
         aria-modal="true"

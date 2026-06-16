@@ -6,9 +6,10 @@
 
 import { computed, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { createLogger } from "@/shared/utils/logger";
-import { MessagePlugin } from "tdesign-vue-next";
+import { toast } from "@/shared/utils/toast";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
@@ -42,6 +43,12 @@ import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { ENABLE_PIN_MESSAGE } from "@/shared/config/runtime";
+import {
+  addBookmark,
+  removeBookmark,
+  isBookmarked as checkIsBookmarked,
+  type BookmarkEntry,
+} from "@/features/chat/message-flow/bookmark/storage/localBookmarkStorage";
 import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
@@ -125,6 +132,7 @@ export type PatchbayPageModel = ShallowUnwrapRef<PatchbayPageRawModel>;
 export function usePatchbayPageModel(): PatchbayPageModel {
   const router = useRouter();
   const route = useRoute();
+  const { t } = useI18n();
   const logger = createLogger("MainPage");
   const { roomSession, messageFlow, roomGovernance } = resolvePatchbayPageFeatureDeps();
   const roomDirectory = roomSession.directory;
@@ -349,10 +357,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     if (!token) return;
     try {
       await httpChatApiPort.pinMessage(s, token, cid, messageId);
-      void MessagePlugin.success("消息已置顶");
+      void toast.success(t("pinned_message"));
     } catch (error) {
       logger.error("Action: chat_pin_message_failed", { messageId, error: String(error) });
-      void MessagePlugin.error(`置顶失败：${String(error)}`);
+      void toast.error(`${t("pin_failed")}：${String(error)}`);
     }
   }
 
@@ -371,10 +379,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     if (!token) return;
     try {
       await httpChatApiPort.unpinMessage(s, token, cid, messageId);
-      void MessagePlugin.success("消息已取消置顶");
+      void toast.success(t("pinned_message"));
     } catch (error) {
       logger.error("Action: chat_unpin_message_failed", { messageId, error: String(error) });
-      void MessagePlugin.error(`取消置顶失败：${String(error)}`);
+      void toast.error(`${t("unpin_failed")}：${String(error)}`);
     }
   }
 
@@ -399,16 +407,34 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleMoreClick,
   } = useMessageContextMenu({
     getClipboardText: getMessageClipboardText,
-    copyTextToClipboard,
+    copyTextToClipboard: async (text: string) => {
+      const ok = await copyTextToClipboard(text);
+      if (ok) {
+        void toast.success(t("copied_to_clipboard"));
+      } else {
+        void toast.error(t("copy_failed"));
+      }
+      return ok;
+    },
     startReply: currentChannelMessageFlow.beginReply,
     startQuoteReply: (messageId: string, preview: string) => {
       const message = currentChannelMessageFlow.findMessageById(messageId);
       if (!message) return;
       messageComposer.startQuoteReply(messageId, message.from.id, preview);
     },
-    deleteMessage: currentChannelMessageFlow.deleteMessage,
-    recallMessage: (messageId: string) => {
-      return currentChannelMessageFlow.recallMessage(messageId) as Promise<RecallChatMessageOutcome>;
+    deleteMessage: async (messageId: string) => {
+      const outcome = await currentChannelMessageFlow.deleteMessage(messageId);
+      if (!outcome.ok) {
+        void toast.error(outcome.error.message || t("delete_failed"));
+      }
+      return outcome;
+    },
+    recallMessage: async (messageId: string) => {
+      const outcome = await currentChannelMessageFlow.recallMessage(messageId) as RecallChatMessageOutcome;
+      if (!outcome.ok) {
+        void toast.error(outcome.error.message || t("recall_failed"));
+      }
+      return outcome;
     },
     onAsyncError: logAsyncError,
     enterMultiSelectMode: (messageId: string) => {
@@ -423,6 +449,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openThread: (messageId) => threadPanel.openThread(messageId),
     pinMessage: (messageId: string) => handlePinMessage(messageId),
     unpinMessage: (messageId: string) => handleUnpinMessage(messageId),
+    bookmarkMessage: (messageId: string) => handleBookmarkMessage(messageId),
+    unbookmarkMessage: (messageId: string) => handleUnbookmarkMessage(messageId),
   });
 
   const showEdit = computed(() => {
@@ -505,6 +533,47 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     return (message as { isPinned?: boolean }).isPinned ?? false;
   });
 
+  /**
+   * 当前右键菜单消息是否已收藏。
+   */
+  const isBookmarked = computed(() => {
+    const mid = menuMessageId.value;
+    if (!mid) return false;
+    return checkIsBookmarked(mid);
+  });
+
+  /**
+   * 收藏当前右键菜单消息。
+   */
+  function handleBookmarkMessage(messageId: string): void {
+    const message = currentChannelMessageFlow.findMessageById(messageId);
+    const channelName = currentChannelName.value;
+    const cid = currentSessionSnapshot.value.currentChannelId;
+    if (!message) {
+      void toast.warning(t("bookmark_failed"));
+      return;
+    }
+    const preview = message.kind === "core_text" ? message.text : message.preview;
+    const entry: BookmarkEntry = {
+      messageId,
+      channelId: cid,
+      channelName,
+      contentPreview: String(preview ?? "").slice(0, 200),
+      senderName: message.from.name,
+      bookmarkedAt: Date.now(),
+    };
+    addBookmark(entry);
+    void toast.success(t("bookmark"));
+  }
+
+  /**
+   * 取消收藏当前右键菜单消息。
+   */
+  function handleUnbookmarkMessage(messageId: string): void {
+    removeBookmark(messageId);
+    void toast.success(t("remove_bookmark"));
+  }
+
   const currentChannelName = computed(() => {
     const channel = roomDirectory.findChannelById(currentSessionSnapshot.value.currentChannelId);
     return channel?.name ?? currentSessionSnapshot.value.currentChannelId;
@@ -550,6 +619,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     linkPreview,
     fetchLinkPreview,
     dismissLinkPreview,
+    chatApi: IS_STORE_MOCK ? undefined : httpChatApiPort,
+    serverSocket: computed(() => socket.value),
+    getAccessToken: async (s: string) => (await ensureValidAccessToken(s))?.trim() || undefined,
     selectChannel: async (channelId: string) => {
       await currentSession.selectChannel(channelId);
     },
@@ -706,6 +778,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     showViewThread,
     canPin,
     isPinned,
+    isBookmarked,
     close: closeMenu,
     handleMenuCommand: handleMenuAction,
   });

@@ -49,8 +49,9 @@ type PatchbayMessageContextMenuRawModel = {
   showViewThread: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
+  isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin"): void;
+  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -170,8 +171,9 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   showViewThread: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
+  isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin"): void;
+  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
 };
 
 /**
@@ -189,6 +191,7 @@ export function createPatchbayMessageContextMenuSection(
     showViewThread: deps.showViewThread,
     canPin: deps.canPin,
     isPinned: deps.isPinned,
+    isBookmarked: deps.isBookmarked,
     close: deps.close,
     handleMenuCommand: deps.handleMenuCommand,
   });

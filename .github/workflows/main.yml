@@ -133,3 +133,45 @@ jobs:
                   releaseBody: "Automated build with pnpm."
                   releaseDraft: true
                   prerelease: false
+
+            - name: Generate latest.json for Tauri updater
+              if: matrix.platform == 'ubuntu-latest'
+              shell: bash
+              run: |
+                  VERSION="${{ env.APP_VERSION }}"
+                  DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+
+                  cat > latest.json << EOF
+                  {
+                    "version": "v${VERSION}",
+                    "notes": "Release v${VERSION}",
+                    "pub_date": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+                    "platforms": {
+                      "windows-x86_64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${VERSION}_x64_en-US.msi"
+                      },
+                      "darwin-x86_64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${VERSION}_x64.dmg"
+                      },
+                      "darwin-aarch64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${VERSION}_aarch64.dmg"
+                      },
+                      "linux-x86_64": {
+                        "signature": "",
+                        "url": "${DOWNLOAD_URL}/carrypigeon-desktop_${VERSION}_amd64.AppImage"
+                      }
+                    }
+                  }
+                  EOF
+
+            - name: Upload latest.json to release
+              if: matrix.platform == 'ubuntu-latest'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v${{ env.APP_VERSION }}
+                  files: latest.json
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

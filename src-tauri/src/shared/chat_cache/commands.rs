@@ -3,8 +3,10 @@
 use aes_gcm::{Aes256Gcm, Nonce, aead::Aead, aead::KeyInit};
 use anyhow::{Context, Result};
 use keyring_core::Entry;
-use sea_orm::ConnectionTrait;
-use sea_orm::{Database, DatabaseBackend, Statement, StatementBuilder, TransactionTrait, Value};
+use sea_orm::{
+    ConnectionTrait, Database, DatabaseBackend, Statement, StatementBuilder, TransactionTrait,
+    Value,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -104,6 +106,20 @@ async fn db() -> Result<Arc<sea_orm::DatabaseConnection>> {
         format!("sqlite:{path_str}?mode=rwc")
     };
     let conn = Arc::new(Database::connect(url).await?);
+
+    // 应用 SQLite 性能 PRAGMA
+    if let Err(e) = conn
+        .execute_unprepared(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA cache_size = -8000;
+             PRAGMA busy_timeout = 5000;",
+        )
+        .await
+    {
+        tracing::warn!(action = "db_chat_cache_pragma_set_failed", error = %e);
+    }
+
     let stmt = RawStatement::new(
         r#"
         CREATE TABLE IF NOT EXISTS chat_cache (

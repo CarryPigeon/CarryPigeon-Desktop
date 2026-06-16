@@ -5,6 +5,7 @@
  */
 
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useFocusTrap } from "@/shared/utils/useFocusTrap";
 
 const props = defineProps<{
   /**
@@ -163,15 +164,21 @@ function handleKeydown(e: KeyboardEvent): void {
 /** 保存 body 原始 overflow 值。 */
 let originalBodyOverflow = "";
 
+/** 灯箱容器 ref，用于 focus trap。 */
+const backdropRef = ref<HTMLElement | null>(null);
+const { trapFocus, releaseFocus } = useFocusTrap(backdropRef);
+
 onMounted(() => {
   originalBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = "hidden";
   window.addEventListener("keydown", handleKeydown);
+  trapFocus();
 });
 
 onUnmounted(() => {
   document.body.style.overflow = originalBodyOverflow;
   window.removeEventListener("keydown", handleKeydown);
+  releaseFocus();
 });
 
 // 当 images 或 initialIndex 变化时同步
@@ -188,6 +195,7 @@ watch(
   <!-- 组件：ImageLightbox｜职责：全屏图片灯箱 -->
   <Teleport to="body">
     <div
+      ref="backdropRef"
       class="cp-lightbox__backdrop"
       @click="onBackdropClick"
       @mousemove="onDrag"
