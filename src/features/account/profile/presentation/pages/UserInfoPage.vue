@@ -6,6 +6,7 @@
 
 import { computed, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { getAccountCapabilities } from "@/features/account/api";
 import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
@@ -14,7 +15,7 @@ import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabil
 import { getUserMutationPort } from "@/features/account/profile/di/user.di";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { createLogger } from "@/shared/utils/logger";
-import { MessagePlugin } from "tdesign-vue-next";
+import { toast } from "@/shared/utils/toast";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 type ProfileDraft = {
@@ -41,6 +42,7 @@ const avatarFileInputRef = ref<HTMLInputElement | null>(null);
 const backgroundFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadingAvatar = ref(false);
 const isUploadingBackground = ref(false);
+const { t } = useI18n();
 const logger = createLogger("UserInfoPage");
 const formError = ref("");
 const formSuccess = ref("");
@@ -118,7 +120,7 @@ function syncDraftFromDisplay(): void {
 function readActiveServerSocket(): string {
   const socket = serverConnectionCapabilities.workspace.readSocket().trim();
   if (!socket) {
-    throw new Error("Missing server socket.");
+    throw new Error(t("profile_missing_socket"));
   }
   return socket;
 }
@@ -139,13 +141,13 @@ function handleCancelEdit(): void {
 
 function validateDraft(): string {
   if (!draft.username.trim()) {
-    return "Name is required.";
+    return t("profile_name_required");
   }
   if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
-    return "Email is invalid.";
+    return t("email_invalid");
   }
   if (isEmailChanged.value && !draft.emailCode.trim()) {
-    return "Email verification code is required.";
+    return t("email_code_required");
   }
   return "";
 }
@@ -156,7 +158,7 @@ function toErrorMessage(error: unknown, fallback: string): string {
 
 async function handleSendEmailCode(): Promise<void> {
   if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
-    formError.value = "Email is invalid.";
+    formError.value = t("email_invalid");
     return;
   }
 
@@ -169,9 +171,9 @@ async function handleSendEmailCode(): Promise<void> {
       formError.value = outcome.error.message;
       return;
     }
-    formSuccess.value = "Verification code sent.";
+    formSuccess.value = t("email_code_sent");
   } catch (error) {
-    formError.value = toErrorMessage(error, "Failed to send verification code.");
+    formError.value = toErrorMessage(error, t("email_code_failed"));
   } finally {
     isSendingEmailCode.value = false;
   }
@@ -190,10 +192,10 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 function validateImageFile(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return "Only PNG, JPEG, WebP formats are supported";
+    return t("profile_image_type_error");
   }
   if (file.size > MAX_IMAGE_SIZE) {
-    return "Image size must not exceed 5MB";
+    return t("profile_image_size_error");
   }
   return null;
 }
@@ -203,7 +205,7 @@ async function handleAvatarFileChange(e: Event) {
   if (!file) return;
   const error = validateImageFile(file);
   if (error) {
-    MessagePlugin.error(error);
+    toast.error(error);
     if (avatarFileInputRef.value) avatarFileInputRef.value.value = "";
     return;
   }
@@ -212,7 +214,7 @@ async function handleAvatarFileChange(e: Event) {
     const serverSocket = serverConnectionCapabilities.workspace.readSocket();
     const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
-      MessagePlugin.error("Not connected to server, please try again");
+      toast.error(t("profile_not_connected"));
       return;
     }
     const mutationPort = getUserMutationPort(serverSocket);
@@ -225,10 +227,10 @@ async function handleAvatarFileChange(e: Event) {
       avatarUrl,
       backgroundUrl: draft.backgroundUrl.trim(),
     });
-    MessagePlugin.success("Avatar uploaded");
+    toast.success(t("profile_avatar_uploaded"));
   } catch (err) {
     logger.error("Action: auth_profile_avatar_upload_failed", { error: String(err) });
-    MessagePlugin.error("Upload failed, please try again");
+    toast.error(t("upload_failed"));
   } finally {
     isUploadingAvatar.value = false;
     if (avatarFileInputRef.value) avatarFileInputRef.value.value = "";
@@ -240,7 +242,7 @@ async function handleBackgroundFileChange(e: Event) {
   if (!file) return;
   const error = validateImageFile(file);
   if (error) {
-    MessagePlugin.error(error);
+    toast.error(error);
     if (backgroundFileInputRef.value) backgroundFileInputRef.value.value = "";
     return;
   }
@@ -249,7 +251,7 @@ async function handleBackgroundFileChange(e: Event) {
     const serverSocket = serverConnectionCapabilities.workspace.readSocket();
     const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
-      MessagePlugin.error("Not connected to server, please try again");
+      toast.error(t("profile_not_connected"));
       return;
     }
     const mutationPort = getUserMutationPort(serverSocket);
@@ -262,10 +264,10 @@ async function handleBackgroundFileChange(e: Event) {
       avatarUrl: draft.avatarUrl.trim(),
       backgroundUrl,
     });
-    MessagePlugin.success("Background image uploaded");
+    toast.success(t("profile_background_uploaded"));
   } catch (err) {
     logger.error("Action: auth_profile_background_upload_failed", { error: String(err) });
-    MessagePlugin.error("Upload failed, please try again");
+    toast.error(t("upload_failed"));
   } finally {
     isUploadingBackground.value = false;
     if (backgroundFileInputRef.value) backgroundFileInputRef.value.value = "";
@@ -311,10 +313,10 @@ async function handleSaveEdit(): Promise<void> {
       avatarUrl: draft.avatarUrl.trim(),
       backgroundUrl: draft.backgroundUrl.trim(),
     });
-    formSuccess.value = "Profile saved.";
+    formSuccess.value = t("profile_saved");
     isEditing.value = false;
   } catch (error) {
-    formError.value = toErrorMessage(error, "Failed to save profile.");
+    formError.value = toErrorMessage(error, t("profile_save_failed"));
   } finally {
     isSaving.value = false;
   }
@@ -329,73 +331,73 @@ async function handleSaveEdit(): Promise<void> {
       <header class="cp-info__hero" :style="heroStyle">
         <div class="cp-info__hero-overlay"></div>
         <div class="cp-info__hero-top">
-          <button class="cp-info__back" type="button" @click="router.back()">Back</button>
-          <button v-if="isOwnProfile && !isEditing" class="cp-info__edit" type="button" @click="handleStartEdit">Edit Profile</button>
-          <button v-else-if="isOwnProfile" class="cp-info__edit" type="button" @click="handleCancelEdit">Cancel</button>
+          <button class="cp-info__back" type="button" @click="router.back()">{{ t("back") }}</button>
+          <button v-if="isOwnProfile && !isEditing" class="cp-info__edit" type="button" @click="handleStartEdit">{{ t("profile_edit") }}</button>
+          <button v-else-if="isOwnProfile" class="cp-info__edit" type="button" @click="handleCancelEdit">{{ t("cancel") }}</button>
         </div>
         <div v-if="isEditing" class="cp-info__hero-edit">
           <label class="cp-info__field">
-            <span class="cp-info__fieldLabel">Name</span>
+            <span class="cp-info__fieldLabel">{{ t("profile_name") }}</span>
             <input v-model="draft.username" class="cp-info__input" type="text" autocomplete="name" />
           </label>
           <label class="cp-info__field">
-            <span class="cp-info__fieldLabel">Email</span>
+            <span class="cp-info__fieldLabel">{{ t("email") }}</span>
             <input v-model="draft.email" class="cp-info__input" type="email" autocomplete="email" />
           </label>
           <label v-if="isEmailChanged" class="cp-info__field">
-            <span class="cp-info__fieldLabel">Email Code</span>
+            <span class="cp-info__fieldLabel">{{ t("email_code") }}</span>
             <span class="cp-info__inline">
               <input v-model="draft.emailCode" class="cp-info__input" type="text" inputmode="numeric" />
               <button class="cp-info__smallBtn" :disabled="isSendingEmailCode" type="button" @click="handleSendEmailCode">
-                {{ isSendingEmailCode ? "Sending..." : "Send Code" }}
+                {{ isSendingEmailCode ? t("profile_sending_code") : t("send_code") }}
               </button>
             </span>
           </label>
           <label class="cp-info__field">
-            <span class="cp-info__fieldLabel">Avatar</span>
+            <span class="cp-info__fieldLabel">{{ t("upload_avatar") }}</span>
             <input ref="avatarFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleAvatarFileChange" />
             <span class="cp-info__inline">
-              <input v-model="draft.avatarUrl" class="cp-info__input" type="url" placeholder="Avatar URL (or click Upload)" />
+              <input v-model="draft.avatarUrl" class="cp-info__input" type="url" :placeholder="t('profile_avatar_url_hint')" />
               <button class="cp-info__smallBtn" :disabled="isUploadingAvatar" type="button" @click="handleUploadAvatar">
-                {{ isUploadingAvatar ? "Uploading..." : "Upload" }}
+                {{ isUploadingAvatar ? t("uploading") : t("upload_avatar") }}
               </button>
             </span>
           </label>
           <label class="cp-info__field">
-            <span class="cp-info__fieldLabel">Background</span>
+            <span class="cp-info__fieldLabel">{{ t("profile_background") }}</span>
             <input ref="backgroundFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleBackgroundFileChange" />
             <span class="cp-info__inline">
-              <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" placeholder="Background URL (or click Upload)" />
+              <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" :placeholder="t('profile_bg_url_hint')" />
               <button class="cp-info__smallBtn" :disabled="isUploadingBackground" type="button" @click="handleUploadBackground">
-                {{ isUploadingBackground ? "Uploading..." : "Upload" }}
+                {{ isUploadingBackground ? t("uploading") : t("profile_background") }}
               </button>
             </span>
           </label>
           <label class="cp-info__field cp-info__field--wide">
-            <span class="cp-info__fieldLabel">Bio</span>
+            <span class="cp-info__fieldLabel">{{ t("user_brief") }}</span>
             <textarea v-model="draft.brief" class="cp-info__textarea" rows="4"></textarea>
           </label>
           <div v-if="formError" class="cp-info__status cp-info__status--error">{{ formError }}</div>
           <div v-if="formSuccess" class="cp-info__status cp-info__status--success">{{ formSuccess }}</div>
           <div class="cp-info__editActions">
-            <button class="cp-info__back" type="button" @click="handleCancelEdit">Cancel</button>
+            <button class="cp-info__back" type="button" @click="handleCancelEdit">{{ t("cancel") }}</button>
             <button class="cp-info__edit" :disabled="isSaving" type="button" @click="handleSaveEdit">
-              {{ isSaving ? "Saving..." : "Save" }}
+              {{ isSaving ? t("profile_saving") : t("save") }}
             </button>
           </div>
         </div>
         <div v-else class="cp-info__hero-content">
           <div class="cp-info__avatar">
-            <img v-if="avatarUrl" class="cp-info__avatar-image" :src="avatarUrl" :alt="name || 'User'" />
-            <div v-else class="cp-info__avatar-fallback">{{ (name || "U").slice(0, 1).toUpperCase() }}</div>
+            <img v-if="avatarUrl" class="cp-info__avatar-image" :src="avatarUrl" :alt="name || t('user_info')" />
+            <div v-else class="cp-info__avatar-fallback">{{ (name || t("user_info")).slice(0, 1).toUpperCase() }}</div>
           </div>
           <div class="cp-info__hero-text">
-            <div class="cp-info__name">{{ name || "User" }}</div>
-            <div class="cp-info__sub">Profile · Full details</div>
+            <div class="cp-info__name">{{ name || t("user_info") }}</div>
+            <div class="cp-info__sub">{{ t("profile_subtitle") }}</div>
             <div class="cp-info__hero-meta">
-              <span class="cp-info__hero-pill">uid available</span>
-              <span class="cp-info__hero-pill">email available</span>
-              <span class="cp-info__hero-pill">bio available</span>
+              <span class="cp-info__hero-pill">{{ t("profile_uid_available") }}</span>
+              <span class="cp-info__hero-pill">{{ t("profile_email_available") }}</span>
+              <span class="cp-info__hero-pill">{{ t("profile_bio_available") }}</span>
             </div>
           </div>
         </div>

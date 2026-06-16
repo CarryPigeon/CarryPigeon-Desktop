@@ -143,7 +143,8 @@
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { createPopper, type Placement, type Options } from "@popperjs/core";
 import { useRouter } from "vue-router";
-import { MessagePlugin } from "tdesign-vue-next";
+import { useI18n } from "vue-i18n";
+import { toast } from "@/shared/utils/toast";
 import { createLogger } from "@/shared/utils/logger";
 import { getUserUsecase, getUserMutationPort } from "@/features/account/profile/di/user.di";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
@@ -163,6 +164,7 @@ const props = withDefaults(defineProps<UserProfilePopoverProps>(), {
 });
 
 const router = useRouter();
+const { t } = useI18n();
 const logger = createLogger("userProfilePopover");
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 
@@ -418,12 +420,12 @@ async function handleCopyEmail() {
   try {
     await navigator.clipboard.writeText(email);
     copiedEmail.value = true;
-    MessagePlugin.success("已复制到剪贴板");
+    toast.success(t("copied_to_clipboard"));
     setTimeout(() => {
       copiedEmail.value = false;
     }, 2000);
   } catch (e) {
-    MessagePlugin.error("复制失败");
+    toast.error(t("copy_failed"));
     logger.error("Action: auth_profile_copy_failed", {
       error: String(e),
     });
@@ -437,12 +439,12 @@ async function handleCopyUid() {
   try {
     await navigator.clipboard.writeText(uid);
     copiedUid.value = true;
-    MessagePlugin.success("已复制到剪贴板");
+    toast.success(t("copied_to_clipboard"));
     setTimeout(() => {
       copiedUid.value = false;
     }, 2000);
   } catch (e) {
-    MessagePlugin.error("复制失败");
+    toast.error(t("copy_failed"));
     logger.error("Action: auth_profile_copy_failed", {
       error: String(e),
       field: "uid",
@@ -493,14 +495,14 @@ async function handleFileChange(e: Event) {
   // Validate file type
   const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
   if (!allowedTypes.includes(file.type)) {
-    MessagePlugin.error("仅支持 PNG、JPG、JPEG、WebP 格式");
+    toast.error(t("profile_image_type_error"));
     return;
   }
 
   // Validate file size (5MB)
   const maxSize = 5 * 1024 * 1024;
   if (file.size > maxSize) {
-    MessagePlugin.error("图片大小不能超过 5MB");
+    toast.error(t("profile_image_size_error"));
     return;
   }
 
@@ -508,7 +510,7 @@ async function handleFileChange(e: Event) {
     const serverSocket = serverConnectionCapabilities.workspace.readSocket();
     const accessToken = await ensureValidAccessToken(serverSocket);
     if (!serverSocket || !accessToken) {
-      MessagePlugin.error("未连接到服务器，请稍后重试");
+      toast.error(t("profile_not_connected"));
       return;
     }
 
@@ -530,12 +532,12 @@ async function handleFileChange(e: Event) {
         backgroundUrl,
       };
     }
-    MessagePlugin.success("背景图片更新成功");
+    toast.success(t("profile_background_uploaded"));
   } catch (err) {
     logger.error("Action: auth_profile_background_upload_failed", {
       error: String(err),
     });
-    MessagePlugin.error("上传失败，请稍后重试");
+    toast.error(t("upload_failed"));
   }
 
   // Reset input

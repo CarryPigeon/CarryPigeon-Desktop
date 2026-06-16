@@ -10,7 +10,7 @@ import { createAsyncTaskRunner } from "./asyncTaskRunner";
 /**
  * 消息上下文菜单动作类型。
  */
-export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin";
+export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark";
 
 /**
  * 消息上下文菜单编排依赖。
@@ -29,6 +29,8 @@ export type UseMessageContextMenuDeps = {
   openThread(messageId: string): void;
   pinMessage(messageId: string): Promise<void>;
   unpinMessage(messageId: string): Promise<void>;
+  bookmarkMessage(messageId: string): void;
+  unbookmarkMessage(messageId: string): void;
 };
 
 /**
@@ -102,6 +104,12 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
         return;
       case "unpin":
         runAsyncTask(deps.unpinMessage(messageId), "chat_unpin_message_failed");
+        return;
+      case "bookmark":
+        deps.bookmarkMessage(messageId);
+        return;
+      case "unbookmark":
+        deps.unbookmarkMessage(messageId);
         return;
     }
   }

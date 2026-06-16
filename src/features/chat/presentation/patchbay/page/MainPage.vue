@@ -316,6 +316,7 @@ onBeforeUnmount(() => {
         :show-view-thread="page.messageContextMenu.showViewThread"
         :can-pin="page.messageContextMenu.canPin"
         :is-pinned="page.messageContextMenu.isPinned"
+        :is-bookmarked="page.messageContextMenu.isBookmarked"
         @close="page.messageContextMenu.close"
         @action="page.messageContextMenu.handleMenuCommand"
       />

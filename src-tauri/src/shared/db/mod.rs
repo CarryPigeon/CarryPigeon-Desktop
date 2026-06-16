@@ -4,7 +4,7 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 use anyhow::anyhow;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -135,6 +135,22 @@ pub async fn connect_named(key: &str, path: PathBuf) -> anyhow::Result<()> {
         "Opening database",
     );
     let db = CPDatabase::new(&url).await?;
+
+    // 应用 SQLite 性能 PRAGMA
+    if let Err(e) = db
+        .connection
+        .execute_unprepared(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA cache_size = -8000;
+             PRAGMA busy_timeout = 5000;
+             PRAGMA foreign_keys = ON;",
+        )
+        .await
+    {
+        tracing::warn!(action = "db_pragma_set_failed", error = %e);
+    }
+
     let entry = DbEntry {
         db: Arc::new(db),
         path,
@@ -214,6 +230,22 @@ pub async fn remove_db(key: &str) -> anyhow::Result<Option<PathBuf>> {
     };
     if let Some(entry) = entry {
         let path = entry.path.clone();
+
+        // WAL 模式下，先执行 checkpoint 确保 -wal / -shm 文件被回收，
+        // 避免 Windows 上因文件仍被锁而导致删除失败。
+        let _ = entry
+            .db
+            .connection
+            .execute_unprepared("PRAGMA wal_checkpoint(TRUNCATE)")
+            .await;
+
+        // 切换到 DELETE journal 模式后关闭，释放所有 WAL 文件句柄
+        let _ = entry
+            .db
+            .connection
+            .execute_unprepared("PRAGMA journal_mode = DELETE")
+            .await;
+
         entry.db.connection.clone().close().await?;
         Ok(Some(path))
     } else {

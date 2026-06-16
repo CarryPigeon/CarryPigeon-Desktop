@@ -151,13 +151,6 @@ impl ManagedDbKind {
             _ => Err(command_error("DB_KIND_INVALID", "error.db_kind_invalid")),
         }
     }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::System => "system",
-            Self::Server => "server",
-        }
-    }
 }
 
 fn is_server_db_key(key: &str) -> bool {
@@ -553,9 +546,32 @@ pub async fn db_remove(key: String) -> CommandResult<()> {
     }
 
     if tokio::fs::metadata(&path).await.is_ok() {
-        tokio::fs::remove_file(&path).await.map_err(|e| {
-            to_command_error("DB_FILE_REMOVE_FAILED", "error.db_file_remove_failed", e)
-        })?;
+        // WAL 模式下文件关闭后 OS 可能略微延迟释放锁，
+        // 因此重试几次删除操作。
+        let mut last_err = None;
+        for _ in 0..5 {
+            match tokio::fs::remove_file(&path).await {
+                Ok(()) => {
+                    // 同时清理 WAL / SHM 残留（best-effort）
+                    let wal = path.with_extension("db-wal");
+                    let shm = path.with_extension("db-shm");
+                    let _ = tokio::fs::remove_file(&wal).await;
+                    let _ = tokio::fs::remove_file(&shm).await;
+                    return Ok(());
+                }
+                Err(e) => {
+                    last_err = Some(e);
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            }
+        }
+        if let Some(e) = last_err {
+            return Err(to_command_error(
+                "DB_FILE_REMOVE_FAILED",
+                "error.db_file_remove_failed",
+                e,
+            ));
+        }
     }
     Ok(())
 }

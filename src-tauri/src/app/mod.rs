@@ -217,6 +217,7 @@ pub fn run() -> anyhow::Result<()> {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(crate::features::voice_call::di::commands::VoiceCallService::new())
         .manage(crate::features::voice_message::di::commands::VoiceRecorderState(
             std::sync::Mutex::new(None),

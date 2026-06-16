@@ -5,6 +5,7 @@
  */
 
 import { useI18n } from "vue-i18n";
+import { debounce } from "@/shared/utils/rateLimit";
 import type { FileListQuery } from "../../domain/contracts";
 
 const emit = defineEmits<{
@@ -13,10 +14,10 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-function handleInput(event: Event): void {
+const handleInput = debounce(function (event: Event): void {
   const value = (event.target as HTMLInputElement).value;
   emit("search", { search: value || undefined });
-}
+}, 300);
 
 function handleTypeSelect(event: Event): void {
   const value = (event.target as HTMLSelectElement).value;

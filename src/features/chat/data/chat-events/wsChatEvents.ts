@@ -15,6 +15,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { readLastEventId, writeLastEventId } from "@/shared/utils/localState";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { connectProtocolMockChatWs } from "@/shared/mock/protocol/protocolMockTransport";
+import { getWsConnectionPool } from "./wsConnectionPool";
 import type { ChatWsEventWire } from "../protocol/chatWireEvents";
 
 /**
@@ -390,6 +391,10 @@ export function connectChatWs(
 
   connect();
 
+  // 将连接注册到全局连接池，统一监控和统计
+  const pool = getWsConnectionPool();
+  pool.registerConnection(socket, { close, reauth });
+
   /**
    * 使用最新 access_token 发送 `reauth` 命令。
    *
@@ -412,6 +417,7 @@ export function connectChatWs(
    * @returns 无返回值。
    */
   function close(): void {
+    pool.unregisterConnection(socket);
     closedByUser = true;
     stopPing();
     stopReconnect();

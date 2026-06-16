@@ -142,6 +142,23 @@ export function usePatchbayHotkeys(deps: UsePatchbayHotkeysDeps) {
       description: "shortcut_help",
       category: "actions",
     },
+    {
+      key: "?",
+      action: () => {
+        // ? 仅在没有 meta/alt/shift 时触发，避免与搜索冲突
+        deps.openShortcutHelp?.();
+      },
+      description: "shortcut_help",
+      category: "general",
+    },
+    {
+      key: "c",
+      meta: true,
+      shift: true,
+      action: () => deps.openQuickSwitcher(),
+      description: "shortcut_quick_switcher",
+      category: "navigation",
+    },
   ];
 
   function onKeydown(e: KeyboardEvent): void {

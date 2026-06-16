@@ -16,6 +16,7 @@ import FileSearchBar from "../components/FileSearchBar.vue";
 import FileListTable from "../components/FileListTable.vue";
 import type { FileListQuery, FileRecord } from "../../domain/contracts";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import SkeletonBlock from '@/shared/ui/SkeletonBlock.vue';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -61,7 +62,13 @@ onMounted(() => {
         <div class="cp-fileManager__title">{{ t("file_manager") }}</div>
       </header>
       <FileSearchBar @search="handleSearch" />
-      <div v-if="loading" class="cp-fileManager__loading">{{ t("loading") }}</div>
+      <div v-if="loading" class="cp-fileManager__skeleton">
+        <div v-for="i in 5" :key="i" class="cp-fileManager__skeletonRow">
+          <SkeletonBlock variant="text" width="60%" />
+          <SkeletonBlock variant="text" width="30%" />
+          <SkeletonBlock variant="text" width="10%" />
+        </div>
+      </div>
       <FileListTable v-else :files="files" @download="handleDownload" />
     </ErrorBoundary>
   </main>
@@ -113,6 +120,22 @@ onMounted(() => {
   letter-spacing: 0.04em;
   font-size: 18px;
   color: var(--cp-text);
+}
+
+.cp-fileManager__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.cp-fileManager__skeletonRow {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--cp-surface);
+  border-radius: 12px;
 }
 
 .cp-fileManager__loading {

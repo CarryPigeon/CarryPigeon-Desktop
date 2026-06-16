@@ -1057,6 +1057,95 @@
   outline-offset: 2px;
 }
 
+/* ── 渐进式入场动画 ── */
+
+/* 骨骼脉冲 */
+@keyframes cp-skeleton-pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* 列表项入场：淡入 + 轻微上滑 */
+@keyframes cp-fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 频道行入场 */
+.cp-channelRow {
+  animation: cp-fade-slide-in 0.25s ease both;
+}
+.cp-channelRow:nth-child(2) { animation-delay: 20ms; }
+.cp-channelRow:nth-child(3) { animation-delay: 40ms; }
+.cp-channelRow:nth-child(4) { animation-delay: 60ms; }
+.cp-channelRow:nth-child(5) { animation-delay: 80ms; }
+.cp-channelRow:nth-child(6) { animation-delay: 100ms; }
+.cp-channelRow:nth-child(7) { animation-delay: 120ms; }
+.cp-channelRow:nth-child(8) { animation-delay: 140ms; }
+
+/* 成员行入场 */
+.cp-member {
+  animation: cp-fade-slide-in 0.25s ease both;
+}
+.cp-member:nth-child(2) { animation-delay: 20ms; }
+.cp-member:nth-child(3) { animation-delay: 40ms; }
+.cp-member:nth-child(4) { animation-delay: 60ms; }
+.cp-member:nth-child(5) { animation-delay: 80ms; }
+.cp-member:nth-child(6) { animation-delay: 100ms; }
+.cp-member:nth-child(7) { animation-delay: 120ms; }
+.cp-member:nth-child(8) { animation-delay: 140ms; }
+
+/* 机架条目入场 */
+.cp-rack {
+  animation: cp-fade-slide-in 0.25s ease both;
+}
+.cp-rack:nth-child(2) { animation-delay: 20ms; }
+.cp-rack:nth-child(3) { animation-delay: 40ms; }
+.cp-rack:nth-child(4) { animation-delay: 60ms; }
+.cp-rack:nth-child(5) { animation-delay: 80ms; }
+.cp-rack:nth-child(6) { animation-delay: 100ms; }
+
+/* 空状态骨骼占位（pending → loaded 过渡） */
+.cp-channelEmpty,
+.cp-rail__empty {
+  animation: cp-skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+/* ── 消息入场动画 ── */
+
+/* 消息行入场：轻微淡入 + 上滑 */
+@keyframes cp-msg-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cp-msg {
+  animation: cp-msg-enter 0.2s ease both;
+}
+
+/* 骨架屏 → 内容交叉淡入 */
+@keyframes cp-content-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cp-signalPane:not(:empty) {
+  animation: cp-content-reveal 0.3s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cp-historyMore__btn,
   .cp-jumpBottom,
@@ -1066,9 +1155,13 @@
   .cp-rail__btn,
   .cp-rack,
   .cp-channelRow,
+  .cp-member,
   .cp-channelRow__join,
   .cp-channelTabs__btn,
-  .cp-channelMenu__item {
+  .cp-channelMenu__item,
+  .cp-channelEmpty,
+  .cp-rail__empty {
     transition: none !important;
+    animation: none !important;
   }
 }

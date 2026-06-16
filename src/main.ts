@@ -39,6 +39,7 @@ import {
 import { checkForUpdateSilently } from "@/shared/updater/checkUpdate";
 
 import { resolveStartup } from '@/app/bootstrap/startupState';
+import { getMemoryMonitor, destroyMemoryMonitor } from "@/shared/monitoring/memoryMonitor";
 
 const UPDATE_CHECK_DELAY_MS = 5000;
 
@@ -52,6 +53,7 @@ const serverConnectionCapabilities = getServerConnectionCapabilities();
 let pluginsRuntimeLease: Awaited<ReturnType<typeof pluginsCapabilities.runtime.acquireLease>> | null = null;
 let serverConnectionRuntimeLease: Awaited<ReturnType<typeof serverConnectionCapabilities.runtime.acquireLease>> | null = null;
 let trayUnreadBridgeStop: WatchStopHandle | null = null;
+let memoryMonitorStartTimer: number | null = null;
 
 authFlowCapabilities.configureInstalledPluginsQueryProvider((serverSocket: string) =>
   pluginsCapabilities.forServer(serverSocket).listInstalledPlugins(),
@@ -121,6 +123,11 @@ function releaseMainWindowRuntimes(): void {
 window.addEventListener("beforeunload", () => {
   releaseMainWindowRuntimes();
   stopLogPersistence();
+  if (memoryMonitorStartTimer !== null) {
+    clearTimeout(memoryMonitorStartTimer);
+    memoryMonitorStartTimer = null;
+  }
+  destroyMemoryMonitor();
 });
 
 // Mount first to unblock LCP
@@ -164,4 +171,12 @@ if (!isSubWindow && hasTauriRuntime) {
 } else if (!isSubWindow) {
   // 无 Tauri runtime（纯前端 dev 模式）：立即标记就绪
   resolveStartup('ready');
+}
+
+// 启动内存监控（延迟启动，避免干扰首帧渲染和关键启动流程）
+if (hasTauriRuntime) {
+  const memoryMonitor = getMemoryMonitor();
+  memoryMonitorStartTimer = window.setTimeout(() => {
+    memoryMonitor.start();
+  }, 10000); // 应用初始化后 10 秒启动
 }

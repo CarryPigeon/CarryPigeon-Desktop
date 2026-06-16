@@ -4,10 +4,11 @@
  * @description plugins｜组件：PluginCenterCatalogGrid。
  *
  * 职责：
- * - 渲染插件目录的状态区（锁定提示/加载/错误）与网格列表。
- * - 将 ModuleCard 的无参事件转为“带上下文”的事件，减少页面模板内的闭包与重复表达。
+ * - 渲染插件目录的状态区（锁定提示/加载/错误/空）与网格列表。
+ * - 将 ModuleCard 的无参事件转为"带上下文"的事件，减少页面模板内的闭包与重复表达。
  */
 
+import { useI18n } from "vue-i18n";
 import ModuleCard from "./ModuleCard.vue";
 import type {
   InstalledPluginStateLike,
@@ -17,6 +18,8 @@ import type {
 type PluginCatalogViewEntry = PluginCatalogEntryLike;
 type InstalledStateView = InstalledPluginStateLike;
 type PluginProgressView = PluginProgress;
+
+const { t } = useI18n();
 
 type Props = {
   /**
@@ -90,11 +93,14 @@ function isLocked(): boolean {
 
 <template>
   <!-- 组件：PluginCenterCatalogGrid｜职责：目录状态提示与模块网格渲染 -->
-  <div v-if="serverSocket && !serverId" class="cp-plugins__state err">
-    Plugin Center is locked: missing `server_id` from `GET /api/server`. Install/enable/update are disabled until fixed.
+  <div v-if="serverSocket && !serverId" class="cp-plugins__state err">{{ t("plugins_locked") }}</div>
+  <div v-else-if="loading" class="cp-plugins__state loading">{{ t("loading_catalog") }}</div>
+  <div v-else-if="error" class="cp-plugins__state err">{{ t("plugins_load_failed") }}: {{ error }}</div>
+  <div v-else-if="plugins.length === 0" class="cp-plugins__state empty">
+    <div class="cp-emptyHint__icon">🔌</div>
+    <div class="cp-emptyHint__title">{{ t("plugins_empty") }}</div>
+    <div class="cp-emptyHint__desc">{{ t("plugins_empty_hint") }}</div>
   </div>
-  <div v-if="loading" class="cp-plugins__state">Loading catalog…</div>
-  <div v-else-if="error" class="cp-plugins__state err">{{ error }}</div>
   <div v-else class="cp-plugins__grid">
     <ModuleCard
       v-for="p in plugins"
@@ -126,6 +132,44 @@ function isLocked(): boolean {
 
 .cp-plugins__state.err {
   color: rgba(248, 113, 113, 0.92);
+}
+
+.cp-plugins__state.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  min-height: 240px;
+}
+
+.cp-plugins__state.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 36px 24px;
+  min-height: 120px;
+}
+
+.cp-emptyHint__icon {
+  font-size: 36px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.cp-emptyHint__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-emptyHint__desc {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  max-width: 280px;
 }
 
 .cp-plugins__grid {
