@@ -15,6 +15,7 @@ import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { createLogger } from "@/shared/utils/logger";
 import type { UserPublic, CurrentUser } from "@/features/account/api-types";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
+import SkeletonBlock from "@/shared/ui/SkeletonBlock.vue";
 
 const logger = createLogger("ContactsPage");
 const router = useRouter();
@@ -157,7 +158,15 @@ loadCurrentUser();
 
       <!-- 搜索结果 -->
       <section class="cp-contacts__section cp-contacts__results">
-        <div v-if="loading" class="cp-contacts__status">{{ t("loading") }}</div>
+        <div v-if="loading" class="cp-contacts__skeleton">
+          <div v-for="i in 4" :key="i" class="cp-contacts__skeletonCard">
+            <SkeletonBlock variant="avatar" />
+            <div class="cp-contacts__skeletonInfo">
+              <SkeletonBlock variant="title" width="120px" />
+              <SkeletonBlock variant="text" width="80px" />
+            </div>
+          </div>
+        </div>
         <div v-else-if="searching" class="cp-contacts__status">{{ t("searching") }}</div>
         <div v-else-if="searchResults.length === 0 && searchQuery && !searching" class="cp-contacts__status">
           {{ t("contacts_no_results") }}
@@ -351,6 +360,29 @@ loadCurrentUser();
     opacity: 0.5;
     cursor: not-allowed;
   }
+}
+
+.cp-contacts__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cp-contacts__skeletonCard {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--cp-surface);
+  border-radius: 12px;
+}
+
+.cp-contacts__skeletonInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .cp-contacts__status {

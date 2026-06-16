@@ -59,4 +59,26 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  // Build optimizations
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/vue')) return 'vendor-vue';
+          if (id.includes('node_modules/tdesign-vue-next') || id.includes('node_modules/@popperjs')) return 'vendor-tdesign';
+          if (id.includes('node_modules/@tauri-apps')) return 'vendor-tauri';
+        },
+      },
+    },
+  },
+
+  // Optimize dependency pre-bundling
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'tdesign-vue-next', '@tauri-apps/api'],
+  },
 }));

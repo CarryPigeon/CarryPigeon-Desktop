@@ -30,10 +30,24 @@ import ImageLightbox from "@/features/chat/message-flow/message/presentation/com
 import { addFiles as addImageFiles, addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 import { createLogger } from "@/shared/utils/logger";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
+import SkeletonMessageList from "@/shared/ui/SkeletonMessageList.vue";
 import SearchPanel from "@/features/chat/presentation/patchbay/components/search/SearchPanel.vue";
 import AnnouncementBanner from "@/features/chat/presentation/channel-info/AnnouncementBanner.vue";
+import PinListBar from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
 import ShortcutHelp from "@/features/chat/presentation/patchbay/components/help/ShortcutHelp.vue";
 import type { ShortcutBinding } from "@/features/chat/presentation/patchbay/interactions/usePatchbayHotkeys";
+import { useVirtualizer } from '@tanstack/vue-virtual';
+
+/**
+ * 虚拟滚动项目类型。
+ */
+interface VirtualListItem {
+  kind: 'message' | 'separator';
+  key: string;
+  /** 消息数据（仅在 kind='message' 时有值） */
+  m?: any;
+  isGroupStart?: boolean;
+}
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -163,6 +177,38 @@ async function handleVoiceRecorded(payload: { filePath: string; durationMs: numb
 }
 
 const signalPaneEl = ref<HTMLElement | null>(null);
+
+/**
+ * 将 messageRows 展平为虚拟滚动可消费的平坦列表。
+ * 每个原始消息行要么是普通消息，要么可能在此之前插入一条未读分隔符。
+ */
+const virtualListItems = computed<VirtualListItem[]>(() => {
+  const items: VirtualListItem[] = [];
+  const rows = props.model.messageRows;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.isUnreadStart) {
+      items.push({ kind: 'separator', key: `sep-${row.m.id}` });
+    }
+    items.push({ kind: 'message', key: row.m.id, m: row.m, isGroupStart: row.isGroupStart });
+  }
+  return items;
+});
+
+/** @tanstack/vue-virtual 虚拟滚动实例。 */
+const virtualizerOptions = computed(() => ({
+  count: virtualListItems.value.length,
+  getScrollElement: () => signalPaneEl.value,
+  estimateSize: (index: number) => {
+    const item = virtualListItems.value[index];
+    if (!item || item.kind === 'separator') return 36;
+    return 72;
+  },
+  overscan: 10,
+}));
+
+const virtualizer = useVirtualizer(virtualizerOptions);
+
 const connectionLabel = computed(() => {
   switch (props.model.connectionPillState) {
     case "connected":
@@ -327,6 +373,57 @@ function handleSearchNavigate(index: number): void {
     props.model.openSearchResult(result.message.id, isServer ? (result as any).channelId : undefined);
   }
 }
+
+/**
+ * 重试发送失败的消息。
+ *
+ * @param messageId - 失败的消息 ID。
+ */
+function handleRetryMessage(messageId: string): void {
+  const row = props.model.messageRows.find((r) => r.m.id === messageId);
+  if (!row) return;
+  const msg = row.m;
+  // Reconstruct send payload from the failed message
+  if (msg.kind === "image") {
+    props.model.handleSend({
+      domain: msg.domain.id,
+      domainVersion: msg.domain.version || "1.0.0",
+      data: {
+        text: `[file:${msg.fileKey}]`,
+        attachments: [{
+          shareKey: msg.fileKey,
+          name: msg.fileName,
+          size: msg.fileSize,
+          mimeType: msg.mimeType,
+          width: msg.width,
+          height: msg.height,
+        }],
+      },
+    });
+  } else if (msg.kind === "core_text") {
+    props.model.handleSend({
+      domain: msg.domain.id,
+      domainVersion: msg.domain.version || "1.0.0",
+      data: { text: msg.text },
+    });
+  }
+  logger.info("Action: chat_retry_send_message", { messageId });
+}
+
+/**
+ * 移除发送失败的消息。
+ *
+ * @param messageId - 失败的消息 ID。
+ */
+function handleRemoveFailedMessage(messageId: string): void {
+  props.model.toggleMessageSelection(messageId);
+  void props.model.handleBatchDelete();
+  logger.info("Action: chat_remove_failed_message", { messageId });
+}
+
+/** 将 retry/remove 方法代理到 model 上，供模板直接调用。 */
+const retryMessage = handleRetryMessage;
+const removeFailedMessage = handleRemoveFailedMessage;
 </script>
 
 <template>
@@ -379,6 +476,7 @@ function handleSearchNavigate(index: number): void {
           :label="connectionLabel"
           :detail="props.model.connectionDetail"
           :action-label="connectionActionLabel"
+          aria-live="polite"
           @action="props.model.retryConnection"
         />
       </div>
@@ -414,6 +512,16 @@ function handleSearchNavigate(index: number): void {
       @close="props.model.closeSearchPanel"
     />
 
+    <PinListBar
+      v-if="!props.model.pinsDismissed"
+      :pins="props.model.pins"
+      :loading="props.model.pinsLoading"
+      :error="props.model.pinsError"
+      @select="(messageId: string) => props.model.selectPinnedMessage(messageId)"
+      @dismiss="props.model.dismissPins()"
+      @unpin="(messageId: string) => props.model.unpinFromBar(messageId)"
+    />
+
     <MultiSelectToolbar
       v-if="props.model.multiSelectMode"
       :selected-count="props.model.selectedCount"
@@ -424,6 +532,22 @@ function handleSearchNavigate(index: number): void {
       @bookmark="props.model.handleBatchBookmark"
     />
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
+      <!-- 区块：空状态（无频道选中） -->
+      <div v-if="!props.model.currentChannelId" class="cp-emptyState">
+        <div class="cp-emptyState__icon">💬</div>
+        <div class="cp-emptyState__title">{{ t("select_channel") }}</div>
+      </div>
+
+      <!-- 区块：加载骨架（频道已选中、消息加载中） -->
+      <SkeletonMessageList v-else-if="virtualListItems.length === 0 && !props.model.currentChannelHasMore" />
+
+      <!-- 区块：空状态（消息已加载但无消息） -->
+      <div v-else-if="virtualListItems.length === 0 && !props.model.loadingMoreMessages" class="cp-emptyState">
+        <div class="cp-emptyState__icon">📭</div>
+        <div class="cp-emptyState__title">{{ t("no_messages") }}</div>
+        <div class="cp-emptyState__desc">{{ t("no_messages_hint") }}</div>
+      </div>
+
       <!-- 区块：游标分页（加载更早历史） -->
       <div v-if="props.model.currentChannelHasMore" class="cp-historyMore">
         <button
@@ -436,77 +560,87 @@ function handleSearchNavigate(index: number): void {
         </button>
       </div>
 
-      <!-- 区块：消息列表（包含基于 lastReadTime 的“UNREAD”分隔符，mock 逻辑） -->
-      <template v-for="{ m, isGroupStart, isUnreadStart } in props.model.messageRows" :key="m.id">
-        <!-- 区块：未读边界 -->
-        <div v-if="isUnreadStart" class="cp-unreadSep" role="separator" :aria-label="t('unread')">{{ t("unread") }}</div>
-        <!-- 区块：消息行 -->
+      <!-- 区块：虚拟滚动消息列表（@tanstack/vue-virtual），仅渲染视口附近项目 -->
+      <div :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }">
         <div
-          class="cp-msg"
-          :data-message-id="m.id"
-          :data-highlighted="m.id === props.model.highlightedMessageId"
-          :data-mine="m.from.id === props.model.currentUserId"
-          :data-group-start="isGroupStart"
-          :data-mentioned="props.model.isMentioned(m)"
-          tabindex="0"
-          role="article"
-          :aria-label="`message ${m.domain.label} from ${m.from.name}`"
-          @contextmenu="props.onMessageContextMenu($event, m.id)"
-          @keydown="props.model.handleMessageKeydown($event, m.id)"
+          v-for="vr in virtualizer.getVirtualItems()"
+          :key="String(vr.key)"
+          :data-index="vr.index"
+          :ref="(el: unknown) => { if (el) virtualizer.measureElement(el as Element); }"
+          :style="{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }"
         >
-          <!-- 区块：多选复选框 -->
-          <div v-if="props.model.multiSelectMode" class="cp-msg__checkbox">
-            <input
-              type="checkbox"
-              :checked="props.model.isMessageSelected(m.id)"
-              @change="props.model.toggleMessageSelection(m.id)"
-            />
-          </div>
-          <!-- 区块：头像列（仅 group-start 可见；预留空间用于对齐） -->
-          <div class="cp-msg__avatar" :data-visible="isGroupStart">
-            <UserProfilePopover
-              :user-id="m.from.id"
-              :username="m.from.name"
-              trigger="hover"
+          <!-- 未读边界 -->
+          <div v-if="virtualListItems[vr.index]?.kind === 'separator'" class="cp-unreadSep" role="separator" :aria-label="t('unread')">{{ t("unread") }}</div>
+          <!-- 区块：消息行 -->
+          <template v-else-if="virtualListItems[vr.index]?.kind === 'message'">
+            <div
+              class="cp-msg"
+              :data-message-id="virtualListItems[vr.index].m.id"
+              :data-highlighted="virtualListItems[vr.index].m.id === props.model.highlightedMessageId"
+              :data-mine="virtualListItems[vr.index].m.from.id === props.model.currentUserId"
+              :data-group-start="virtualListItems[vr.index].isGroupStart"
+              :data-mentioned="props.model.isMentioned(virtualListItems[vr.index].m)"
+              tabindex="0"
+              role="article"
+              :aria-label="`message ${virtualListItems[vr.index].m.domain.label} from ${virtualListItems[vr.index].m.from.name}`"
+              @contextmenu="props.onMessageContextMenu($event, virtualListItems[vr.index].m.id)"
+              @keydown="props.model.handleMessageKeydown($event, virtualListItems[vr.index].m.id)"
             >
-              <AvatarBadge :name="m.from.name" :size="28" />
-            </UserProfilePopover>
-          </div>
-          <!-- 区块：domain 色条列 -->
-          <div class="cp-msg__strip">
-            <SignalStrip :color-var="m.domain.colorVar" />
-          </div>
-          <!-- 区块：内容列（meta + bubble/card） -->
-          <div class="cp-msg__body">
-            <!-- 区块：meta 行 -->
-            <div class="cp-msg__meta" :data-compact="!isGroupStart">
-              <span v-if="isGroupStart" class="cp-msg__from">{{ m.from.name }}</span>
-              <span class="cp-msg__dot"></span>
-              <span class="cp-msg__time">{{ props.model.fmtTime(m.timeMs) }}</span>
-              <span class="cp-msg__dot"></span>
-              <span class="cp-msg__domain">{{ m.domain.label }}</span>
-              <button class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, m.id)">⋯</button>
-            </div>
+              <!-- 区块：多选复选框 -->
+              <div v-if="props.model.multiSelectMode" class="cp-msg__checkbox">
+                <input
+                  type="checkbox"
+                  :checked="props.model.isMessageSelected(virtualListItems[vr.index].m.id)"
+                  @change="props.model.toggleMessageSelection(virtualListItems[vr.index].m.id)"
+                />
+              </div>
+              <!-- 区块：头像列（仅 group-start 可见） -->
+              <div class="cp-msg__avatar" :data-visible="virtualListItems[vr.index].isGroupStart">
+                <UserProfilePopover
+                  :user-id="virtualListItems[vr.index].m.from.id"
+                  :username="virtualListItems[vr.index].m.from.name"
+                  trigger="hover"
+                >
+                  <AvatarBadge :name="virtualListItems[vr.index].m.from.name" :size="28" />
+                </UserProfilePopover>
+              </div>
+              <!-- 区块：domain 色条列 -->
+              <div class="cp-msg__strip">
+                <SignalStrip :color-var="virtualListItems[vr.index].m.domain.colorVar" />
+              </div>
+              <!-- 区块：内容列（meta + bubble/card） -->
+              <div class="cp-msg__body">
+                <!-- 区块：meta 行 -->
+                <div class="cp-msg__meta" :data-compact="!virtualListItems[vr.index].isGroupStart">
+                  <span v-if="virtualListItems[vr.index].isGroupStart" class="cp-msg__from">{{ virtualListItems[vr.index].m.from.name }}</span>
+                  <span class="cp-msg__dot"></span>
+                  <span class="cp-msg__time">{{ props.model.fmtTime(virtualListItems[vr.index].m.timeMs) }}</span>
+                  <span class="cp-msg__dot"></span>
+                  <span class="cp-msg__domain">{{ virtualListItems[vr.index].m.domain.label }}</span>
+                  <button class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)">⋯</button>
+                </div>
 
-            <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
-            <MessageContentHost
-              :message="m"
-              :reply-text="m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, m.replyToId) : ''"
-              :domain-registry-store="props.model.domainRegistryStore"
-              :editing-message-id="props.editingMessageId"
-              @install="props.onInstallHint"
-              @react="(messageId, emoji) => emoji && reactToMessage(messageId, emoji)"
-              @edit="(payload) => props.onEdit?.(payload.messageId, payload.text)"
-              @edit-cancel="props.onEditCancel?.()"
-              @openLightbox="openLightbox"
-              @viewThread="(messageId) => props.onViewThread?.(messageId)"
-              @viewForwardDetail="openForwardDetail"
-              @retry="(mid: string) => logger.warn('Action: chat_retry_message not yet implemented', { messageId: mid })"
-              @remove="(mid: string) => logger.warn('Action: chat_remove_message not yet implemented', { messageId: mid })"
-            />
-          </div>
+                <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
+                <MessageContentHost
+                  :message="virtualListItems[vr.index].m"
+                  :reply-text="virtualListItems[vr.index].m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, virtualListItems[vr.index].m.replyToId) : ''"
+                  :domain-registry-store="props.model.domainRegistryStore"
+                  :editing-message-id="props.editingMessageId"
+                  @install="props.onInstallHint"
+                  @react="(messageId, emoji) => emoji && reactToMessage(messageId, emoji)"
+                  @edit="(payload) => props.onEdit?.(payload.messageId, payload.text)"
+                  @edit-cancel="props.onEditCancel?.()"
+                  @openLightbox="openLightbox"
+                  @viewThread="(messageId) => props.onViewThread?.(messageId)"
+                  @viewForwardDetail="openForwardDetail"
+                  @retry="(mid: string) => retryMessage(mid)"
+                  @remove="(mid: string) => removeFailedMessage(mid)"
+                />
+              </div>
+            </div>
+          </template>
         </div>
-      </template>
+      </div>
 
       <button
         v-if="props.showJumpToBottom"
@@ -618,5 +752,35 @@ function handleSearchNavigate(index: number): void {
   align-items: flex-start;
   padding: 8px 4px;
   flex-shrink: 0;
+}
+
+/* 空状态 */
+.cp-emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  min-height: 200px;
+}
+
+.cp-emptyState__icon {
+  font-size: 40px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.cp-emptyState__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-emptyState__desc {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  max-width: 280px;
 }
 </style>

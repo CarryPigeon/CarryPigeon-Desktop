@@ -69,5 +69,7 @@ export function mapApiChannel(c: ChatChannelRecord): ChannelSummary {
     joined: true,
     joinRequested: false,
     announcement: c.announcement,
+    categoryId: c.categoryId ? String(c.categoryId).trim() : undefined,
+    categoryName: c.categoryName ? String(c.categoryName).trim() : undefined,
   };
 }

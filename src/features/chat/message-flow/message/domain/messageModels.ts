@@ -84,6 +84,8 @@ export type RenderableChatMessage =
       threadRootId?: string;
       threadReplyCount?: number;
       linkPreview?: ChatLinkPreview;
+      status?: "sending" | "sent" | "failed";
+      sendError?: string;
     }
   | {
       id: string;
@@ -121,6 +123,8 @@ export type RenderableChatMessage =
       threadRootId?: string;
       threadReplyCount?: number;
       linkPreview?: ChatLinkPreview;
+      status?: "sending" | "sent" | "failed";
+      sendError?: string;
     }
   | {
       id: string;

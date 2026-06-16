@@ -9,6 +9,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useI18n } from "vue-i18n";
 import { createLogger } from "@/shared/utils/logger";
 import "emoji-picker-element";
+import { uploadFile } from "@/features/chat/message-flow/upload/presentation/runtime/fileUploadStore";
 
 const props = defineProps<{
   currentUserId: string;
@@ -70,7 +71,6 @@ async function handleStickerClick(sticker: { id: string; name: string; filePath:
     const blob = await response.blob();
     const file = new File([blob], `${sticker.name}.${ext}`, { type: mime });
 
-    const { uploadFile } = await import("@/features/chat/message-flow/upload/presentation/runtime/fileUploadStore");
     const result = await uploadFile(file);
     emit("select", result.shareKey);
   } catch (e) {

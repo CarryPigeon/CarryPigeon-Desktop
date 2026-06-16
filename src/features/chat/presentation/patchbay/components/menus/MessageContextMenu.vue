@@ -7,7 +7,7 @@
 import { onBeforeUnmount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
-type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin";
+type MessageMenuAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark";
 
 const props = defineProps<{
   open: boolean;
@@ -18,6 +18,8 @@ const props = defineProps<{
   showViewThread?: boolean;
   canPin?: boolean;
   isPinned?: boolean;
+  /** 当前消息是否已收藏。 */
+  isBookmarked?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -109,6 +111,9 @@ onBeforeUnmount(handleBeforeUnmount);
         </button>
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
           {{ t("forward_message") }}
+        </button>
+        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isBookmarked ? 'unbookmark' : 'bookmark')">
+          {{ props.isBookmarked ? t("remove_bookmark") : t("bookmark") }}
         </button>
         <button v-if="props.canPin" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isPinned ? 'unpin' : 'pin')">
           {{ props.isPinned ? t("unpin_message") : t("pin_message") }}

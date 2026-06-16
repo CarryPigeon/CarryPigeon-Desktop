@@ -79,6 +79,9 @@ export class RoomSessionCatalogApplicationService {
         unread: unread ? Math.max(0, Math.trunc(unread.unread)) : 0,
         joined: true,
         joinRequested: false,
+        categoryId: channel.categoryId ? String(channel.categoryId).trim() : undefined,
+        categoryName: channel.categoryName ? String(channel.categoryName).trim() : undefined,
+        order: Number.isFinite(channel.order) ? Math.trunc(channel.order as number) : undefined,
       });
     }
     this.deps.directoryState.replaceChannels(next);
