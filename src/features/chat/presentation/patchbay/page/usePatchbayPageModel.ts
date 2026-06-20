@@ -316,7 +316,13 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     toggleMute: async (channelId) => {
       const socket = currentServerSocket.value ?? "";
       const token = readAuthToken(socket) ?? "";
-      await channelMuteStore.toggleMute(channelId, socket, token);
+      const wasMuted = channelMuteStore.isMuted(channelId);
+      try {
+        await channelMuteStore.toggleMute(channelId, socket, token);
+        toast.success(wasMuted ? t("channel_unmuted_toast") : t("channel_muted_toast"));
+      } catch {
+        toast.error(t("settings_save_business_preference_failed"));
+      }
     },
     openChannelInfo: (channelId) => {
       router.push(`/channel-info?cid=${encodeURIComponent(channelId)}`);
