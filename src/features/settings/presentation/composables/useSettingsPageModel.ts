@@ -23,6 +23,7 @@ export type SettingsPageModel = {
   checkForUpdates: Ref<boolean>;
   emailNotifications: Ref<boolean>;
   desktopNotifications: Ref<boolean>;
+  globalDnd: Ref<boolean>;
   selectLanguage(locale: AppLocale): void;
   refreshGeneralPreferences(): Promise<void>;
   refreshBusinessPreferences(): Promise<void>;
@@ -32,6 +33,7 @@ export type SettingsPageModel = {
   toggleCheckForUpdates(next: boolean): Promise<void>;
   toggleEmailNotifications(next: boolean): Promise<void>;
   toggleDesktopNotifications(next: boolean): Promise<void>;
+  toggleGlobalDnd(next: boolean): Promise<void>;
   businessPreferencesError: Ref<string>;
 };
 
