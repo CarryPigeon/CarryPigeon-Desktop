@@ -164,6 +164,7 @@ pub struct SettingsBackendStateV1 {
     pub check_for_updates: bool,
     pub email_notifications: bool,
     pub desktop_notifications: bool,
+    pub global_dnd: bool,
     pub server_port: Option<u16>,
     pub server_list: Vec<SettingsServerConfigV1>,
 }
@@ -225,6 +226,7 @@ mod tests {
                 "checkForUpdates": true,
                 "emailNotifications": true,
                 "desktopNotifications": false,
+                "globalDnd": false,
                 "serverList": [
                     {
                         "serverSocket": "socket://example.test:11443",
@@ -284,6 +286,7 @@ mod tests {
                 "checkForUpdates": true,
                 "emailNotifications": true,
                 "desktopNotifications": false,
+                "globalDnd": false,
                 "serverList": []
             },
             "localCache": {
@@ -311,6 +314,7 @@ mod tests {
                 "checkForUpdates": true,
                 "emailNotifications": true,
                 "desktopNotifications": false,
+                "globalDnd": false,
                 "serverList": [],
                 "unknownField": true
             },
