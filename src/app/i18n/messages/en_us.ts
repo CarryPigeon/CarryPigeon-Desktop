@@ -49,6 +49,8 @@ export const en_us = {
   profile_visibility: "Profile Visibility",
   email_notifications: "Email Notifications",
   desktop_notifications: "Desktop Notifications",
+  global_dnd: "Do Not Disturb",
+  global_dnd_desc: "Silence all desktop notifications",
   show_file_extensions: "Show File Extensions",
   auto_save_files: "Auto Save Files",
   server_socket: "Server Address",
@@ -145,6 +147,7 @@ export const en_us = {
   messages_title: "Messages",
   search_messages: "Search messages",
   search_current_channel: "Search current channel",
+  search_all_channels: "All channels",
   searching: "Searching...",
   no_messages_found: "No messages found",
   unread: "UNREAD",
@@ -415,6 +418,7 @@ export const en_us = {
   voice_call_status_cancelled: "Cancelled",
   voice_call_status_ended: "Ended",
   voice_call_unknown_user: "Unknown User",
+  voice_call_default_device: "Default Device",
   // File upload
   upload_file: "Upload File",
   uploading: "Uploading...",
@@ -458,6 +462,8 @@ export const en_us = {
   settings_business_settings: "Business settings",
   settings_business_settings_sub: "Business-owned notification preferences and persisted state.",
   settings_feature_settings: "Feature settings",
+  settings_account: "Account",
+  settings_account_sub: "Account security and session management.",
   settings_data_management: "Data management",
   settings_data_management_sub: "Import, export, reset, and shortcut entrypoints.",
   settings_import_export_reset: "Import / export / reset",
@@ -481,6 +487,9 @@ export const en_us = {
   settings_save_language_preference_failed: "Failed to save language preference.",
   settings_load_business_preferences_failed: "Failed to load business preferences.",
   settings_save_business_preference_failed: "Failed to save business preference.",
+  settings_logout_failed: "Logout failed.",
+  settings_logout_hint: "Logging out will clear the local session. You'll need to sign in again next time.",
+  settings_logout_confirm: "Are you sure you want to log out?",
   // File manager
   file_manager: "File Manager",
   file_search_placeholder: "Search files…",
@@ -499,6 +508,13 @@ export const en_us = {
   emoji_name: "Emoji name",
   emoji_tags: "Tags (comma separated)",
   no_custom_emojis: "No custom emojis yet",
+  edit_announcement: "Edit announcement",
+  saving: "Saving...",
+  add_rack: "Add rack",
+  workspace_maintenance: "Workspace maintenance",
+  rack_list: "Rack list",
+  server_socket_label: "Server socket",
+  known_server_id: "Known server ID",
   favorites: "Favorites",
   emoji: "Emoji",
   // About
@@ -600,6 +616,17 @@ export const en_us = {
   loading_catalog: "Loading plugin catalog…",
   // Image loading
   image_load_failed: "Image failed to load",
+  load_failed: "Failed to load",
   image_retry: "Retry",
   image_max_retries: "Max retries reached",
+  // Video
+  video_load_failed: "Video failed to load",
+  video_playing: "Video playing",
+  // Lightbox
+  scroll_to_zoom: "Scroll to zoom",
+  drag_to_pan: "Drag to pan",
+  r_to_rotate: "Press R to rotate",
+  navigate: "Navigate",
+  // File upload
+  file_type_not_supported: "Only image and video files are supported",
 };
