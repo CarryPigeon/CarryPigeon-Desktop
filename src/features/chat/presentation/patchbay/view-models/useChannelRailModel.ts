@@ -37,6 +37,7 @@ type ChannelRailRawModel = {
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   hasDraft(channelId: string): boolean;
+  isChannelMuted(channelId: string): boolean;
 };
 /**
  * ChannelRail 组件消费的页面模型。
@@ -58,6 +59,12 @@ export type UseChannelRailModelDeps = {
   openChannelInfo(channelId: string): void;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   onAsyncError: AsyncErrorHandler;
+  /** 频道静音状态查询 */
+  isChannelMuted(channelId: string): boolean;
+  /** 切换频道静音 */
+  toggleChannelMute(channelId: string): Promise<void>;
+  /** 打开频道右键菜单 */
+  openChannelContextMenu(e: MouseEvent, channelId: string): void;
 };
 
 /**
@@ -123,6 +130,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
       if (!channelId) return false;
       return draftStorage.readDraft(channelId) !== null;
     },
+    isChannelMuted: deps.isChannelMuted,
   };
   return proxyRefs(rawModel);
 }
