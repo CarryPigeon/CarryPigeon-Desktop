@@ -12,6 +12,7 @@ import ChannelSettingsMenu from "@/features/chat/presentation/patchbay/component
 import ChatCenter from "@/features/chat/presentation/patchbay/components/layout/ChatCenter.vue";
 import ThreadPanel from "@/features/chat/presentation/patchbay/components/thread/ThreadPanel.vue";
 import { usePatchbayPageModel } from "@/features/chat/presentation/patchbay/page/usePatchbayPageModel";
+import ChannelContextMenu from "@/features/chat/presentation/patchbay/components/menus/ChannelContextMenu.vue";
 import MessageContextMenu from "@/features/chat/presentation/patchbay/components/menus/MessageContextMenu.vue";
 import CreateChatMenu from "@/features/chat/presentation/patchbay/components/menus/CreateChatMenu.vue";
 import QuickSwitcher from "@/features/chat/presentation/patchbay/components/overlay/QuickSwitcher.vue";
@@ -307,6 +308,15 @@ onBeforeUnmount(() => {
         @select="page.quickSwitcher.handleSelect"
       />
 
+      <ChannelContextMenu
+        :open="page.channelContextMenu.open.value"
+        :x="page.channelContextMenu.x.value"
+        :y="page.channelContextMenu.y.value"
+        :is-muted="page.channelContextMenu.isMuted(page.channelContextMenu.currentChannelId.value ?? '')"
+        @action="page.channelContextMenu.handleMenuAction"
+        @close="page.channelContextMenu.close"
+      />
+
       <MessageContextMenu
         :open="page.messageContextMenu.open"
         :x="page.messageContextMenu.x"
@@ -325,6 +335,7 @@ onBeforeUnmount(() => {
         :open="page.channelSettingsMenu.open"
         :x="page.channelSettingsMenu.x"
         :y="page.channelSettingsMenu.y"
+        :show-delete="page.channelDialogs.canDeleteCurrentChannel"
         @close="page.channelSettingsMenu.close"
         @members="page.channelSettingsMenu.openMembers(page.chatCenter.currentChannelId)"
         @applications="page.channelSettingsMenu.openJoinApplications(page.chatCenter.currentChannelId)"

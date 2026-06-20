@@ -4,7 +4,7 @@
  * 收敛 MainPage 所需的页面级状态、导航、浮层、快捷键与生命周期装配，使页面本身只承担模板入口职责。
  */
 
-import { computed, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
+import { computed, onMounted, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
@@ -53,6 +53,10 @@ import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
+import { useChannelMuteStore } from "../view-models/useChannelMuteStore";
+import { useChannelContextMenu, type ChannelContextAction } from "../interactions/useChannelContextMenu";
+import { currentServerSocket } from "@/features/server-connection/api";
+import { readAuthToken } from "@/shared/utils/localState";
 import {
   createPatchbayChannelDialogsSection,
   createPatchbayChannelSettingsMenuSection,
@@ -114,6 +118,17 @@ type PatchbayPageRawModel = {
   closeShortcutHelp: () => void;
   /** 快捷键绑定列表。 */
   bindings: ShortcutBinding[];
+  /** 频道右键菜单相关状态。 */
+  channelContextMenu: {
+    open: Ref<boolean>;
+    x: Ref<number>;
+    y: Ref<number>;
+    currentChannelId: Ref<string>;
+    isMuted: (channelId: string) => boolean;
+    close: () => void;
+    handleMenuAction: (action: ChannelContextAction) => Promise<void>;
+    currentAction: () => "mute" | "unmute";
+  };
 };
 
 /**
@@ -295,6 +310,28 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     onAsyncError: logAsyncError,
   });
 
+  const channelMuteStore = useChannelMuteStore();
+  const channelContextMenu = useChannelContextMenu({
+    isMuted: (channelId) => channelMuteStore.isMuted(channelId),
+    toggleMute: async (channelId) => {
+      const socket = currentServerSocket.value ?? "";
+      const token = readAuthToken(socket) ?? "";
+      await channelMuteStore.toggleMute(channelId, socket, token);
+    },
+    openChannelInfo: (channelId) => {
+      router.push(`/channel-info?cid=${encodeURIComponent(channelId)}`);
+    },
+  });
+
+  // Refresh mute state on mount
+  onMounted(() => {
+    const socket = currentServerSocket.value ?? "";
+    const token = readAuthToken(socket) ?? "";
+    if (socket && token) {
+      channelMuteStore.refresh(socket, token);
+    }
+  });
+
   const channelRail = useChannelRailModel({
     directory: roomDirectory,
     currentSession,
@@ -307,12 +344,13 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openChannelInfo,
     applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
     onAsyncError: logAsyncError,
-    /** TODO: Wire to ChannelMuteStore in Task 9 */
-    isChannelMuted: (_channelId: string) => false,
-    /** TODO: Wire to ChannelMuteStore in Task 9 */
-    toggleChannelMute: async (_channelId: string) => {},
-    /** TODO: Wire to ChannelContextMenu in Task 9 */
-    openChannelContextMenu: (_e: MouseEvent, _channelId: string) => {},
+    isChannelMuted: (channelId) => channelMuteStore.isMuted(channelId),
+    toggleChannelMute: async (channelId) => {
+      const socket = currentServerSocket.value ?? "";
+      const token = readAuthToken(socket) ?? "";
+      await channelMuteStore.toggleMute(channelId, socket, token);
+    },
+    openChannelContextMenu: channelContextMenu.openMenuForChannel,
   });
 
   const membersRail = useMembersRailModel({
@@ -853,6 +891,16 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     shortcutHelpOpen,
     closeShortcutHelp,
     bindings,
+    channelContextMenu: {
+      open: channelContextMenu.menuOpen,
+      x: channelContextMenu.menuX,
+      y: channelContextMenu.menuY,
+      currentChannelId: channelContextMenu.menuChannelId,
+      isMuted: (channelId: string) => channelMuteStore.isMuted(channelId),
+      close: channelContextMenu.closeMenu,
+      handleMenuAction: channelContextMenu.handleMenuAction,
+      currentAction: channelContextMenu.currentAction,
+    },
   };
 
   return proxyRefs(rawModel);
