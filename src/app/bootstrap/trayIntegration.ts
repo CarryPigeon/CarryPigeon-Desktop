@@ -173,6 +173,7 @@ async function applyTrayLocale(locale: string): Promise<void> {
  * @param deps.getChannelName - 获取指定频道的显示名称
  */
 export function createNotificationOnNewMessageHandler(deps: {
+  getGlobalDndEnabled: () => Promise<boolean>;
   getDesktopNotificationsEnabled: () => Promise<boolean>;
   getCurrentChannelId: () => string;
   getCurrentUserId: () => string;
@@ -181,6 +182,7 @@ export function createNotificationOnNewMessageHandler(deps: {
 }) {
   return async function onNewMessage(channelId: string, message: ChatMessage): Promise<void> {
     try {
+      const globalDnd = await deps.getGlobalDndEnabled();
       const desktopEnabled = await deps.getDesktopNotificationsEnabled();
       let focused = true;
       try {
@@ -204,6 +206,7 @@ export function createNotificationOnNewMessageHandler(deps: {
         );
 
       const decision = decideNotification({
+        globalDndEnabled: globalDnd,
         desktopNotificationsEnabled: desktopEnabled,
         isWindowFocused: focused,
         messageChannelId: channelId,

@@ -23,6 +23,8 @@ export interface TrayNotificationDependencies {
   getUnreadPreviews(maxCount: number): UnreadPreview[];
   /** 新消息事件处理器注册 */
   onNewMessage?: (handler: (channelId: string, message: unknown) => void) => () => void;
+  /** 全局免打扰开关 */
+  getGlobalDndEnabled?(): Promise<boolean>;
   /** 桌面通知开关 */
   getDesktopNotificationsEnabled?(): Promise<boolean>;
   /** 当前频道 ID */
@@ -136,6 +138,12 @@ export function createTrayNotificationRuntime(
 
     return deps.onNewMessage(async (channelId: string, message: unknown) => {
       try {
+        const globalDnd = deps.getGlobalDndEnabled
+          ? await deps.getGlobalDndEnabled()
+          : false;
+
+        if (globalDnd) return;
+
         const desktopEnabled = deps.getDesktopNotificationsEnabled
           ? await deps.getDesktopNotificationsEnabled()
           : true;
