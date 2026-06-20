@@ -14,16 +14,19 @@ import {
 export type BusinessPreferencesModel = {
   emailNotifications: Ref<boolean>;
   desktopNotifications: Ref<boolean>;
+  globalDnd: Ref<boolean>;
   businessPreferencesError: Ref<string>;
   refreshBusinessPreferences(): Promise<void>;
   toggleEmailNotifications(next: boolean): Promise<void>;
   toggleDesktopNotifications(next: boolean): Promise<void>;
+  toggleGlobalDnd(next: boolean): Promise<void>;
 };
 
 export function useBusinessPreferencesModel(): BusinessPreferencesModel {
   const { t } = useI18n();
   const emailNotifications = ref(false);
   const desktopNotifications = ref(false);
+  const globalDnd = ref(false);
   const businessPreferencesError = ref("");
 
   function setError(error: unknown, fallbackMessage: string): void {
@@ -35,6 +38,7 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
       const snapshot = await readBusinessPreferences();
       emailNotifications.value = snapshot.emailNotifications;
       desktopNotifications.value = snapshot.desktopNotifications;
+      globalDnd.value = snapshot.globalDnd;
       businessPreferencesError.value = "";
     } catch (error) {
       setError(error, t("settings_load_business_preferences_failed"));
@@ -66,6 +70,10 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
     return persistBusinessPreference("desktop_notifications", next, desktopNotifications);
   }
 
+  function toggleGlobalDnd(next: boolean): Promise<void> {
+    return persistBusinessPreference("global_dnd", next, globalDnd);
+  }
+
   function refreshBusinessPreferences(): Promise<void> {
     return hydrateBusinessPreferences();
   }
@@ -77,9 +85,11 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
   return {
     emailNotifications,
     desktopNotifications,
+    globalDnd,
     businessPreferencesError,
     refreshBusinessPreferences,
     toggleEmailNotifications,
     toggleDesktopNotifications,
+    toggleGlobalDnd,
   };
 }
