@@ -22,6 +22,9 @@ import {
 } from "@/features/settings/application/settingsService";
 import type { SettingsSchemaEnvelopeV1 } from "@/features/settings/api-types";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import { currentServerSocket } from "@/features/server-connection/api";
+import { getAccountCapabilities } from "@/features/account/api";
+import { readRefreshToken, clearAuthAndResumeState } from "@/shared/utils/localState";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -37,6 +40,7 @@ const {
   checkForUpdates,
   emailNotifications,
   desktopNotifications,
+  globalDnd,
   selectLanguage,
   toggleAutoLogin,
   toggleAutoLaunch,
@@ -46,16 +50,18 @@ const {
   refreshBusinessPreferences,
   toggleEmailNotifications,
   toggleDesktopNotifications,
+  toggleGlobalDnd,
   businessPreferencesError,
 } = useSettingsPageModel();
 
-const sectionIds = ["general", "business", "data", "about"] as const;
+const sectionIds = ["general", "business", "account", "data", "about"] as const;
 
 type SectionId = (typeof sectionIds)[number];
 
 const sectionNav = computed(() => [
   { id: "general" as const, label: t("general"), subtitle: t("settings_nav_general_sub") },
   { id: "business" as const, label: t("settings_business"), subtitle: t("settings_nav_business_sub") },
+  { id: "account" as const, label: t("settings_account"), subtitle: t("settings_account_sub") },
   { id: "data" as const, label: t("settings_data"), subtitle: t("settings_nav_data_sub") },
   { id: "about" as const, label: t("menu_about"), subtitle: t("about_version") },
 ]);
@@ -210,6 +216,33 @@ async function handleResetDefaults(): Promise<void> {
     setDataStatus("success", t("settings_reset_done"));
   } catch (error) {
     setDataStatus("danger", String(error) || t("settings_reset_failed"));
+  }
+}
+
+const logouting = ref(false);
+const showLogoutConfirm = ref(false);
+
+async function handleLogout(): Promise<void> {
+  showLogoutConfirm.value = false;
+  logouting.value = true;
+  try {
+    const socket = currentServerSocket.value.trim();
+    if (socket) {
+      const refreshToken = readRefreshToken(socket);
+      if (refreshToken) {
+        try {
+          await getAccountCapabilities().forServer(socket).revokeToken(refreshToken);
+        } catch {
+          // best-effort: continue clearing local state even if revoke fails
+        }
+      }
+      clearAuthAndResumeState(socket);
+    }
+    getAccountCapabilities().currentUser.clearSnapshot();
+    void router.replace("/login");
+  } catch (error) {
+    logouting.value = false;
+    setDataStatus("danger", String(error) || t("settings_logout_failed"));
   }
 }
 </script>
@@ -411,10 +444,59 @@ async function handleResetDefaults(): Promise<void> {
                     {{ desktopNotifications ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
+                <div class="cp-settings__row">
+                  <span class="cp-settings__muted">{{ t("global_dnd") }}</span>
+                  <button class="cp-settings__segBtn" data-testid="settings-global-dnd" :data-active="globalDnd" type="button" @click="toggleGlobalDnd(!globalDnd)">
+                    {{ globalDnd ? t("enabled") : t("disabled") }}
+                  </button>
+                </div>
+                <div class="cp-settings__hint">{{ t("global_dnd_desc") }}</div>
               </div>
             </div>
           </div>
         </section>
+
+        <section id="settings-section-account" class="cp-settings__section" data-testid="settings-section-account">
+          <header class="cp-settings__sectionHead">
+            <div>
+              <div class="cp-settings__sectionName">{{ t("settings_account") }}</div>
+              <div class="cp-settings__sectionSub">{{ t("settings_account_sub") }}</div>
+            </div>
+          </header>
+
+          <div class="cp-settings__grid">
+            <div class="cp-settings__card">
+              <div class="cp-settings__k">{{ t("security") }}</div>
+              <div class="cp-settings__v">
+                <div class="cp-settings__hint">{{ t("settings_logout_hint") }}</div>
+                <button
+                  class="cp-settings__btn cp-settings__btn--danger"
+                  data-testid="settings-logout"
+                  type="button"
+                  :disabled="logouting"
+                  @click="showLogoutConfirm = true"
+                >
+                  {{ logouting ? t("loading") : t("logout") }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 退出登录确认弹窗 -->
+        <t-dialog
+          v-model:visible="showLogoutConfirm"
+          :header="t('logout')"
+          :confirm-btn="{
+            content: t('logout'),
+            loading: logouting,
+            theme: 'danger',
+          }"
+          :cancel-btn="t('cancel')"
+          @confirm="handleLogout"
+        >
+          <p>{{ t("settings_logout_confirm") }}</p>
+        </t-dialog>
 
         <section id="settings-section-data" class="cp-settings__section" data-testid="settings-section-data">
           <header class="cp-settings__sectionHead">
@@ -608,6 +690,16 @@ async function handleResetDefaults(): Promise<void> {
 .cp-settings__btn:disabled {
   opacity: 0.56;
   cursor: not-allowed;
+}
+
+.cp-settings__btn--danger {
+  border-color: color-mix(in oklab, var(--cp-danger) 40%, var(--cp-border));
+  color: var(--cp-danger);
+}
+
+.cp-settings__btn--danger:hover:not(:disabled) {
+  border-color: var(--cp-danger);
+  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
 }
 
 /* 选择器：`.cp-settings__toolbar`｜用途：全局状态 / 主操作条 */
