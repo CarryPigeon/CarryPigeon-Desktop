@@ -49,6 +49,8 @@ export const zh_cn = {
   profile_visibility: "个人资料可见性",
   email_notifications: "邮件通知",
   desktop_notifications: "桌面通知",
+  global_dnd: "全局免打扰",
+  global_dnd_desc: "开启后所有桌面通知静音",
   show_file_extensions: "显示文件扩展名",
   auto_save_files: "自动保存文件",
   server_socket: "服务器地址",
@@ -145,6 +147,7 @@ export const zh_cn = {
   messages_title: "消息",
   search_messages: "搜索消息",
   search_current_channel: "搜索当前频道",
+  search_all_channels: "全部频道",
   searching: "搜索中...",
   no_messages_found: "未找到消息",
   unread: "未读",
@@ -415,6 +418,7 @@ export const zh_cn = {
   voice_call_status_cancelled: "已取消",
   voice_call_status_ended: "已结束",
   voice_call_unknown_user: "未知用户",
+  voice_call_default_device: "默认设备",
   // 文件上传
   upload_file: "上传文件",
   uploading: "上传中...",
@@ -458,6 +462,8 @@ export const zh_cn = {
   settings_business_settings: "业务设置",
   settings_business_settings_sub: "业务侧通知偏好与持久化状态。",
   settings_feature_settings: "功能设置",
+  settings_account: "账号",
+  settings_account_sub: "账号安全与会话管理。",
   settings_data_management: "数据管理",
   settings_data_management_sub: "导入、导出、重置和快捷入口。",
   settings_import_export_reset: "导入 / 导出 / 重置",
@@ -481,6 +487,9 @@ export const zh_cn = {
   settings_save_language_preference_failed: "保存语言偏好失败。",
   settings_load_business_preferences_failed: "加载业务偏好失败。",
   settings_save_business_preference_failed: "保存业务偏好失败。",
+  settings_logout_failed: "退出登录失败。",
+  settings_logout_hint: "退出登录将清空本地会话，下次访问需要重新登录。",
+  settings_logout_confirm: "确定要退出登录吗？",
   // File manager
   file_manager: "文件管理",
   file_search_placeholder: "搜索文件…",
@@ -499,6 +508,13 @@ export const zh_cn = {
   emoji_name: "表情名称",
   emoji_tags: "标签（逗号分隔）",
   no_custom_emojis: "暂无自定义表情",
+  edit_announcement: "编辑公告",
+  saving: "保存中...",
+  add_rack: "添加机柜",
+  workspace_maintenance: "工作区维护",
+  rack_list: "机柜列表",
+  server_socket_label: "服务器地址",
+  known_server_id: "已知服务器 ID",
   favorites: "收藏",
   emoji: "表情",
   // About
@@ -600,6 +616,17 @@ export const zh_cn = {
   loading_catalog: "正在加载插件目录…",
   // 图片加载
   image_load_failed: "图片加载失败",
+  load_failed: "加载失败",
   image_retry: "重试",
   image_max_retries: "已达到最大重试次数",
+  // 视频
+  video_load_failed: "视频加载失败",
+  video_playing: "视频播放中",
+  // 灯箱
+  scroll_to_zoom: "滚轮缩放",
+  drag_to_pan: "拖拽平移",
+  r_to_rotate: "按 R 旋转",
+  navigate: "导航",
+  // 文件上传
+  file_type_not_supported: "仅支持图片和视频文件",
 };
