@@ -16,6 +16,10 @@ const props = defineProps<{
   model: ChannelRailModel;
 }>();
 
+const emit = defineEmits<{
+  "channel-context-menu": [e: MouseEvent, channelId: string];
+}>();
+
 const { t } = useI18n();
 
 /**
@@ -74,6 +78,10 @@ function toggleGroup(groupId: string): void {
   } else {
     collapsedGroups.add(groupId);
   }
+}
+
+function onChannelContextMenu(e: MouseEvent, channelId: string): void {
+  emit("channel-context-menu", e, channelId);
 }
 </script>
 
@@ -148,6 +156,7 @@ function toggleGroup(groupId: string): void {
               v-if="!collapsedGroups.has(group.id)"
               class="cp-channelRow"
               :data-active="c.id === props.model.currentChannelId"
+              @contextmenu.prevent="onChannelContextMenu($event, c.id)"
             >
               <!-- 区块：频道主入口（未加入时禁用） -->
               <button
@@ -159,7 +168,10 @@ function toggleGroup(groupId: string): void {
               >
                 <span class="cp-channel__port" aria-hidden="true"></span>
                 <span class="cp-channelRow__meta">
-                  <span class="cp-channel__name">{{ c.name }}</span>
+                  <span class="cp-channel__name">
+                    {{ c.name }}
+                    <span v-if="props.model.isChannelMuted(c.id)" class="cp-channel__muted-icon" title="muted">🔇</span>
+                  </span>
                   <span class="cp-channelRow__brief">{{ c.brief }}</span>
                 </span>
                 <span v-if="props.model.hasDraft(c.id)" class="cp-channel__draft-indicator" :title="t('draft')">&#x270E;</span>

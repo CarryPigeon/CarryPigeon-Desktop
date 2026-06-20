@@ -284,8 +284,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleChannelCreated,
     openDeleteChannelDialog,
     handleChannelDeleted,
+    canDeleteCurrentChannel,
   } = useChannelDialogs({
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
+    currentUserId,
     channels: computed(() => roomDirectorySnapshot.value.visibleChannels),
     findChannelById,
     selectChannel: currentSession.selectChannel,
@@ -305,6 +307,12 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openChannelInfo,
     applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
     onAsyncError: logAsyncError,
+    /** TODO: Wire to ChannelMuteStore in Task 9 */
+    isChannelMuted: (_channelId: string) => false,
+    /** TODO: Wire to ChannelMuteStore in Task 9 */
+    toggleChannelMute: async (_channelId: string) => {},
+    /** TODO: Wire to ChannelContextMenu in Task 9 */
+    openChannelContextMenu: (_e: MouseEvent, _channelId: string) => {},
   });
 
   const membersRail = useMembersRailModel({
@@ -417,11 +425,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       return ok;
     },
     startReply: currentChannelMessageFlow.beginReply,
-    startQuoteReply: (messageId: string, preview: string) => {
-      const message = currentChannelMessageFlow.findMessageById(messageId);
-      if (!message) return;
-      messageComposer.startQuoteReply(messageId, message.from.id, preview);
-    },
     deleteMessage: async (messageId: string) => {
       const outcome = await currentChannelMessageFlow.deleteMessage(messageId);
       if (!outcome.ok) {
@@ -803,6 +806,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
+    canDeleteCurrentChannel,
     closeCreateChatMenu,
     setShowCreateChannel,
     setShowCreateFriendPrivateChat,
