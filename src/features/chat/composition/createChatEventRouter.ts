@@ -72,6 +72,8 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
   });
 
   const handleNewMessage = createNotificationOnNewMessageHandler({
+    getGlobalDndEnabled: () =>
+      invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key: "global_dnd" }),
     getDesktopNotificationsEnabled: () =>
       invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key: "desktop_notifications" }),
     getCurrentChannelId: deps.timelineState.readCurrentChannelId,

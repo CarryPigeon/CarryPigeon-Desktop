@@ -9,7 +9,7 @@ import type { NotificationMode } from "@/features/chat/notification-preferences/
 
 export type NotificationDecision = {
   shouldNotify: boolean;
-  reason?: "disabled_in_settings" | "window_focused" | "current_channel" | "channel_muted" | "mentions_only";
+  reason?: "global_dnd" | "disabled_in_settings" | "window_focused" | "current_channel" | "channel_muted" | "mentions_only";
 };
 
 /**
@@ -23,6 +23,7 @@ export type NotificationDecision = {
  * 5. 频道设为仅@提及，且当前消息未提及当前用户
  */
 export function decideNotification(params: {
+  globalDndEnabled: boolean;
   desktopNotificationsEnabled: boolean;
   isWindowFocused: boolean;
   messageChannelId: string;
@@ -30,6 +31,7 @@ export function decideNotification(params: {
   notificationPreference: NotificationMode;
   isMentioned: boolean;
 }): NotificationDecision {
+  if (params.globalDndEnabled) return { shouldNotify: false, reason: "global_dnd" };
   if (!params.desktopNotificationsEnabled) return { shouldNotify: false, reason: "disabled_in_settings" };
   if (params.isWindowFocused) return { shouldNotify: false, reason: "window_focused" };
   if (params.messageChannelId === params.currentChannelId) return { shouldNotify: false, reason: "current_channel" };
