@@ -15,7 +15,14 @@ use crate::features::settings::domain::settings_schema::{
     parse_settings_import_envelope,
 };
 
-const CONFIG_FILE: &str = "./config.json";
+/// 获取配置文件路径。
+///
+/// 优先通过 `app_data_dir` 解析（生产环境），回退到 `"./config.json"`（开发/测试兼容）。
+pub(crate) fn config_file_path() -> PathBuf {
+    crate::shared::app_data_dir::get_app_data_dir()
+        .map(|dir| dir.join("config.json"))
+        .unwrap_or_else(|_| PathBuf::from("./config.json"))
+}
 
 fn config_write_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -103,6 +110,7 @@ fn legacy_config_to_backend_state(config: &Config) -> SettingsBackendStateV1 {
         check_for_updates: config.check_for_updates,
         email_notifications: config.email_notifications,
         desktop_notifications: config.desktop_notifications,
+        global_dnd: config.global_dnd,
         server_port: None,
         server_list: config
             .server_list
@@ -155,21 +163,21 @@ fn default_config_json() -> String {
 }
 
 async fn ensure_config_file_exists() -> String {
-    let config_file = Path::new(CONFIG_FILE);
+    let config_file = config_file_path();
     let default_json = default_config_json();
 
-    match tokio::fs::write(config_file, &default_json).await {
+    match tokio::fs::write(&config_file, &default_json).await {
         Ok(_) => {
             tracing::info!(
                 action = "settings_config_file_initialized",
-                path = CONFIG_FILE
+                path = %config_file.display()
             );
             default_json
         }
         Err(error) => {
             tracing::error!(
                 action = "settings_config_file_initialize_failed",
-                path = CONFIG_FILE,
+                path = %config_file.display(),
                 error = %error
             );
             default_json
@@ -201,6 +209,7 @@ fn envelope_value_for_key(envelope: &SettingsImportEnvelopeV1, key: &str) -> Opt
         "check_for_updates" => Some(Value::Bool(envelope.backend.check_for_updates)),
         "email_notifications" => Some(Value::Bool(envelope.backend.email_notifications)),
         "desktop_notifications" => Some(Value::Bool(envelope.backend.desktop_notifications)),
+        "global_dnd" => Some(Value::Bool(envelope.backend.global_dnd)),
         "server_port" => envelope
             .backend
             .server_port
@@ -220,6 +229,7 @@ fn update_envelope_bool(envelope: &mut SettingsImportEnvelopeV1, key: &str, valu
         "check_for_updates" => envelope.backend.check_for_updates = value,
         "email_notifications" => envelope.backend.email_notifications = value,
         "desktop_notifications" => envelope.backend.desktop_notifications = value,
+        "global_dnd" => envelope.backend.global_dnd = value,
         _ => return false,
     }
     true
@@ -249,17 +259,17 @@ fn update_envelope_u32(envelope: &mut SettingsImportEnvelopeV1, key: &str, value
 }
 
 async fn persist_envelope(envelope: &SettingsImportEnvelopeV1) -> anyhow::Result<()> {
-    let config_file = Path::new(CONFIG_FILE);
+    let config_file = config_file_path();
     let json = format_envelope_json(envelope)?;
-    atomic_write_config(config_file, &json).await
+    atomic_write_config(&config_file, &json).await
 }
 
 async fn load_current_envelope() -> SettingsImportEnvelopeV1 {
-    let config_file = Path::new(CONFIG_FILE);
-    let raw = match tokio::fs::read_to_string(config_file).await {
+    let config_file = config_file_path();
+    let raw = match tokio::fs::read_to_string(&config_file).await {
         Ok(data) if !data.trim().is_empty() => data,
         Ok(_) => {
-            tracing::warn!(action = "settings_config_file_empty", path = CONFIG_FILE);
+            tracing::warn!(action = "settings_config_file_empty", path = %config_file.display());
             let default_json = ensure_config_file_exists().await;
             return parse_settings_import_envelope(&default_json)
                 .unwrap_or_else(|_| default_settings_envelope());
@@ -267,7 +277,7 @@ async fn load_current_envelope() -> SettingsImportEnvelopeV1 {
         Err(error) => {
             tracing::warn!(
                 action = "settings_config_file_read_failed",
-                path = CONFIG_FILE,
+                path = %config_file.display(),
                 error = %error
             );
             let default_json = ensure_config_file_exists().await;
@@ -286,7 +296,7 @@ async fn load_current_envelope() -> SettingsImportEnvelopeV1 {
             if let Err(error) = persist_envelope(&envelope).await {
                 tracing::warn!(
                     action = "settings_config_migration_persist_failed",
-                    path = CONFIG_FILE,
+                    path = %config_file.display(),
                     error = %error
                 );
             }
@@ -295,7 +305,7 @@ async fn load_current_envelope() -> SettingsImportEnvelopeV1 {
         Err(error) => {
             tracing::warn!(
                 action = "settings_config_parse_failed",
-                path = CONFIG_FILE,
+                path = %config_file.display(),
                 error = %error
             );
             let default_json = ensure_config_file_exists().await;
@@ -338,6 +348,8 @@ pub struct Config {
     pub email_notifications: bool,
     /// 是否接收桌面通知。
     pub desktop_notifications: bool,
+    /// 全局免打扰。
+    pub global_dnd: bool,
     /// 服务器列表（历史字段）。
     pub server_list: Vec<ServerConfig>,
 }
@@ -657,6 +669,7 @@ mod tests {
                 "checkForUpdates": true,
                 "emailNotifications": true,
                 "desktopNotifications": false,
+                "globalDnd": false,
                 "serverList": [
                     {
                         "serverSocket": "socket://example.test:11443",
@@ -692,6 +705,7 @@ mod tests {
     #[tokio::test]
     async fn legacy_config_is_migrated_to_versioned_envelope() {
         let _guard = test_lock();
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
         std::fs::create_dir_all(&dir).expect("temp dir");
@@ -720,6 +734,7 @@ mod tests {
     #[tokio::test]
     async fn import_export_round_trip_persists_envelope() {
         let _guard = test_lock();
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
         std::fs::create_dir_all(&dir).expect("temp dir");
@@ -743,6 +758,7 @@ mod tests {
     #[tokio::test]
     async fn import_rejects_version_mismatch_and_unknown_fields() {
         let _guard = test_lock();
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
         std::fs::create_dir_all(&dir).expect("temp dir");
@@ -757,6 +773,7 @@ mod tests {
                 "checkForUpdates": true,
                 "emailNotifications": true,
                 "desktopNotifications": false,
+                "globalDnd": false,
                 "serverList": []
             },
             "localCache": {
@@ -782,6 +799,7 @@ mod tests {
                 "checkForUpdates": true,
                 "emailNotifications": true,
                 "desktopNotifications": false,
+                "globalDnd": false,
                 "serverList": [],
                 "unknownField": true
             },
@@ -805,6 +823,7 @@ mod tests {
     #[tokio::test]
     async fn reset_settings_writes_default_envelope() {
         let _guard = test_lock();
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
         std::fs::create_dir_all(&dir).expect("temp dir");
@@ -831,6 +850,7 @@ mod tests {
     #[tokio::test]
     async fn update_config_bool_and_theme_are_persisted_atomically() {
         let _guard = test_lock();
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
         std::fs::create_dir_all(&dir).expect("temp dir");
