@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
  * @fileoverview ThreadPanel.vue
- * @description chat｜线程面板模态组件。
+ * @description chat｜线程面板模态组件（含虚拟滚动）。
  */
 
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import ThreadRootCard from "./ThreadRootCard.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import type { useThreadPanelModel } from "./useThreadPanelModel";
@@ -19,6 +21,17 @@ const props = defineProps<{
 defineEmits<{
   (e: "close"): void;
 }>();
+
+const repliesScrollEl = ref<HTMLElement | null>(null);
+
+const replyVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: props.model.replies.value.length,
+    getScrollElement: () => repliesScrollEl.value,
+    estimateSize: () => 60,
+    overscan: 8,
+  }))
+);
 </script>
 
 <template>
@@ -38,21 +51,31 @@ defineEmits<{
 
           <div v-if="props.model.loading.value" class="cp-threadPanel__loading">{{ t("loading") }}</div>
 
-          <div v-else class="cp-threadPanel__replies">
+          <template v-else>
             <div v-if="props.model.replies.value.length === 0" class="cp-threadPanel__empty">
               {{ t("no_replies_yet") }}
             </div>
             <div
-              v-for="reply in props.model.replies.value"
-              :key="reply.id"
-              class="cp-threadPanel__reply"
+              v-else
+              ref="repliesScrollEl"
+              class="cp-threadPanel__repliesScroll"
             >
-              <MessageContentHost
-                :message="reply as any"
-                :domain-registry-store="props.domainRegistryStore"
-              />
+              <div :style="{ height: `${replyVirtualizer.getTotalSize()}px`, position: 'relative' }">
+                <div
+                  v-for="vr in replyVirtualizer.getVirtualItems()"
+                  :key="String(vr.key)"
+                  :ref="(el: unknown) => { if (el && (el as Element).parentNode) replyVirtualizer.measureElement(el as Element); }"
+                  :style="{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }"
+                  class="cp-threadPanel__reply"
+                >
+                  <MessageContentHost
+                    :message="props.model.replies.value[vr.index] as any"
+                    :domain-registry-store="props.domainRegistryStore"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <div class="cp-threadPanel__composer">
@@ -99,8 +122,7 @@ defineEmits<{
   font-size: 16px; line-height: 1;
 }
 .cp-threadPanel__body { flex: 1; overflow-y: auto; padding: 16px 20px; }
-.cp-threadPanel__replies { margin-top: 4px; }
-.cp-threadPanel__reply + .cp-threadPanel__reply { margin-top: 8px; }
+.cp-threadPanel__repliesScroll { margin-top: 4px; overflow-y: auto; max-height: 400px; }
 .cp-threadPanel__empty, .cp-threadPanel__loading { color: var(--cp-text-muted); font-size: 13px; text-align: center; padding: 24px; }
 .cp-threadPanel__composer {
   display: flex; gap: 8px; align-items: flex-end;

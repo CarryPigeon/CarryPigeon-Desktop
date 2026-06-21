@@ -12,6 +12,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import UnknownDomainCard from "./UnknownDomainCard.vue";
 import ImageMessageBubble from "./ImageMessageBubble.vue";
+import VideoMessageBubble from "./VideoMessageBubble.vue";
 import VoiceMessageBubble from "./VoiceMessageBubble.vue";
 import MessageFailedIndicator from "./MessageFailedIndicator.vue";
 import {
@@ -63,7 +64,7 @@ const emit = defineEmits<{
   /**
    * 打开图片灯箱。
    */
-  (event: "openLightbox", payload: { url: string; filename: string }): void;
+  (event: "openLightbox", payload: { url: string; fileName: string; isVideo?: boolean }): void;
   /**
    * 打开线程面板。
    */
@@ -230,6 +231,18 @@ function handleInstall(): void {
       :file-size="props.message.fileSize"
       :width="props.message.width"
       :height="props.message.height"
+      @openLightbox="(payload) => emit('openLightbox', payload)"
+    />
+    <!-- 视频消息 -->
+    <VideoMessageBubble
+      v-else-if="props.message.kind === 'video'"
+      :url="props.message.url"
+      :thumb-url="props.message.thumbUrl"
+      :file-name="props.message.fileName"
+      :file-size="props.message.fileSize"
+      :width="props.message.width"
+      :height="props.message.height"
+      :duration="props.message.duration"
       @openLightbox="(payload) => emit('openLightbox', payload)"
     />
     <CoreTextMessageBubble

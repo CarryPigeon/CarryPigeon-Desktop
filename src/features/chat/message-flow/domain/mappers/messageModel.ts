@@ -31,6 +31,7 @@ export function createMessageMapper(deps: MessageModelDeps) {
     const mid = String(m.id ?? "").trim() || `msg_${Date.now()}`;
     const uid = String(m.userId ?? "").trim();
     const fromName = String(m.sender?.nickname ?? "").trim() || (uid ? `u:${uid.slice(-6)}` : "Unknown");
+    const fromAvatarUrl = (m.sender?.avatar ?? "").trim() || undefined;
     const timeMs = Number(m.sentTime ?? 0) || Date.now();
     const domainLabel = String(m.domain ?? "").trim() || "Unknown:Domain";
     const pluginIdHint = deps.resolveDomainPluginHint(serverSocket, domainLabel) || "";
@@ -107,60 +108,76 @@ export function createMessageMapper(deps: MessageModelDeps) {
     if (domainLabel === "Core:Text") {
       const text = tryReadText(m.data) ?? String(m.preview ?? "");
 
-      // 判定：消息内容只有一条 [file:xxx] 标记且附件是图片
-      const fileRefMatch = text.match(/^\[file:([^\]]+)\]$/);
-      if (fileRefMatch) {
-        const data = (m.data ?? {}) as Record<string, unknown>;
-        const attachments = data.attachments;
-        if (Array.isArray(attachments) && attachments.length === 1) {
-          const att = attachments[0];
+      // 检查消息是否包含文件引用标记
+      const fileRefRe = /\[file:([^\]]+)\]/g;
+      const fileRefs = [...text.matchAll(fileRefRe)];
+      const data = (m.data ?? {}) as Record<string, unknown>;
+      const attachments: unknown[] = Array.isArray(data.attachments) ? data.attachments : [];
+
+      // 判定：消息内容仅包含 [file:xxx] 标记且附件是图片/视频 → 内联媒体消息
+      if (fileRefs.length > 0 && attachments.length > 0) {
+        // 查找图片和视频附件
+        const mediaAtts = attachments.filter((att: unknown) => {
+          const mime = String((att as Record<string, unknown>).mimeType ?? "").trim().toLowerCase();
+          return mime.startsWith("image/") || mime.startsWith("video/");
+        });
+
+        // 文本中去除 [file:xxx] 标记后的剩余内容
+        const cleanText = text.replace(fileRefRe, "").trim();
+
+        // 如果文本只有文件引用（无其他内容），且恰好一个媒体附件且无非媒体附件 → 渲染为内联媒体消息。
+        // 多个媒体附件或混合附件时回退到 core_text，保留 [file:xxx] 引用文本，避免丢弃附件。
+        if (!cleanText && mediaAtts.length === 1 && mediaAtts.length === attachments.length) {
+          const att = mediaAtts[0] as Record<string, unknown>;
           const mime = String(att.mimeType ?? "").trim().toLowerCase();
-          if (mime.startsWith("image/")) {
-            const fileName = String(att.name ?? "image").trim();
-            const rawSize = att.size;
-            const parsedSize = typeof rawSize === "number" && !Number.isNaN(rawSize) ? rawSize : Number(rawSize);
-            const safeFileSize = Number.isFinite(parsedSize) ? Math.max(0, parsedSize) : 0;
-            return {
-              id: mid,
-              kind: "image" as const,
-              from: { id: uid, name: fromName },
-              timeMs,
-              domain,
-              fileKey: String(att.shareKey ?? att.key ?? fileRefMatch[1]).trim(),
-              thumbKey: String(att.thumbKey ?? "").trim() || undefined,
-              fileName,
-              fileSize: safeFileSize,
-              width: att.width ? Number(att.width) : undefined,
-              height: att.height ? Number(att.height) : undefined,
-              mimeType: mime,
-              url: String(att.url ?? "").trim(),
-              thumbUrl: String(att.thumbUrl ?? "").trim() || undefined,
-              localPath: String(att.localPath ?? "").trim() || undefined,
-              replyToId,
-              replyTo,
-              quoteReply,
-              mentions,
-              reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })),
-              forwardedFrom,
-              forwardedMessages,
-              preview: String(m.preview ?? "").trim() || `[图片] ${fileName}`,
-              data: m.data,
-              editedAt: m.editedAt ? Number(m.editedAt) : undefined,
-              recalledAt: m.recalledAt ? Number(m.recalledAt) : undefined,
-              threadRootId: String(m.threadRootId ?? "").trim() || undefined,
-              threadReplyCount: Number(m.threadReplyCount ?? 0) || undefined,
-              linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined,
-              status: "sent" as const,
-            };
-          }
+          const isVideo = mime.startsWith("video/");
+          const fileName = String(att.name ?? (isVideo ? "video" : "image")).trim();
+          const rawSize = att.size;
+          const parsedSize = typeof rawSize === "number" && !Number.isNaN(rawSize) ? rawSize : Number(rawSize);
+          const safeFileSize = Number.isFinite(parsedSize) ? Math.max(0, parsedSize) : 0;
+          return {
+            id: mid,
+            kind: (isVideo ? "video" : "image") as "video" | "image",
+            from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl },
+            timeMs,
+            domain,
+            fileKey: String(att.shareKey ?? att.key ?? fileRefs[0][1]).trim(),
+            thumbKey: String(att.thumbKey ?? "").trim() || undefined,
+            fileName,
+            fileSize: safeFileSize,
+            width: att.width != null ? Number(att.width) : undefined,
+            height: att.height != null ? Number(att.height) : undefined,
+            mimeType: mime,
+            url: String(att.url ?? "").trim(),
+            thumbUrl: String(att.thumbUrl ?? "").trim() || undefined,
+            localPath: String(att.localPath ?? "").trim() || undefined,
+            duration: att.duration != null
+              ? (Number.isFinite(Number(att.duration)) ? Math.max(0, Number(att.duration)) : undefined)
+              : undefined,
+            replyToId,
+            replyTo,
+            quoteReply,
+            mentions,
+            reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })),
+            forwardedFrom,
+            forwardedMessages,
+            preview: String(m.preview ?? "").trim() || (isVideo ? `[Video] ${fileName}` : `[Image] ${fileName}`),
+            data: m.data,
+            editedAt: m.editedAt != null ? Number(m.editedAt) : undefined,
+            recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined,
+            threadRootId: String(m.threadRootId ?? "").trim() || undefined,
+            threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined,
+            linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined,
+            status: "sent" as const,
+          };
         }
       }
 
-      return { id: mid, kind: "core_text", from: { id: uid, name: fromName }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: Number(m.threadReplyCount ?? 0) || undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
+      return { id: mid, kind: "core_text", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt != null ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
     }
 
     const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${domainLabel}${domain.version ? `@${domain.version}` : ""}`;
-    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: Number(m.threadReplyCount ?? 0) || undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
+    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt != null ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
   }
 
   return { mapWireMessage };

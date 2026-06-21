@@ -2,11 +2,14 @@
 /**
  * @fileoverview FileUploadButton.vue
  * @description chat/message-flow/upload｜组件：FileUploadButton。
+ *
+ * 选择文件后将图片加入附件预览条（AttachmentPreviewBar），
+ * 上传统一在发送消息时由 sendMessageWithAttachments 执行。
  */
 
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { uploadFile } from "@/features/chat/message-flow/upload/presentation/runtime/fileUploadStore";
+import { addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 
 const props = defineProps<{
   accept?: string;
@@ -14,67 +17,71 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "uploaded", result: { fileId: string; shareKey: string }): void;
+  (e: "filesSelected", files: File[]): void;
   (e: "error", error: string): void;
 }>();
 
 const { t } = useI18n();
 
 const fileInput = ref<HTMLInputElement | null>(null);
-const uploading = ref(false);
 
 /**
  * 打开系统文件选择器。
- *
- * @returns 无返回值。
  */
 function handleClick(): void {
   fileInput.value?.click();
 }
 
 /**
- * 处理文件选择并触发上传。
+ * 处理文件选择：将图片文件加入附件预览条。
  *
  * @param e - 文件 input 的 change 事件。
- * @returns 无返回值。
  */
-async function handleFileChange(e: Event): Promise<void> {
+function handleFileChange(e: Event): void {
   const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
+  const selectedFiles = input.files ? Array.from(input.files) : [];
+  input.value = "";
 
-  if (props.maxSize && file.size > props.maxSize) {
-    emit("error", t("file_too_large"));
-    input.value = "";
+  if (selectedFiles.length === 0) return;
+
+  // 文件大小校验
+  if (props.maxSize) {
+    const oversized = selectedFiles.filter((f) => f.size > props.maxSize!);
+    if (oversized.length > 0) {
+      emit("error", t("file_too_large"));
+      return;
+    }
+  }
+
+  // 只保留图片和视频类型
+  const mediaFiles = selectedFiles.filter(
+    (f) => f.type.startsWith("image/") || f.type.startsWith("video/"),
+  );
+  if (mediaFiles.length === 0) {
+    emit("error", t("file_type_not_supported") || "Only image and video files are supported");
     return;
   }
 
-  uploading.value = true;
-  try {
-    const result = await uploadFile(file);
-    emit("uploaded", { fileId: result.fileId, shareKey: result.shareKey });
-  } catch (err) {
-    emit("error", String(err));
-  } finally {
-    uploading.value = false;
-    input.value = "";
-  }
+  // 加入附件预览条
+  addFiles(mediaFiles);
+  emit("filesSelected", mediaFiles);
 }
 </script>
 
 <template>
-  <!-- 组件：FileUploadButton｜职责：选择文件并触发上传 -->
+  <!-- 组件：FileUploadButton｜职责：选择图片文件并加入附件预览 -->
   <div class="cp-fileUpload">
     <input
       ref="fileInput"
       type="file"
       class="cp-fileUpload__input"
-      :accept="props.accept"
+      :accept="accept ?? 'image/*,video/*'"
+      multiple
       @change="handleFileChange"
     />
-    <button class="cp-fileUpload__btn" type="button" :disabled="uploading" @click="handleClick">
+    <button class="cp-fileUpload__btn" type="button" @click="handleClick">
       <span class="cp-fileUpload__icon">+</span>
-      <span class="cp-fileUpload__text">{{ uploading ? t("uploading") : t("attach_file") }}</span>
+      <span class="cp-fileUpload__text">{{ t("attach_file") }}</span>
     </button>
   </div>
 </template>
@@ -103,14 +110,9 @@ async function handleFileChange(e: Event): Promise<void> {
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-fileUpload__btn:hover:not(:disabled) {
+.cp-fileUpload__btn:hover {
   transform: translateY(-1px);
   background: var(--cp-hover-bg);
-}
-
-.cp-fileUpload__btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .cp-fileUpload__icon {

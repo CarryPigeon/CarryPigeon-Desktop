@@ -93,6 +93,7 @@ export function createChatGovernanceRuntime(
           id: member.uid,
           name: member.nickname || `u:${String(member.uid).slice(-6)}`,
           role,
+          avatarUrl: member.avatar?.trim() || undefined,
         });
       }
       membersRailState.replaceMembers(nextMembers);

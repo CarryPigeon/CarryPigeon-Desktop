@@ -4,7 +4,7 @@
  * @description Patchbay 中央消息区：顶部状态、消息流、编辑器。
  */
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
@@ -26,7 +26,13 @@ import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components
 import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
 import ForwardDetailDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardDetailDialog.vue";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
-import ImageLightbox from "@/features/chat/message-flow/message/presentation/components/ImageLightbox.vue";
+import SkeletonBlock from "@/shared/ui/SkeletonBlock.vue";
+const ImageLightbox = defineAsyncComponent({
+  loader: () => import("@/features/chat/message-flow/message/presentation/components/ImageLightbox.vue"),
+  loadingComponent: SkeletonBlock,
+  delay: 150,
+  timeout: 15000,
+});
 import { addFiles as addImageFiles, addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 import { createLogger } from "@/shared/utils/logger";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
@@ -202,7 +208,14 @@ const virtualizerOptions = computed(() => ({
   estimateSize: (index: number) => {
     const item = virtualListItems.value[index];
     if (!item || item.kind === 'separator') return 36;
-    return 72;
+    const m = item.m;
+    if (!m) return 52;
+    if (m.kind === 'image' || m.kind === 'video') return 220;
+    let base = item.isGroupStart ? 52 : 32;
+    if (m.replyToId) base += 28;
+    if (m.reactions && m.reactions.length > 0) base += 24;
+    if (m.threadReplyCount) base += 20;
+    return base;
   },
   overscan: 10,
 }));
@@ -238,8 +251,20 @@ function onVoiceCallStateChange(state: CallState): void {
 
 /** 图片灯箱状态。 */
 const lightboxOpen = ref(false);
-const lightboxImages = ref<{ url: string; filename: string }[]>([]);
+const lightboxImages = ref<{ url: string; fileName: string; isVideo?: boolean; messageId?: string }[]>([]);
 const lightboxIndex = ref(0);
+/** 灯箱会话 key：每次打开递增，强制重建 ErrorBoundary + ImageLightbox 子树，避免残留错误状态。 */
+const lightboxSessionKey = ref(0);
+
+/** 媒体消息缓存（预计算，避免 openLightbox 每次 O(n) 扫描）。 */
+const lightboxMediaCache = computed(() =>
+  props.model.messageRows
+    .filter((row) => (row.m.kind === "image" || row.m.kind === "video") && (row.m as any).url)
+    .map((row) => {
+      const m = row.m as Extract<typeof row.m, { kind: "image" | "video" }>;
+      return { url: m.url, fileName: m.fileName, isVideo: m.kind === "video", messageId: m.id };
+    }),
+);
 
 /** 拖拽上传高亮状态。 */
 const isDragOver = ref(false);
@@ -309,11 +334,25 @@ function handleDrop(e: DragEvent): void {
 /**
  * 打开图片灯箱。
  *
+ * 收集当前频道内所有图片消息，支持在灯箱中前后翻页浏览。
+ *
  * @param payload - 包含图片 URL 和文件名的对象。
  */
-function openLightbox(payload: { url: string; filename: string }): void {
-  lightboxImages.value = [payload];
-  lightboxIndex.value = 0;
+function openLightbox(payload: { url: string; fileName: string; isVideo?: boolean }): void {
+  const allImages: { url: string; fileName: string; isVideo?: boolean; messageId?: string }[] = [...lightboxMediaCache.value];
+  // 按 URL 查找点击的媒体在缓存中的索引。
+  // 重复 URL 时取首个匹配项 —— 灯箱内按全频道媒体序列导航，重复项位置等价。
+  let clickedIndex = allImages.findIndex((img) => img.url === payload.url);
+
+  // 如果没找到匹配的图片（可能来自 thumbUrl 或附件 blob URL），至少包含当前点击的图片
+  if (clickedIndex === -1) {
+    clickedIndex = allImages.length;
+    allImages.push({ url: payload.url, fileName: payload.fileName, isVideo: payload.isVideo });
+  }
+
+  lightboxImages.value = allImages;
+  lightboxIndex.value = clickedIndex;
+  lightboxSessionKey.value++;
   lightboxOpen.value = true;
 }
 
@@ -384,7 +423,7 @@ function handleRetryMessage(messageId: string): void {
   if (!row) return;
   const msg = row.m;
   // Reconstruct send payload from the failed message
-  if (msg.kind === "image") {
+  if (msg.kind === "image" || msg.kind === "video") {
     props.model.handleSend({
       domain: msg.domain.id,
       domainVersion: msg.domain.version || "1.0.0",
@@ -397,6 +436,7 @@ function handleRetryMessage(messageId: string): void {
           mimeType: msg.mimeType,
           width: msg.width,
           height: msg.height,
+          ...(msg.kind === "video" && msg.duration ? { duration: msg.duration } : {}),
         }],
       },
     });
@@ -566,7 +606,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
           v-for="vr in virtualizer.getVirtualItems()"
           :key="String(vr.key)"
           :data-index="vr.index"
-          :ref="(el: unknown) => { if (el) virtualizer.measureElement(el as Element); }"
+          :ref="(el: unknown) => { if (el && (el as Element).parentNode) virtualizer.measureElement(el as Element); }"
           :style="{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }"
         >
           <!-- 未读边界 -->
@@ -577,13 +617,14 @@ const removeFailedMessage = handleRemoveFailedMessage;
               class="cp-msg"
               :data-message-id="virtualListItems[vr.index].m.id"
               :data-highlighted="virtualListItems[vr.index].m.id === props.model.highlightedMessageId"
+              :data-editing="virtualListItems[vr.index].m.id === props.editingMessageId"
               :data-mine="virtualListItems[vr.index].m.from.id === props.model.currentUserId"
               :data-group-start="virtualListItems[vr.index].isGroupStart"
               :data-mentioned="props.model.isMentioned(virtualListItems[vr.index].m)"
               tabindex="0"
               role="article"
               :aria-label="`message ${virtualListItems[vr.index].m.domain.label} from ${virtualListItems[vr.index].m.from.name}`"
-              @contextmenu="props.onMessageContextMenu($event, virtualListItems[vr.index].m.id)"
+              @contextmenu="!virtualListItems[vr.index].m.recalledAt && props.onMessageContextMenu($event, virtualListItems[vr.index].m.id)"
               @keydown="props.model.handleMessageKeydown($event, virtualListItems[vr.index].m.id)"
             >
               <!-- 区块：多选复选框 -->
@@ -601,7 +642,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
                   :username="virtualListItems[vr.index].m.from.name"
                   trigger="hover"
                 >
-                  <AvatarBadge :name="virtualListItems[vr.index].m.from.name" :size="28" />
+                  <AvatarBadge :name="virtualListItems[vr.index].m.from.name" :avatar-url="virtualListItems[vr.index].m.from.avatarUrl" :size="28" />
                 </UserProfilePopover>
               </div>
               <!-- 区块：domain 色条列 -->
@@ -617,7 +658,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
                   <span class="cp-msg__time">{{ props.model.fmtTime(virtualListItems[vr.index].m.timeMs) }}</span>
                   <span class="cp-msg__dot"></span>
                   <span class="cp-msg__domain">{{ virtualListItems[vr.index].m.domain.label }}</span>
-                  <button class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)">⋯</button>
+                  <button v-if="!virtualListItems[vr.index].m.recalledAt" class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)">⋯</button>
                 </div>
 
                 <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
@@ -661,7 +702,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
           @recorded="handleVoiceRecorded"
           @error="(msg) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
         />
-        <FileUploadButton @uploaded="props.model.handleFileUploaded" @error="props.model.handleFileUploadError" />
+        <FileUploadButton @error="props.model.handleFileUploadError" />
         <StickerPickerButton
           :current-user-id="props.model.currentUserId"
           @sticker="handleStickerSelected"
@@ -693,6 +734,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
         @close-mention-menu="props.model.handleMentionMenuClose"
         @url-detected="(url: string) => props.model.fetchLinkPreview(url)"
         @dismiss-link-preview="props.model.dismissLinkPreview"
+        @openLightbox="openLightbox"
       />
     </div>
 
@@ -714,12 +756,14 @@ const removeFailedMessage = handleRemoveFailedMessage;
       @close="closeForwardDetail"
     />
 
-    <ImageLightbox
-      v-if="lightboxOpen"
-      :images="lightboxImages"
-      :initial-index="lightboxIndex"
-      @close="closeLightbox"
-    />
+    <ErrorBoundary :key="lightboxSessionKey">
+      <ImageLightbox
+        v-if="lightboxOpen"
+        :images="lightboxImages"
+        :initial-index="lightboxIndex"
+        @close="closeLightbox"
+      />
+    </ErrorBoundary>
 
     <ShortcutHelp
       :visible="!!props.shortcutHelpVisible"
@@ -740,6 +784,12 @@ const removeFailedMessage = handleRemoveFailedMessage;
   border-radius: 14px;
   outline: 2px solid var(--cp-primary);
   outline-offset: -2px;
+}
+.cp-msg[data-editing="true"] {
+  background: color-mix(in oklab, var(--cp-accent, #5865f2) 8%, transparent);
+  border-radius: 14px;
+  outline: 1.5px dashed var(--cp-accent, #5865f2);
+  outline-offset: -1.5px;
 }
 .cp-center--dragOver {
   outline: 3px dashed var(--cp-accent, #5865f2);

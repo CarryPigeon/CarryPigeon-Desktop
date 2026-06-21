@@ -29,7 +29,7 @@ const props = defineProps<{
           :username="u.name"
           trigger="hover"
         >
-          <AvatarBadge :name="u.name" :size="28" />
+          <AvatarBadge :name="u.name" :avatar-url="u.avatarUrl" :size="28" />
         </UserProfilePopover>
         <div class="cp-member__meta">
           <div class="cp-member__name">{{ u.name }}</div>

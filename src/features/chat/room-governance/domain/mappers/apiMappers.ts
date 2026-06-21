@@ -68,6 +68,7 @@ export function mapApiChannel(c: ChatChannelRecord): ChannelSummary {
     unread: 0,
     joined: true,
     joinRequested: false,
+    ownerUserId: c.ownerUserId ? String(c.ownerUserId).trim() : undefined,
     announcement: c.announcement,
     categoryId: c.categoryId ? String(c.categoryId).trim() : undefined,
     categoryName: c.categoryName ? String(c.categoryName).trim() : undefined,

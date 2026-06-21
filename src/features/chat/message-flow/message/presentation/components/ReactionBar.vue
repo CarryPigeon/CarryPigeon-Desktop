@@ -4,6 +4,7 @@
  */
 
 import { ref, onMounted, onBeforeUnmount } from "vue";
+import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
 import "emoji-picker-element";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/api-types";
@@ -17,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "react", messageId: string, emoji: string): void;
 }>();
+
+const { t } = useI18n();
 
 const pickerVisible = ref(false);
 const customEmojis = ref<Array<{ id: string; name: string; filePath: string }>>([]);
@@ -112,7 +115,7 @@ function handleCustomEmojiClick(ce: { id: string; name: string }): void {
           <button :class="{ active: emojiTab === 'standard' }" @click="emojiTab = 'standard'">Emoji</button>
           <button :class="{ active: emojiTab === 'custom' }" @click="emojiTab = 'custom'">{{ customEmojis.length }}</button>
         </div>
-        <emoji-picker v-if="emojiTab === 'standard'" @emoji-click="onEmojiClick"></emoji-picker>
+        <emoji-picker v-if="emojiTab === 'standard'" data-source="/emoji-data.json" @emoji-click="onEmojiClick"></emoji-picker>
         <div v-else class="cp-customEmojiGrid">
           <button
             v-for="ce in customEmojis"
@@ -123,7 +126,7 @@ function handleCustomEmojiClick(ce: { id: string; name: string }): void {
           >
             <img :src="`asset://localhost/${encodeURIComponent(ce.filePath)}`" :alt="ce.name" class="cp-customEmojiImg" />
           </button>
-          <div v-if="customEmojis.length === 0" class="cp-customEmojiEmpty">No custom emojis</div>
+          <div v-if="customEmojis.length === 0" class="cp-customEmojiEmpty">{{ t("no_custom_emojis") }}</div>
         </div>
       </template>
     </t-popup>

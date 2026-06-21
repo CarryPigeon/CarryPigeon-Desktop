@@ -5,6 +5,7 @@
 //! 约定：注释中文，日志英文（tracing）。
 pub mod app_data_dir;
 pub mod chat_cache;
+pub mod close_to_tray_state;
 pub mod db;
 pub mod error;
 pub mod log;

@@ -25,6 +25,7 @@ const {
   banCount,
   canOpenAddBanDialog,
   canSubmitAddBan,
+  canRemoveBan,
   formatBanUntil,
   openAddBanDialog,
   closeAddBanDialog,
@@ -62,7 +63,7 @@ const {
             <div class="cp-banCard__until">{{ t("ban_until") }}: {{ formatBanUntil(b.until) }}</div>
           </div>
           <div class="cp-banCard__actions">
-            <button class="cp-banCard__btn" type="button" @click="handleRemoveBan(b.uid)">
+            <button v-if="canRemoveBan" class="cp-banCard__btn" type="button" @click="handleRemoveBan(b.uid)">
               {{ t("remove_ban") }}
             </button>
           </div>

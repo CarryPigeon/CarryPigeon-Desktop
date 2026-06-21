@@ -51,7 +51,7 @@ type PatchbayMessageContextMenuRawModel = {
   isPinned: RefLike<boolean>;
   isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
+  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -82,6 +82,7 @@ type PatchbayChannelDialogsRawModel = {
   showDeleteChannel: RefLike<boolean>;
   deleteChannelId: RefLike<string>;
   deleteChannelName: RefLike<string>;
+  canDeleteCurrentChannel: RefLike<boolean>;
   closeCreateChatMenu(): void;
   setShowCreateChannel(visible: boolean): void;
   setShowCreateFriendPrivateChat(visible: boolean): void;
@@ -173,7 +174,7 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   isPinned: RefLike<boolean>;
   isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
+  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
 };
 
 /**
@@ -235,6 +236,7 @@ type CreatePatchbayChannelDialogsSectionDeps = {
   showDeleteChannel: RefLike<boolean>;
   deleteChannelId: RefLike<string>;
   deleteChannelName: RefLike<string>;
+  canDeleteCurrentChannel: RefLike<boolean>;
   closeCreateChatMenu(): void;
   setShowCreateChannel(visible: boolean): void;
   setShowCreateFriendPrivateChat(visible: boolean): void;
@@ -258,6 +260,7 @@ export function createPatchbayChannelDialogsSection(deps: CreatePatchbayChannelD
     showDeleteChannel: deps.showDeleteChannel,
     deleteChannelId: deps.deleteChannelId,
     deleteChannelName: deps.deleteChannelName,
+    canDeleteCurrentChannel: deps.canDeleteCurrentChannel,
     closeCreateChatMenu: deps.closeCreateChatMenu,
     setShowCreateChannel: deps.setShowCreateChannel,
     setShowCreateFriendPrivateChat: deps.setShowCreateFriendPrivateChat,

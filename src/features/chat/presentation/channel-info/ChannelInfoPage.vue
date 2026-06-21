@@ -126,7 +126,7 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
 /* 布局与变量说明：使用全局 `--cp-*` 变量；主区域为两列网格，部分卡片跨全宽。 */
 .cp-info {
   height: 100%;
-  padding: 14px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;

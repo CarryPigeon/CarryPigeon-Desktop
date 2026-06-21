@@ -53,8 +53,9 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
         callState.value = session.state;
         activeSession.value = session;
         participants.value = session.participants;
-        isMuted.value = session.participants.find(p => p.userId === userId())?.isMuted ?? false;
-        isNoiseSuppressionOn.value = session.mediaSettings.noiseSuppression;
+        // 不从 poll 覆盖 isMuted / isNoiseSuppressionOn：
+        // toggleMute/toggleNoiseSuppression 已直接从命令返回值设置它们，
+        // 而 poll 的 session 数据来自全局 store（可能因事件延迟而陈旧）。
       }
     }, 500);
   }
@@ -173,6 +174,15 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     if (!session) return false;
     const muted = await statePort.toggleMute(session.sessionId);
     isMuted.value = muted;
+    // 同步更新本地会话中的参与者静音状态，避免 poll 的陈数据覆盖不一致
+    if (activeSession.value) {
+      activeSession.value = {
+        ...activeSession.value,
+        participants: activeSession.value.participants.map(p =>
+          p.userId === userId() ? { ...p, isMuted: muted } : p
+        ),
+      };
+    }
     return muted;
   }
 
@@ -181,19 +191,39 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     if (!session) return false;
     const ns = await statePort.toggleNoiseSuppression(session.sessionId);
     isNoiseSuppressionOn.value = ns;
+    // 同步更新本地会话中的媒体设置，保持一致性
+    if (activeSession.value) {
+      activeSession.value = {
+        ...activeSession.value,
+        mediaSettings: { ...activeSession.value.mediaSettings, noiseSuppression: ns },
+      };
+    }
     return ns;
   }
 
   async function selectInputDevice(deviceId: string): Promise<void> {
-    const session = activeSession.value;
-    if (!session) return;
-    await statePort.updateMediaSettings(session.sessionId, { inputDeviceId: deviceId });
+    const sessionId = activeSession.value?.sessionId;
+    if (!sessionId) return;
+    await statePort.updateMediaSettings(sessionId, { inputDeviceId: deviceId });
+    // 同步更新本地状态
+    if (activeSession.value) {
+      activeSession.value = {
+        ...activeSession.value,
+        mediaSettings: { ...activeSession.value.mediaSettings, inputDeviceId: deviceId },
+      };
+    }
   }
 
   async function selectOutputDevice(deviceId: string): Promise<void> {
-    const session = activeSession.value;
-    if (!session) return;
-    await statePort.updateMediaSettings(session.sessionId, { outputDeviceId: deviceId });
+    const sessionId = activeSession.value?.sessionId;
+    if (!sessionId) return;
+    await statePort.updateMediaSettings(sessionId, { outputDeviceId: deviceId });
+    if (activeSession.value) {
+      activeSession.value = {
+        ...activeSession.value,
+        mediaSettings: { ...activeSession.value.mediaSettings, outputDeviceId: deviceId },
+      };
+    }
   }
 
   async function connectSignaling(wsUrl: string, accessToken: string, userId: string, displayName: string): Promise<void> {
@@ -201,9 +231,47 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   }
 
   async function initDevices(): Promise<void> {
-    const devices = await statePort.enumerateDevices();
-    inputDevices.value = devices.input;
-    outputDevices.value = devices.output;
+    try {
+      const devices = await statePort.enumerateDevices();
+      inputDevices.value = devices.input;
+      outputDevices.value = devices.output;
+
+      // 自动选中系统默认设备
+      const defaultInput = devices.input.find((d) => d.isDefault);
+      if (defaultInput) {
+        await statePort.updateMediaSettings("", { inputDeviceId: defaultInput.deviceId });
+      }
+      const defaultOutput = devices.output.find((d) => d.isDefault);
+      if (defaultOutput) {
+        await statePort.updateMediaSettings("", { outputDeviceId: defaultOutput.deviceId });
+      }
+    } catch (_e) {
+      // 设备枚举失败时保持空列表，不影响通话（pipeline 层自动使用系统默认设备）
+    }
+  }
+
+  /**
+   * 重新枚举音频设备并检测变化。
+   * 当设备列表发生变化时（如热插拔 USB 设备），自动更新状态。
+   * @returns 设备列表是否发生了变化。
+   */
+  async function refreshDevices(): Promise<boolean> {
+    try {
+      const devices = await statePort.enumerateDevices();
+      const prevInputIds = inputDevices.value.map((d) => d.deviceId).sort().join(",");
+      const prevOutputIds = outputDevices.value.map((d) => d.deviceId).sort().join(",");
+      const newInputIds = devices.input.map((d) => d.deviceId).sort().join(",");
+      const newOutputIds = devices.output.map((d) => d.deviceId).sort().join(",");
+
+      const changed = prevInputIds !== newInputIds || prevOutputIds !== newOutputIds;
+      if (changed) {
+        inputDevices.value = devices.input;
+        outputDevices.value = devices.output;
+      }
+      return changed;
+    } catch {
+      return false;
+    }
   }
 
   async function joinConference(sessionId: string, initiatorId?: string): Promise<CallSession | undefined> {
@@ -276,6 +344,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     selectInputDevice,
     selectOutputDevice,
     initDevices,
+    refreshDevices,
     joinConference,
     leaveConference,
     beginListening,
