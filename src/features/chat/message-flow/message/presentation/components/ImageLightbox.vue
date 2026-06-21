@@ -1,17 +1,22 @@
 <script setup lang="ts">
 /**
  * @fileoverview ImageLightbox.vue
- * @description chat/message-flow/message｜全屏图片灯箱组件：支持导航、缩放、拖拽平移。
+ * @description chat/message-flow/message｜全屏图片灯箱组件：支持导航、缩放、拖拽平移、旋转、下载。
  */
 
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useFocusTrap } from "@/shared/utils/useFocusTrap";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("ImageLightbox");
+const { t } = useI18n();
 
 const props = defineProps<{
   /**
-   * 图片列表。
+   * 图片/视频列表。
    */
-  images: { url: string; filename: string }[];
+  images: { url: string; fileName: string; isVideo?: boolean }[];
   /**
    * 初始展示的图片索引。
    */
@@ -42,11 +47,27 @@ const dragStartY = ref(0);
 const dragLastX = ref(0);
 const dragLastY = ref(0);
 
+/** 旋转角度（0 | 90 | 180 | 270）。 */
+const rotation = ref(0);
+
+/** 下载进行中状态。 */
+const isDownloading = ref(false);
+
+/** 下载 blob URL 列表（组件卸载时统一撤销）。 */
+const blobUrls: string[] = [];
+
 const currentImage = computed(() => props.images[currentIndex.value] ?? null);
 const totalCount = computed(() => props.images.length);
 const hasPrev = computed(() => currentIndex.value > 0);
 const hasNext = computed(() => currentIndex.value < totalCount.value - 1);
 const counterText = computed(() => `${currentIndex.value + 1} / ${totalCount.value}`);
+
+/** 当前媒体是否为视频（优先使用传入的 isVideo 标记，回退到文件名后缀判断）。 */
+const isVideo = computed(() => {
+  if (currentImage.value?.isVideo != null) return currentImage.value.isVideo;
+  const name = currentImage.value?.fileName ?? "";
+  return /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(name);
+});
 
 /**
  * 关闭灯箱。
@@ -61,7 +82,7 @@ function close(): void {
 function prev(): void {
   if (!hasPrev.value) return;
   currentIndex.value--;
-  resetZoom();
+  resetView();
 }
 
 /**
@@ -70,7 +91,15 @@ function prev(): void {
 function next(): void {
   if (!hasNext.value) return;
   currentIndex.value++;
+  resetView();
+}
+
+/**
+ * 重置缩放、平移和旋转。
+ */
+function resetView(): void {
   resetZoom();
+  rotation.value = 0;
 }
 
 /**
@@ -83,6 +112,59 @@ function resetZoom(): void {
 }
 
 /**
+ * 顺时针旋转 90°。
+ */
+function rotateClockwise(): void {
+  rotation.value = ((rotation.value + 90) % 360) as 0 | 90 | 180 | 270;
+}
+
+/**
+ * 下载当前图片。
+ * 使用 fetch + Blob 方式兼容跨域图片下载。
+ */
+async function downloadImage(): Promise<void> {
+  if (!currentImage.value?.url || isDownloading.value) return;
+
+  isDownloading.value = true;
+  try {
+    const response = await fetch(currentImage.value.url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    blobUrls.push(blobUrl);
+
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = currentImage.value.fileName || "image";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    logger.info("Action: chat_lightbox_download_image", {
+      fileName: currentImage.value.fileName,
+    });
+  } catch (err) {
+    logger.error("Action: chat_lightbox_download_failed", {
+      error: String(err),
+    });
+    // 降级：通过 <a> 元素打开原始链接（不受弹窗拦截器限制）。
+    if (currentImage.value?.url) {
+      const a = document.createElement("a");
+      a.href = currentImage.value.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  } finally {
+    isDownloading.value = false;
+  }
+}
+
+/**
  * 滚轮缩放。
  *
  * @param e - WheelEvent。
@@ -90,11 +172,12 @@ function resetZoom(): void {
 function handleWheel(e: WheelEvent): void {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 0.1 : -0.1;
+  const prevScale = scale.value;
   const next = Math.min(3, Math.max(0.5, scale.value + delta));
   scale.value = Math.round(next * 10) / 10;
   // 缩放后把偏移也等比例缩小，避免飞出边界
-  panX.value = panX.value * (next / scale.value);
-  panY.value = panY.value * (next / scale.value);
+  panX.value = panX.value * (scale.value / prevScale);
+  panY.value = panY.value * (scale.value / prevScale);
 }
 
 /**
@@ -158,6 +241,10 @@ function handleKeydown(e: KeyboardEvent): void {
     case "ArrowRight":
       next();
       break;
+    case "r":
+    case "R":
+      rotateClockwise();
+      break;
   }
 }
 
@@ -176,6 +263,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  blobUrls.forEach((url) => URL.revokeObjectURL(url));
+  blobUrls.length = 0;
   document.body.style.overflow = originalBodyOverflow;
   window.removeEventListener("keydown", handleKeydown);
   releaseFocus();
@@ -186,7 +275,7 @@ watch(
   () => props.initialIndex,
   (idx) => {
     currentIndex.value = idx;
-    resetZoom();
+    resetView();
   },
 );
 </script>
@@ -205,20 +294,31 @@ watch(
       <!-- 顶部栏 -->
       <div class="cp-lightbox__topBar">
         <span class="cp-lightbox__filename">{{
-          currentImage?.filename ?? ""
+          currentImage?.fileName ?? ""
         }}</span>
         <span class="cp-lightbox__counter">{{ counterText }}</span>
         <div class="cp-lightbox__topActions">
-          <a
-            v-if="currentImage?.url"
-            :href="currentImage.url"
-            class="cp-lightbox__download"
-            target="_blank"
-            rel="noopener noreferrer"
-            download
+          <button
+            v-if="!isVideo"
+            class="cp-lightbox__actionBtn"
+            type="button"
+            aria-label="Rotate"
+            title="Rotate 90°"
+            @click="rotateClockwise"
           >
-            ↓
-          </a>
+            ↻
+          </button>
+          <button
+            v-if="currentImage?.url"
+            class="cp-lightbox__actionBtn"
+            type="button"
+            :aria-label="'Download'"
+            :title="'Download'"
+            :disabled="isDownloading"
+            @click="downloadImage"
+          >
+            {{ isDownloading ? "⋯" : "↓" }}
+          </button>
           <button
             class="cp-lightbox__closeBtn"
             type="button"
@@ -243,19 +343,33 @@ watch(
           ‹
         </button>
 
-        <!-- 图片容器 -->
+        <!-- 媒体容器 -->
         <div class="cp-lightbox__imageWrap">
-          <img
-            v-if="currentImage"
+          <!-- 视频播放器 -->
+          <video
+            v-if="currentImage && isVideo"
+            :key="`video-${currentIndex}`"
             :src="currentImage.url"
-            :alt="currentImage.filename"
+            class="cp-lightbox__image cp-lightbox__video"
+            controls
+            autoplay
+            playsinline
+            loop
+          />
+          <!-- 图片 -->
+          <img
+            v-else-if="currentImage"
+            :key="`img-${currentIndex}`"
+            :src="currentImage.url"
+            :alt="currentImage.fileName"
             class="cp-lightbox__image"
             :style="{
-              transform: `translate(${panX}px, ${panY}px) scale(${scale})`,
+              transform: `translate(${panX}px, ${panY}px) scale(${scale}) rotate(${rotation}deg)`,
               cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
             }"
             @mousedown="startDrag"
             @wheel.prevent="handleWheel"
+            draggable="false"
           />
         </div>
 
@@ -279,14 +393,28 @@ watch(
           class="cp-lightbox__thumbItem"
           :class="{ 'cp-lightbox__thumbItem--active': idx === currentIndex }"
           type="button"
-          @click="currentIndex = idx; resetZoom()"
+          @click="currentIndex = idx; resetView()"
         >
           <img
             :src="img.url"
-            :alt="img.filename"
+            :alt="img.fileName"
             class="cp-lightbox__thumbImg"
           />
         </button>
+      </div>
+
+      <!-- 底部提示栏 -->
+      <div class="cp-lightbox__hintBar">
+        <template v-if="isVideo">
+          <span>▶ {{ t("video_playing") }}</span>
+          <span>← → {{ t("navigate") }}</span>
+        </template>
+        <template v-else>
+          <span>🖱 {{ t("scroll_to_zoom") }}</span>
+          <span>🖐 {{ t("drag_to_pan") }}</span>
+          <span>↻ {{ t("r_to_rotate") }}</span>
+          <span>← → {{ t("navigate") }}</span>
+        </template>
       </div>
     </div>
   </Teleport>
@@ -338,22 +466,28 @@ watch(
   gap: 8px;
 }
 
-.cp-lightbox__download {
+.cp-lightbox__actionBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
+  border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  text-decoration: none;
   font-size: 18px;
+  cursor: pointer;
   transition: background 120ms ease;
 }
 
-.cp-lightbox__download:hover {
+.cp-lightbox__actionBtn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.25);
+}
+
+.cp-lightbox__actionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cp-lightbox__closeBtn {
@@ -400,6 +534,12 @@ watch(
   object-fit: contain;
   transition: transform 200ms ease;
   will-change: transform;
+}
+
+.cp-lightbox__video {
+  width: auto;
+  height: auto;
+  outline: none;
 }
 
 /* 左右箭头 */
@@ -471,5 +611,27 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* 底部操作提示栏 */
+.cp-lightbox__hintBar {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.cp-lightbox__backdrop:hover .cp-lightbox__hintBar {
+  opacity: 1;
 }
 </style>

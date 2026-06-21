@@ -4,7 +4,7 @@
  * @description 消息搜索面板独立组件，支持键盘导航与关键词高亮。
  */
 
-import { ref, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 
 /** 搜索结果项接口。 */
@@ -35,10 +35,10 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 /** 搜索范围选项。 */
-const scopeOptions = [
-  { label: "当前频道", value: "channel" },
-  { label: "全部频道", value: "server" },
-];
+const scopeOptions = computed(() => [
+  { label: t("search_current_channel"), value: "channel" },
+  { label: t("search_all_channels"), value: "server" },
+]);
 
 /** 内部搜索查询文本。 */
 const localQuery = ref(props.query);

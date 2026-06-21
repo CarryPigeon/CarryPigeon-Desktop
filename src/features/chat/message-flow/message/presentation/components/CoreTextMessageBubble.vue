@@ -125,7 +125,7 @@ const emit = defineEmits<{
   /**
    * 打开图片灯箱。
    */
-  (event: "openLightbox", payload: { url: string; filename: string }): void;
+  (event: "openLightbox", payload: { url: string; fileName: string }): void;
 }>();
 
 /**

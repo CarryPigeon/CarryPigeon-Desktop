@@ -220,7 +220,7 @@ loadCurrentUser();
 <style scoped lang="scss">
 .cp-contacts {
   height: 100%;
-  padding: 14px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;

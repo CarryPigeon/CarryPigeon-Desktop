@@ -216,7 +216,7 @@ watch(customEmojis, async (newEmojis) => {
 
     <!-- Emoji Tab -->
     <div v-else class="cp-stickerPanel__body">
-      <emoji-picker @emoji-click="onEmojiPickerClick"></emoji-picker>
+      <emoji-picker data-source="/emoji-data.json" @emoji-click="onEmojiPickerClick"></emoji-picker>
     </div>
 
     <!-- Upload Dialog -->

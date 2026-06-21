@@ -220,7 +220,16 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
         }
       }
     }
-    return sendComposerMessage(payload);
+    const outcome = await sendComposerMessage(payload);
+    if (outcome.ok) {
+      // 仅清理上传成功的附件，保留失败的以便用户查看错误状态并重试
+      for (const [id, att] of getAttachments()) {
+        if (att.status === "done") {
+          removeAttachment(id);
+        }
+      }
+    }
+    return outcome;
   }
 
   return {

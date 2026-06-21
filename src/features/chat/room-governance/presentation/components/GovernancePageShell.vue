@@ -46,7 +46,7 @@ const emit = defineEmits<{
 <style scoped lang="scss">
 .cp-governancePage {
   height: 100%;
-  padding: 14px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;

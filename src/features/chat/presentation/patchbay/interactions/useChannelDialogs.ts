@@ -3,7 +3,7 @@
  * @description chat｜presentation composable：收敛主页面频道弹窗状态与删除后续动作。
  */
 
-import { ref, type ComputedRef, type Ref } from "vue";
+import { computed, ref, type ComputedRef, type Ref } from "vue";
 import type { ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
 
@@ -12,6 +12,7 @@ type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChannelLike = {
   id: string;
   name: string;
+  ownerUserId?: string;
 };
 
 /**
@@ -19,6 +20,7 @@ type ChannelLike = {
  */
 export type UseChannelDialogsDeps = {
   currentChannelId: RefLike<string>;
+  currentUserId: RefLike<string>;
   channels: RefLike<readonly ChannelLike[]>;
   findChannelById(channelId: string): ChannelLike | null | undefined;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
@@ -39,6 +41,12 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
   const deleteChannelId = ref("");
   const deleteChannelName = ref("");
   const runAsyncTask = createAsyncTaskRunner(deps.onAsyncError);
+
+  const canDeleteCurrentChannel = computed(() => {
+    const channel = deps.findChannelById(deps.currentChannelId.value);
+    if (!channel?.ownerUserId) return false;
+    return channel.ownerUserId === deps.currentUserId.value;
+  });
 
   function openCreateChatMenu(e: MouseEvent): void {
     const target = e.currentTarget as HTMLElement | null;
@@ -89,6 +97,7 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
   }
 
   function openDeleteChannelDialog(): void {
+    if (!canDeleteCurrentChannel.value) return;
     const channel = deps.findChannelById(deps.currentChannelId.value);
     if (!channel) return;
     deleteChannelId.value = channel.id;
@@ -134,5 +143,6 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
     handleChannelCreated,
     openDeleteChannelDialog,
     handleChannelDeleted,
+    canDeleteCurrentChannel,
   };
 }

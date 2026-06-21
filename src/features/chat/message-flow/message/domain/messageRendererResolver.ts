@@ -59,6 +59,17 @@ export function toMessageContentModel(envelope: MessageEnvelope): MessageContent
       replyToId: message.replyToId,
     };
   }
+  if (message.kind === "video") {
+    return {
+      kind: "video",
+      url: message.url,
+      fileName: message.fileName,
+      fileSize: message.fileSize,
+      preview: message.preview,
+      replyToId: message.replyToId,
+      duration: message.duration,
+    };
+  }
   return {
     kind: "plugin",
     domainId: message.domain.id,
@@ -106,6 +117,21 @@ export function resolveMessageRenderModel(
       from: envelope.from,
       timeMs: envelope.timeMs,
       replyToMid: content.replyToId,
+    };
+  }
+
+  if (content.kind === "video") {
+    return {
+      kind: "video",
+      messageId: envelope.messageId,
+      url: content.url,
+      fileName: content.fileName,
+      fileSize: content.fileSize,
+      preview: content.preview,
+      from: envelope.from,
+      timeMs: envelope.timeMs,
+      replyToMid: content.replyToId,
+      duration: content.duration,
     };
   }
 

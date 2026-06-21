@@ -111,7 +111,12 @@ export function useChannelMembersPage(
   }
 
   function canKickMember(member: ChannelMember): boolean {
-    return isAdmin.value && hasManageableIdentity(member, currentUserId.value);
+    if (!hasManageableIdentity(member, currentUserId.value)) return false;
+    // Owner can kick admins and regular members
+    if (isOwner.value) return true;
+    // Admin (non-owner) can only kick regular members
+    if (isAdmin.value && member.role === "member") return true;
+    return false;
   }
 
   async function handleKick(uid: string): Promise<void> {
