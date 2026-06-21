@@ -22,6 +22,8 @@ export type ChatMember = {
   id: string;
   name: string;
   role: "owner" | "admin" | "member";
+  /** 头像 URL（可选）。来自服务端 avatar 字段，用于 AvatarBadge 渲染。 */
+  avatarUrl?: string;
 };
 
 /**

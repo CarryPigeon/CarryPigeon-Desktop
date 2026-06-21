@@ -1,13 +1,9 @@
 import type { CallSession, CallKind, CallParticipant, AudioDeviceInfo, MediaSettings } from "../domain/contracts";
 import type { VoiceCallStatePort } from "../domain/ports";
+import { invoke } from "@tauri-apps/api/core";
 
 export function createMockVoiceCallStatePort(): VoiceCallStatePort {
   let _activeSession: CallSession | null = null;
-
-  const mockDevices: AudioDeviceInfo[] = [
-    { deviceId: "default-mic", name: "Default Microphone", isDefault: true },
-    { deviceId: "virtual-mic", name: "Virtual Microphone", isDefault: false },
-  ];
 
   const mockParticipants: CallParticipant[] = [
     { userId: "u-1", displayName: "Operator", isMuted: false, isSpeaking: true, audioLevel: 0.8, joinedAt: Date.now() },
@@ -76,6 +72,12 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
     async toggleMute(_sessionId: string) {
       if (!_activeSession) throw new Error("call_not_found");
       const muted = !_activeSession.participants[0]?.isMuted;
+      _activeSession = {
+        ..._activeSession,
+        participants: _activeSession.participants.map((p, i) =>
+          i === 0 ? { ...p, isMuted: muted } : p
+        ),
+      };
       return muted;
     },
 
@@ -87,7 +89,8 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
     },
 
     async updateMediaSettings(sessionId: string, settings: Partial<MediaSettings>) {
-      if (!_activeSession || _activeSession.sessionId !== sessionId) throw new Error("call_not_found");
+      if (!_activeSession) throw new Error("call_not_found");
+      if (_activeSession.sessionId !== sessionId) throw new Error("call_not_found");
       _activeSession = { ..._activeSession, mediaSettings: { ..._activeSession.mediaSettings, ...settings } };
     },
 
@@ -95,7 +98,35 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
     getParticipants(_sessionId: string) { return mockParticipants; },
 
     async enumerateDevices() {
-      return { input: mockDevices, output: mockDevices };
+      // 1) 优先使用 Tauri 命令（Tauri webview 环境）
+      try {
+        const result = await invoke<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>("enumerate_audio_devices");
+        if (result.input.length > 0 || result.output.length > 0) return result;
+      } catch { /* Tauri 不可用，继续下一步 */ }
+
+      try {
+        const input = await invoke<AudioDeviceInfo[]>("enumerate_input_devices");
+        const output = await invoke<AudioDeviceInfo[]>("enumerate_output_devices");
+        if (input.length > 0 || output.length > 0) return { input, output };
+      } catch { /* 继续下一步 */ }
+
+      // 2) 回退到浏览器 Web API（纯浏览器开发模式）
+      try {
+        const all = await navigator.mediaDevices.enumerateDevices();
+        const input: AudioDeviceInfo[] = [];
+        const output: AudioDeviceInfo[] = [];
+        for (const d of all) {
+          const name = d.label || (d.kind === "audioinput" ? `麦克风 (${d.deviceId.slice(0, 8)}…)` : `扬声器 (${d.deviceId.slice(0, 8)}…)`);
+          if (d.kind === "audioinput") {
+            input.push({ deviceId: d.deviceId, name, isDefault: d.deviceId === "default" });
+          } else if (d.kind === "audiooutput") {
+            output.push({ deviceId: d.deviceId, name, isDefault: d.deviceId === "default" });
+          }
+        }
+        return { input, output };
+      } catch {
+        return { input: [], output: [] };
+      }
     },
 
     async joinConference(sessionId: string, initiatorId?: string) {

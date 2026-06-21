@@ -1,10 +1,10 @@
 /**
  * @fileoverview httpFileListPort.ts
- * @description files/data｜HTTP 文件列表数据适配器。
+ * @description files/data｜HTTP 文件列表及操作数据适配器。
  */
 
 import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
-import type { FileRecord, FileListQuery } from "../domain/contracts";
+import type { FileRecord, FileListQuery, FileDeleteRequest, BatchFileRequest, UploaderInfo } from "../domain/contracts";
 
 type FileRecordWire = {
   id: string;
@@ -21,6 +21,15 @@ type FileRecordWire = {
 
 type ApiListFilesResponse = {
   items: FileRecordWire[];
+};
+
+type UploaderWire = {
+  id: string;
+  name: string;
+};
+
+type ApiUploadersResponse = {
+  items: UploaderWire[];
 };
 
 function mapFileRecordWire(wire: FileRecordWire): FileRecord {
@@ -45,7 +54,28 @@ export async function httpListFiles(serverSocket: string, accessToken: string, q
   if (query.mimePrefix) q.push(`mime_prefix=${encodeURIComponent(query.mimePrefix)}`);
   if (query.offset != null) q.push(`offset=${encodeURIComponent(String(Math.max(0, Math.trunc(query.offset))))}`);
   if (query.limit != null) q.push(`limit=${encodeURIComponent(String(Math.max(1, Math.trunc(query.limit))))}`);
+  if (query.sortBy) q.push(`sort_by=${encodeURIComponent(query.sortBy)}`);
+  if (query.sortOrder) q.push(`sort_order=${encodeURIComponent(query.sortOrder)}`);
+  if (query.uploaderId) q.push(`uploader_id=${encodeURIComponent(query.uploaderId)}`);
+  if (query.dateFrom) q.push(`date_from=${encodeURIComponent(query.dateFrom)}`);
+  if (query.dateTo) q.push(`date_to=${encodeURIComponent(query.dateTo)}`);
   const path = `/api/files/list${q.length ? `?${q.join("&")}` : ""}`;
   const res = await client.requestJson<ApiListFilesResponse>("GET", path);
   return Array.isArray(res?.items) ? res.items.map(mapFileRecordWire) : [];
+}
+
+export async function httpDeleteFile(serverSocket: string, accessToken: string, request: FileDeleteRequest): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  await client.requestJson("POST", "/api/files/delete", { file_id: request.fileId, share_key: request.shareKey });
+}
+
+export async function httpBatchDeleteFiles(serverSocket: string, accessToken: string, request: BatchFileRequest): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  await client.requestJson("POST", "/api/files/batch-delete", { file_ids: request.fileIds });
+}
+
+export async function httpListUploaders(serverSocket: string, accessToken: string): Promise<UploaderInfo[]> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const res = await client.requestJson<ApiUploadersResponse>("GET", "/api/files/uploaders");
+  return Array.isArray(res?.items) ? res.items : [];
 }

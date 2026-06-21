@@ -40,24 +40,23 @@ function generateId(): string {
   return `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const IMAGE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/bmp",
-  "image/svg+xml",
-  "image/avif",
-];
+/**
+ * 判断 MIME 类型是否为支持的图片或视频格式。
+ * 使用前缀匹配与代码库其他位置保持一致，避免遗漏合法类型（如 image/heic、video/3gpp）。
+ */
+function isSupportedMediaType(mime: string): boolean {
+  const t = mime.trim().toLowerCase();
+  return t.startsWith("image/") || t.startsWith("video/");
+}
 
 /**
- * 添加文件（仅过滤出图片类型）到附件列表。
+ * 添加文件（图片和视频）到附件列表。
  *
  * @param files - FileList 或 File 数组。
  */
 export function addFiles(files: FileList | File[]): void {
   for (const file of Array.from(files)) {
-    if (!IMAGE_TYPES.includes(file.type)) continue;
+    if (!isSupportedMediaType(file.type)) continue;
     const id = generateId();
     const blobUrl = URL.createObjectURL(file);
     attachments.set(id, { id, file, blobUrl, status: "pending", progress: 0 });
@@ -85,6 +84,25 @@ export function clearAttachments(): void {
     URL.revokeObjectURL(att.blobUrl);
   }
   attachments.clear();
+}
+
+/**
+ * 分离全部附件（不释放 blob URL）。
+ *
+ * 用于将附件 blob URL 所有权转移给消息对象后清理附件存储，
+ * 避免释放已被消息引用的 blob URL。
+ */
+export function detachAttachments(): void {
+  attachments.clear();
+}
+
+/**
+ * 分离指定附件（不释放 blob URL）。
+ *
+ * @param id - 附件 id。
+ */
+export function detachAttachment(id: string): void {
+  attachments.delete(id);
 }
 
 /**

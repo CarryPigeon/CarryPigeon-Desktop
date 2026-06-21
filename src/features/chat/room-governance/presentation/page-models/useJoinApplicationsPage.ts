@@ -6,11 +6,14 @@
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
-import type { ChannelApplication, RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
+import type { ChannelApplication, ChannelMember, RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import { useChannelScopedRefresh } from "@/features/chat/presentation/shared/useChannelScopedRefresh";
 import { useGovernanceChannelPageRoute } from "../page-support/useGovernanceChannelPageRoute";
 import { useGovernancePageState } from "../page-support/useGovernancePageState";
+
+type MemberRole = ChannelMember["role"];
 
 /**
  * 入群申请页模型。
@@ -21,6 +24,7 @@ export type JoinApplicationsPageModel = {
   isLoading: Ref<boolean>;
   pageError: Ref<string>;
   pendingCount: ComputedRef<number>;
+  canDecide: ComputedRef<boolean>;
   formatApplyTime(applyTimeMs: number): string;
   handleDecide(applicationId: string, approved: boolean): Promise<void>;
   goBack(): void;
@@ -31,11 +35,13 @@ export type JoinApplicationsPageModel = {
  */
 export type JoinApplicationsPageDeps = {
   governance: RoomGovernanceCapabilities;
+  currentUserId: ComputedRef<string>;
 };
 
 function createDefaultJoinApplicationsPageDeps(): JoinApplicationsPageDeps {
   return {
     governance: getRoomGovernanceCapabilities(),
+    currentUserId: computed(() => currentChatUserId.value),
   };
 }
 
@@ -63,21 +69,49 @@ export function useJoinApplicationsPage(
   const pendingApplications = computed(() => applications.value.filter((application) => application.status === "pending"));
   const pendingCount = computed(() => pendingApplications.value.length);
 
+  const currentUserId = computed(() => deps.currentUserId.value);
+  const members = ref<ChannelMember[]>([]);
+  const currentUserRole = computed<MemberRole>(() => {
+    const member = members.value.find((item) => item.uid === currentUserId.value);
+    return member?.role ?? "member";
+  });
+  const isAdmin = computed(() => currentUserRole.value === "admin" || currentUserRole.value === "owner");
+  const canDecide = computed(() => isAdmin.value);
+
   function formatApplyTime(applyTimeMs: number): string {
     if (!applyTimeMs) return "—";
     return new Date(applyTimeMs).toLocaleString();
   }
 
   async function loadApplications(): Promise<void> {
-    await runPageLoad((channelId) => deps.governance.forChannel(channelId).listApplications(), (nextApplications) => {
-      applications.value = nextApplications;
-    });
+    await runPageLoad(
+      async (channelId) => {
+        const channelGovernance = deps.governance.forChannel(channelId);
+        const [applicationList, memberList] = await Promise.all([
+          channelGovernance.listApplications(),
+          channelGovernance.listMembers(),
+        ]);
+        return { applicationList, memberList };
+      },
+      ({ applicationList, memberList }) => {
+        applications.value = applicationList;
+        members.value = memberList;
+      },
+    );
   }
 
   async function handleDecide(applicationId: string, approved: boolean): Promise<void> {
     await runChannelAction(
       (channelId) => deps.governance.forChannel(channelId).decideApplication(applicationId, approved),
-      loadApplications,
+      async () => {
+        // 审批成功后重新加载申请列表并刷新成员侧栏。
+        await loadApplications();
+        if (approved && channelId.value) {
+          try {
+            await deps.governance.forChannel(channelId.value).listMembers();
+          } catch { /* 成员刷新失败不影响申请列表 */ }
+        }
+      },
     );
   }
 
@@ -97,6 +131,7 @@ export function useJoinApplicationsPage(
     isLoading,
     pageError,
     pendingCount,
+    canDecide,
     formatApplyTime,
     handleDecide,
     goBack,

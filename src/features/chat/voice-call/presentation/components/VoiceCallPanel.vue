@@ -25,7 +25,7 @@
           <img v-if="p.avatarUrl" class="voice-call-panel__participant-avatar" :src="p.avatarUrl" alt="" />
           <AvatarBadge v-else :name="p.displayName || p.userId" :size="26" />
           <span class="voice-call-panel__participant-name">{{ p.displayName || p.userId }}</span>
-          <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><t-icon name="microphone-off" /></span>
+          <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><t-icon name="microphone-1" /></span>
           <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon"><t-icon name="sound" /></span>
           <span class="voice-call-panel__participant-level">
             <span class="voice-call-panel__level-bar" :style="{ width: (p.audioLevel * 100) + '%' }"></span>
@@ -40,7 +40,7 @@
           :title="isMuted ? t('voice_call_unmute') : t('voice_call_mute')"
           @click="$emit('toggleMute')"
         >
-          <t-icon :name="isMuted ? 'microphone-off' : 'microphone'" />
+          <t-icon name="microphone" />
         </button>
         <button
           class="voice-call-panel__ctrl-btn"
@@ -51,11 +51,11 @@
           <t-icon name="sound-mute" />
         </button>
         <select
-          v-if="inputDevices.length > 0"
           class="voice-call-panel__device-select"
-          :value="currentInputDeviceId"
+          :value="currentInputDeviceId ?? ''"
           @change="$emit('selectInputDevice', ($event.target as HTMLSelectElement).value)"
         >
+          <option value="">{{ t("voice_call_default_device") }}</option>
           <option
             v-for="device in inputDevices"
             :key="device.deviceId"
@@ -65,11 +65,11 @@
           </option>
         </select>
         <select
-          v-if="outputDevices.length > 0"
           class="voice-call-panel__device-select"
-          :value="currentOutputDeviceId"
+          :value="currentOutputDeviceId ?? ''"
           @change="$emit('selectOutputDevice', ($event.target as HTMLSelectElement).value)"
         >
+          <option value="">{{ t("voice_call_default_device") }}</option>
           <option
             v-for="device in outputDevices"
             :key="device.deviceId"

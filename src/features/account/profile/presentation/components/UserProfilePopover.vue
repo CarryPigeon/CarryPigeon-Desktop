@@ -196,11 +196,17 @@ const resolvedUsername = computed(() => props.username ?? profile.value?.nicknam
 const resolvedEmail = computed(() => props.email ?? profile.value?.email ?? "");
 const resolvedBio = computed(() => props.bio ?? profile.value?.bio ?? "");
 const resolvedAvatarUrl = computed(() => {
-  const url = props.avatarUrl ?? profile.value?.avatar;
+  // 当前用户优先使用全局快照中的头像（可能已通过 applyLocalProfilePatch 更新），
+  // 再回退到从 API 拉取的 profile.avatar，避免 mock 模式下上传后不刷新。
+  const url = props.avatarUrl
+    ?? (isCurrentUser.value ? currentUser.avatarUrl : undefined)
+    ?? profile.value?.avatar;
   return url || "https://picsum.photos/80/80?grayscale";
 });
 const resolvedBackgroundUrl = computed(() => {
-  return props.backgroundUrl ?? profile.value?.backgroundUrl;
+  return props.backgroundUrl
+    ?? (isCurrentUser.value ? currentUser.backgroundUrl : undefined)
+    ?? profile.value?.backgroundUrl;
 });
 
 // Popper
@@ -241,7 +247,7 @@ async function loadProfile() {
     logger.error("Action: auth_profile_load_failed", {
       error: String(e),
     });
-    error.value = "加载失败";
+    error.value = t("load_failed");
   } finally {
     loading.value = false;
   }
@@ -254,6 +260,8 @@ function retryLoad() {
 // Popper management
 function createPopperInstance() {
   if (!triggerRef.value || !popoverRef.value) return;
+  // 确保触发元素仍然在 DOM 中，避免 "Cannot read properties of undefined (reading 'parentNode')"
+  if (!triggerRef.value.isConnected || !document.body.contains(triggerRef.value)) return;
 
   const options: Partial<Options> = props.placement
     ? { placement: props.placement as Placement }
@@ -456,7 +464,7 @@ async function handleCopyUid() {
 function handleViewFullProfile() {
   closePopover();
   router.push({
-    path: "/user_info",
+    path: "/user-info",
     query: {
       uid: props.userId,
       name: resolvedUsername.value || undefined,
@@ -471,7 +479,7 @@ function handleViewFullProfile() {
 function handleEditProfile() {
   closePopover();
   router.push({
-    path: "/user_info",
+    path: "/user-info",
     query: {
       uid: props.userId,
       name: resolvedUsername.value || undefined,

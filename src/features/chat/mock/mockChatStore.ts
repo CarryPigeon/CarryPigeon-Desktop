@@ -7,6 +7,8 @@ import { computed, reactive, ref } from "vue";
 import { currentChatUser, currentChatUsername } from "@/features/chat/composition/chatAccountSession";
 import { getAvailableChatMessageDomains } from "@/features/chat/data/plugins/chatPluginRuntime";
 import { chatCurrentServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
+import { getAttachments, detachAttachments } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
@@ -73,18 +75,28 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
       { id: "cid-tech", name: "Troubleshooting", unread: 0, brief: "Connectivity + diagnostics.", joined: true, joinRequested: false },
       { id: "cid-lab", name: "Lab", unread: 1, brief: "Experiments and extensions.", joined: false, joinRequested: false },
     ] as ChatChannel[],
+    /** 入群申请列表（mock 状态追踪 —— 审批后更新 status，不再硬编码）。 */
+    applications: [
+      {
+        applicationId: "app-1",
+        uid: "u-new-1",
+        nickname: "NewUser",
+        reason: "Want to join the discussion",
+        applyTime: Date.now() - 1000 * 60 * 30,
+      },
+    ] as { applicationId: string; uid: string; nickname: string; reason: string; applyTime: number; status?: string }[],
     members: [
-      { id: "u-1", name: "Operator", role: "owner" },
-      { id: "u-2", name: "Relay", role: "admin" },
-      { id: "u-3", name: "PatchCable", role: "member" },
-      { id: "u-4", name: "Guest", role: "member" },
+      { id: "u-1", name: "Operator", role: "owner", avatarUrl: "https://i.pravatar.cc/80?u=u-1" },
+      { id: "u-2", name: "Relay", role: "admin", avatarUrl: "https://i.pravatar.cc/80?u=u-2" },
+      { id: "u-3", name: "PatchCable", role: "member", avatarUrl: "https://i.pravatar.cc/80?u=u-3" },
+      { id: "u-4", name: "Guest", role: "member", avatarUrl: "https://i.pravatar.cc/80?u=u-4" },
     ] as ChatMember[],
     messagesByChannel: {
       "cid-ann": [
         {
           id: "m-1",
           kind: "core_text",
-          from: { id: "u-1", name: "Operator" },
+          from: { id: "u-1", name: "Operator", avatarUrl: "https://i.pravatar.cc/80?u=u-1" },
           timeMs: Date.now() - 1000 * 60 * 30,
           domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
           text: "Welcome to Patchbay. This is the baseline text domain.",
@@ -98,7 +110,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         {
           id: "m-2",
           kind: "core_text",
-          from: { id: "u-2", name: "Relay" },
+          from: { id: "u-2", name: "Relay", avatarUrl: "https://i.pravatar.cc/80?u=u-2" },
           timeMs: Date.now() - 1000 * 60 * 18,
           domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
           text: "P0 checklist: required gate, unknown domain downgrade, hard delete disappears, weak disconnect hints.",
@@ -106,7 +118,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         {
           id: "m-3",
           kind: "domain_message",
-          from: { id: "u-4", name: "Guest" },
+          from: { id: "u-4", name: "Guest", avatarUrl: "https://i.pravatar.cc/80?u=u-4" },
           timeMs: Date.now() - 1000 * 60 * 16,
           domain: { id: "Ext:Alpha", label: "Ext:Alpha", colorVar: "--cp-domain-ext-a", pluginIdHint: "ext.codec", version: "0.9.0" },
           preview: "UNPATCHED SIGNAL · Ext:Alpha@0.9.0 (install ext.codec to decode)",
@@ -116,7 +128,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         {
           id: "m-4",
           kind: "core_text",
-          from: { id: "u-2", name: "Relay" },
+          from: { id: "u-2", name: "Relay", avatarUrl: "https://i.pravatar.cc/80?u=u-2" },
           timeMs: Date.now() - 1000 * 60 * 10,
           domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
           text: "If you see TLS verify failures, you should be given certificate details and explicit trust choices.",
@@ -126,7 +138,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         {
           id: "m-5",
           kind: "domain_message",
-          from: { id: "u-3", name: "PatchCable" },
+          from: { id: "u-3", name: "PatchCable", avatarUrl: "https://i.pravatar.cc/80?u=u-3" },
           timeMs: Date.now() - 1000 * 60 * 5,
           domain: { id: "Ext:Beta", label: "Ext:Beta", colorVar: "--cp-domain-ext-b", pluginIdHint: "ext.styler", version: "0.3.2" },
           preview: "UNPATCHED SIGNAL · Ext:Beta@0.3.2",
@@ -423,6 +435,12 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         error,
       };
     }
+    // 释放媒体消息的 blob URL，避免 mock 长时间运行时内存泄漏。
+    const removed = list[idx];
+    if (removed.kind === "image" || removed.kind === "video") {
+      if ((removed as any).url?.startsWith("blob:")) URL.revokeObjectURL((removed as any).url);
+      if ((removed as any).thumbUrl?.startsWith("blob:")) URL.revokeObjectURL((removed as any).thumbUrl);
+    }
     list.splice(idx, 1);
     messageActionError.value = null;
     return {
@@ -513,7 +531,14 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     const uiDomain = selectedDomainId.value.trim();
     const isCoreText = uiDomain === "Core:Text";
     const text = composerDraft.value.trim();
-    if (!payload && isCoreText && !text) {
+    // 检查是否有待发送的媒体附件
+    const attachmentList = Array.from(getAttachments().values());
+    const hasMediaAttachments = attachmentList.some(
+      (att) =>
+        (att.file.type.startsWith("image/") || att.file.type.startsWith("video/")) &&
+        (att.status === "done" || att.status === "pending"),
+    );
+    if (!payload && isCoreText && !text && !hasMediaAttachments) {
       const error: ChatMessageActionErrorInfo = {
         code: "missing_domain",
         message: "Missing message payload.",
@@ -558,7 +583,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
 
     const now = Date.now();
     const list = state.messagesByChannel[currentChannelId.value] ?? (state.messagesByChannel[currentChannelId.value] = []);
-    const from = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator" };
+    const from = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator", avatarUrl: currentChatUser.value.avatarUrl || undefined };
     const replyToId = replyDraft.value?.messageId || replyToMessageId.value || undefined;
     const replyTo = replyDraft.value
       ? {
@@ -569,35 +594,112 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         }
       : undefined;
     const quoteReply = payload?.quoteReply ?? quoteReplyDraft.value ?? undefined;
-    let createdMessage: ChatMessage;
+    const createdMessages: ChatMessage[] = [];
 
     if (payload) {
-      createdMessage = {
+      // 支持重试时正确还原图片/视频消息类型（从 payload.data.attachments 推断）
+      const retryAttachments: unknown[] = Array.isArray((payload.data as any)?.attachments)
+        ? (payload.data as any).attachments
+        : [];
+      const isRetryVideo = retryAttachments.length === 1 && String((retryAttachments[0] as any)?.mimeType ?? "").startsWith("video/");
+      const isRetryImage = retryAttachments.length === 1 && String((retryAttachments[0] as any)?.mimeType ?? "").startsWith("image/");
+      const retryKind = isRetryVideo ? "video" : isRetryImage ? "image" : "domain_message";
+      const retryAtt = retryAttachments[0] as Record<string, unknown> | undefined;
+      const msg = {
         id: `m-${now}`,
-        kind: "domain_message",
+        kind: retryKind,
         from,
         timeMs: now,
         domain: { id: payload.domain, label: payload.domain, colorVar: "--cp-domain-ext-a", version: payload.domainVersion },
-        preview: `UNPATCHED SIGNAL · ${payload.domain}@${payload.domainVersion}`,
-        data: payload.data,
+        ...(retryKind === "video" || retryKind === "image" ? {
+          fileKey: String(retryAtt?.shareKey ?? ""),
+          fileName: String(retryAtt?.name ?? ""),
+          fileSize: Number(retryAtt?.size ?? 0),
+          mimeType: String(retryAtt?.mimeType ?? ""),
+          url: "",
+          preview: String((payload.data as any)?.text ?? ""),
+          status: "sent" as const,
+          ...(retryKind === "video" && retryAtt?.duration != null ? { duration: Number(retryAtt.duration) } : {}),
+        } : {
+          preview: `UNPATCHED SIGNAL · ${payload.domain}@${payload.domainVersion}`,
+          data: payload.data,
+        }),
         replyToId,
         replyTo,
         quoteReply,
-      };
-      list.push(createdMessage);
+      } as ChatMessage;
+      list.push(msg);
+      createdMessages.push(msg);
     } else {
-      createdMessage = {
-        id: `m-${now}`,
-        kind: "core_text",
-        from,
-        timeMs: now,
-        domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
-        text,
-        replyToId,
-        replyTo,
-        quoteReply,
-      };
-      list.push(createdMessage);
+      // 从附件存储中读取已上传完成的媒体附件，生成内联消息
+      const attachmentList = Array.from(getAttachments().values());
+      const doneMediaAttachments = attachmentList.filter(
+        (att) =>
+          (att.file.type.startsWith("image/") || att.file.type.startsWith("video/")) &&
+          (att.status === "done" || att.status === "pending"),
+      );
+
+      if (doneMediaAttachments.length > 0) {
+        // 为每个媒体文件创建消息
+        for (const att of doneMediaAttachments) {
+          const isVideo = att.file.type.startsWith("video/");
+          const msg: ChatMessage = {
+            id: `m-${isVideo ? "vid" : "img"}-${Date.now()}-${att.id.slice(-6)}`,
+            kind: isVideo ? "video" : "image",
+            from,
+            timeMs: now,
+            domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+            fileKey: att.shareKey || att.id,
+            fileName: att.file.name,
+            fileSize: att.file.size,
+            mimeType: att.file.type,
+            url: att.blobUrl,
+            thumbUrl: isVideo ? undefined : att.blobUrl,
+            preview: isVideo ? `[Video] ${att.file.name}` : `[Image] ${att.file.name}`,
+            replyToId,
+            replyTo,
+            quoteReply,
+            status: "sent",
+          } as ChatMessage;
+          list.push(msg);
+          createdMessages.push(msg);
+        }
+
+        // 如果文本中除 [file:xxx] 外还有实质内容，同时创建文本消息
+        const textWithoutFileRefs = text.replace(/\[file:[^\]]+\]/g, "").trim();
+        if (textWithoutFileRefs) {
+          const textMsg: ChatMessage = {
+            id: `m-${Date.now()}`,
+            kind: "core_text",
+            from,
+            timeMs: now,
+            domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+            text: textWithoutFileRefs,
+            replyToId,
+            replyTo,
+            quoteReply,
+          } as ChatMessage;
+          list.push(textMsg);
+          createdMessages.push(textMsg);
+        }
+
+        // 分离已处理的附件（保留 blob URL 给消息引用）
+        detachAttachments();
+      } else {
+        const msg: ChatMessage = {
+          id: `m-${now}`,
+          kind: "core_text",
+          from,
+          timeMs: now,
+          domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+          text,
+          replyToId,
+          replyTo,
+          quoteReply,
+        };
+        list.push(msg);
+        createdMessages.push(msg);
+      }
       composerDraft.value = "";
     }
 
@@ -608,7 +710,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     return {
       ok: true,
       kind: "chat_message_sent",
-      message: createdMessage,
+      message: createdMessages[0],
     };
   }
 
@@ -832,17 +934,15 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
    * @returns `Promise<ChannelApplication[]>`。
    */
   async function listApplications(channelId: string): Promise<ChannelApplication[]> {
-    return [
-      {
-        applicationId: "app-1",
-        cid: channelId,
-        uid: "u-new-1",
-        nickname: "NewUser",
-        reason: "Want to join the discussion",
-        applyTime: Date.now() - 1000 * 60 * 30,
-        status: "pending",
-      },
-    ];
+    return state.applications.map((a) => ({
+      applicationId: a.applicationId,
+      cid: channelId,
+      uid: a.uid,
+      nickname: a.nickname,
+      reason: a.reason,
+      applyTime: a.applyTime,
+      status: a.status ?? "pending",
+    }));
   }
 
   /**
@@ -858,10 +958,21 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     applicationId: string,
     approved: boolean,
   ): Promise<DecideChannelApplicationOutcome> {
-    void channelId;
-    void applicationId;
+    // 更新申请状态，使其从 pending 列表中消失。
+    const application = state.applications.find((a) => a.applicationId === applicationId);
+    if (application) {
+      application.status = approved ? "approved" : "rejected";
+    }
+    // 通过时将申请人加入成员列表（避免重复添加同一个用户）。
     if (approved) {
-      state.members.push({ id: "u-new-1", name: "NewUser", role: "member" });
+      const alreadyMember = state.members.some((m) => m.id === (application?.uid ?? "u-new-1"));
+      if (!alreadyMember) {
+        state.members.push({
+          id: application?.uid ?? "u-new-1",
+          name: application?.nickname ?? "NewUser",
+          role: "member",
+        });
+      }
     }
     return {
       ok: true,
@@ -1074,7 +1185,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         {
           id: mid,
           kind: "core_text" as const,
-          from: { id: "u-1", name: "Operator" },
+          from: { id: "u-1", name: "Operator", avatarUrl: "https://i.pravatar.cc/80?u=u-1" },
           timeMs: Date.now() - 1000 * 60,
           domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" as const },
           text: "Message from search result",
@@ -1110,7 +1221,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     req: { targetCid: string; comment?: string; mergedMids?: string[] },
   ): Promise<ChatMessage> {
     const now = Date.now();
-    const f = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator" };
+    const f = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator", avatarUrl: currentChatUser.value.avatarUrl || undefined };
     const targetChannelId = String(req.targetCid ?? "").trim();
     if (!targetChannelId) throw new Error("Missing target channel id");
 
@@ -1187,6 +1298,47 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     targetList.push(newMsg);
     return newMsg;
   }
+
+  /**
+   * 注册 server scope 清理回调：当已激活的 server 被移除时，清空全部 mock 聊天状态，
+   * 避免返回到 chat 页面时显示已移除服务器的旧数据。
+   *
+   * 与 live store（createChatRuntimeStore.ts 内建 watch）共享相同的清理契约。
+   */
+  registerServerScopeCleanupHandler((event) => {
+    const shouldClear =
+      event.type === "all" ||
+      (event.type === "scope" && event.key === chatCurrentServerSocket.value.trim());
+    if (!shouldClear) return;
+
+    state.channels = [];
+    state.members = [];
+    state.messagesByChannel = {};
+    state.applications = [];
+    state.lastReadTimeMsByChannel = {};
+    state.lastReadMidByChannel = {};
+    currentChannelId.value = "";
+    channelSearch.value = "";
+    channelTab.value = "joined";
+    composerDraft.value = "";
+    selectedDomainId.value = "Core:Text";
+    replyToMessageId.value = "";
+    replyDraft.value = null;
+    draftMentions.value = [];
+    quoteReplyDraft.value = null;
+    multiSelectMode.value = false;
+    selectedMessageIds.value = new Set();
+    messageActionError.value = null;
+    searchState.value = {
+      query: "",
+      loading: false,
+      error: "",
+      results: [],
+      serverResults: [],
+      searchScope: "channel",
+    };
+    highlightedMessageId.value = "";
+  });
 
   return {
     channels,

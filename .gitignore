@@ -48,3 +48,5 @@ CLAUDE.md
 
 .codegraph/*
 .codegraph/daemon.pid
+docs/performance-benchmarks.md
+docs/release-readiness-checklist.md

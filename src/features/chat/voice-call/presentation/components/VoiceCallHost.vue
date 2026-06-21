@@ -81,6 +81,7 @@ const {
   selectInputDevice,
   selectOutputDevice,
   initDevices,
+  refreshDevices,
   joinConference,
   leaveConference,
   beginListening,
@@ -102,11 +103,19 @@ const callerName = computed(() => {
 });
 
 const currentInputDeviceId = computed(() => {
-  return activeSession.value?.mediaSettings.inputDeviceId ?? null;
+  const sessionDevice = activeSession.value?.mediaSettings.inputDeviceId;
+  if (sessionDevice && inputDevices.value.some((d) => d.deviceId === sessionDevice)) {
+    return sessionDevice;
+  }
+  return inputDevices.value.find((d) => d.isDefault)?.deviceId ?? inputDevices.value[0]?.deviceId ?? null;
 });
 
 const currentOutputDeviceId = computed(() => {
-  return activeSession.value?.mediaSettings.outputDeviceId ?? null;
+  const sessionDevice = activeSession.value?.mediaSettings.outputDeviceId;
+  if (sessionDevice && outputDevices.value.some((d) => d.deviceId === sessionDevice)) {
+    return sessionDevice;
+  }
+  return outputDevices.value.find((d) => d.isDefault)?.deviceId ?? outputDevices.value[0]?.deviceId ?? null;
 });
 
 function handleAccept() {
@@ -157,6 +166,33 @@ const participantsWithAvatars = computed(() => {
     const avatarUrl = avatars.get(p.userId);
     return avatarUrl ? { ...p, avatarUrl } : p;
   });
+});
+
+// ── 设备热插拔轮询 ────────────────────────────────────────────
+const DEVICE_POLL_INTERVAL_MS = 3_000;
+let devicePollHandle: ReturnType<typeof setInterval> | null = null;
+
+function startDevicePoll() {
+  if (devicePollHandle) return;
+  devicePollHandle = setInterval(() => {
+    void refreshDevices();
+  }, DEVICE_POLL_INTERVAL_MS);
+}
+
+function stopDevicePoll() {
+  if (devicePollHandle) {
+    clearInterval(devicePollHandle);
+    devicePollHandle = null;
+  }
+}
+
+// 通话活跃期间持续轮询设备变化（支持热插拔检测）
+watch(callState, (s) => {
+  if (s === "dialing" || s === "connecting" || s === "active" || s === "ringing") {
+    startDevicePoll();
+  } else {
+    stopDevicePoll();
+  }
 });
 
 onMounted(() => {
@@ -239,6 +275,7 @@ watch(
 onUnmounted(() => {
   unlistenIncoming?.();
   unlistenStateChange?.();
+  stopDevicePoll();
 });
 
 function startCall(targetUserId?: string) {

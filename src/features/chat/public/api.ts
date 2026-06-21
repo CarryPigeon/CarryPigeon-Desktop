@@ -12,6 +12,7 @@ import { createMessageFlowCapabilities } from "../message-flow/api";
 import { createRoomGovernanceCapabilities } from "../room-governance/api";
 import { createRoomSessionCapabilities } from "../room-session/api";
 import { getVoiceCallCapabilities } from "../voice-call/api";
+import { getActiveChatServerSocket } from "../composition/serverWorkspaceAdapter";
 import type { ChatCapabilities, UnreadMessagePreview } from "./api-types";
 
 let cachedChatCapabilities: ChatCapabilities | null = null;
@@ -67,6 +68,10 @@ export function createChatCapabilities(): ChatCapabilities {
         });
       }
       return items.sort((a, b) => b.timeMs - a.timeMs).slice(0, maxCount);
+    },
+
+    getServerSocket() {
+      return getActiveChatServerSocket();
     },
   };
 }

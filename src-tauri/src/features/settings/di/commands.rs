@@ -1,6 +1,10 @@
 //! settings｜DI/命令入口：commands。
 //!
 //! 约定：注释中文，日志英文（tracing）。
+//!
+//! 本模块仅做参数透传 + 错误规范化。
+//! close_to_tray 的缓存同步已下沉到 ConfigStorePortAdapter（data 层）。
+
 use crate::features::settings::data::config_store_port_adapter::ConfigStorePortAdapter;
 use crate::features::settings::usecases::config_usecases;
 use crate::shared::error::{CommandResult, to_command_error};
@@ -37,6 +41,8 @@ pub async fn export_settings() -> CommandResult<String> {
 }
 
 /// 导入版本化 settings envelope。
+///
+/// close_to_tray 缓存同步已下沉到 ConfigStorePortAdapter（data 层）。
 #[tauri::command]
 pub async fn import_settings(raw: String) -> CommandResult<()> {
     config_usecases::import_settings(raw, ConfigStorePortAdapter::shared())
@@ -51,6 +57,8 @@ pub async fn import_settings(raw: String) -> CommandResult<()> {
 }
 
 /// 重置 settings 到默认值。
+///
+/// close_to_tray 缓存同步已下沉到 ConfigStorePortAdapter（data 层）。
 #[tauri::command]
 pub async fn reset_settings() -> CommandResult<()> {
     config_usecases::reset_settings(ConfigStorePortAdapter::shared())
@@ -225,6 +233,8 @@ pub async fn get_server_config_bool(server_socket: String) -> CommandResult<bool
 }
 
 /// 写入 bool 类型配置值（顶层字段）。
+///
+/// close_to_tray 缓存同步已下沉到 ConfigStorePortAdapter（data 层）。
 ///
 /// # 参数
 /// - `key`：配置键名。

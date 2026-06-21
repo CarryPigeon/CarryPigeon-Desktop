@@ -8,6 +8,8 @@
 //! - 注释统一使用中文，便于团队维护与交接。
 //! - 日志输出统一使用英文，便于跨端检索与与上游/第三方日志对齐。
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use anyhow::Context;
 use tauri::{
     Manager,
@@ -20,8 +22,12 @@ pub mod log_commands;
 
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::features::plugins::data::plugin_store;
+use crate::features::settings::data::config_store::{Config, config_file_path};
+use crate::features::settings::data::config_store_port_adapter::ConfigStorePortAdapter;
+use crate::features::settings::domain::settings_schema::SettingsImportEnvelopeV1;
 use crate::features::tray::di::commands::{TrayUnreadState, start_hover_timer};
 use crate::features::tray::domain::tray_i18n::tray_labels;
+use crate::shared::close_to_tray_state::CloseToTrayState;
 use crate::shared::temp_file::TempFileManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -111,6 +117,26 @@ pub fn run() -> anyhow::Result<()> {
             .context("TempFileManager init thread panicked")??;
 
             app.manage(temp_file_manager);
+
+            // 同步读取 close_to_tray 设置，缓存到托管状态供窗口关闭事件使用。
+            // 优先解析信封格式（迁移后），回退到旧版 Config 格式。
+            let config_path = config_file_path();
+            let close_to_tray = std::fs::read_to_string(&config_path)
+                .ok()
+                .and_then(|raw| {
+                    serde_json::from_str::<SettingsImportEnvelopeV1>(&raw)
+                        .map(|e| e.backend.close_to_tray)
+                        .or_else(|_| {
+                            serde_json::from_str::<Config>(&raw).map(|c| c.close_to_tray)
+                        })
+                        .ok()
+                })
+                .unwrap_or(true); // 默认启用关闭到托盘（聊天应用标准行为）。
+            tracing::info!(action = "app_close_to_tray_init", close_to_tray = close_to_tray);
+            app.manage(CloseToTrayState(AtomicBool::new(close_to_tray)));
+            // 初始化 ConfigStorePortAdapter 的 AppHandle 引用，
+            // 使 close_to_tray 缓存同步在 data 层完成，无需 di/commands 感知。
+            ConfigStorePortAdapter::init_app_handle(app.handle());
 
             // 启动时清理过期临时文件（后台执行，不需要阻塞 setup）
             let handle = app.handle().clone();
@@ -209,10 +235,23 @@ pub fn run() -> anyhow::Result<()> {
         })
         .on_window_event(|window, event| {
             let label = window.label();
+            // 子窗口失焦自动关闭。
             if (label == "user-info-popover" || label == "tray-notification-popover")
                 && matches!(event, &tauri::WindowEvent::Focused(false))
             {
                 let _ = window.close();
+            }
+            // 主窗口关闭时，若 close_to_tray 为 true，则阻止关闭并隐藏到托盘。
+            if label == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if let Some(state) = window.app_handle().try_state::<CloseToTrayState>() {
+                        if state.0.load(Ordering::SeqCst) {
+                            api.prevent_close();
+                            let _ = window.hide();
+                            tracing::info!(action = "app_main_window_hide_to_tray");
+                        }
+                    }
+                }
             }
         })
         .plugin(tauri_plugin_opener::init())
@@ -322,6 +361,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::voice_call::di::commands::toggle_noise_suppression,
             crate::features::voice_call::di::commands::enumerate_input_devices,
             crate::features::voice_call::di::commands::enumerate_output_devices,
+            crate::features::voice_call::di::commands::enumerate_audio_devices,
             crate::features::voice_call::di::commands::select_input_device,
             crate::features::voice_call::di::commands::select_output_device,
             crate::features::voice_call::di::commands::join_conference,

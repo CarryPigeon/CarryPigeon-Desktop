@@ -37,7 +37,7 @@ const emit = defineEmits<{
   /**
    * 打开图片灯箱。
    */
-  (e: "openLightbox", payload: { url: string; filename: string }): void;
+  (e: "openLightbox", payload: { url: string; fileName: string }): void;
 }>();
 
 const { t } = useI18n();
@@ -108,7 +108,7 @@ function handleDismissTask(): void {
 <template>
   <!-- 组件：FileRefMessageBubble｜职责：渲染文件引用消息 -->
   <div class="cp-fileBubble">
-    <div v-if="isImage && downloadUrl" class="cp-fileBubble__preview" @click="emit('openLightbox', { url: downloadUrl, filename: props.filename })">
+    <div v-if="isImage && downloadUrl" class="cp-fileBubble__preview" @click="emit('openLightbox', { url: downloadUrl, fileName: props.filename })">
       <img :src="downloadUrl" :alt="props.filename" class="cp-fileBubble__img" />
     </div>
     <div class="cp-fileBubble__info">

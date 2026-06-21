@@ -32,7 +32,7 @@ while IFS= read -r line; do
     echo "$line"
     action_prefix_failed=1
   fi
-done < <(grep -RInE "Action:[[:space:]]*[a-z0-9_]+" "$FRONTEND_DIR")
+done < <(grep -RInE '(^|[^[:alnum:]_])(tauriLog|((this\.)?logger)|deps\.logger)\.(debug|info|warn|error)\(.*Action:[[:space:]]*[a-z0-9_]+' "$FRONTEND_DIR")
 
 if [[ "$action_prefix_failed" -ne 0 ]]; then
   echo "[check-log-standards] ❌ Action must use layered prefix: <domain>_<subdomain>_..."

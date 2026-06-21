@@ -3,14 +3,16 @@
  */
 
 import type { FilesCapabilities } from "./api-types";
-import { getFileListPort } from "./composition/fileServices";
+import { getFileListPort, getFileDeletePort, getFileBatchDeletePort, getFileListUploadersPort } from "./composition/fileServices";
 
 let filesCapabilities: FilesCapabilities | null = null;
 
 export function createFilesCapabilities(): FilesCapabilities {
-  const port = getFileListPort();
   return {
-    listFiles: port,
+    listFiles: getFileListPort(),
+    deleteFile: getFileDeletePort(),
+    batchDeleteFiles: getFileBatchDeletePort(),
+    listUploaders: getFileListUploadersPort(),
   };
 }
 

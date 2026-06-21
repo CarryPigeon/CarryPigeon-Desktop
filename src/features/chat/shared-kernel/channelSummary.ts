@@ -16,6 +16,7 @@ export type ChannelSummary = {
   brief: string;
   joined: boolean;
   joinRequested: boolean;
+  ownerUserId?: string;
   announcement?: ChatChannelAnnouncementRecord;
   categoryId?: string;
   categoryName?: string;

@@ -50,10 +50,19 @@ pub struct MediaSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AudioDeviceInfo {
     pub device_id: String,
     pub name: String,
     pub is_default: bool,
+}
+
+/// Combined result of enumerating audio devices (input + output).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioDevicesInfo {
+    pub input: Vec<AudioDeviceInfo>,
+    pub output: Vec<AudioDeviceInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

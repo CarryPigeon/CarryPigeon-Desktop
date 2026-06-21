@@ -63,6 +63,7 @@ impl AudioPipeline {
                         .map(|did| did.to_string() == id)
                         .unwrap_or(false)
                 })
+                .or_else(|| host.default_input_device())
         } else {
             host.default_input_device()
         }
@@ -125,6 +126,7 @@ impl AudioPipeline {
                         .map(|did| did.to_string() == id)
                         .unwrap_or(false)
                 })
+                .or_else(|| host.default_output_device())
         } else {
             host.default_output_device()
         }

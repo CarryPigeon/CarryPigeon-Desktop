@@ -46,13 +46,23 @@ export type MessageMention = {
 };
 
 /**
+ * 消息发送者最小模型。
+ */
+export type MessageSender = {
+  id: string;
+  name: string;
+  /** 头像 URL（可选）。来自服务端 sender.avatar，用于 AvatarBadge 渲染。 */
+  avatarUrl?: string;
+};
+
+/**
  * 消息渲染链路使用的最小消息模型。
  */
 export type RenderableChatMessage =
   | {
       id: string;
       kind: "core_text";
-      from: { id: string; name: string };
+      from: MessageSender;
       timeMs: number;
       domain: MessageDomainRef;
       text: string;
@@ -90,7 +100,7 @@ export type RenderableChatMessage =
   | {
       id: string;
       kind: "domain_message";
-      from: { id: string; name: string };
+      from: MessageSender;
       timeMs: number;
       domain: MessageDomainRef;
       preview: string;
@@ -129,7 +139,7 @@ export type RenderableChatMessage =
   | {
       id: string;
       kind: "image";
-      from: { id: string; name: string };
+      from: MessageSender;
       timeMs: number;
       domain: MessageDomainRef;
       fileKey: string;
@@ -174,6 +184,57 @@ export type RenderableChatMessage =
       data?: unknown;
       status: "sending" | "sent" | "failed";
       sendError?: string;
+    }
+  | {
+      id: string;
+      kind: "video";
+      from: MessageSender;
+      timeMs: number;
+      domain: MessageDomainRef;
+      fileKey: string;
+      thumbKey?: string;
+      fileName: string;
+      fileSize: number;
+      width?: number;
+      height?: number;
+      mimeType: string;
+      url: string;
+      thumbUrl?: string;
+      localPath?: string;
+      /** 视频时长（秒）。 */
+      duration?: number;
+      replyToId?: string;
+      replyTo?: MessageReplySummary;
+      quoteReply?: {
+        messageId: string;
+        userId: string;
+        preview: string;
+      };
+      mentions?: MessageMention[];
+      reactions?: MessageReactionSummary[];
+      forwardedFrom?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      };
+      forwardedMessages?: {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        preview: string;
+        sentTime: number;
+      }[];
+      editedAt?: number;
+      recalledAt?: number;
+      threadRootId?: string;
+      threadReplyCount?: number;
+      linkPreview?: ChatLinkPreview;
+      preview: string;
+      data?: unknown;
+      status: "sending" | "sent" | "failed";
+      sendError?: string;
     };
 
 /**
@@ -181,7 +242,7 @@ export type RenderableChatMessage =
  */
 export type MessageEnvelope = {
   messageId: string;
-  from: { id: string; name: string };
+  from: MessageSender;
   timeMs: number;
   domain: MessageDomainRef;
   raw: RenderableChatMessage;
@@ -203,6 +264,15 @@ export type MessageContentModel =
       fileSize: number;
       preview: string;
       replyToId?: string;
+    }
+  | {
+      kind: "video";
+      url: string;
+      fileName: string;
+      fileSize: number;
+      preview: string;
+      replyToId?: string;
+      duration?: number;
     }
   | {
       kind: "plugin";
@@ -231,9 +301,21 @@ export type MessageRenderModel =
       fileName: string;
       fileSize: number;
       preview: string;
-      from: { id: string; name: string };
+      from: MessageSender;
       timeMs: number;
       replyToMid?: string;
+    }
+  | {
+      kind: "video";
+      messageId: string;
+      url: string;
+      fileName: string;
+      fileSize: number;
+      preview: string;
+      from: MessageSender;
+      timeMs: number;
+      replyToMid?: string;
+      duration?: number;
     }
   | {
       kind: "plugin";
@@ -244,7 +326,7 @@ export type MessageRenderModel =
       domainVersion: string;
       preview: string;
       data?: unknown;
-      from: { id: string; name: string };
+      from: MessageSender;
       timeMs: number;
       replyToMid?: string;
     }

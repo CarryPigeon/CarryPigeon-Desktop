@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
  * @fileoverview 头像徽章组件（AvatarBadge.vue）。
- * @description 最小头像徽章（首字母 + 确定性颜色），用于消息/频道/成员等 UI。
+ * @description 统一头像组件：有图片时显示图片，无图片时显示首字母 + 确定性颜色。
  *
- * 设计意图（方案A｜Patchbay）：
- * - 头像仅作为“定位线索”，而非主要视觉信号。
- * - 2px 的 domain 信号色条仍是第一视觉线索；头像需要更克制。
+ * 设计意图：
+ * - 全局唯一的头像渲染入口，避免各处重复 <img> + fallback 逻辑。
+ * - 提供 `avatarUrl` 时展示实际头像图片；未提供时回退到首字母徽章。
  */
 
 import { computed } from "vue";
@@ -13,13 +13,20 @@ import type { CSSProperties } from "vue";
 
 const props = withDefaults(
   defineProps<{
+    /** 用户显示名（用于生成首字母 fallback 与 alt 文本）。 */
     name: string;
+    /** 头像图片 URL（可选）。提供时展示图片，否则展示首字母徽章。 */
+    avatarUrl?: string;
+    /** 头像尺寸（px），会被钳制在 22–96 之间。 */
     size?: number;
   }>(),
   {
+    avatarUrl: "",
     size: 30,
   },
 );
+
+const hasAvatarImage = computed(() => (props.avatarUrl ?? "").trim().length > 0);
 
 /**
  * 将字符串确定性映射为 hue（0..359）。
@@ -45,7 +52,7 @@ function hashToHue(input: string): number {
  */
 function clampAvatarSize(size: number | undefined): number {
   const raw = Math.trunc(size ?? 30);
-  return Math.max(22, Math.min(44, raw));
+  return Math.max(22, Math.min(96, raw));
 }
 
 /**
@@ -109,10 +116,11 @@ const styleVars = computed(computeStyleVarsForProps);
 </script>
 
 <template>
-  <!-- 组件：AvatarBadge｜职责：头像（无图片时用首字母） -->
+  <!-- 组件：AvatarBadge｜职责：统一头像（有图片用图片，无图片用首字母徽章） -->
   <!-- 区块：<span> .cp-avatar -->
-  <span class="cp-avatar" :style="styleVars" :title="props.name" aria-hidden="true">
-    <span class="cp-avatar__inner">{{ initial }}</span>
+  <span class="cp-avatar" :class="{ 'cp-avatar--image': hasAvatarImage }" :style="styleVars" :title="props.name" aria-hidden="true">
+    <img v-if="hasAvatarImage" class="cp-avatar__img" :src="props.avatarUrl" :alt="props.name" />
+    <span v-else class="cp-avatar__inner">{{ initial }}</span>
   </span>
 </template>
 
@@ -135,6 +143,20 @@ const styleVars = computed(computeStyleVarsForProps);
   box-shadow: 0 10px 18px rgba(20, 32, 29, 0.10);
   user-select: none;
   flex: 0 0 auto;
+  overflow: hidden;
+}
+
+/* 选择器：`.cp-avatar--image`｜用途：有图片时隐藏渐变背景，让图片完整展示 */
+.cp-avatar--image {
+  background: var(--cp-panel);
+}
+
+/* 选择器：`.cp-avatar__img`｜用途：头像图片，填满圆形容器 */
+.cp-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
 }
 
 /* 选择器：`.cp-avatar__inner`｜用途：首字母文本（在 28–32px 时仍可读） */

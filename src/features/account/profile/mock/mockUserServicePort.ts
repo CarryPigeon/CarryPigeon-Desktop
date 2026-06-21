@@ -17,6 +17,10 @@ const MOCK_BACKGROUNDS = [
   "https://picsum.photos/id/1043/800/400", // Sea
 ];
 
+// Mock 持久化存储：模拟服务端保存上传的头像/背景图片 URL
+let mockPersistedAvatarUrl = "";
+let mockPersistedBackgroundUrl = MOCK_BACKGROUNDS[0];
+
 /**
  * 创建 `UserServicePort` 的 mock 实现。
  *
@@ -33,21 +37,22 @@ export function createMockUserServicePort(serverSocket: string): UserServicePort
         uid: "1",
         email: "user@example.com",
         nickname: "Operator",
-        avatar: "",
-        backgroundUrl: MOCK_BACKGROUNDS[0],
+        avatar: mockPersistedAvatarUrl,
+        backgroundUrl: mockPersistedBackgroundUrl,
       };
     },
     async getUser(accessToken: string, uid: string): Promise<UserPublic> {
       void accessToken;
       await sleep(MOCK_LATENCY_MS);
       const idx = parseInt(String(uid), 10) % MOCK_BACKGROUNDS.length;
+      const isMe = String(uid) === "1";
       return {
         uid: String(uid ?? "1"),
         nickname: "User " + uid,
-        avatar: "",
+        avatar: isMe ? mockPersistedAvatarUrl : "",
         email: `user${uid}@example.com`,
         bio: "这是一段用户简介。在这里可以写一些关于自己的介绍。",
-        backgroundUrl: MOCK_BACKGROUNDS[idx] ?? MOCK_BACKGROUNDS[0],
+        backgroundUrl: isMe ? mockPersistedBackgroundUrl : (MOCK_BACKGROUNDS[idx] ?? MOCK_BACKGROUNDS[0]),
       };
     },
     async listUsers(accessToken: string, ids: string[]): Promise<UserPublic[]> {
@@ -56,12 +61,13 @@ export function createMockUserServicePort(serverSocket: string): UserServicePort
       const out: UserPublic[] = [];
       for (const id of ids ?? []) {
         const idx = parseInt(String(id), 10) % MOCK_BACKGROUNDS.length;
+        const isMe = String(id) === "1";
         out.push({
           uid: String(id ?? ""),
           nickname: "User " + id,
-          avatar: "",
+          avatar: isMe ? mockPersistedAvatarUrl : "",
           email: `user${id}@example.com`,
-          backgroundUrl: MOCK_BACKGROUNDS[idx] ?? MOCK_BACKGROUNDS[0],
+          backgroundUrl: isMe ? mockPersistedBackgroundUrl : (MOCK_BACKGROUNDS[idx] ?? MOCK_BACKGROUNDS[0]),
         });
       }
       return out;
@@ -79,16 +85,19 @@ export function createMockUserServicePort(serverSocket: string): UserServicePort
       void accessToken;
       void file;
       await sleep(MOCK_LATENCY_MS);
-      // 返回随机背景
-      const idx = Math.floor(Math.random() * MOCK_BACKGROUNDS.length);
-      return MOCK_BACKGROUNDS[idx] ?? MOCK_BACKGROUNDS[0];
+      // 使用 File 对象生成 object URL 并持久化，确保 getMe/getUser 返回新值
+      const objectUrl = URL.createObjectURL(file);
+      mockPersistedBackgroundUrl = objectUrl;
+      return objectUrl;
     },
     async updateUserAvatarImage(accessToken: string, file: File): Promise<string> {
       void accessToken;
       void file;
       await sleep(MOCK_LATENCY_MS);
-      // 返回随机头像
-      return "https://picsum.photos/200/200?random=" + Math.random();
+      // 使用 File 对象生成 object URL 并持久化，确保 getMe/getUser 返回新值
+      const objectUrl = URL.createObjectURL(file);
+      mockPersistedAvatarUrl = objectUrl;
+      return objectUrl;
     },
   };
 }

@@ -86,7 +86,6 @@ gif = "0.14"
 
 [profile.dev]
 opt-level = 0             # 不优化，最快编译
-incremental = true        # 增量编译
 codegen-units = 256       # 最大并行编译单元
 lto = false               # 关闭 LTO
 

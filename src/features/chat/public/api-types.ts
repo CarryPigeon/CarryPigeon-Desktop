@@ -177,4 +177,11 @@ export type ChatCapabilities = {
    * @param maxCount - 最多返回条数
    */
   getUnreadMessagePreviews(maxCount: number): UnreadMessagePreview[];
+
+  /**
+   * 获取当前聊天服务器 socket 地址。
+   *
+   * 用于跨 feature 发送 HTTP API 请求时指定目标服务器。
+   */
+  getServerSocket(): string;
 };

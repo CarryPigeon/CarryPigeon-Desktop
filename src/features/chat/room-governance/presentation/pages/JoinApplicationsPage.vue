@@ -17,6 +17,7 @@ const {
   isLoading,
   pageError,
   pendingCount,
+  canDecide,
   formatApplyTime,
   handleDecide,
   goBack,
@@ -47,7 +48,7 @@ const {
             </div>
             <div class="cp-appCard__time">{{ t("applied_at") }}: {{ formatApplyTime(a.applyTime) }}</div>
           </div>
-          <div class="cp-appCard__actions">
+          <div v-if="canDecide" class="cp-appCard__actions">
             <button class="cp-appCard__btn approve" type="button" @click="handleDecide(a.applicationId, true)">
               {{ t("approve") }}
             </button>

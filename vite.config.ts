@@ -13,7 +13,7 @@ const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), 
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [
     vue(),
     AutoImport({
@@ -63,7 +63,7 @@ export default defineConfig(async () => ({
   // Build optimizations
   build: {
     target: 'esnext',
-    minify: 'esbuild',
+    minify: 'esbuild' as const,
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {

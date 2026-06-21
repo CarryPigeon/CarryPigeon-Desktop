@@ -118,7 +118,9 @@ const startLoadingImage = () => {
   imgObject.value = img
 
   img.onload = () => {
-    // Set the actual image source
+    loadState.value = 'loaded'
+    isLoadingError.value = false
+    // 确保 imageSrc 更新触发 <img> 渲染
     if (imgRef.value) {
       imageSrc.value = props.thumbUrl || props.url
     }

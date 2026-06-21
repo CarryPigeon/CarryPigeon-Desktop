@@ -72,6 +72,9 @@ export function useGovernancePageState(
   const isLoading = ref(true);
   const pageError = ref("");
 
+  /** 防止并发操作：确保同一时间只有一个治理命令在执行。 */
+  let actionInFlight = false;
+
   function setPageError(error: unknown): void {
     pageError.value = formatGovernancePageError(error);
   }
@@ -109,6 +112,10 @@ export function useGovernancePageState(
     const channelId = requireChannelId();
     if (!channelId) return;
 
+    // 防止并发点击导致重复操作（如多次审批同一申请产生重复成员）。
+    if (actionInFlight) return;
+    actionInFlight = true;
+
     try {
       const outcome = await action(channelId);
       if (!outcome.ok) {
@@ -118,6 +125,8 @@ export function useGovernancePageState(
       await afterSuccess?.(outcome as GovernanceCommandOutcomeLike & { ok: true });
     } catch (error) {
       setPageError(error);
+    } finally {
+      actionInFlight = false;
     }
   }
 

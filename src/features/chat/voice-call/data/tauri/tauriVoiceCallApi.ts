@@ -61,9 +61,15 @@ export function createTauriVoiceCallApi(): VoiceCallStatePort {
     },
 
     async enumerateDevices() {
-      const input = await invoke<AudioDeviceInfo[]>("enumerate_input_devices");
-      const output = await invoke<AudioDeviceInfo[]>("enumerate_output_devices");
-      return { input, output };
+      try {
+        const result = await invoke<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>("enumerate_audio_devices");
+        return result;
+      } catch {
+        // Fallback: use individual commands (backward compatible)
+        const input = await invoke<AudioDeviceInfo[]>("enumerate_input_devices");
+        const output = await invoke<AudioDeviceInfo[]>("enumerate_output_devices");
+        return { input, output };
+      }
     },
 
     async joinConference(sessionId: string, initiatorId?: string) {

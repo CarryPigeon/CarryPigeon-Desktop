@@ -457,7 +457,22 @@ pub async fn leave_conference(
     }
     drop(webrtc_guard);
 
-    // Disable conference mode and stop audio
+    // End session（先持 sessions 锁，再持 audio_pipeline 锁，保持一致顺序避免死锁）
+    let session_ended = {
+        let mut sessions = inner
+            .sessions
+            .lock()
+            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        if let Some(s) = sessions.get_mut(&session_id) {
+            s.state = CallState::Ended;
+            s.ended_at = Some(now_secs());
+            true
+        } else {
+            false
+        }
+    };
+
+    // Disable conference mode and stop audio（sessions 锁已释放）
     let pipeline_guard = inner.audio_pipeline.lock().await;
     if let Some(ref p) = *pipeline_guard {
         p.unregister_participant(&user_id);
@@ -467,16 +482,11 @@ pub async fn leave_conference(
     }
     drop(pipeline_guard);
 
-    // End session
-    {
-        let mut sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
-        if let Some(s) = sessions.get_mut(&session_id) {
-            s.state = CallState::Ended;
-            s.ended_at = Some(now_secs());
-        }
+    if !session_ended {
+        tracing::warn!(
+            action = "app_voice_call_leave_conference_session_not_found",
+            session_id = %session_id,
+        );
     }
 
     let _ = app_handle.emit(
@@ -858,6 +868,32 @@ pub async fn enumerate_output_devices(
             )
         }),
         None => Ok(Vec::new()),
+    }
+}
+
+#[tauri::command]
+pub async fn enumerate_audio_devices(
+    service: State<'_, VoiceCallService>,
+) -> CommandResult<AudioDevicesInfo> {
+    let audio = service
+        .inner
+        .audio
+        .lock()
+        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    match audio.as_ref() {
+        Some(manager) => {
+            let input = manager
+                .enumerate_input_devices()
+                .map_err(|e| format!("[VOICE_CALL_AUDIO_DEVICE_FAILED] {}", e))?;
+            let output = manager
+                .enumerate_output_devices()
+                .map_err(|e| format!("[VOICE_CALL_AUDIO_DEVICE_FAILED] {}", e))?;
+            Ok(AudioDevicesInfo { input, output })
+        }
+        None => Ok(AudioDevicesInfo {
+            input: Vec::new(),
+            output: Vec::new(),
+        }),
     }
 }
 

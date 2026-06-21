@@ -43,6 +43,10 @@ const emit = defineEmits<{
   (e: "closeMentionMenu"): void;
   (e: "urlDetected", url: string): void;
   (e: "dismissLinkPreview"): void;
+  /**
+   * 打开图片灯箱预览。
+   */
+  (e: "openLightbox", payload: { url: string; fileName: string }): void;
 }>();
 
 /**
@@ -60,14 +64,22 @@ const isPluginComposerActive = computed(computeIsPluginComposerActive);
  * 判断当前是否允许发送。
  *
  * 规则：
- * - Draft 至少包含一个非空白字符。
+ * - Draft 至少包含一个非空白字符，或存在待发送的图片附件。
  *
  * @returns 允许发送则为 `true`。
  */
 function computeCanSend(): boolean {
   if (isPluginComposerActive.value) return false;
   if (props.domainId.trim() !== "Core:Text") return false;
-  return props.draft.trim().length > 0;
+  const hasText = props.draft.trim().length > 0;
+  // "done" 表示上传已完成（可发送），"pending" 表示等待上传。
+  // 两者均视为"有待发送内容"，允许启用发送按钮。
+  const hasPendingAttachments = attachments.value.some(
+    (att) =>
+      (att.file.type.startsWith("image/") || att.file.type.startsWith("video/")) &&
+      (att.status === "done" || att.status === "pending"),
+  );
+  return hasText || hasPendingAttachments;
 }
 
 const canSend = computed(computeCanSend);
@@ -283,6 +295,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
           :attachments="attachments"
           @remove="removeAttachment"
           @retry="handleRetryAttachment"
+          @openLightbox="(payload) => emit('openLightbox', payload)"
         />
         <t-textarea
           :model-value="props.draft"

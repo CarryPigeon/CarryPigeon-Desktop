@@ -22,6 +22,10 @@ const emit = defineEmits<{
    * 重试上传失败的附件。
    */
   (e: "retry", id: string): void;
+  /**
+   * 打开图片灯箱预览。
+   */
+  (e: "openLightbox", payload: { url: string; fileName: string }): void;
 }>();
 </script>
 
@@ -33,6 +37,7 @@ const emit = defineEmits<{
         v-for="att in attachments"
         :key="att.id"
         class="cp-attachmentBar__item"
+        @click="emit('openLightbox', { url: att.blobUrl, fileName: att.file.name })"
       >
         <!-- 缩略图 -->
         <img
@@ -107,6 +112,13 @@ const emit = defineEmits<{
   overflow: hidden;
   border: 1px solid var(--cp-border, #e0e0e0);
   background: var(--cp-panel-muted, #f5f5f5);
+  cursor: pointer;
+  transition: transform var(--cp-fast) var(--cp-ease), box-shadow var(--cp-fast) var(--cp-ease);
+}
+
+.cp-attachmentBar__item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--cp-accent, #5865f2) 30%, transparent);
 }
 
 .cp-attachmentBar__thumb {

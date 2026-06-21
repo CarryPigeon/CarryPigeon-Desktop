@@ -6,7 +6,7 @@ import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
 import { ServerManagerPage } from '@/features/server-connection/routes';
 import { FileManagerPage } from '@/features/files/routes';
 
-// 低频页面使用动态导入，减少首屏 JS 体积
+// 子窗口/低频页面使用动态导入，减少首屏 JS 体积
 const ContactsPage = () => import('@/features/chat/presentation/patchbay/contacts/ContactsPage.vue');
 const SavedMessagesPage = () => import('@/features/chat/message-flow/bookmark/presentation/SavedMessagesPage.vue');
 const ChannelInfoPopoverView = () => import('@/features/chat/presentation/channel-info/ChannelInfoPopoverView.vue');

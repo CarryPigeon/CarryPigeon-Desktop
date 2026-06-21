@@ -10,7 +10,7 @@ import { createAsyncTaskRunner } from "./asyncTaskRunner";
 /**
  * 消息上下文菜单动作类型。
  */
-export type MessageContextAction = "copy" | "reply" | "quote" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark";
+export type MessageContextAction = "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark";
 
 /**
  * 消息上下文菜单编排依赖。
@@ -19,7 +19,6 @@ export type UseMessageContextMenuDeps = {
   getClipboardText(messageId: string): string | null;
   copyTextToClipboard(text: string): Promise<unknown>;
   startReply(messageId: string): void;
-  startQuoteReply(messageId: string, preview: string): void;
   deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   onAsyncError(action: string, error: unknown): void;
@@ -66,12 +65,6 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
       case "reply":
         deps.startReply(messageId);
         return;
-      case "quote": {
-        const text = deps.getClipboardText(messageId);
-        if (!text) return;
-        deps.startQuoteReply(messageId, text);
-        return;
-      }
       case "recall":
         runAsyncTask(deps.recallMessage(messageId), "chat_recall_menu_failed");
         return;

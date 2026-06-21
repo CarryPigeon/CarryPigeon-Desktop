@@ -20,6 +20,10 @@ const props = defineProps<{
    * 菜单左上角 y 坐标（px）。
    */
   y: number;
+  /**
+   * 是否展示“删除频道”菜单项（仅频道主可见）。
+   */
+  showDelete?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -108,10 +112,12 @@ onBeforeUnmount(handleBeforeUnmount);
       <button class="cp-channelMenu__item" type="button" role="menuitem" @click="runAndClose(() => emit('bans'))">
         {{ t("channel_bans") }}
       </button>
-      <div class="cp-channelMenu__sep"></div>
-      <button class="cp-channelMenu__item danger" type="button" role="menuitem" @click="runAndClose(() => emit('delete'))">
-        {{ t("delete_channel") }}
-      </button>
+      <template v-if="props.showDelete !== false">
+        <div class="cp-channelMenu__sep"></div>
+        <button class="cp-channelMenu__item danger" type="button" role="menuitem" @click="runAndClose(() => emit('delete'))">
+          {{ t("delete_channel") }}
+        </button>
+      </template>
     </div>
     <div v-if="props.open" class="cp-channelMenu__backdrop" @click="emit('close')"></div>
   </teleport>

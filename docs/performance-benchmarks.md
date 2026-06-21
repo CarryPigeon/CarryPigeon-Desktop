@@ -55,12 +55,16 @@
 ### 构建性能
 | 指标 | 优化前 | 当前 |
 |------|--------|------|
-| 模块数 | — | 4,455 |
-| 构建耗时 | — | ~2.77s → **11s (含 typecheck)** |
-| `pnpm benchmark` 全流程 | — | **~32s**（含 typecheck + build + cargo check + test）|
-| 主 JS 包体积 | — | **470 kB** (gzip ~115 kB) |
-| 全部 JS 资源 | — | **2,746 kB** (gzip ~660 kB) |
-| 分块策略 | 默认 | 手动分块 + 依赖预优化 + 路由懒加载 |
+| 模块数 | — | 4,467 |
+| typecheck 耗时 | — | **13.1s** |
+| build 耗时（含 typecheck） | — | **16.5s** |
+| Rust tests 耗时 | — | **39.2s** |
+| 首页入口 (index) | — | **121.16 kB** (gzip ~36 kB) |
+| MainPage 包 | **434.95 kB** (gzip ~101 kB) | **222.26 kB** (gzip ~68 kB) **(-49%)** |
+| vendor-vue | — | **80.80 kB** (gzip ~28 kB) |
+| vendor-tdesign | — | **384.97 kB** (gzip ~127 kB) |
+| ImageLightbox | 内联 MainPage | **3.48 kB** (gzip ~1.6 kB) 懒加载 |
+| 分块策略 | 默认 | 手动分块 + 依赖预优化 + 内联动态导入 |
 
 ## 性能监控工具
 
@@ -106,12 +110,13 @@ Action: ws_pool_evict_lru              { socket, lastActiveAt }
 
 ### 前端优化
 - [x] Vite 构建优化配置（手动分块、依赖预优化）
-- [x] 虚拟滚动（消息列表）
+- [x] 虚拟滚动（消息列表 + ThreadPanel）
+- [x] 虚拟滚动 estimateSize 精度优化（按消息类型区分高度）
 - [x] 图片懒加载（Intersection Observer + 重试退避）
 - [x] 前端内存监控（定时采样 + 趋势分析 + 阈值告警）
-- [x] 路由懒加载（LoginPage 及弹窗路由动态导入，首屏 JS 减 ~30%）
+- [x] 路由懒加载（全部路由内联动态导入，MainPage 435KB→222KB）
+- [x] 组件懒加载（ImageLightbox defineAsyncComponent）
 - [x] 防抖/节流工具（rateLimit.ts，已应用于 FileSearchBar）
-- [ ] 组件懒加载继续深化
 - [ ] Web Worker（评估后延期：加密使用异步 Web Crypto，不阻塞主线程）
 
 ### 后端优化
