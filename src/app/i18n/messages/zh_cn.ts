@@ -424,6 +424,7 @@ export const zh_cn = {
   voice_call_status_ended: "已结束",
   voice_call_unknown_user: "未知用户",
   voice_call_default_device: "默认设备",
+  video_call: "视频通话",
   voice_call_camera_on: "开启摄像头",
   voice_call_camera_off: "关闭摄像头",
   voice_call_screen_share_start: "共享屏幕",

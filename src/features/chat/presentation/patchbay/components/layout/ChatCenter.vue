@@ -240,6 +240,7 @@ const connectionActionLabel = computed(() =>
 const voiceHostRef = ref<{
   callState: { value: CallState };
   startDirectCall: (targetUserId: string) => Promise<unknown>;
+  startVideoCall: (targetUserId?: string) => Promise<void>;
   startConference: () => Promise<unknown>;
 } | null>(null);
 
@@ -368,6 +369,10 @@ function handleDirectCallStart(targetUserId: string): void {
   voiceHostRef.value?.startDirectCall(targetUserId || props.targetUserId || "");
 }
 
+function handleVideoCallStart(targetUserId: string): void {
+  voiceHostRef.value?.startVideoCall(targetUserId || props.targetUserId || "");
+}
+
 function handleConferenceStart(): void {
   voiceHostRef.value?.startConference();
 }
@@ -490,6 +495,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
           :call-state="currentCallState"
           :target-user-id="props.targetUserId"
           @start-direct="handleDirectCallStart"
+          @start-video="handleVideoCallStart"
           @start-conference="handleConferenceStart"
         />
         <button
