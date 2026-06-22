@@ -148,6 +148,13 @@ pub enum SignalingMessage {
         session_id: String,
         user_id: String,
     },
+    /// Generic container for video/screen-signaling SDP/ICE payloads.
+    /// Opaque to Rust — the relay forwards JSON without inspecting fields.
+    VideoSignaling {
+        session_id: String,
+        signal_type: String,
+        payload: serde_json::Value,
+    },
 }
 
 /// ICE connection state for UI feedback

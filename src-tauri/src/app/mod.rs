@@ -366,6 +366,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::voice_call::di::commands::select_output_device,
             crate::features::voice_call::di::commands::join_conference,
             crate::features::voice_call::di::commands::leave_conference,
+            crate::features::voice_call::di::commands::send_video_signaling,
         ])
         .run(tauri::generate_context!())
         .context("error while running tauri application")?;
