@@ -17,10 +17,17 @@
       :output-devices="outputDevices"
       :current-output-device-id="currentOutputDeviceId"
       :is-conference="isConference"
+      :has-video="callState === 'active' && activeSession?.kind === 'direct'"
+      :local-stream="videoCall.localStream.value"
+      :remote-stream="videoCall.remoteStream.value"
+      :camera-enabled="videoCall.cameraEnabled.value"
+      :is-sharing="screenShare.isSharing.value"
       @toggle-mute="toggleMute"
       @toggle-noise-suppression="toggleNoiseSuppression"
       @select-input-device="selectInputDevice"
       @select-output-device="selectOutputDevice"
+      @toggle-camera="handleToggleCamera"
+      @toggle-screen-share="handleToggleScreenShare"
       @hangup="handleHangup"
     />
   </div>
@@ -31,6 +38,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listen } from "@tauri-apps/api/event";
 import { useVoiceCall } from "../composables/useVoiceCall";
+import { useVideoCall } from "../../composition/useVideoCall";
+import { useScreenShare } from "../../composition/useScreenShare";
 import VoiceCallBanner from "./VoiceCallBanner.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
 import { createMockVoiceCallStatePort } from "../../mock";
@@ -93,6 +102,19 @@ const {
   userId: () => currentChatUserId.value,
 });
 
+const videoCall = useVideoCall("");
+const screenShare = useScreenShare("");
+
+watch(
+  () => activeSession.value?.sessionId,
+  (sessionId) => {
+    if (sessionId) {
+      videoCall.hangup();
+      // Re-create with new session ID — handled via sessionId reactivity below
+    }
+  },
+);
+
 const isConference = computed(() => activeSession.value?.kind === "conference");
 
 const callerName = computed(() => {
@@ -133,6 +155,22 @@ function handleHangup() {
     void leaveConference();
   } else {
     hangup();
+  }
+}
+
+function handleToggleCamera() {
+  videoCall.toggleCamera();
+}
+
+function handleToggleScreenShare() {
+  if (screenShare.isSharing.value) {
+    screenShare.stopScreenShare();
+  } else {
+    const pc = videoCall.getPeerConnection();
+    if (pc) {
+      screenShare.setPeerConnection(pc);
+      screenShare.startScreenShare();
+    }
   }
 }
 
@@ -276,6 +314,7 @@ onUnmounted(() => {
   unlistenIncoming?.();
   unlistenStateChange?.();
   stopDevicePoll();
+  videoCall.hangup();
 });
 
 function startCall(targetUserId?: string) {

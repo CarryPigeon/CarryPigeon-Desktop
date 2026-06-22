@@ -33,6 +33,13 @@
         </div>
       </div>
 
+      <div v-if="!minimized && hasVideo" class="voice-call-panel__video">
+        <VideoGrid
+          :local-stream="localStream"
+          :remote-stream="remoteStream"
+        />
+      </div>
+
       <div v-if="!minimized" class="voice-call-panel__controls">
         <button
           class="voice-call-panel__ctrl-btn"
@@ -49,6 +56,22 @@
           @click="$emit('toggleNoiseSuppression')"
         >
           <t-icon name="sound-mute" />
+        </button>
+        <button
+          class="voice-call-panel__ctrl-btn"
+          :class="{ 'is-muted': !cameraEnabled }"
+          :title="cameraEnabled ? t('voice_call_camera_off') : t('voice_call_camera_on')"
+          @click="$emit('toggleCamera')"
+        >
+          <t-icon name="camera" />
+        </button>
+        <button
+          class="voice-call-panel__ctrl-btn"
+          :class="{ 'is-active': isSharing }"
+          :title="isSharing ? t('voice_call_screen_share_stop') : t('voice_call_screen_share_start')"
+          @click="$emit('toggleScreenShare')"
+        >
+          <t-icon name="share" />
         </button>
         <select
           class="voice-call-panel__device-select"
@@ -95,6 +118,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import type { CallState, AudioDeviceInfo, CallParticipant } from "../../domain/contracts";
+import VideoGrid from "./VideoGrid.vue";
 
 const { t } = useI18n();
 
@@ -109,6 +133,11 @@ const props = defineProps<{
   outputDevices: readonly AudioDeviceInfo[];
   currentOutputDeviceId: string | null;
   isConference?: boolean;
+  hasVideo?: boolean;
+  localStream?: MediaStream | null;
+  remoteStream?: MediaStream | null;
+  cameraEnabled?: boolean;
+  isSharing?: boolean;
 }>();
 
 defineEmits<{
@@ -117,6 +146,8 @@ defineEmits<{
   selectInputDevice: [deviceId: string];
   selectOutputDevice: [deviceId: string];
   hangup: [];
+  toggleCamera: [];
+  toggleScreenShare: [];
 }>();
 
 const minimized = ref(false);
@@ -210,6 +241,10 @@ const formattedDuration = computed(() => {
     color: var(--cp-text-light);
   }
 
+  &__video {
+    border-top: 1px solid var(--cp-border);
+  }
+
   &__controls {
     display: flex;
     align-items: center;
@@ -243,6 +278,12 @@ const formattedDuration = computed(() => {
     &.is-off {
       background: var(--cp-danger);
       border-color: var(--cp-danger);
+      color: #fff;
+    }
+
+    &.is-active {
+      background: var(--cp-success);
+      border-color: var(--cp-success);
       color: #fff;
     }
 

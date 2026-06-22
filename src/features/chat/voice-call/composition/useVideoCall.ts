@@ -164,6 +164,10 @@ export function useVideoCall(sessionId: string) {
 
   onUnmounted(cleanup);
 
+  function getPeerConnection(): RTCPeerConnection | null {
+    return pc;
+  }
+
   return {
     localStream,
     remoteStream,
@@ -173,5 +177,6 @@ export function useVideoCall(sessionId: string) {
     acceptCall,
     toggleCamera,
     hangup,
+    getPeerConnection,
   };
 }
