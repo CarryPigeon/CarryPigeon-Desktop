@@ -424,6 +424,7 @@ export const en_us = {
   voice_call_status_ended: "Ended",
   voice_call_unknown_user: "Unknown User",
   voice_call_default_device: "Default Device",
+  video_call: "Video Call",
   voice_call_camera_on: "Camera On",
   voice_call_camera_off: "Camera Off",
   voice_call_screen_share_start: "Share Screen",
