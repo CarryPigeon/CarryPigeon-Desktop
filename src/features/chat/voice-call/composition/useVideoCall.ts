@@ -6,7 +6,8 @@ const STUN_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
 
-export function useVideoCall(sessionId: string) {
+export function useVideoCall(initialSessionId: string) {
+  const sessionId = ref(initialSessionId);
   const localStream = ref<MediaStream>();
   const remoteStream = ref<MediaStream>();
   const cameraEnabled = ref(true);
@@ -15,6 +16,10 @@ export function useVideoCall(sessionId: string) {
   let pc: RTCPeerConnection | null = null;
   let unlisten: UnlistenFn | null = null;
 
+  function setSessionId(sid: string) {
+    sessionId.value = sid;
+  }
+
   async function ensurePC(): Promise<RTCPeerConnection> {
     if (pc) return pc;
     pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
@@ -22,7 +27,7 @@ export function useVideoCall(sessionId: string) {
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         invoke("send_video_signaling", {
-          sessionId,
+          sessionId: sessionId.value,
           signalType: "ice_candidate",
           payload: e.candidate.toJSON(),
         });
@@ -53,7 +58,7 @@ export function useVideoCall(sessionId: string) {
     await p.setLocalDescription(offer);
 
     await invoke("send_video_signaling", {
-      sessionId,
+      sessionId: sessionId.value,
       signalType: "offer",
       payload: {
         sdp: offer.sdp,
@@ -82,7 +87,7 @@ export function useVideoCall(sessionId: string) {
     await p.setLocalDescription(answer);
 
     await invoke("send_video_signaling", {
-      sessionId,
+      sessionId: sessionId.value,
       signalType: "answer",
       payload: {
         sdp: answer.sdp,
@@ -102,7 +107,7 @@ export function useVideoCall(sessionId: string) {
     });
     cameraEnabled.value = tracks.some((t) => t.enabled);
     await invoke("send_video_signaling", {
-      sessionId,
+      sessionId: sessionId.value,
       signalType: "video_mute",
       payload: { muted: !cameraEnabled.value },
     });
@@ -114,7 +119,7 @@ export function useVideoCall(sessionId: string) {
       signalType: string;
       payload: any;
     }>("voice_call:video_signaling", async (event) => {
-      if (event.payload.sessionId !== sessionId) return;
+      if (event.payload.sessionId !== sessionId.value) return;
       if (!pc) return;
 
       switch (event.payload.signalType) {
@@ -125,7 +130,7 @@ export function useVideoCall(sessionId: string) {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           await invoke("send_video_signaling", {
-            sessionId,
+            sessionId: sessionId.value,
             signalType: "answer",
             payload: { sdp: answer.sdp, type: answer.type, candidates: [] },
           });
@@ -178,5 +183,6 @@ export function useVideoCall(sessionId: string) {
     toggleCamera,
     hangup,
     getPeerConnection,
+    setSessionId,
   };
 }
