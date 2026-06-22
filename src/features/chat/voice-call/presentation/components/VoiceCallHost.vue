@@ -107,10 +107,9 @@ const screenShare = useScreenShare("");
 
 watch(
   () => activeSession.value?.sessionId,
-  (sessionId) => {
-    if (sessionId) {
-      videoCall.hangup();
-      // Re-create with new session ID — handled via sessionId reactivity below
+  (sid) => {
+    if (sid) {
+      videoCall.setSessionId(sid);
     }
   },
 );
@@ -170,6 +169,8 @@ function handleToggleScreenShare() {
     if (pc) {
       screenShare.setPeerConnection(pc);
       screenShare.startScreenShare();
+    } else {
+      console.warn("[VOICE_CALL] Cannot start screen share: no RTCPeerConnection available");
     }
   }
 }
@@ -315,6 +316,9 @@ onUnmounted(() => {
   unlistenStateChange?.();
   stopDevicePoll();
   videoCall.hangup();
+  if (screenShare.isSharing.value) {
+    screenShare.stopScreenShare();
+  }
 });
 
 function startCall(targetUserId?: string) {
