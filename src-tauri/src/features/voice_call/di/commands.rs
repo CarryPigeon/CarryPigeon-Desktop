@@ -927,6 +927,27 @@ pub async fn select_output_device(
     Ok(())
 }
 
+// ── Video signaling relay ─────────────────────────────────────────
+
+#[tauri::command]
+pub async fn send_video_signaling(
+    inner: tauri::State<'_, VoiceCallInner>,
+    session_id: String,
+    signal_type: String,
+    payload: serde_json::Value,
+) -> CommandResult<()> {
+    let msg = SignalingMessage::VideoSignaling {
+        session_id,
+        signal_type,
+        payload,
+    };
+    let sig = inner.signaling.lock().await;
+    match sig.as_ref() {
+        Some(client) => client.send(&msg).await.map_err(|e| e.to_string()),
+        None => Err("[VOICE_CALL_FAILED] Signaling not connected".to_string()),
+    }
+}
+
 // ── Signaling connection ────────────────────────────────────────────
 
 #[tauri::command]
@@ -1447,6 +1468,20 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             // Joiner receives ack — returns immediately; state changes are driven
             // by the ConferenceSdpAnswer handler and participant_update events.
             SignalingMessage::ConferenceJoinAck { .. } => {}
+            SignalingMessage::VideoSignaling {
+                session_id,
+                signal_type,
+                payload,
+            } => {
+                let _ = app_handle.emit(
+                    "voice_call:video_signaling",
+                    serde_json::json!({
+                        "sessionId": session_id,
+                        "signalType": signal_type,
+                        "payload": payload,
+                    }),
+                );
+            }
         }
     }
 
