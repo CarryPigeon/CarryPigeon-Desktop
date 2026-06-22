@@ -1,10 +1,13 @@
 import { ref, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { createLogger } from "@/shared/utils/logger";
 
 const STUN_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
+
+const logger = createLogger("VideoCall");
 
 export function useVideoCall(initialSessionId: string) {
   const sessionId = ref(initialSessionId);
@@ -46,11 +49,18 @@ export function useVideoCall(initialSessionId: string) {
   }
 
   async function startCall() {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: false,
-    });
-    localStream.value = stream;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+      localStream.value = stream;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[VOICE_CALL] Failed to start video call: ${msg}`);
+      return;
+    }
     const p = await ensurePC();
     stream.getTracks().forEach((t) => p.addTrack(t, stream));
 
@@ -66,16 +76,21 @@ export function useVideoCall(initialSessionId: string) {
         candidates: [],
       },
     });
-
-    setupListener();
   }
 
   async function acceptCall(remoteOffer: any) {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: false,
-    });
-    localStream.value = stream;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+      localStream.value = stream;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[VOICE_CALL] Failed to accept video call: ${msg}`);
+      return;
+    }
     const p = await ensurePC();
     stream.getTracks().forEach((t) => p.addTrack(t, stream));
 
@@ -95,8 +110,6 @@ export function useVideoCall(initialSessionId: string) {
         candidates: [],
       },
     });
-
-    setupListener();
   }
 
   async function toggleCamera() {
@@ -114,6 +127,7 @@ export function useVideoCall(initialSessionId: string) {
   }
 
   function setupListener() {
+    if (unlisten) return;
     listen<{
       sessionId: string;
       signalType: string;
@@ -124,6 +138,7 @@ export function useVideoCall(initialSessionId: string) {
 
       switch (event.payload.signalType) {
         case "offer": {
+          if (pc.signalingState !== "stable") break;
           await pc.setRemoteDescription(
             new RTCSessionDescription(event.payload.payload)
           );
@@ -152,6 +167,8 @@ export function useVideoCall(initialSessionId: string) {
       unlisten = fn;
     });
   }
+
+  setupListener();
 
   async function hangup() {
     localStream.value?.getTracks().forEach((t) => t.stop());

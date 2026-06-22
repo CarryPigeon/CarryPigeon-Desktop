@@ -37,6 +37,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listen } from "@tauri-apps/api/event";
+import { createLogger } from "@/shared/utils/logger";
 import { useVoiceCall } from "../composables/useVoiceCall";
 import { useVideoCall } from "../../composition/useVideoCall";
 import { useScreenShare } from "../../composition/useScreenShare";
@@ -54,6 +55,7 @@ import {
 import type { CallParticipant, CallSession, CallState } from "../../domain/contracts";
 
 const { t } = useI18n();
+const logger = createLogger("VoiceCallHost");
 
 const props = defineProps<{
   roomId: string;
@@ -170,7 +172,7 @@ function handleToggleScreenShare() {
       screenShare.setPeerConnection(pc);
       screenShare.startScreenShare();
     } else {
-      console.warn("[VOICE_CALL] Cannot start screen share: no RTCPeerConnection available");
+      logger.warn("[VOICE_CALL] Cannot start screen share: no RTCPeerConnection available");
     }
   }
 }
@@ -315,10 +317,10 @@ onUnmounted(() => {
   unlistenIncoming?.();
   unlistenStateChange?.();
   stopDevicePoll();
-  videoCall.hangup();
   if (screenShare.isSharing.value) {
     screenShare.stopScreenShare();
   }
+  videoCall.hangup();
 });
 
 function startCall(targetUserId?: string) {
@@ -326,9 +328,18 @@ function startCall(targetUserId?: string) {
   return startDirectCall(uid);
 }
 
+async function startVideoCall(targetUserId?: string) {
+  const uid = targetUserId || props.targetUserId || "";
+  await startDirectCall(uid);
+  setTimeout(() => {
+    videoCall.startCall();
+  }, 1000);
+}
+
 defineExpose({
   callState,
   startDirectCall: startCall,
+  startVideoCall,
   startConference,
   joinConference,
   leaveConference,

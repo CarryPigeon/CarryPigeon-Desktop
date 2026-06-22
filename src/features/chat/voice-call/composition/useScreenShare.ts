@@ -1,5 +1,8 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("ScreenShare");
 
 export function useScreenShare(sessionId: string) {
   const isSharing = ref(false);
@@ -12,9 +15,16 @@ export function useScreenShare(sessionId: string) {
 
   async function startScreenShare() {
     if (!pcRef) return;
-    const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-    });
+    let displayStream: MediaStream;
+    try {
+      displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[VOICE_CALL] Screen share failed: ${msg}`);
+      return;
+    }
     const [displayTrack] = displayStream.getVideoTracks();
 
     const sender = pcRef
