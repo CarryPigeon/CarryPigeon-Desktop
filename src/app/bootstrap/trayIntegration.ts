@@ -224,7 +224,7 @@ export function createNotificationOnNewMessageHandler(deps: {
 
       const channelName = deps.getChannelName(channelId) || channelId;
       const senderName = message.from?.name ?? "Unknown";
-      const previewText = message.kind === "core_text" ? message.text : (message as any).preview ?? "";
+      const previewText = message.kind === "core_text" ? message.text : ("preview" in message ? message.preview : "");
       const title = `${senderName} · #${channelName}`;
       const body = previewText.length > 100 ? previewText.slice(0, 100) + "..." : previewText;
 
