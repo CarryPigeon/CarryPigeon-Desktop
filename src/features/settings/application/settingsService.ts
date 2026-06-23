@@ -12,7 +12,7 @@ import { invokeTauri } from "@/shared/tauri/invokeClient";
 
 export type GeneralPreferenceKey = "auto_login" | "auto_launch" | "close_to_tray" | "check_for_updates";
 
-export type BusinessPreferenceKey = "email_notifications" | "desktop_notifications" | "global_dnd";
+export type BusinessPreferenceKey = "email_notifications" | "desktop_notifications" | "global_dnd" | "notification_sound";
 type BooleanPreferenceKey = GeneralPreferenceKey | BusinessPreferenceKey;
 
 export type GeneralPreferencesSnapshot = {
@@ -33,6 +33,7 @@ const BUSINESS_PREFERENCE_KEYS: readonly BusinessPreferenceKey[] = [
   "email_notifications",
   "desktop_notifications",
   "global_dnd",
+  "notification_sound",
 ];
 
 /**
@@ -84,10 +85,11 @@ export type BusinessPreferencesSnapshot = {
   emailNotifications: boolean;
   desktopNotifications: boolean;
   globalDnd: boolean;
+  notificationSound: boolean;
 };
 
 export async function readBusinessPreferences(): Promise<BusinessPreferencesSnapshot> {
-  const [emailNotifications, desktopNotifications, globalDnd] = await Promise.all(
+  const [emailNotifications, desktopNotifications, globalDnd, notificationSound] = await Promise.all(
     BUSINESS_PREFERENCE_KEYS.map((key) => readConfigBool(key)),
   );
 
@@ -95,6 +97,7 @@ export async function readBusinessPreferences(): Promise<BusinessPreferencesSnap
     emailNotifications,
     desktopNotifications,
     globalDnd,
+    notificationSound,
   };
 }
 

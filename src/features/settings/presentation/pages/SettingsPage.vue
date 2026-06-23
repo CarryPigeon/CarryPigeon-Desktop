@@ -41,6 +41,7 @@ const {
   emailNotifications,
   desktopNotifications,
   globalDnd,
+  notificationSound,
   selectLanguage,
   toggleAutoLogin,
   toggleAutoLaunch,
@@ -51,6 +52,7 @@ const {
   toggleEmailNotifications,
   toggleDesktopNotifications,
   toggleGlobalDnd,
+  toggleNotificationSound,
   businessPreferencesError,
 } = useSettingsPageModel();
 
@@ -451,6 +453,12 @@ async function handleLogout(): Promise<void> {
                   </button>
                 </div>
                 <div class="cp-settings__hint">{{ t("global_dnd_desc") }}</div>
+                <div class="cp-settings__row">
+                  <span class="cp-settings__muted">{{ t("notification_sound") }}</span>
+                  <button class="cp-settings__segBtn" data-testid="settings-notification-sound" :data-active="notificationSound" type="button" @click="toggleNotificationSound(!notificationSound)">
+                    {{ notificationSound ? t("enabled") : t("disabled") }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
