@@ -11,6 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { CallState } from "@/features/chat/voice-call/domain/contracts";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
+import NotificationBell from "@/features/notifications/presentation/components/NotificationBell.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
@@ -517,6 +518,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
         >
           <t-icon name="setting" />
         </button>
+        <NotificationBell />
         <ConnectionPill
           :state="props.model.connectionPillState"
           :label="connectionLabel"
