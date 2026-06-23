@@ -15,11 +15,13 @@ export type BusinessPreferencesModel = {
   emailNotifications: Ref<boolean>;
   desktopNotifications: Ref<boolean>;
   globalDnd: Ref<boolean>;
+  notificationSound: Ref<boolean>;
   businessPreferencesError: Ref<string>;
   refreshBusinessPreferences(): Promise<void>;
   toggleEmailNotifications(next: boolean): Promise<void>;
   toggleDesktopNotifications(next: boolean): Promise<void>;
   toggleGlobalDnd(next: boolean): Promise<void>;
+  toggleNotificationSound(next: boolean): Promise<void>;
 };
 
 export function useBusinessPreferencesModel(): BusinessPreferencesModel {
@@ -27,6 +29,7 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
   const emailNotifications = ref(false);
   const desktopNotifications = ref(false);
   const globalDnd = ref(false);
+  const notificationSound = ref(false);
   const businessPreferencesError = ref("");
 
   function setError(error: unknown, fallbackMessage: string): void {
@@ -39,6 +42,7 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
       emailNotifications.value = snapshot.emailNotifications;
       desktopNotifications.value = snapshot.desktopNotifications;
       globalDnd.value = snapshot.globalDnd;
+      notificationSound.value = snapshot.notificationSound;
       businessPreferencesError.value = "";
     } catch (error) {
       setError(error, t("settings_load_business_preferences_failed"));
@@ -74,6 +78,10 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
     return persistBusinessPreference("global_dnd", next, globalDnd);
   }
 
+  function toggleNotificationSound(next: boolean): Promise<void> {
+    return persistBusinessPreference("notification_sound", next, notificationSound);
+  }
+
   function refreshBusinessPreferences(): Promise<void> {
     return hydrateBusinessPreferences();
   }
@@ -86,10 +94,12 @@ export function useBusinessPreferencesModel(): BusinessPreferencesModel {
     emailNotifications,
     desktopNotifications,
     globalDnd,
+    notificationSound,
     businessPreferencesError,
     refreshBusinessPreferences,
     toggleEmailNotifications,
     toggleDesktopNotifications,
     toggleGlobalDnd,
+    toggleNotificationSound,
   };
 }

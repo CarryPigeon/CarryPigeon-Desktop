@@ -58,6 +58,7 @@ export const zh_cn = {
   desktop_notifications: "桌面通知",
   global_dnd: "全局免打扰",
   global_dnd_desc: "开启后所有桌面通知静音",
+  notification_sound: "通知提示音",
   show_file_extensions: "显示文件扩展名",
   auto_save_files: "自动保存文件",
   server_socket: "服务器地址",

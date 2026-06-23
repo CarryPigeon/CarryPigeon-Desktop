@@ -58,6 +58,7 @@ export const en_us = {
   desktop_notifications: "Desktop Notifications",
   global_dnd: "Do Not Disturb",
   global_dnd_desc: "Silence all desktop notifications",
+  notification_sound: "Notification Sound",
   show_file_extensions: "Show File Extensions",
   auto_save_files: "Auto Save Files",
   server_socket: "Server Address",

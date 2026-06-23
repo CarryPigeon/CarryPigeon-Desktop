@@ -22,6 +22,7 @@ import { getStoredLocale } from "@/shared/utils/locale";
 import { decideNotification } from "@/features/chat/message-flow/domain/usecases/notificationDecider";
 import { sendDesktopNotification } from "@/features/chat/message-flow/domain/usecases/notificationSender";
 import { getNotificationCapabilities } from "@/features/notifications/api";
+import { playNotificationSound } from "@/shared/utils/notificationSound";
 import type { UnreadMessagePreview } from "@/features/chat/public/api-types";
 import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 
@@ -228,6 +229,18 @@ export function createNotificationOnNewMessageHandler(deps: {
       const body = previewText.length > 100 ? previewText.slice(0, 100) + "..." : previewText;
 
       await sendDesktopNotification({ title, body, channelId, messageId: message.id });
+
+      if (!focused) {
+        try {
+          const soundEnabled = await invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key: "notification_sound" });
+          if (soundEnabled) {
+            playNotificationSound();
+          }
+        } catch {
+          // setting not available — play sound by default
+          playNotificationSound();
+        }
+      }
 
       getNotificationCapabilities().add({
         id: message.id,
