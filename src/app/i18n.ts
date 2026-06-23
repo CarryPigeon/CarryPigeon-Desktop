@@ -22,6 +22,7 @@ import { DEFAULT_APP_LOCALE, getStoredLocale } from "@/shared/utils/locale";
 export const i18n = createI18n({
   legacy: false,
   locale: getStoredLocale() ?? DEFAULT_APP_LOCALE,
+  fallbackLocale: DEFAULT_APP_LOCALE,
   messages: {
     zh_cn,
     en_us,
