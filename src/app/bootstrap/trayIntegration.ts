@@ -21,6 +21,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { getStoredLocale } from "@/shared/utils/locale";
 import { decideNotification } from "@/features/chat/message-flow/domain/usecases/notificationDecider";
 import { sendDesktopNotification } from "@/features/chat/message-flow/domain/usecases/notificationSender";
+import { getNotificationCapabilities } from "@/features/notifications/api";
 import type { UnreadMessagePreview } from "@/features/chat/public/api-types";
 import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 
@@ -227,6 +228,17 @@ export function createNotificationOnNewMessageHandler(deps: {
       const body = previewText.length > 100 ? previewText.slice(0, 100) + "..." : previewText;
 
       await sendDesktopNotification({ title, body, channelId, messageId: message.id });
+
+      getNotificationCapabilities().add({
+        id: message.id,
+        type: isMentioned ? "mention" : "message",
+        channelId,
+        serverId: undefined,
+        title,
+        summary: body,
+        timestamp: Date.now(),
+        read: false,
+      });
     } catch (e) {
       logger.error("Action: chat_notification_handle_failed", { error: String(e) });
     }
