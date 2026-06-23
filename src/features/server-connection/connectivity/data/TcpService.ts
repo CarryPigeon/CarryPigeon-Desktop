@@ -12,6 +12,8 @@ import { createTcpRequestResponseSender } from "./TcpRequestResponseSender";
 
 const KEY_EXCHANGE_TIMEOUT_MS = 15_000;
 const RESPONSE_CALLBACK_TIMEOUT_MS = 15_000;
+/** 单帧 JSON 明文最大字节数（超过则丢弃，防止大 payload DoS）。 */
+const MAX_INCOMING_JSON_BYTES = 256 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -219,6 +221,10 @@ export class TcpService {
   }
 
   private parseIncomingJson(data: string): unknown | null {
+    if (data.length > MAX_INCOMING_JSON_BYTES) {
+      tauriLog.warn("Action: network_json_too_large", { length: data.length, max: MAX_INCOMING_JSON_BYTES });
+      return null;
+    }
     try {
       return JSON.parse(data) as unknown;
     } catch (error) {

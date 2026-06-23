@@ -349,6 +349,13 @@ export class Encryption {
      */
     private sendSequence: number = 0;
     /**
+     * 接收序号（从 AAD 解析，用于客户端重放检测）。
+     *
+     * 初始值为 -1 表示尚未收到任何业务帧。
+     * 仅对握手完成后的加密帧做单调递增校验。
+     */
+    private receiveSequence: number = -1;
+    /**
      * 是否已完成握手（收到 `/handshake` 后置为 true）。
      */
     private handshakeComplete: boolean = false;
@@ -444,6 +451,7 @@ export class Encryption {
     private setHandshakeSession(sessionId: bigint): void {
         this.sessionId = sessionId;
         this.sendSequence = 0;
+        this.receiveSequence = -1;
         this.handshakeComplete = true;
         tauriLog.debug("Action: network_handshake_completed", { sessionId: this.sessionId.toString() });
     }
@@ -460,7 +468,9 @@ export class Encryption {
      */
     public async swapKey(requestId: number): Promise<void> {
         const isMockSocket = this.transportSocket.startsWith("mock://");
-        const isMockKey = this.serverEccPublicKeyBase64 === "mock";
+        // 仅在 DEV 构建允许 mock key；生产构建中即使配置了 "mock" 也会被忽略，
+        // 防止通过服务端配置篡改绕过密钥交换（mock:// socket 已由 Rust 侧 cfg!(debug_assertions) 保护）。
+        const isMockKey = import.meta.env.DEV && this.serverEccPublicKeyBase64 === "mock";
         const isTlsSocket =
             this.transportSocket.startsWith("tls://") ||
             this.transportSocket.startsWith("tls-insecure://") ||
@@ -586,6 +596,12 @@ export class Encryption {
         if (!this.aesKey) throw new Error("AES key is not initialized; cannot decrypt.");
         if (framePayload.length < 32) throw new Error(`Invalid encrypted payload length: ${framePayload.length}`);
 
+        // 握手完成前拒绝所有加密帧：握手响应通过 UTF-8 明文路径投递，
+        // 此阶段不应存在可被成功解密的业务帧。
+        if (!this.handshakeComplete) {
+            throw new Error("Handshake not complete; rejecting encrypted frame before session is established.");
+        }
+
         const nonce = framePayload.slice(0, 12);
         const aad = framePayload.slice(12, 32);
         const cipherText = framePayload.slice(32);
@@ -594,9 +610,25 @@ export class Encryption {
             return null;
         }
 
-        const { sessionId } = parseAad(aad);
-        if (this.handshakeComplete && sessionId !== this.sessionId) {
+        const { sequence, sessionId } = parseAad(aad);
+        if (sessionId !== this.sessionId) {
             throw new Error(`Session id mismatch: got ${sessionId.toString()}, expected ${this.sessionId.toString()}`);
+        }
+
+        // 接收侧重放检测：序号必须严格递增。
+        // uint32 回绕处理：last 靠近 2³²-1 且 incoming 为小值时视为合法回绕。
+        if (this.receiveSequence >= 0) {
+            const REORDER_WINDOW = 0xffff_0000;
+            const wrapped = this.receiveSequence >= REORDER_WINDOW && sequence < 0x0000_ffff;
+            if (!wrapped && sequence <= this.receiveSequence) {
+                tauriLog.warn("Action: network_replay_detected", {
+                    receivedSeq: sequence,
+                    lastSeq: this.receiveSequence,
+                });
+                throw new Error(
+                    `Replay or out-of-order frame: seq=${sequence} last=${this.receiveSequence}`
+                );
+            }
         }
 
         try {
@@ -605,6 +637,7 @@ export class Encryption {
                 this.aesKey,
                 toArrayBuffer(cipherText)
             );
+            this.receiveSequence = sequence;
             return decoder.decode(decrypted);
         } catch (e) {
             tauriLog.error("Action: network_crypto_aes_gcm_decrypt_failed", { error: String(e) });

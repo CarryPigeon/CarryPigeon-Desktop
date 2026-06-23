@@ -13,6 +13,9 @@ const ChannelInfoPopoverView = () => import('@/features/chat/presentation/channe
 const UserPopoverPage = () => import('@/features/account/current-user/presentation/pages/UserPopoverPage.vue');
 const TrayNotificationPopover = () => import('@/features/tray-notification/presentation/pages/TrayNotificationPopover.vue');
 
+// 截图遮罩窗口
+import ScreenshotOverlayRoutes from '@/features/screenshot/routes';
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -40,6 +43,8 @@ const router = createRouter({
     { path: '/channel-info-popover', component: ChannelInfoPopoverView, name: 'channel-info-popover' },
     { path: '/user-info-popover', component: UserPopoverPage, name: 'user-info-popover' },
     { path: '/tray-notification-popover', component: TrayNotificationPopover, name: 'tray-notification-popover' },
+    // 截图遮罩窗口
+    ...ScreenshotOverlayRoutes,
     // catch-all 兜底
     { path: '/:pathMatch(.*)*', redirect: '/chat' },
   ],

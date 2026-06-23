@@ -84,6 +84,9 @@ image = { version = "0.25", default-features = false, features = ["gif", "png"] 
 uuid = { version = "1", features = ["v4"] }
 gif = "0.14"
 
+# 截图
+xcap = "0.5"
+
 [profile.dev]
 opt-level = 0             # 不优化，最快编译
 codegen-units = 256       # 最大并行编译单元
