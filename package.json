@@ -15,7 +15,7 @@
         "build": "npm run -s typecheck && vite build",
         "preview": "vite preview",
         "tauri": "tauri",
-        "lint": "npm run -s typecheck && npm run -s lint:logs:std && npm run -s lint:rust:std && npm run -s lint:feature:boundaries && npm run -s lint:docs",
+        "lint": "node scripts/lint.js",
         "lint:feature:boundaries": "bash scripts/check-feature-boundaries.sh",
         "lint:docs": "node scripts/check-markup-style-docs.mjs",
         "lint:rust:std": "bash scripts/check-rust-standards.sh",
