@@ -1,0 +1,1 @@
+export { getScreenshotCapabilities } from "../api";
