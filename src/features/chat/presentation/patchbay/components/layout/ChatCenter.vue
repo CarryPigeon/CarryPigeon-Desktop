@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
+import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
 import type { CallState } from "@/features/chat/voice-call/domain/contracts";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import NotificationBell from "@/features/notifications/presentation/components/NotificationBell.vue";
@@ -45,15 +46,16 @@ import ShortcutHelp from "@/features/chat/presentation/patchbay/components/help/
 import type { ShortcutBinding } from "@/features/chat/presentation/patchbay/interactions/usePatchbayHotkeys";
 import { useVirtualizer } from '@tanstack/vue-virtual';
 
+type VirtualMessageItem = ChatMessage;
+
 /**
  * 虚拟滚动项目类型。
  */
 interface VirtualListItem {
   kind: 'message' | 'separator';
   key: string;
-  /** 消息数据（仅在 kind='message' 时有值） */
-  m?: any;
-  isGroupStart?: boolean;
+  m: VirtualMessageItem;
+  isGroupStart: boolean;
 }
 
 const props = defineProps<{
@@ -195,7 +197,7 @@ const virtualListItems = computed<VirtualListItem[]>(() => {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (row.isUnreadStart) {
-      items.push({ kind: 'separator', key: `sep-${row.m.id}` });
+      items.push({ kind: 'separator', key: `sep-${row.m.id}`, m: row.m, isGroupStart: false });
     }
     items.push({ kind: 'message', key: row.m.id, m: row.m, isGroupStart: row.isGroupStart });
   }
@@ -261,9 +263,9 @@ const lightboxSessionKey = ref(0);
 /** 媒体消息缓存（预计算，避免 openLightbox 每次 O(n) 扫描）。 */
 const lightboxMediaCache = computed(() =>
   props.model.messageRows
-    .filter((row) => (row.m.kind === "image" || row.m.kind === "video") && (row.m as any).url)
+    .filter((row) => (row.m.kind === "image" || row.m.kind === "video") && "url" in row.m)
     .map((row) => {
-      const m = row.m as Extract<typeof row.m, { kind: "image" | "video" }>;
+      const m = row.m as Extract<ChatMessage, { kind: "image" | "video" }>;
       return { url: m.url, fileName: m.fileName, isVideo: m.kind === "video", messageId: m.id };
     }),
 );
@@ -410,12 +412,16 @@ const searchActiveIndex = ref(0);
  */
 function handleSearchNavigate(index: number): void {
   const isServer = props.model.searchScope === "server";
-  const results = isServer
-    ? props.model.searchState.serverResults
-    : props.model.searchState.results;
-  const result = results[index];
-  if (result) {
-    props.model.openSearchResult(result.message.id, isServer ? (result as any).channelId : undefined);
+  if (isServer) {
+    const result = props.model.searchState.serverResults[index];
+    if (result) {
+      props.model.openSearchResult(result.message.id, result.channelId);
+    }
+  } else {
+    const result = props.model.searchState.results[index];
+    if (result) {
+      props.model.openSearchResult(result.message.id);
+    }
   }
 }
 
@@ -470,6 +476,10 @@ function handleRemoveFailedMessage(messageId: string): void {
 /** 将 retry/remove 方法代理到 model 上，供模板直接调用。 */
 const retryMessage = handleRetryMessage;
 const removeFailedMessage = handleRemoveFailedMessage;
+
+function getReplyText(m: VirtualMessageItem): string {
+  return m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, m.replyToId) : '';
+}
 </script>
 
 <template>
@@ -672,7 +682,7 @@ const removeFailedMessage = handleRemoveFailedMessage;
                 <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
                 <MessageContentHost
                   :message="virtualListItems[vr.index].m"
-                  :reply-text="virtualListItems[vr.index].m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, virtualListItems[vr.index].m.replyToId) : ''"
+                  :reply-text="getReplyText(virtualListItems[vr.index].m)"
                   :domain-registry-store="props.model.domainRegistryStore"
                   :editing-message-id="props.editingMessageId"
                   @install="props.onInstallHint"
