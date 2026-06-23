@@ -1,0 +1,1 @@
+export { getNotificationCapabilities } from "../api";
