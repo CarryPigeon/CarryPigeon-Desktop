@@ -38,6 +38,8 @@ export const en_us = {
   account: "Account",
   privacy: "Privacy",
   notifications: "Notifications",
+  mark_all_read: "Mark all read",
+  no_notifications: "No notifications",
   edit_in_file: "Edit Config",
   security: "Security",
   logout: "Logout",

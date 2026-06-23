@@ -38,6 +38,8 @@ export const zh_cn = {
   account: "账号",
   privacy: "隐私",
   notifications: "通知",
+  mark_all_read: "全部标记已读",
+  no_notifications: "暂无通知",
   edit_in_file: "编辑配置",
   security: "安全",
   logout: "退出登录",

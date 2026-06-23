@@ -38,24 +38,24 @@ onMounted(async () => {
       <p class="cp-about__description">{{ appInfo.description }}</p>
 
       <section class="cp-about__section">
-        <h2>{{ t("version") }}</h2>
+        <h2>{{ t("about_version") }}</h2>
         <p>{{ appInfo.version }}</p>
       </section>
 
       <section class="cp-about__section">
-        <h2>{{ t("tech_stack") }}</h2>
+        <h2>{{ t("about_tech_stack") }}</h2>
         <ul>
           <li v-for="item in appInfo.techStack" :key="item">{{ item }}</li>
         </ul>
       </section>
 
       <section class="cp-about__section">
-        <h2>{{ t("license") }}</h2>
+        <h2>{{ t("about_license") }}</h2>
         <p>{{ appInfo.license }}</p>
       </section>
 
       <section class="cp-about__section">
-        <h2>{{ t("credits") }}</h2>
+        <h2>{{ t("about_credits") }}</h2>
         <ul>
           <li v-for="credit in appInfo.credits" :key="credit.name">
             <a v-if="credit.url" :href="credit.url" target="_blank" rel="noopener">{{ credit.name }}</a>
