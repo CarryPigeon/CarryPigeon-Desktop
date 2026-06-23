@@ -5,6 +5,7 @@ import { PluginCenterPage, DomainCatalogPage, PluginDetailPage } from '@/feature
 import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
 import { ServerManagerPage } from '@/features/server-connection/routes';
 import { FileManagerPage } from '@/features/files/routes';
+import { aboutRoutes } from '@/features/about/routes';
 
 // 子窗口/低频页面使用动态导入，减少首屏 JS 体积
 const ContactsPage = () => import('@/features/chat/presentation/patchbay/contacts/ContactsPage.vue');
@@ -43,6 +44,8 @@ const router = createRouter({
     { path: '/channel-info-popover', component: ChannelInfoPopoverView, name: 'channel-info-popover' },
     { path: '/user-info-popover', component: UserPopoverPage, name: 'user-info-popover' },
     { path: '/tray-notification-popover', component: TrayNotificationPopover, name: 'tray-notification-popover' },
+    // 关于页面
+    ...aboutRoutes,
     // 截图遮罩窗口
     ...ScreenshotOverlayRoutes,
     // catch-all 兜底
