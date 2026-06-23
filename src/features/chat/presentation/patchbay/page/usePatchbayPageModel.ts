@@ -10,7 +10,7 @@ import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { createLogger } from "@/shared/utils/logger";
 import { toast } from "@/shared/utils/toast";
-import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
+import type { ChatLinkPreview, ChatMessageRecord } from "@/features/chat/domain/types/chatApiModels";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
   chatConnectionDetail,
@@ -554,7 +554,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
         data: { text, threadRootId: rootMessageId },
       });
     },
-    findMessageById: (id) => currentChannelMessageFlow.findMessageById(id) as any,
+    findMessageById: (id) => currentChannelMessageFlow.findMessageById(id) as unknown as ChatMessageRecord | undefined,
     currentChannelId: currentSessionSnapshot.value.currentChannelId,
   });
 

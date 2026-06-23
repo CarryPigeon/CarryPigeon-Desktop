@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import ThreadRootCard from "./ThreadRootCard.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
+import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 import type { useThreadPanelModel } from "./useThreadPanelModel";
 
 const { t } = useI18n();
@@ -69,7 +70,7 @@ const replyVirtualizer = useVirtualizer(
                   class="cp-threadPanel__reply"
                 >
                   <MessageContentHost
-                    :message="props.model.replies.value[vr.index] as any"
+                    :message="(props.model.replies.value[vr.index] as unknown) as ChatMessage"
                     :domain-registry-store="props.domainRegistryStore"
                   />
                 </div>

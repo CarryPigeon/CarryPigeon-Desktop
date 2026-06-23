@@ -12,7 +12,7 @@ defineProps<{ message: ChatMessageRecord }>();
 <template>
   <div class="cp-threadRoot">
     <div class="cp-threadRoot__sender">{{ message.sender?.nickname ?? message.userId }}</div>
-    <div class="cp-threadRoot__text">{{ (message as any).preview ?? "(message)" }}</div>
+    <div class="cp-threadRoot__text">{{ message.preview ?? "(message)" }}</div>
   </div>
 </template>
 
