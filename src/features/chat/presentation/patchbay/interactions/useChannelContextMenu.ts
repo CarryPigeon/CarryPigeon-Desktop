@@ -4,12 +4,15 @@
  */
 
 import { ref } from "vue";
+import type { NotificationLevel } from "../view-models/useChannelMuteStore";
 
-export type ChannelContextAction = "mute" | "unmute" | "channel_info" | "mark_read";
+export type ChannelContextAction = "mute" | "unmute" | "channel_info" | "mark_read" | `level:${NotificationLevel}`;
 
 export type UseChannelContextMenuDeps = {
   isMuted(channelId: string): boolean;
+  getNotificationLevel(channelId: string): NotificationLevel;
   toggleMute(channelId: string): Promise<void>;
+  setNotificationLevel(channelId: string, level: NotificationLevel, serverSocket: string, accessToken: string): Promise<void>;
   openChannelInfo(channelId: string): void;
   markChannelRead?(channelId: string): void;
 };
@@ -32,8 +35,8 @@ export function useChannelContextMenu(deps: UseChannelContextMenuDeps) {
     menuOpen.value = false;
   }
 
-  function currentAction(): "mute" | "unmute" {
-    return deps.isMuted(menuChannelId.value) ? "unmute" : "mute";
+  function currentNotifLevel(): NotificationLevel {
+    return deps.getNotificationLevel(menuChannelId.value);
   }
 
   async function handleMenuAction(action: ChannelContextAction): Promise<void> {
@@ -52,6 +55,12 @@ export function useChannelContextMenu(deps: UseChannelContextMenuDeps) {
       case "mark_read":
         deps.markChannelRead?.(channelId);
         break;
+      default:
+        if (action.startsWith("level:")) {
+          const level = action.slice(6) as NotificationLevel;
+          await deps.setNotificationLevel(channelId, level, "", "");
+        }
+        break;
     }
   }
 
@@ -63,6 +72,6 @@ export function useChannelContextMenu(deps: UseChannelContextMenuDeps) {
     openMenuForChannel,
     closeMenu,
     handleMenuAction,
-    currentAction,
+    currentNotifLevel,
   };
 }

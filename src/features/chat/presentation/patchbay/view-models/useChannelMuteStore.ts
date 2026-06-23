@@ -1,6 +1,6 @@
 /**
  * @fileoverview useChannelMuteStore.ts
- * @description chat｜频道静音状态管理：从服务端同步并本地乐观更新。
+ * @description chat｜频道通知级别状态管理：从服务端同步并本地乐观更新。
  */
 
 import { ref, type Ref } from "vue";
@@ -10,25 +10,36 @@ import { createHttpNotificationPreferenceApi } from "@/features/chat/notificatio
 
 const logger = createLogger("channelMuteStore");
 
+export type NotificationLevel = "all" | "mentions_only" | "muted";
+
 export type ChannelMuteStore = {
-  /** 当前已静音的频道 id 集合 */
-  mutedChannelIds: Ref<Set<string>>;
-  /** 查询指定频道是否已静音 */
+  /** 频道通知级别映射 */
+  channelLevels: Ref<Map<string, NotificationLevel>>;
+  /** 查询指定频道是否已静音（等效于 level === "muted"） */
   isMuted(channelId: string): boolean;
+  /** 查询指定频道的通知级别 */
+  getNotificationLevel(channelId: string): NotificationLevel;
+  /** 设置指定频道的通知级别，乐观更新 */
+  setNotificationLevel(
+    channelId: string,
+    level: NotificationLevel,
+    serverSocket: string,
+    accessToken: string,
+  ): Promise<void>;
   /** 切换指定频道的静音状态（muted ↔ all），乐观更新 */
   toggleMute(
     channelId: string,
     serverSocket: string,
     accessToken: string,
   ): Promise<void>;
-  /** 从服务端拉取当前通知偏好，更新 mutedChannelIds */
+  /** 从服务端拉取当前通知偏好，更新 channelLevels */
   refresh(serverSocket: string, accessToken: string): Promise<void>;
 };
 
 /**
- * 创建频道静音状态管理 store。
+ * 创建频道通知级别状态管理 store。
  *
- * 单例模式：整个 patchbay 共享同一份 mute 状态。
+ * 单例模式：整个 patchbay 共享同一份状态。
  */
 let storeInstance: ChannelMuteStore | null = null;
 
@@ -36,10 +47,14 @@ export function useChannelMuteStore(): ChannelMuteStore {
   if (storeInstance) return storeInstance;
 
   const api: ChatNotificationPreferenceApi = createHttpNotificationPreferenceApi();
-  const mutedChannelIds = ref(new Set<string>());
+  const channelLevels = ref(new Map<string, NotificationLevel>());
 
   function isMuted(channelId: string): boolean {
-    return mutedChannelIds.value.has(channelId);
+    return channelLevels.value.get(channelId) === "muted";
+  }
+
+  function getNotificationLevel(channelId: string): NotificationLevel {
+    return channelLevels.value.get(channelId) ?? "all";
   }
 
   async function refresh(
@@ -49,17 +64,43 @@ export function useChannelMuteStore(): ChannelMuteStore {
     if (!serverSocket || !accessToken) return;
     try {
       const prefs = await api.getPreferences(serverSocket, accessToken);
-      const muted = new Set<string>();
+      const levels = new Map<string, NotificationLevel>();
       for (const ch of prefs.channels) {
-        if (ch.mode === "muted") {
-          muted.add(ch.cid);
+        if (ch.mode === "muted" || ch.mode === "mentions_only" || ch.mode === "all") {
+          levels.set(ch.cid, ch.mode);
         }
       }
-      mutedChannelIds.value = muted;
+      channelLevels.value = levels;
     } catch (error) {
       logger.warn("Action: chat_channel_mute_refresh_failed", {
         error: String(error),
       });
+    }
+  }
+
+  async function setNotificationLevel(
+    channelId: string,
+    level: NotificationLevel,
+    serverSocket: string,
+    accessToken: string,
+  ): Promise<void> {
+    if (!channelId || !serverSocket || !accessToken) return;
+
+    const prev = new Map(channelLevels.value);
+    channelLevels.value = new Map(channelLevels.value).set(channelId, level);
+
+    try {
+      await api.setChannelPreference(serverSocket, accessToken, channelId, {
+        mode: level,
+      });
+    } catch (error) {
+      channelLevels.value = prev;
+      logger.error("Action: chat_channel_notification_level_set_failed", {
+        channelId,
+        level,
+        error: String(error),
+      });
+      throw error;
     }
   }
 
@@ -68,39 +109,16 @@ export function useChannelMuteStore(): ChannelMuteStore {
     serverSocket: string,
     accessToken: string,
   ): Promise<void> {
-    if (!channelId || !serverSocket || !accessToken) return;
-
-    const currentlyMuted = isMuted(channelId);
-    const nextMode = currentlyMuted ? "all" : "muted";
-
-    // 乐观更新
-    const prev = new Set(mutedChannelIds.value);
-    if (currentlyMuted) {
-      mutedChannelIds.value.delete(channelId);
-    } else {
-      mutedChannelIds.value.add(channelId);
-    }
-    // 触发响应式更新
-    mutedChannelIds.value = new Set(mutedChannelIds.value);
-
-    try {
-      await api.setChannelPreference(serverSocket, accessToken, channelId, {
-        mode: nextMode,
-      });
-    } catch (error) {
-      // 失败回滚
-      mutedChannelIds.value = prev;
-      logger.error("Action: chat_channel_mute_toggle_failed", {
-        channelId,
-        error: String(error),
-      });
-      throw error;
-    }
+    const current = getNotificationLevel(channelId);
+    const next: NotificationLevel = current === "muted" ? "all" : "muted";
+    await setNotificationLevel(channelId, next, serverSocket, accessToken);
   }
 
   storeInstance = {
-    mutedChannelIds,
+    channelLevels,
     isMuted,
+    getNotificationLevel,
+    setNotificationLevel,
     toggleMute,
     refresh,
   };
