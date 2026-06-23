@@ -6,6 +6,7 @@
 pub mod emoji;
 pub mod network;
 pub mod plugins;
+pub mod screenshot;
 pub mod settings;
 pub mod tray;
 pub mod voice_call;

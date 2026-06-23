@@ -7,6 +7,7 @@
 import { computed, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import DomainSelector from "./DomainSelector.vue";
+import ScreenshotButton from "@/features/screenshot/presentation/components/ScreenshotButton.vue";
 import LinkPreviewCard from "./LinkPreviewCard.vue";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-types";
@@ -338,6 +339,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
     <div class="cp-composer__actions">
       <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
       <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">{{ t("no_composer_available") }}</div>
+      <ScreenshotButton v-else />
       <button v-else class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
         {{ props.sending ? `${t('send')}…` : t("send") }}
       </button>

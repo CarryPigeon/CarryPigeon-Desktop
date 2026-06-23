@@ -350,6 +350,11 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::emoji::di::commands::copy_emoji,
             crate::features::emoji::di::commands::write_temp_emoji_file,
             crate::features::emoji::di::commands::get_emoji_image_path,
+            // screenshot
+            crate::features::screenshot::di::commands::start_screenshot,
+            crate::features::screenshot::di::commands::get_screenshot_data,
+            crate::features::screenshot::di::commands::finish_screenshot,
+            crate::features::screenshot::di::commands::cancel_screenshot,
             // voice_call
             crate::features::voice_call::di::commands::connect_signaling,
             crate::features::voice_call::di::commands::start_direct_call,
