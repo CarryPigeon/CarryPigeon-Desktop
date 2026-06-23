@@ -312,7 +312,7 @@ onBeforeUnmount(() => {
         :open="page.channelContextMenu.open.value"
         :x="page.channelContextMenu.x.value"
         :y="page.channelContextMenu.y.value"
-        :is-muted="page.channelContextMenu.isMuted(page.channelContextMenu.currentChannelId.value ?? '')"
+        :notification-level="page.channelContextMenu.currentNotifLevel()"
         @action="page.channelContextMenu.handleMenuAction"
         @close="page.channelContextMenu.close"
       />

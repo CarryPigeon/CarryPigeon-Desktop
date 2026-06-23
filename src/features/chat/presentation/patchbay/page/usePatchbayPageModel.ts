@@ -53,7 +53,7 @@ import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
-import { useChannelMuteStore } from "../view-models/useChannelMuteStore";
+import { useChannelMuteStore, type NotificationLevel } from "../view-models/useChannelMuteStore";
 import { useChannelContextMenu, type ChannelContextAction } from "../interactions/useChannelContextMenu";
 import { currentServerSocket } from "@/features/server-connection/api";
 import { readAuthToken } from "@/shared/utils/localState";
@@ -127,7 +127,7 @@ type PatchbayPageRawModel = {
     isMuted: (channelId: string) => boolean;
     close: () => void;
     handleMenuAction: (action: ChannelContextAction) => Promise<void>;
-    currentAction: () => "mute" | "unmute";
+    currentNotifLevel: () => NotificationLevel;
   };
 };
 
@@ -313,6 +313,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const channelMuteStore = useChannelMuteStore();
   const channelContextMenu = useChannelContextMenu({
     isMuted: (channelId) => channelMuteStore.isMuted(channelId),
+    getNotificationLevel: (channelId) => channelMuteStore.getNotificationLevel(channelId),
     toggleMute: async (channelId) => {
       const socket = currentServerSocket.value ?? "";
       const token = readAuthToken(socket) ?? "";
@@ -320,6 +321,16 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       try {
         await channelMuteStore.toggleMute(channelId, socket, token);
         toast.success(wasMuted ? t("channel_unmuted_toast") : t("channel_muted_toast"));
+      } catch {
+        toast.error(t("settings_save_business_preference_failed"));
+      }
+    },
+    setNotificationLevel: async (channelId, level, _socket, _token) => {
+      const socket = currentServerSocket.value ?? "";
+      const token = readAuthToken(socket) ?? "";
+      try {
+        await channelMuteStore.setNotificationLevel(channelId, level, socket, token);
+        toast.success(t("notif_level_updated"));
       } catch {
         toast.error(t("settings_save_business_preference_failed"));
       }
@@ -905,7 +916,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       isMuted: (channelId: string) => channelMuteStore.isMuted(channelId),
       close: channelContextMenu.closeMenu,
       handleMenuAction: channelContextMenu.handleMenuAction,
-      currentAction: channelContextMenu.currentAction,
+      currentNotifLevel: channelContextMenu.currentNotifLevel,
     },
   };
 
