@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { getScreenshotData, finishScreenshot, cancelScreenshot } from "../../data/screenshotCommands";
 import AnnotationToolbar from "./tools/AnnotationToolbar.vue";
 import type { ScreenCapture } from "../../api-types";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("screenshot");
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -30,19 +34,29 @@ let startY = 0;
 
 let baseImageData: ImageData | null = null;
 
+let resizeObserver: ResizeObserver | null = null;
+
 type Annotation = {
   type: "pen" | "arrow" | "rect" | "text" | "mosaic";
   x1: number; y1: number; x2: number; y2: number;
   color: string; width: number; text?: string; fontSize?: number;
+  points?: { x: number; y: number }[];
 };
 const annotations = ref<Annotation[]>([]);
 
 let textInput: HTMLTextAreaElement | null = null;
 let isTextPlacing = false;
+let isComposing = false;
+let penPoints: { x: number; y: number }[] = [];
 
 onMounted(async () => {
   try {
-    const data = await getScreenshotData();
+    const data = await Promise.race([
+      getScreenshotData(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("getScreenshotData timed out after 15s")), 15000),
+      ),
+    ]);
     captures.value = data;
 
     if (data.length === 0) {
@@ -67,29 +81,97 @@ onMounted(async () => {
     bgCtx.fillStyle = "#1a1a2e";
     bgCtx.fillRect(0, 0, virtualW, virtualH);
 
-    const imagePromises = data.map((s) => {
-      return new Promise<void>((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          bgCtx.drawImage(img, s.x - minX, s.y - minY, s.width, s.height);
-          resolve();
-        };
-        img.src = `data:image/png;base64,${s.data_base64}`;
-      });
-    });
-    await Promise.all(imagePromises);
+    // 立即显示 canvas（暗色背景），图片异步渐进加载
+    loading.value = false;
+    await nextTick();
 
     const ctx = canvasRef.value?.getContext("2d");
     if (!ctx) {
       error.value = "Canvas not available";
-      loading.value = false;
       return;
     }
 
     fitCanvas(ctx);
-    ctx.drawImage(bgCanvas, 0, 0, virtualW * scale, virtualH * scale);
+    ctx.drawImage(bgCanvas, offsetX, offsetY, virtualW * scale, virtualH * scale);
     baseImageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-    loading.value = false;
+
+    const loadAndRedraw = () => {
+      const c = canvasRef.value?.getContext("2d");
+      if (!c) return;
+      c.drawImage(bgCanvas, offsetX, offsetY, virtualW * scale, virtualH * scale);
+    };
+
+    const bodyEl = canvasRef.value?.parentElement;
+    if (bodyEl) {
+      resizeObserver = new ResizeObserver(() => {
+        const ctx2 = canvasRef.value?.getContext("2d");
+        if (!ctx2) return;
+        fitCanvas(ctx2);
+        loadAndRedraw();
+        if (baseImageData) {
+          baseImageData = ctx2.getImageData(0, 0, ctx2.canvas.width, ctx2.canvas.height);
+          redrawAnnotations();
+        }
+      });
+      resizeObserver.observe(bodyEl);
+    }
+
+    let loadedCount = 0;
+    let failedCount = 0;
+
+    const imagePromises = data.map((s, idx) => {
+      return new Promise<void>((resolve) => {
+        const loadImage = (src: string, useFile: boolean) => {
+          const img = new Image();
+          if (useFile) {
+            img.crossOrigin = "anonymous";
+          }
+          img.onload = () => {
+            bgCtx.drawImage(img, s.x - minX, s.y - minY, s.width, s.height);
+            loadedCount++;
+            loadAndRedraw();
+            resolve();
+          };
+          img.onerror = () => {
+            if (useFile && s.data_base64) {
+              loadImage(`data:image/png;base64,${s.data_base64}`, false);
+            } else {
+              logger.error("Action: screenshot_image_load_failed", { index: idx });
+              failedCount++;
+              resolve();
+            }
+          };
+          img.src = src;
+        };
+
+        if (s.file_path) {
+          loadImage(convertFileSrc(s.file_path), true);
+        } else {
+          loadImage(`data:image/png;base64,${s.data_base64}`, false);
+        }
+      });
+    });
+
+    // 异步等待所有图片加载完成后更新 baseImageData（用于马赛克等工具）
+    Promise.all(imagePromises).then(() => {
+      if (loadedCount === 0) {
+        error.value = `Failed to load all ${failedCount} screenshot image(s)`;
+      }
+      const c = canvasRef.value?.getContext("2d");
+      if (c) {
+        loadAndRedraw();
+        baseImageData = c.getImageData(0, 0, c.canvas.width, c.canvas.height);
+      }
+    }).catch(() => {
+      // 超时由下面的 race 处理
+    });
+
+    const imageLoadTimeout = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error("Image loading timed out after 30s")), 30000),
+    );
+    Promise.race([Promise.all(imagePromises), imageLoadTimeout]).catch(() => {
+      // 超时不阻塞 UI，图片已在渐进加载
+    });
   } catch (e) {
     error.value = String(e);
     loading.value = false;
@@ -117,11 +199,6 @@ function getVirtualCoords(e: MouseEvent): { vx: number; vy: number } | null {
   return { vx: mx + virtualX, vy: my + virtualY };
 }
 
-function getCanvasCoords(e: MouseEvent): { cx: number; cy: number } {
-  const rect = canvasRef.value!.getBoundingClientRect();
-  return { cx: e.clientX - rect.left, cy: e.clientY - rect.top };
-}
-
 function handlePointerDown(e: MouseEvent) {
   if (activeTool.value === "select") {
     const pos = getVirtualCoords(e);
@@ -136,8 +213,14 @@ function handlePointerDown(e: MouseEvent) {
     if (isTextPlacing) return;
     isTextPlacing = true;
     isDrawing = true;
-    const canvasCoord = getCanvasCoords(e);
-    showTextInput(canvasCoord.cx, canvasCoord.cy, pos.vx, pos.vy);
+    showTextInput(e.clientX, e.clientY, pos.vx, pos.vy);
+  } else if (activeTool.value === "pen") {
+    const pos = getVirtualCoords(e);
+    if (!pos) return;
+    isDrawing = true;
+    penPoints = [{ x: pos.vx, y: pos.vy }];
+    startX = pos.vx;
+    startY = pos.vy;
   } else {
     const pos = getVirtualCoords(e);
     if (!pos) return;
@@ -167,6 +250,20 @@ function handlePointerMove(e: MouseEvent) {
       Math.abs(pos.vy - startY) * scale,
     );
     ctx.setLineDash([]);
+  } else if (activeTool.value === "pen") {
+    const last = penPoints[penPoints.length - 1];
+    if (!last) return;
+    const tvx = (v: number) => (v - virtualX) * scale + offsetX;
+    const tvy = (v: number) => (v - virtualY) * scale + offsetY;
+    ctx.strokeStyle = strokeColor.value;
+    ctx.lineWidth = strokeWidth.value;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(tvx(last.x), tvy(last.y));
+    ctx.lineTo(tvx(pos.vx), tvy(pos.vy));
+    ctx.stroke();
+    penPoints.push({ x: pos.vx, y: pos.vy });
   } else {
     redrawAnnotations();
     drawPreviewLine(ctx, startX, startY, pos.vx, pos.vy);
@@ -197,6 +294,20 @@ function handlePointerUp(e: MouseEvent) {
       hasSelection.value = true;
       activeTool.value = "pen";
     }
+  } else if (activeTool.value === "pen") {
+    if (penPoints.length < 2) {
+      penPoints = [];
+      return;
+    }
+    annotations.value.push({
+      type: "pen",
+      x1: 0, y1: 0, x2: 0, y2: 0,
+      color: strokeColor.value,
+      width: strokeWidth.value,
+      points: [...penPoints],
+    });
+    penPoints = [];
+    redraw();
   } else {
     addAnnotation(pos.vx, pos.vy);
   }
@@ -243,24 +354,37 @@ function confirmText(textVal: string, vx: number, vy: number) {
   redraw();
 }
 
-function showTextInput(cx: number, cy: number, vx: number, vy: number) {
+function showTextInput(vx: number, vy: number, cvx: number, cvy: number) {
   textInput?.remove();
   const input = document.createElement("textarea");
   input.className = "cp-screenshot-text-input";
-  input.style.left = `${cx}px`;
-  input.style.top = `${cy}px`;
+  input.style.left = `${vx}px`;
+  input.style.top = `${vy}px`;
   input.style.color = strokeColor.value;
   input.style.fontSize = `${fontSize.value}px`;
   document.querySelector(".cp-screenshot-overlay")?.appendChild(input);
   textInput = input;
   input.focus();
+  isComposing = false;
 
   const finish = () => {
-    confirmText(input.value, vx, vy);
+    if (isComposing) return;
+    confirmText(input.value, cvx, cvy);
   };
-  input.addEventListener("blur", finish);
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (isComposing) return;
+      confirmText(input.value, cvx, cvy);
+    }, 0);
+  });
+  input.addEventListener("compositionstart", () => {
+    isComposing = true;
+  });
+  input.addEventListener("compositionend", () => {
+    isComposing = false;
+  });
   input.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" && !ev.shiftKey) {
+    if (ev.key === "Enter" && !ev.shiftKey && !isComposing) {
       ev.preventDefault();
       finish();
     }
@@ -282,13 +406,6 @@ function drawPreviewLine(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
   ctx.fillStyle = strokeColor.value;
 
   switch (activeTool.value) {
-    case "pen": {
-      ctx.beginPath();
-      ctx.moveTo(tvx(startX), tvy(startY));
-      ctx.lineTo(tvx(ex), tvy(ey));
-      ctx.stroke();
-      break;
-    }
     case "arrow": {
       const angle = Math.atan2(ey - sy, ex - sx);
       const headLen = 12;
@@ -406,10 +523,15 @@ function redrawAnnotations() {
 
     switch (ann.type) {
       case "pen": {
-        ctx.beginPath();
-        ctx.moveTo(tvx(ann.x1), tvy(ann.y1));
-        ctx.lineTo(tvx(ann.x2), tvy(ann.y2));
-        ctx.stroke();
+        const pts = ann.points;
+        if (pts && pts.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(tvx(pts[0].x), tvy(pts[0].y));
+          for (let i = 1; i < pts.length; i++) {
+            ctx.lineTo(tvx(pts[i].x), tvy(pts[i].y));
+          }
+          ctx.stroke();
+        }
         break;
       }
       case "arrow": {
@@ -473,15 +595,21 @@ function undo() {
 
 async function handleConfirm() {
   const canvas = canvasRef.value;
-  if (!canvas) return;
+  if (!canvas) {
+    error.value = "Canvas not available for export";
+    return;
+  }
 
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) {
+    error.value = "Failed to get canvas 2D context for export";
+    return;
+  }
 
-  let exportW = virtualW;
-  let exportH = virtualH;
-  let exportSrcX = 0;
-  let exportSrcY = 0;
+  let exportW = virtualW * scale;
+  let exportH = virtualH * scale;
+  let exportSrcX = offsetX;
+  let exportSrcY = offsetY;
 
   if (currentSelection.value) {
     exportSrcX = (currentSelection.value.x1 - virtualX) * scale + offsetX;
@@ -518,6 +646,11 @@ function handleToolChange(tool: Tool) {
     isTextPlacing = false;
     isDrawing = false;
   }
+  if (activeTool.value === "pen" && isDrawing) {
+    penPoints = [];
+    isDrawing = false;
+    redraw();
+  }
   activeTool.value = tool;
 }
 
@@ -531,6 +664,7 @@ function handleWidthChange(width: number) {
 
 onBeforeUnmount(() => {
   textInput?.remove();
+  resizeObserver?.disconnect();
 });
 </script>
 
