@@ -663,6 +663,10 @@ export const en_us = {
   video_load_failed: "Video failed to load",
   video_playing: "Video playing",
   // Lightbox
+  // Screenshot
+  screenshot: "Screenshot",
+  screenshot_standard: "Standard",
+  screenshot_no_hide: "No-Hide",
   scroll_to_zoom: "Scroll to zoom",
   drag_to_pan: "Drag to pan",
   r_to_rotate: "Press R to rotate",
