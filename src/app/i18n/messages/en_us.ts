@@ -665,8 +665,8 @@ export const en_us = {
   // Lightbox
   // Screenshot
   screenshot: "Screenshot",
-  screenshot_standard: "Standard",
-  screenshot_no_hide: "No-Hide",
+  screenshot_hide: "Standard",
+  screenshot_show: "No-Hide",
   scroll_to_zoom: "Scroll to zoom",
   drag_to_pan: "Drag to pan",
   r_to_rotate: "Press R to rotate",
