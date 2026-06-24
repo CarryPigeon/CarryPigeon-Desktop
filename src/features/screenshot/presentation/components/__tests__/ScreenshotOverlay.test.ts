@@ -48,6 +48,10 @@ function teardownImageMock() {
 }
 
 function setupCanvasMocks() {
+  vi.stubGlobal("ResizeObserver", class {
+    observe = vi.fn();
+    disconnect = vi.fn();
+  } as unknown as typeof ResizeObserver);
   Object.defineProperty(
     HTMLCanvasElement.prototype,
     "getContext",
@@ -98,6 +102,7 @@ describe("ScreenshotOverlay", () => {
 
   afterEach(() => {
     teardownImageMock();
+    vi.unstubAllGlobals();
     delete (HTMLCanvasElement.prototype as unknown as Record<string, unknown>).getContext;
   });
 
