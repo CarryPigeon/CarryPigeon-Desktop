@@ -11,22 +11,20 @@ use crate::shared::error::{command_error, CommandResult};
 /// 截图数据缓存状态：从 `start_screenshot` 暂存，供遮罩窗口 `get_screenshot_data` 取用。
 pub struct ScreenshotCaptureState(pub Mutex<Option<Vec<ScreenCapture>>>);
 
-/// 开始截图：隐藏主窗口 → 截取所有显示器 → 打开遮罩窗口。
+/// 开始截图：可选隐藏主窗口 → 截取所有显示器 → 打开遮罩窗口。
 #[tauri::command]
-pub async fn start_screenshot(app: AppHandle) -> CommandResult<()> {
-    tracing::info!(action = "screenshot_start");
+pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> CommandResult<()> {
+    let hide_window = hide_window.unwrap_or(true);
+    tracing::info!(action = "screenshot_start", hide_window = hide_window);
 
-    // 1. 隐藏主窗口
-    if let Some(main_window) = app.get_webview_window("main") {
-        main_window
-            .hide()
-            .map_err(|e| command_error("SCREENSHOT_HIDE_WINDOW_FAIL", &e.to_string()))?;
-    }
-
-    // 2. 核心截图流程（如果失败，恢复主窗口显示）
-    let result = {
-        // 轮询等待窗口完全隐藏（最多 500ms）
+    // 1. 隐藏主窗口（可选）
+    if hide_window {
         if let Some(main_window) = app.get_webview_window("main") {
+            main_window
+                .hide()
+                .map_err(|e| command_error("SCREENSHOT_HIDE_WINDOW_FAIL", &e.to_string()))?;
+
+            // 轮询等待窗口完全隐藏（最多 500ms）
             for _ in 0..100 {
                 if !main_window
                     .is_visible()
@@ -37,7 +35,10 @@ pub async fn start_screenshot(app: AppHandle) -> CommandResult<()> {
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
             }
         }
+    }
 
+    // 2. 核心截图流程（如果失败且曾隐藏，恢复主窗口显示）
+    let result = {
         // 截取所有显示器（存为临时文件到 app data 目录，确保在 Tauri asset scope 内）
         let app_data = app
             .path()
@@ -66,7 +67,7 @@ pub async fn start_screenshot(app: AppHandle) -> CommandResult<()> {
         Ok::<(), String>(())
     };
 
-    if result.is_err() {
+    if result.is_err() && hide_window {
         if let Some(main_window) = app.get_webview_window("main") {
             let _ = main_window.show();
         }
