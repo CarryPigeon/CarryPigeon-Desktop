@@ -663,6 +663,10 @@ export const zh_cn = {
   video_load_failed: "视频加载失败",
   video_playing: "视频播放中",
   // 灯箱
+  // 截图
+  screenshot: "截图",
+  screenshot_standard: "标准截图",
+  screenshot_no_hide: "无隐藏截图",
   scroll_to_zoom: "滚轮缩放",
   drag_to_pan: "拖拽平移",
   r_to_rotate: "按 R 旋转",
