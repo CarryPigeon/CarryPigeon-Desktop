@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ScreenCapture } from "../domain/contracts";
 
-export function startScreenshot(): Promise<void> {
-  return invoke("start_screenshot");
+export function startScreenshot(hideWindow?: boolean): Promise<void> {
+  return invoke("start_screenshot", { hideWindow });
 }
 
 export function getScreenshotData(): Promise<ScreenCapture[]> {
