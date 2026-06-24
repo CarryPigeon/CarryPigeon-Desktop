@@ -665,8 +665,8 @@ export const zh_cn = {
   // 灯箱
   // 截图
   screenshot: "截图",
-  screenshot_standard: "标准截图",
-  screenshot_no_hide: "无隐藏截图",
+  screenshot_hide: "标准截图",
+  screenshot_show: "无隐藏截图",
   scroll_to_zoom: "滚轮缩放",
   drag_to_pan: "拖拽平移",
   r_to_rotate: "按 R 旋转",

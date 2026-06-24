@@ -278,7 +278,6 @@ function handlePointerUp(e: MouseEvent) {
   if (!pos) return;
 
   if (activeTool.value === "select") {
-    if (activeTool.value === "select") {
       if (Math.abs(pos.vx - startX) < 10 && Math.abs(pos.vy - startY) < 10) return;
       const selectMinX = Math.min(startX, pos.vx);
       const selectMinY = Math.min(startY, pos.vy);
@@ -293,7 +292,6 @@ function handlePointerUp(e: MouseEvent) {
       };
       hasSelection.value = true;
       activeTool.value = "pen";
-    }
   } else if (activeTool.value === "pen") {
     if (penPoints.length < 2) {
       penPoints = [];
