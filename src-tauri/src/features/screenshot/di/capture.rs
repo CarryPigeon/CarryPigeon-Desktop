@@ -1,6 +1,8 @@
 //! screenshot｜截屏核心逻辑
 //!
 //! 约定：注释中文，日志英文（tracing）。
+use std::path::Path;
+
 use serde::Serialize;
 use xcap::Monitor;
 
@@ -19,12 +21,17 @@ pub struct ScreenCapture {
     pub y: i32,
     /// DPI 缩放因子
     pub scale_factor: f64,
-    /// PNG 编码后的图片数据（base64）
+    /// PNG 编码后的图片数据（base64，向后兼容）
     pub data_base64: String,
+    /// 截图文件在磁盘上的路径（前端可用 convertFileSrc 加载）
+    pub file_path: Option<String>,
 }
 
-/// 截取所有显示器的画面。
-pub fn capture_all_screens() -> Result<Vec<ScreenCapture>, String> {
+/// 截取所有显示器的画面，保存 PNG 文件到 `save_dir`。
+pub fn capture_all_screens(save_dir: &Path) -> Result<Vec<ScreenCapture>, String> {
+    std::fs::create_dir_all(save_dir)
+        .map_err(|e| format!("capture_all_screens create save_dir failed: {e:?}"))?;
+
     let monitors = Monitor::all().map_err(|e| format!("capture_all_screens monitor list failed: {e:?}"))?;
 
     let mut captures = Vec::new();
@@ -34,6 +41,14 @@ pub fn capture_all_screens() -> Result<Vec<ScreenCapture>, String> {
         let width = image.width();
         let height = image.height();
 
+        // 保存到磁盘，前端通过 convertFileSrc 加载
+        let filename = format!("screenshot_{}.png", uuid::Uuid::new_v4());
+        let file_path = save_dir.join(&filename);
+        image
+            .save(&file_path)
+            .map_err(|e| format!("capture_all_screens save png failed: {e:?}"))?;
+
+        // 同时保留 base64 编码（向后兼容）
         let mut png_bytes = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut png_bytes);
         image
@@ -50,6 +65,7 @@ pub fn capture_all_screens() -> Result<Vec<ScreenCapture>, String> {
             y: monitor.y().map_err(|e| format!("monitor y failed: {e:?}"))?,
             scale_factor: monitor.scale_factor().map_err(|e| format!("monitor scale_factor failed: {e:?}"))? as f64,
             data_base64,
+            file_path: Some(file_path.to_string_lossy().to_string()),
         });
     }
 
@@ -80,4 +96,39 @@ fn use_base64_encode(data: &[u8]) -> String {
         i += 3;
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_encode_empty() {
+        assert_eq!(use_base64_encode(b""), "");
+    }
+
+    #[test]
+    fn base64_encode_single_byte() {
+        assert_eq!(use_base64_encode(b"f"), "Zg==");
+    }
+
+    #[test]
+    fn base64_encode_two_bytes() {
+        assert_eq!(use_base64_encode(b"fo"), "Zm8=");
+    }
+
+    #[test]
+    fn base64_encode_three_bytes() {
+        assert_eq!(use_base64_encode(b"foo"), "Zm9v");
+    }
+
+    #[test]
+    fn base64_encode_known_string() {
+        assert_eq!(use_base64_encode(b"hello"), "aGVsbG8=");
+    }
+
+    #[test]
+    fn base64_encode_padding() {
+        assert_eq!(use_base64_encode(b"abcd"), "YWJjZA==");
+    }
 }
