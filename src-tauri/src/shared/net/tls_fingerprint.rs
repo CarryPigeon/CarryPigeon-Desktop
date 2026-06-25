@@ -39,3 +39,62 @@ pub fn verify_der_sha256_fingerprint(expected_sha256: &str, cert_der: &[u8]) -> 
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_trims_and_lowercases() {
+        assert_eq!(
+            normalize_sha256_fingerprint("  A1B2C3  "),
+            "a1b2c3"
+        );
+    }
+
+    #[test]
+    fn normalize_filters_non_hex() {
+        assert_eq!(
+            normalize_sha256_fingerprint("AA:BB:CC:DD:EE:FF"),
+            "aabbccddeeff"
+        );
+    }
+
+    #[test]
+    fn normalize_filters_colons_and_spaces() {
+        assert_eq!(
+            normalize_sha256_fingerprint("A1:B2:C3:D4 E5:F6:G7:H8 I9:J0:K1:L2 M3:N4:O5:P6 Q7:R8:S9:T0 U1:V2:W3:X4 Y5:Z6"),
+            "a1b2c3d4e5f678901234567890123456"
+        );
+    }
+
+    #[test]
+    fn verify_matching_cert() {
+        let cert_der = b"test certificate data for hashing";
+        let expected = sha256_hex(cert_der);
+        assert!(verify_der_sha256_fingerprint(&expected, cert_der).is_ok());
+    }
+
+    #[test]
+    fn verify_mismatched_cert() {
+        let expected = "a".repeat(64);
+        let cert_der = b"different certificate data";
+        let err = verify_der_sha256_fingerprint(&expected, cert_der).unwrap_err();
+        assert!(err.to_string().contains("fingerprint mismatch"));
+    }
+
+    #[test]
+    fn verify_invalid_length_rejected() {
+        let expected = "abc";
+        let cert_der = b"some data";
+        let err = verify_der_sha256_fingerprint(expected, cert_der).unwrap_err();
+        assert!(err.to_string().contains("Invalid TLS fingerprint"));
+    }
+
+    #[test]
+    fn verify_empty_cert() {
+        let cert_der: &[u8] = &[];
+        let expected = sha256_hex(cert_der);
+        assert!(verify_der_sha256_fingerprint(&expected, cert_der).is_ok());
+    }
+}

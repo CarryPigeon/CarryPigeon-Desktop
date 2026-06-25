@@ -142,11 +142,10 @@ impl ConfigStorePort for ConfigStorePortAdapter {
         Box::pin(async move {
             config_store::update_config_bool(key.clone(), value).await?;
             // 更新 close_to_tray 时同步内存缓存（data 层职责）。
-            if key == "close_to_tray" {
-                if let Some(app_handle) = APP_HANDLE.get() {
+            if key == "close_to_tray"
+                && let Some(app_handle) = APP_HANDLE.get() {
                     Self::notify_close_to_tray_changed(app_handle, value);
                 }
-            }
             Ok(())
         })
     }

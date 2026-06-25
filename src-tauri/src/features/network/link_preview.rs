@@ -170,3 +170,122 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
         site_name,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_absolute_url() {
+        assert_eq!(
+            resolve_url("https://example.com", "https://other.com/img.png"),
+            "https://other.com/img.png"
+        );
+    }
+
+    #[test]
+    fn resolve_protocol_relative() {
+        assert_eq!(
+            resolve_url("https://example.com", "//cdn.example.com/img.png"),
+            "https://cdn.example.com/img.png"
+        );
+    }
+
+    #[test]
+    fn resolve_root_relative() {
+        assert_eq!(
+            resolve_url("https://example.com/page", "/img.png"),
+            "https://example.com/page/img.png"
+        );
+    }
+
+    #[test]
+    fn resolve_relative() {
+        assert_eq!(
+            resolve_url("https://example.com/page/", "img.png"),
+            "https://example.com/page/img.png"
+        );
+    }
+
+    #[test]
+    fn resolve_relative_no_trailing_slash() {
+        assert_eq!(
+            resolve_url("https://example.com/page", "img.png"),
+            "https://example.com/page/img.png"
+        );
+    }
+
+    #[test]
+    fn truncate_no_op() {
+        assert_eq!(truncate("hello", 10), "hello");
+    }
+
+    #[test]
+    fn truncate_exact_length() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_with_ellipsis() {
+        let result = truncate("hello world", 5);
+        assert!(result.ends_with('…'));
+        assert!(result.len() <= 5 + 3); // original chars + '…'
+    }
+
+    #[test]
+    fn truncate_empty() {
+        assert_eq!(truncate("", 10), "");
+    }
+
+    #[test]
+    fn truncate_utf8_safe() {
+        let result = truncate("你好世界", 3); // each char is 3 bytes in UTF-8
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn extract_meta_name_attribute() {
+        let html = r#"<meta name="description" content="A great page">"#;
+        assert_eq!(
+            extract_meta(html, "description"),
+            Some("A great page".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_meta_og_property() {
+        let html = r#"<meta property="og:title" content="OG Title">"#;
+        assert_eq!(extract_meta(html, "title"), Some("OG Title".to_string()));
+    }
+
+    #[test]
+    fn extract_meta_not_found() {
+        let html = r#"<meta name="keywords" content="a,b,c">"#;
+        assert_eq!(extract_meta(html, "description"), None);
+    }
+
+    #[test]
+    fn extract_title_og() {
+        let html = r#"<head><meta property="og:title" content="OG Title"><title>Page Title</title></head>"#;
+        assert_eq!(extract_title(html), Some("OG Title".to_string()));
+    }
+
+    #[test]
+    fn extract_title_fallback_to_title_tag() {
+        let html = r#"<head><title>  Page Title  </title></head>"#;
+        assert_eq!(extract_title(html), Some("Page Title".to_string()));
+    }
+
+    #[test]
+    fn extract_title_not_found() {
+        let html = r#"<head></head>"#;
+        assert_eq!(extract_title(html), None);
+    }
+
+    #[test]
+    fn regex_match_captures_group() {
+        let html = r#"<link rel="icon" href="/favicon.ico">"#;
+        let p = r#"<link\s+[^>]*rel\s*=\s*["']icon["'][^>]*href\s*=\s*["']([^"']*)["']"#;
+        assert_eq!(regex_match(p, html), Some("/favicon.ico".to_string()));
+    }
+}

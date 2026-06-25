@@ -17,3 +17,56 @@ pub(super) fn sha256_hex(bytes: &[u8]) -> String {
 pub(super) fn eq_hash_hex(a: &str, b: &str) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sha256_known_empty() {
+        let result = sha256_hex(b"");
+        assert_eq!(
+            result,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn sha256_known_abc() {
+        let result = sha256_hex(b"abc");
+        assert_eq!(
+            result,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn sha256_output_length() {
+        let result = sha256_hex(b"hello world");
+        assert_eq!(result.len(), 64);
+        assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn eq_hash_exact_match() {
+        assert!(eq_hash_hex(
+            "a1b2c3d4e5f60708",
+            "a1b2c3d4e5f60708"
+        ));
+    }
+
+    #[test]
+    fn eq_hash_case_insensitive() {
+        assert!(eq_hash_hex("ABCDEF", "abcdef"));
+    }
+
+    #[test]
+    fn eq_hash_trim_whitespace() {
+        assert!(eq_hash_hex("  abc  ", "abc"));
+    }
+
+    #[test]
+    fn eq_hash_mismatch() {
+        assert!(!eq_hash_hex("aaaaaa", "bbbbbb"));
+    }
+}

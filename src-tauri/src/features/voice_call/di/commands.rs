@@ -139,12 +139,11 @@ async fn spawn_call_timeout(
 
             // End session
             {
-                if let Ok(mut sessions) = inner.sessions.lock() {
-                    if let Some(s) = sessions.get_mut(&session_id) {
+                if let Ok(mut sessions) = inner.sessions.lock()
+                    && let Some(s) = sessions.get_mut(&session_id) {
                         s.state = CallState::Ended;
                         s.ended_at = Some(now_secs());
                     }
-                }
             }
 
             inner.cleanup_session(&session_id).await;
@@ -545,8 +544,8 @@ pub async fn accept_call(
     // Process ICE candidates that arrived with the CallInvite
     {
         let offers = inner.session_offers.lock().await;
-        if let Some(candidates_json) = offers.get(&format!("{}:candidates", session_id)) {
-            if let Ok(candidates) = serde_json::from_str::<Vec<String>>(candidates_json) {
+        if let Some(candidates_json) = offers.get(&format!("{}:candidates", session_id))
+            && let Ok(candidates) = serde_json::from_str::<Vec<String>>(candidates_json) {
                 let webrtc_guard = inner.webrtc.lock().await;
                 if let Some(ref wm) = *webrtc_guard {
                     for c in &candidates {
@@ -554,7 +553,6 @@ pub async fn accept_call(
                     }
                 }
             }
-        }
     }
 
     // Send CallAccept via signaling
@@ -1102,11 +1100,10 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 }
 
                 // Update session state to active
-                if let Ok(mut sessions) = inner.sessions.lock() {
-                    if let Some(s) = sessions.get_mut(&session_id) {
+                if let Ok(mut sessions) = inner.sessions.lock()
+                    && let Some(s) = sessions.get_mut(&session_id) {
                         s.state = CallState::Active;
                     }
-                }
 
                 let _ = app_handle.emit(
                     "voice_call:state_change",
@@ -1133,12 +1130,11 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             }
 
             SignalingMessage::CallReject { session_id, reason } => {
-                if let Ok(mut sessions) = inner.sessions.lock() {
-                    if let Some(s) = sessions.get_mut(&session_id) {
+                if let Ok(mut sessions) = inner.sessions.lock()
+                    && let Some(s) = sessions.get_mut(&session_id) {
                         s.state = CallState::Ended;
                         s.ended_at = Some(now_secs());
                     }
-                }
                 let _ = app_handle.emit(
                     "voice_call:state_change",
                     CallStateChangeEvent {
@@ -1150,12 +1146,11 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             }
 
             SignalingMessage::CallHangup { session_id } => {
-                if let Ok(mut sessions) = inner.sessions.lock() {
-                    if let Some(s) = sessions.get_mut(&session_id) {
+                if let Ok(mut sessions) = inner.sessions.lock()
+                    && let Some(s) = sessions.get_mut(&session_id) {
                         s.state = CallState::Ended;
                         s.ended_at = Some(now_secs());
                     }
-                }
                 let _ = app_handle.emit(
                     "voice_call:state_change",
                     CallStateChangeEvent {
@@ -1232,8 +1227,8 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 };
 
                 // Send offer to joiner via signaling
-                if let Some(offer) = offer {
-                    if let Some(ref client) = *inner.signaling.lock().await {
+                if let Some(offer) = offer
+                    && let Some(ref client) = *inner.signaling.lock().await {
                         let _ = client
                             .send(&SignalingMessage::ConferenceSdpOffer {
                                 session_id: session_id.clone(),
@@ -1243,7 +1238,6 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                             })
                             .await;
                     }
-                }
 
                 // Register on_track for joiner's audio → push to pipeline
                 {
@@ -1340,11 +1334,10 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 }
 
                 // Update joiner's local state to Active
-                if let Ok(mut sessions) = inner.sessions.lock() {
-                    if let Some(s) = sessions.get_mut(&session_id) {
+                if let Ok(mut sessions) = inner.sessions.lock()
+                    && let Some(s) = sessions.get_mut(&session_id) {
                         s.state = CallState::Active;
                     }
-                }
 
                 let sid_clone = session_id.clone();
                 let _ = app_handle.emit(
@@ -1451,8 +1444,8 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                     }
                 }
 
-                if let Some(answer) = answer {
-                    if let Some(ref client) = *inner.signaling.lock().await {
+                if let Some(answer) = answer
+                    && let Some(ref client) = *inner.signaling.lock().await {
                         let _ = client
                             .send(&SignalingMessage::ConferenceSdpAnswer {
                                 session_id,
@@ -1462,7 +1455,6 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                             })
                             .await;
                     }
-                }
             }
 
             // Joiner receives ack — returns immediately; state changes are driven
@@ -1634,22 +1626,17 @@ async fn monitor_ice_state(
         }
     };
 
-    loop {
-        match rx.changed().await {
-            Ok(()) => {
-                let state = rx.borrow().clone();
-                let _ = app_handle.emit(
-                    "voice_call:ice_state",
-                    serde_json::json!({
-                        "sessionId": session_id,
-                        "state": state,
-                    }),
-                );
-                if state == "failed" || state == "closed" || state == "disconnected" {
-                    break;
-                }
-            }
-            Err(_) => break,
+    while let Ok(()) = rx.changed().await {
+        let state = rx.borrow().clone();
+        let _ = app_handle.emit(
+            "voice_call:ice_state",
+            serde_json::json!({
+                "sessionId": session_id,
+                "state": state,
+            }),
+        );
+        if state == "failed" || state == "closed" || state == "disconnected" {
+            break;
         }
     }
 }

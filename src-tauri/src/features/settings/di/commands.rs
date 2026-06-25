@@ -284,7 +284,6 @@ pub async fn update_config_u32(key: String, value: u32) -> CommandResult<()> {
 ///
 /// # 返回值
 /// 无返回值。
-
 /// 写入 string 类型配置值（顶层字段）。
 ///
 /// # 参数

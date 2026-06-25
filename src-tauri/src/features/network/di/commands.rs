@@ -223,7 +223,7 @@ pub async fn download_file(
 
     let ext = mime_to_ext(mime_type.as_deref().unwrap_or("application/octet-stream"));
     let final_path = temp_files
-        .mark_complete(&task_id, &ext)
+        .mark_complete(&task_id, ext)
         .await
         .map_err(|e| to_command_error("TEMP_FILE_MOVE_FAILED", "error.temp_file_move_failed", e))?;
 

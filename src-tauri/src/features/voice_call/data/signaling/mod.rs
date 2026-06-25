@@ -16,6 +16,12 @@ pub struct SignalingClient {
     connected: RwLock<bool>,
 }
 
+impl Default for SignalingClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SignalingClient {
     pub fn new() -> Self {
         Self {
