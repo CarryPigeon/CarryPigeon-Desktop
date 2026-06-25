@@ -4,15 +4,21 @@
  * @description chat｜组件：ComposerHost。
  */
 
-import { computed, type Component } from "vue";
+import { computed, ref, type Component, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import DomainSelector from "./DomainSelector.vue";
 import ScreenshotButton from "@/features/screenshot/presentation/components/ScreenshotButton.vue";
+import StickerPickerButton from "@/features/chat/presentation/patchbay/components/composer/StickerPickerButton.vue";
+import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
+import VoiceMessageRecorder from "@/features/chat/message-flow/message/presentation/components/VoiceMessageRecorder.vue";
 import LinkPreviewCard from "./LinkPreviewCard.vue";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-types";
 import AttachmentPreviewBar from "@/features/chat/message-flow/upload/presentation/components/AttachmentPreviewBar.vue";
 import { addFiles, getAttachments, removeAttachment } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { createLogger } from "@/shared/utils/logger";
 
 const props = defineProps<{
   domainId: string;
@@ -29,6 +35,7 @@ const props = defineProps<{
   mentionCandidates?: Array<{ userId: string; displayName: string; avatar?: string }>;
   mentionMenuOpen?: boolean;
   currentUserRole?: string;
+  currentUserId: string;
   quoteReplyDraft?: { messageId: string; userId: string; preview: string } | null;
   linkPreview?: ChatLinkPreview | null;
 }>();
@@ -44,9 +51,9 @@ const emit = defineEmits<{
   (e: "closeMentionMenu"): void;
   (e: "urlDetected", url: string): void;
   (e: "dismissLinkPreview"): void;
-  /**
-   * 打开图片灯箱预览。
-   */
+  (e: "sticker", payload: { fileId: string; shareKey: string }): void;
+  (e: "send-text", text: string): void;
+  (e: "file-upload-error", error: string): void;
   (e: "openLightbox", payload: { url: string; fileName: string }): void;
 }>();
 
@@ -85,9 +92,68 @@ function computeCanSend(): boolean {
 
 const canSend = computed(computeCanSend);
 const { t } = useI18n();
+const logger = createLogger("ComposerHost");
+
+const domainExpanded = ref(false);
+const isUploadingVoice = ref(false);
 
 /** 附件列表快照（响应式）。 */
 const attachments = computed(() => Array.from(getAttachments().values()));
+
+async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
+  isUploadingVoice.value = true;
+  try {
+    const base64 = await invoke<string>("read_file_base64", { path: payload.filePath });
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "audio/wav" });
+    const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
+    addFiles([file]);
+  } catch (e) {
+    logger.error("Action: chat_voice_message_upload_failed", { error: String(e) });
+  } finally {
+    isUploadingVoice.value = false;
+  }
+}
+
+let unlistenScreenshot: UnlistenFn | null = null;
+
+async function handleScreenshotCompleted(event: { payload: string }): Promise<void> {
+  try {
+    const base64 = await invoke<string>("read_file_base64", { path: event.payload });
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "image/png" });
+    const file = new File([blob], `screenshot-${Date.now()}.png`, { type: "image/png" });
+    addFiles([file]);
+  } catch (e) {
+    logger.error("Action: screenshot_insert_failed", { error: String(e) });
+  }
+}
+
+onMounted(() => {
+  listen("screenshot-completed", handleScreenshotCompleted).then((unlisten) => {
+    unlistenScreenshot = unlisten;
+  });
+});
+
+onBeforeUnmount(() => {
+  unlistenScreenshot?.();
+});
+
+function handleStickerSelected(r: { fileId: string; shareKey: string }): void {
+  emit("sticker", r);
+}
+
+function handleStickerText(text: string): void {
+  emit("send-text", text);
+}
 
 /**
  * 处理粘贴事件：检测剪贴板中的图片并添加到附件列表。
@@ -242,8 +308,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
 </script>
 
 <template>
-  <!-- 组件：ComposerHost｜职责：发送区（DomainSelector + 输入 + Send） -->
-  <!-- 区块：<section> .cp-composer -->
+  <!-- 组件：ComposerHost｜职责：统一发送区（工具栏 + 输入 + 发送） -->
   <section class="cp-composer">
     <div v-if="props.replyTitle || props.replySnippet" class="cp-reply">
       <div class="cp-reply__left">
@@ -266,17 +331,42 @@ function selectSystemMention(type: "everyone" | "here"): void {
       {{ props.error }}
     </div>
 
-    <div class="cp-composer__row">
-      <div class="cp-composer__label">{{ t("composer_type") }}</div>
+    <!-- 工具栏行 -->
+    <div class="cp-composer__toolbar">
       <DomainSelector
         :model-value="props.domainId"
         :options="props.domainOptions"
+        :collapsed="true"
         @update:model-value="handleUpdateDomainId"
+        @toggle-expand="domainExpanded = !domainExpanded"
+      />
+      <div class="cp-composer__tools">
+        <StickerPickerButton
+          :current-user-id="props.currentUserId"
+          @sticker="handleStickerSelected"
+          @send-text="handleStickerText"
+        />
+        <FileUploadButton @error="(err: string) => emit('file-upload-error', err)" />
+        <VoiceMessageRecorder
+          :disabled="isUploadingVoice"
+          @recorded="handleVoiceRecorded"
+          @error="(msg: string) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
+        />
+        <ScreenshotButton />
+      </div>
+    </div>
+
+    <!-- DomainSelector 展开行 -->
+    <div v-if="domainExpanded" class="cp-composer__domainRow">
+      <DomainSelector
+        :model-value="props.domainId"
+        :options="props.domainOptions"
+        @update:model-value="(v: string) => { handleUpdateDomainId(v); domainExpanded = false; }"
       />
     </div>
 
-    <div class="cp-composer__row">
-      <div class="cp-composer__label">{{ t("composer_message") }}</div>
+    <!-- 输入区 + 附件预览 -->
+    <div class="cp-composer__inputArea">
       <div v-if="isPluginComposerActive" class="cp-composer__plugin">
         <component
           :is="props.pluginComposer"
@@ -287,16 +377,11 @@ function selectSystemMention(type: "everyone" | "here"): void {
         />
       </div>
       <template v-else>
-        <LinkPreviewCard
-          v-if="props.linkPreview"
-          :preview="props.linkPreview"
-          @dismiss="$emit('dismissLinkPreview')"
-        />
         <AttachmentPreviewBar
           :attachments="attachments"
           @remove="removeAttachment"
           @retry="handleRetryAttachment"
-          @openLightbox="(payload) => emit('openLightbox', payload)"
+          @openLightbox="(payload: { url: string; fileName: string }) => emit('openLightbox', payload)"
         />
         <t-textarea
           :model-value="props.draft"
@@ -310,6 +395,23 @@ function selectSystemMention(type: "everyone" | "here"): void {
       </template>
     </div>
 
+    <!-- 操作行：发送按钮 -->
+    <div class="cp-composer__actions">
+      <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
+      <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">{{ t("no_composer_available") }}</div>
+      <button v-else class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
+        {{ props.sending ? `${t('send')}…` : t("send") }}
+      </button>
+    </div>
+
+    <!-- 链接预览 -->
+    <LinkPreviewCard
+      v-if="props.linkPreview"
+      :preview="props.linkPreview"
+      @dismiss="$emit('dismissLinkPreview')"
+    />
+
+    <!-- 提及菜单 -->
     <div v-if="props.mentionMenuOpen && (props.mentionCandidates?.length || systemMentions.length)" class="cp-mentionMenu" role="listbox">
       <button
         v-for="candidate in props.mentionCandidates"
@@ -335,29 +437,118 @@ function selectSystemMention(type: "everyone" | "here"): void {
         {{ sys.label }}
       </button>
     </div>
-
-    <div class="cp-composer__actions">
-      <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
-      <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">{{ t("no_composer_available") }}</div>
-      <template v-else>
-        <ScreenshotButton />
-        <button class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
-          {{ props.sending ? `${t('send')}…` : t("send") }}
-        </button>
-      </template>
-    </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；包含回复条、错误条、两行输入区与底部动作区。 */
 .cp-composer {
   position: relative;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
   border-radius: 18px;
-  padding: 12px;
+  padding: 10px 10px 6px;
   box-shadow: var(--cp-shadow-soft);
+}
+
+.cp-composer__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cp-composer__domainRow {
+  margin-bottom: 8px;
+}
+
+.cp-composer__tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cp-composer__tools :deep(button) {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-composer__tools :deep(button:hover) {
+  background: var(--cp-hover-bg);
+  color: var(--cp-text);
+}
+
+.cp-composer__tools :deep(.cp-stickerBtn__text),
+.cp-composer__tools :deep(.cp-fileUpload__text) {
+  display: none;
+}
+
+.cp-composer__inputArea {
+  margin-bottom: 6px;
+}
+
+.cp-composer__inputArea :deep(.t-textarea__inner) {
+  border: none;
+  box-shadow: var(--cp-inset);
+  background: var(--cp-panel);
+}
+
+.cp-composer__plugin {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: var(--cp-inset);
+}
+
+.cp-composer__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.cp-composer__hint {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  padding: 6px 8px;
+}
+
+.cp-composer__send {
+  border: 1px solid color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  color: var(--cp-text);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-composer__send:hover:enabled {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+}
+
+.cp-composer__send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .cp-reply {
@@ -423,67 +614,6 @@ function selectSystemMention(type: "everyone" | "here"): void {
   margin-bottom: 10px;
 }
 
-.cp-composer__row + .cp-composer__row {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--cp-border-light);
-}
-
-.cp-composer__plugin {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  border-radius: 14px;
-  padding: 10px;
-  box-shadow: var(--cp-inset);
-}
-
-.cp-composer__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  margin-bottom: 10px;
-}
-
-.cp-composer__actions {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.cp-composer__hint {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  padding: 6px 8px;
-}
-
-.cp-composer__send {
-  border: 1px solid color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 10px 14px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-composer__send:hover:enabled {
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
-}
-
-.cp-composer__send:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .cp-quoteBar {
   display: flex;
   align-items: center;
@@ -545,7 +675,6 @@ function selectSystemMention(type: "everyone" | "here"): void {
   border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
 }
 
-/* 提及自动补全菜单 */
 .cp-mentionMenu {
   position: absolute;
   z-index: 70;

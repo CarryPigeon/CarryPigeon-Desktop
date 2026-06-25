@@ -7,20 +7,16 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { invoke } from "@tauri-apps/api/core";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
 import type { CallState } from "@/features/chat/voice-call/domain/contracts";
 import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
-import NotificationBell from "@/features/notifications/presentation/components/NotificationBell.vue";
+import { NotificationBell } from "@/features/notifications/components";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import { reactToMessage } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
-import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
-import StickerPickerButton from "@/features/chat/presentation/patchbay/components/composer/StickerPickerButton.vue";
-import VoiceMessageRecorder from "@/features/chat/message-flow/message/presentation/components/VoiceMessageRecorder.vue";
 import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components/menus/MultiSelectToolbar.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
@@ -35,7 +31,7 @@ const ImageLightbox = defineAsyncComponent({
   delay: 150,
   timeout: 15000,
 });
-import { addFiles as addImageFiles, addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { addFiles as addImageFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 import { createLogger } from "@/shared/utils/logger";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import SkeletonMessageList from "@/shared/ui/SkeletonMessageList.vue";
@@ -159,31 +155,6 @@ const channelAnnouncement = computed(() => {
   if (dismissedAnnouncement.value) return null;
   return currentChannel.value?.announcement ?? null;
 });
-
-/** 语音录制上传状态。 */
-const isUploadingVoice = ref(false);
-
-/**
- * 处理语音录制完成事件：读取文件、转为 Blob、添加到附件列表。
- */
-async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
-  isUploadingVoice.value = true;
-  try {
-    const base64 = await invoke<string>("read_file_base64", { path: payload.filePath });
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: "audio/wav" });
-    const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
-    addFiles([file]);
-  } catch (e) {
-    logger.error("Action: chat_voice_message_upload_failed", { error: String(e) });
-  } finally {
-    isUploadingVoice.value = false;
-  }
-}
 
 const signalPaneEl = ref<HTMLElement | null>(null);
 
@@ -714,19 +685,6 @@ function getReplyText(m: VirtualMessageItem): string {
     </div>
 
     <div class="cp-composerPane">
-      <div class="cp-composerActions">
-        <VoiceMessageRecorder
-          :disabled="isUploadingVoice"
-          @recorded="handleVoiceRecorded"
-          @error="(msg) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
-        />
-        <FileUploadButton @error="props.model.handleFileUploadError" />
-        <StickerPickerButton
-          :current-user-id="props.model.currentUserId"
-          @sticker="handleStickerSelected"
-          @send-text="handleStickerText"
-        />
-      </div>
       <ComposerHost
         :domain-id="props.model.selectedDomainId"
         :domain-options="props.model.domainOptions"
@@ -740,6 +698,7 @@ function getReplyText(m: VirtualMessageItem): string {
         :mention-candidates="props.model.mentionCandidates"
         :mention-menu-open="props.model.mentionMenuOpen"
         :current-user-role="props.model.currentUserRole"
+        :current-user-id="props.model.currentUserId"
         :quote-reply-draft="props.model.quoteReplyDraft"
         :link-preview="props.model.linkPreview"
         @update:domainId="props.model.setDomainId"
@@ -752,6 +711,9 @@ function getReplyText(m: VirtualMessageItem): string {
         @close-mention-menu="props.model.handleMentionMenuClose"
         @url-detected="(url: string) => props.model.fetchLinkPreview(url)"
         @dismiss-link-preview="props.model.dismissLinkPreview"
+        @sticker="handleStickerSelected"
+        @send-text="handleStickerText"
+        @file-upload-error="(err: string) => props.model.handleFileUploadError(err)"
         @openLightbox="openLightbox"
       />
     </div>

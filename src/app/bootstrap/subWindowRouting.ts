@@ -66,6 +66,8 @@ export function routeIfSubWindow(router: Router, searchParams: URLSearchParams):
         avatar_id: searchParams.get("avatar_id") ?? "",
         editable: searchParams.get("editable") ?? "",
       });
+    case "screenshot-overlay":
+      return replaceSubWindowRoute(router, "/screenshot-overlay", {});
     default:
       // 未知 window 类型应回落为主窗口流程，避免误判为子窗口导致 bootstrap 缺失。
       return false;
