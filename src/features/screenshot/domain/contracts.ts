@@ -6,4 +6,5 @@ export interface ScreenCapture {
   y: number;
   scale_factor: number;
   data_base64: string;
+  file_path?: string | null;
 }

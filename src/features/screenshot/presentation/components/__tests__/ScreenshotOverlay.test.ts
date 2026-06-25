@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../data/screenshotCommands", () => mocks);
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(vi.fn())),
+}));
+
 const mockCapture: ScreenCapture = {
   monitor_id: 0,
   width: 1920,
@@ -83,6 +87,8 @@ function setupCanvasMocks() {
           fill: vi.fn(),
           closePath: vi.fn(),
           fillText: vi.fn(),
+          save: vi.fn(),
+          restore: vi.fn(),
           measureText: vi.fn(() => ({ width: 10 })),
           createImageData: vi.fn(() => ({
             data: new Uint8ClampedArray(4),
@@ -121,12 +127,12 @@ describe("ScreenshotOverlay", () => {
     expect(wrapper.text()).toContain("No screen captures available");
   });
 
-  it("renders error when getScreenshotData throws", async () => {
+  it("stays in loading state when getScreenshotData throws (waiting for data-ready event)", async () => {
     mocks.getScreenshotData.mockRejectedValue(new Error("API error"));
     const wrapper = mount(ScreenshotOverlay);
     await flushPromises();
-    expect(wrapper.find(".cp-screenshot-overlay__error").exists()).toBe(true);
-    expect(wrapper.text()).toContain("API error");
+    expect(wrapper.find(".cp-screenshot-overlay__loading").exists()).toBe(true);
+    expect(wrapper.text()).toContain("Loading screenshots...");
   });
 
   it("renders canvas and controls when captures are loaded", async () => {
@@ -188,7 +194,7 @@ describe("ScreenshotOverlay", () => {
     resolveData([mockCapture]);
     await flushPromises();
 
-    await wrapper.find(".cp-screenshot-btn--cancel").trigger("click");
+    await wrapper.find(".cp-screenshot-toolbar-btn--cancel").trigger("click");
     expect(mocks.cancelScreenshot).toHaveBeenCalled();
   });
 });

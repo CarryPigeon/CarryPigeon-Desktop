@@ -11,21 +11,21 @@ use crate::shared::error::{command_error, CommandResult};
 /// 截图数据缓存状态：从 `start_screenshot` 暂存，供遮罩窗口 `get_screenshot_data` 取用。
 pub struct ScreenshotCaptureState(pub Mutex<Option<Vec<ScreenCapture>>>);
 
-/// 开始截图：可选隐藏主窗口 → 截取所有显示器 → 打开遮罩窗口。
+/// 开始截图：隐藏主窗口 → 打开遮罩窗口 → 截取所有显示器 → 通知遮罩。
 #[tauri::command]
 pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> CommandResult<()> {
     let hide_window = hide_window.unwrap_or(true);
     tracing::info!(action = "screenshot_start", hide_window = hide_window);
 
     // 1. 隐藏主窗口（可选）
-    if hide_window {
-        if let Some(main_window) = app.get_webview_window("main") {
+    if hide_window
+        && let Some(main_window) = app.get_webview_window("main") {
             main_window
                 .hide()
                 .map_err(|e| command_error("SCREENSHOT_HIDE_WINDOW_FAIL", &e.to_string()))?;
 
-            // 轮询等待窗口完全隐藏（最多 500ms）
-            for _ in 0..100 {
+            // 轮询等待窗口完全隐藏（最多 100ms）
+            for _ in 0..20 {
                 if !main_window
                     .is_visible()
                     .map_err(|e| command_error("SCREENSHOT_VISIBLE_FAIL", &e.to_string()))?
@@ -35,45 +35,56 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
             }
         }
-    }
 
-    // 2. 核心截图流程（如果失败且曾隐藏，恢复主窗口显示）
-    let result = {
-        // 截取所有显示器（存为临时文件到 app data 目录，确保在 Tauri asset scope 内）
-        let app_data = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| command_error("SCREENSHOT_APP_DATA_FAIL", &e.to_string()))?;
-        let screenshot_dir = app_data.join("temp-screenshots");
-        let captures = capture_all_screens(&screenshot_dir)?;
+    // 2. 先打开遮罩窗口（让用户立即看到 loading 界面）
+    let url = WebviewUrl::App("index.html?window=screenshot-overlay".into());
+    let window = WebviewWindowBuilder::new(&app, "screenshot-overlay", url)
+        .decorations(false)
+        .resizable(false)
+        .fullscreen(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .title("")
+        .build()
+        .map_err(|e| command_error("SCREENSHOT_OVERLAY_FAIL", &e.to_string()))?;
 
-        // 缓存到托管状态
-        app.manage(ScreenshotCaptureState(Mutex::new(Some(captures))));
+    let _ = window.set_focus();
 
-        // 打开遮罩窗口
-        let url = WebviewUrl::App("index.html?window=screenshot-overlay".into());
-        let window = WebviewWindowBuilder::new(&app, "screenshot-overlay", url)
-            .decorations(false)
-            .resizable(false)
-            .fullscreen(true)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .title("")
-            .build()
-            .map_err(|e| command_error("SCREENSHOT_OVERLAY_FAIL", &e.to_string()))?;
+    // 3. 截取所有显示器
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| command_error("SCREENSHOT_APP_DATA_FAIL", &e.to_string()))?;
+    let screenshot_dir = app_data.join("temp-screenshots");
 
-        let _ = window.set_focus();
-
-        Ok::<(), String>(())
+    let captures = match capture_all_screens(&screenshot_dir) {
+        Ok(c) => c,
+        Err(e) => {
+            // 失败时关闭遮罩、恢复主窗口
+            let _ = window.close();
+            if hide_window
+                && let Some(main_window) = app.get_webview_window("main") {
+                    let _ = main_window.show();
+                }
+            return Err(command_error("SCREENSHOT_CAPTURE_FAIL", &e));
+        }
     };
 
-    if result.is_err() && hide_window {
-        if let Some(main_window) = app.get_webview_window("main") {
-            let _ = main_window.show();
-        }
+    // 4. 缓存到托管状态
+    if let Some(state) = app.try_state::<ScreenshotCaptureState>() {
+        let mut guard = state
+            .0
+            .lock()
+            .map_err(|e| command_error("SCREENSHOT_LOCK_FAIL", &e.to_string()))?;
+        *guard = Some(captures);
+    } else {
+        app.manage(ScreenshotCaptureState(Mutex::new(Some(captures))));
     }
 
-    result?;
+    // 5. 通知遮罩窗口数据已就绪
+    if let Some(overlay) = app.get_webview_window("screenshot-overlay") {
+        let _ = overlay.emit("screenshot-data-ready", ());
+    }
 
     tracing::info!(action = "screenshot_overlay_opened");
     Ok(())
