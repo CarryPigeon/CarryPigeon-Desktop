@@ -4,14 +4,20 @@
  * @description chat｜组件：DomainSelector。
  */
 
+import { computed } from "vue";
+
 const props = defineProps<{
   modelValue: string;
   options: Array<{ id: string; label: string; colorVar: string }>;
+  collapsed?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:modelValue", v: string): void;
+  (e: "toggleExpand"): void;
 }>();
+
+const activeOption = computed(() => props.options.find((o) => o.id === props.modelValue));
 
 function optionId(index: number): string {
   return `cp-domain-option-${index}`;
@@ -53,8 +59,14 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
 
 <template>
   <!-- 组件：DomainSelector｜职责：选择发送 domain -->
-  <!-- 区块：<div> .cp-domain-selector -->
+  <div v-if="props.collapsed" class="cp-domain-collapsed" role="button" :tabindex="0" @click="$emit('toggleExpand')" @keydown.enter="$emit('toggleExpand')">
+    <span class="cp-domain__dot" :style="activeOption ? { background: `var(${activeOption.colorVar})` } : {}" aria-hidden="true"></span>
+    <span class="cp-domain-collapsed__label">{{ activeOption?.label ?? '' }}</span>
+    <span class="cp-domain-collapsed__arrow">▾</span>
+  </div>
+  <!-- 区块：<div> .cp-domain-selector (展开模式) -->
   <div
+    v-else
     class="cp-domain-selector"
     role="listbox"
     aria-label="domain"
@@ -132,5 +144,30 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
 /* 选择器：`.cp-domain__label` —— domain 文案（不换行）。 */
 .cp-domain__label {
   white-space: nowrap;
+}
+
+.cp-domain-collapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--cp-text);
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+.cp-domain-collapsed:hover {
+  background: var(--cp-hover-bg);
+}
+.cp-domain-collapsed__label {
+  white-space: nowrap;
+}
+.cp-domain-collapsed__arrow {
+  font-size: 10px;
+  color: var(--cp-text-muted);
+  margin-left: 2px;
 }
 </style>

@@ -171,6 +171,9 @@ if (!isSubWindow && hasTauriRuntime) {
 } else if (!isSubWindow) {
   // 无 Tauri runtime（纯前端 dev 模式）：立即标记就绪
   resolveStartup('ready');
+} else {
+  // 子窗口（如截图遮罩、popover 等）：无需主窗口运行时，立即标记就绪以渲染 UI
+  resolveStartup('ready');
 }
 
 // 启动内存监控（延迟启动，避免干扰首帧渲染和关键启动流程）
