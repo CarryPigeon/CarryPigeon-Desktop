@@ -221,11 +221,10 @@ pub fn run() -> anyhow::Result<()> {
                             let state: tauri::State<'_, TrayUnreadState> = app.state();
                             state.is_hovering.store(false, std::sync::atomic::Ordering::SeqCst);
                             state.popover_open.store(false, std::sync::atomic::Ordering::SeqCst);
-                            if let Some(win) = app.get_webview_window("tray-notification-popover") {
-                                if let Err(err) = win.close() {
+                            if let Some(win) = app.get_webview_window("tray-notification-popover")
+                                && let Err(err) = win.close() {
                                     tracing::warn!(action = "app_tray_leave_close_popover_failed", error = %err);
                                 }
-                            }
                         }
                         _ => {}
                     }
@@ -242,17 +241,14 @@ pub fn run() -> anyhow::Result<()> {
                 let _ = window.close();
             }
             // 主窗口关闭时，若 close_to_tray 为 true，则阻止关闭并隐藏到托盘。
-            if label == "main" {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    if let Some(state) = window.app_handle().try_state::<CloseToTrayState>() {
-                        if state.0.load(Ordering::SeqCst) {
+            if label == "main"
+                && let tauri::WindowEvent::CloseRequested { api, .. } = event
+                    && let Some(state) = window.app_handle().try_state::<CloseToTrayState>()
+                        && state.0.load(Ordering::SeqCst) {
                             api.prevent_close();
                             let _ = window.hide();
                             tracing::info!(action = "app_main_window_hide_to_tray");
                         }
-                    }
-                }
-            }
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -447,6 +443,109 @@ fn mime_by_path(path: &str) -> &'static str {
         return "font/ttf";
     }
     "application/octet-stream"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mime_by_path_js() {
+        assert_eq!(mime_by_path("bundle.js"), "text/javascript; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_by_path_css() {
+        assert_eq!(mime_by_path("style.css"), "text/css; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_by_path_json() {
+        assert_eq!(mime_by_path("data.json"), "application/json; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_by_path_png() {
+        assert_eq!(mime_by_path("icon.png"), "image/png");
+    }
+
+    #[test]
+    fn mime_by_path_jpg() {
+        assert_eq!(mime_by_path("photo.jpg"), "image/jpeg");
+        assert_eq!(mime_by_path("photo.jpeg"), "image/jpeg");
+    }
+
+    #[test]
+    fn mime_by_path_svg() {
+        assert_eq!(mime_by_path("logo.svg"), "image/svg+xml");
+    }
+
+    #[test]
+    fn mime_by_path_webp() {
+        assert_eq!(mime_by_path("img.webp"), "image/webp");
+    }
+
+    #[test]
+    fn mime_by_path_woff() {
+        assert_eq!(mime_by_path("font.woff"), "font/woff");
+    }
+
+    #[test]
+    fn mime_by_path_woff2() {
+        assert_eq!(mime_by_path("font.woff2"), "font/woff2");
+    }
+
+    #[test]
+    fn mime_by_path_ttf() {
+        assert_eq!(mime_by_path("font.ttf"), "font/ttf");
+    }
+
+    #[test]
+    fn mime_by_path_case_insensitive() {
+        assert_eq!(mime_by_path("IMAGE.PNG"), "image/png");
+    }
+
+    #[test]
+    fn mime_by_path_unknown() {
+        assert_eq!(mime_by_path("file.xyz"), "application/octet-stream");
+    }
+
+    #[test]
+    fn mime_by_path_no_extension() {
+        assert_eq!(mime_by_path("README"), "application/octet-stream");
+    }
+
+    #[test]
+    fn percent_decode_no_encoding() {
+        assert_eq!(percent_decode("hello"), "hello");
+    }
+
+    #[test]
+    fn percent_decode_single_char() {
+        assert_eq!(percent_decode("hello%20world"), "hello world");
+    }
+
+    #[test]
+    fn percent_decode_multiple() {
+        assert_eq!(percent_decode("%48%65%6c%6c%6f"), "Hello");
+    }
+
+    #[test]
+    fn percent_decode_mixed_case() {
+        assert_eq!(percent_decode("%2f%2F"), "//");
+    }
+
+    #[test]
+    fn percent_decode_invalid_sequence_kept() {
+        let result = percent_decode("hello%XXworld");
+        assert!(result.contains("hello"));
+        assert!(result.contains("world"));
+    }
+
+    #[test]
+    fn percent_decode_empty() {
+        assert_eq!(percent_decode(""), "");
+    }
 }
 
 /// 最小化 percent 解码器。

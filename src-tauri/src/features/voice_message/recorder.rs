@@ -172,7 +172,7 @@ impl VoiceRecorder {
     /// 写入的字节数。
     fn write_wav(buffer: &Mutex<Vec<f32>>, path: &PathBuf) -> std::io::Result<u64> {
         let samples = buffer.lock().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, format!("Lock error: {}", e))
+            std::io::Error::other(format!("Lock error: {}", e))
         })?;
 
         let num_samples = samples.len() as u32;

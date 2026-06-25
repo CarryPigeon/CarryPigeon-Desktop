@@ -22,6 +22,12 @@ pub struct WebRtcPeerManager {
     turn_server: Option<String>,
 }
 
+impl Default for WebRtcPeerManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WebRtcPeerManager {
     pub fn new() -> Self {
         Self {
@@ -121,11 +127,10 @@ impl WebRtcPeerManager {
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
 
         pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate {
-                if let Ok(json) = serde_json::to_string(&c) {
+            if let Some(c) = candidate
+                && let Ok(json) = serde_json::to_string(&c) {
                     let _ = candidate_tx.try_send(json);
                 }
-            }
             Box::pin(async {})
         }));
 
@@ -150,13 +155,10 @@ impl WebRtcPeerManager {
 
         // Gather initial ICE candidates
         let mut candidates = Vec::new();
-        loop {
-            match tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv())
-                .await
-            {
-                Ok(Some(c)) => candidates.push(c),
-                Ok(None) | Err(_) => break,
-            }
+        while let Ok(Some(c)) =
+            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
+        {
+            candidates.push(c);
         }
 
         let handle = PeerConnectionHandle {
@@ -205,11 +207,10 @@ impl WebRtcPeerManager {
         // Collect ICE candidates
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
         pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate {
-                if let Ok(json) = serde_json::to_string(&c) {
+            if let Some(c) = candidate
+                && let Ok(json) = serde_json::to_string(&c) {
                     let _ = candidate_tx.try_send(json);
                 }
-            }
             Box::pin(async {})
         }));
 
@@ -244,13 +245,10 @@ impl WebRtcPeerManager {
 
         // Gather initial candidates
         let mut candidates = Vec::new();
-        loop {
-            match tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv())
-                .await
-            {
-                Ok(Some(c)) => candidates.push(c),
-                Ok(None) | Err(_) => break,
-            }
+        while let Ok(Some(c)) =
+            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
+        {
+            candidates.push(c);
         }
 
         let handle = PeerConnectionHandle {
@@ -449,11 +447,10 @@ impl WebRtcPeerManager {
 
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
         pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate {
-                if let Ok(json) = serde_json::to_string(&c) {
+            if let Some(c) = candidate
+                && let Ok(json) = serde_json::to_string(&c) {
                     let _ = candidate_tx.try_send(json);
                 }
-            }
             Box::pin(async {})
         }));
 
@@ -475,13 +472,10 @@ impl WebRtcPeerManager {
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: set_local_description")?;
 
         let mut candidates = Vec::new();
-        loop {
-            match tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv())
-                .await
-            {
-                Ok(Some(c)) => candidates.push(c),
-                Ok(None) | Err(_) => break,
-            }
+        while let Ok(Some(c)) =
+            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
+        {
+            candidates.push(c);
         }
 
         let handle = PeerConnectionHandle {
@@ -526,11 +520,10 @@ impl WebRtcPeerManager {
 
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
         pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate {
-                if let Ok(json) = serde_json::to_string(&c) {
+            if let Some(c) = candidate
+                && let Ok(json) = serde_json::to_string(&c) {
                     let _ = candidate_tx.try_send(json);
                 }
-            }
             Box::pin(async {})
         }));
 
@@ -562,13 +555,10 @@ impl WebRtcPeerManager {
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: set_local_description")?;
 
         let mut candidates = Vec::new();
-        loop {
-            match tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv())
-                .await
-            {
-                Ok(Some(c)) => candidates.push(c),
-                Ok(None) | Err(_) => break,
-            }
+        while let Ok(Some(c)) =
+            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
+        {
+            candidates.push(c);
         }
 
         let handle = PeerConnectionHandle {

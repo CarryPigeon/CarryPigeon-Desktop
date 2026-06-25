@@ -76,7 +76,7 @@ impl TempFileManager {
                 accessed_at INTEGER NOT NULL\
             )";
         db.connection
-            .execute(&RawStmt::raw(&sql))
+            .execute(&RawStmt::raw(sql))
             .await
             .context("Failed to create temp_files table")?;
 
@@ -92,7 +92,7 @@ impl TempFileManager {
             ),
         ] {
             db.connection
-                .execute(&RawStmt::raw(&sql))
+                .execute(&RawStmt::raw(sql))
                 .await
                 .with_context(|| format!("Failed to create temp_file index: {name}"))?;
         }

@@ -66,3 +66,118 @@ pub(crate) fn to_http_origin(server_socket: &str) -> anyhow::Result<String> {
     let u = reqwest::Url::parse(&mapped).context("Invalid server socket URL")?;
     Ok(normalize_origin(&u))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn port_suffix_with_port() {
+        let u = reqwest::Url::parse("http://example.com:8080/path").unwrap();
+        assert_eq!(port_suffix(&u), ":8080");
+    }
+
+    #[test]
+    fn port_suffix_default_http() {
+        let u = reqwest::Url::parse("http://example.com/path").unwrap();
+        assert_eq!(port_suffix(&u), "");
+    }
+
+    #[test]
+    fn port_suffix_default_https() {
+        let u = reqwest::Url::parse("https://example.com/path").unwrap();
+        assert_eq!(port_suffix(&u), "");
+    }
+
+    #[test]
+    fn map_ws_to_http() {
+        assert_eq!(map_socket_to_url_candidate("ws://host:1234"), "http://host:1234");
+    }
+
+    #[test]
+    fn map_wss_to_https() {
+        assert_eq!(map_socket_to_url_candidate("wss://host:1234"), "https://host:1234");
+    }
+
+    #[test]
+    fn map_tcp_to_http() {
+        assert_eq!(map_socket_to_url_candidate("tcp://host:8080"), "http://host:8080");
+    }
+
+    #[test]
+    fn map_tls_to_https() {
+        assert_eq!(map_socket_to_url_candidate("tls://host:8443"), "https://host:8443");
+    }
+
+    #[test]
+    fn map_tls_insecure_to_https() {
+        assert_eq!(map_socket_to_url_candidate("tls-insecure://host:8443"), "https://host:8443");
+    }
+
+    #[test]
+    fn map_tls_fp_strips_fingerprint() {
+        assert_eq!(
+            map_socket_to_url_candidate("tls-fp://abc123@host:8443"),
+            "https://host:8443"
+        );
+    }
+
+    #[test]
+    fn map_tls_fp_no_at_keeps_rest() {
+        assert_eq!(
+            map_socket_to_url_candidate("tls-fp://host:8443"),
+            "https://host:8443"
+        );
+    }
+
+    #[test]
+    fn map_http_passthrough() {
+        assert_eq!(map_socket_to_url_candidate("http://example.com"), "http://example.com");
+    }
+
+    #[test]
+    fn map_https_passthrough() {
+        assert_eq!(map_socket_to_url_candidate("https://example.com"), "https://example.com");
+    }
+
+    #[test]
+    fn map_bare_host_defaults_to_https() {
+        assert_eq!(map_socket_to_url_candidate("example.com:443"), "https://example.com:443");
+    }
+
+    #[test]
+    fn to_http_origin_ws() {
+        let origin = to_http_origin("ws://example.com:8080/extra").unwrap();
+        assert_eq!(origin, "http://example.com:8080");
+    }
+
+    #[test]
+    fn to_http_origin_tls_fp() {
+        let origin = to_http_origin("tls-fp://deadbeef@example.com:8443").unwrap();
+        assert_eq!(origin, "https://example.com:8443");
+    }
+
+    #[test]
+    fn to_http_origin_empty_rejected() {
+        let err = to_http_origin("").unwrap_err();
+        assert!(err.to_string().contains("Missing server socket"));
+    }
+
+    #[test]
+    fn to_http_origin_garbage_rejected() {
+        let err = to_http_origin("not a url!!").unwrap_err();
+        assert!(err.to_string().contains("Invalid server socket URL"));
+    }
+
+    #[test]
+    fn normalize_origin_strips_path() {
+        let u = reqwest::Url::parse("https://example.com:8443/some/path?q=1").unwrap();
+        assert_eq!(normalize_origin(&u), "https://example.com:8443");
+    }
+
+    #[test]
+    fn normalize_origin_default_port() {
+        let u = reqwest::Url::parse("https://example.com/foo").unwrap();
+        assert_eq!(normalize_origin(&u), "https://example.com");
+    }
+}

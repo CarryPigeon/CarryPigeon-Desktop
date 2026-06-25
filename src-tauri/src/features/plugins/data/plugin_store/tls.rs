@@ -118,3 +118,67 @@ pub(super) async fn build_server_client(
     }
     build_reqwest_client(policy)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_tls_strict_default() {
+        assert_eq!(parse_tls_policy(None), TlsPolicy::Strict);
+        assert_eq!(parse_tls_policy(Some("")), TlsPolicy::Strict);
+        assert_eq!(parse_tls_policy(Some("strict")), TlsPolicy::Strict);
+        assert_eq!(parse_tls_policy(Some("unknown")), TlsPolicy::Strict);
+    }
+
+    #[test]
+    fn parse_tls_insecure() {
+        assert_eq!(parse_tls_policy(Some("insecure")), TlsPolicy::Insecure);
+        assert_eq!(parse_tls_policy(Some("  insecure  ")), TlsPolicy::Insecure);
+    }
+
+    #[test]
+    fn parse_tls_trust_fingerprint() {
+        assert_eq!(
+            parse_tls_policy(Some("trust_fingerprint")),
+            TlsPolicy::TrustFingerprint
+        );
+    }
+
+    #[test]
+    fn normalize_fingerprint_trims_and_lowercases() {
+        assert_eq!(normalize_fingerprint("  ABC123  "), "abc123");
+    }
+
+    #[test]
+    fn normalize_fingerprint_filters_colons() {
+        assert_eq!(normalize_fingerprint("AA:BB:CC"), "aabbcc");
+    }
+
+    #[test]
+    fn extract_host_port_standard() {
+        let (host, port) = extract_host_port_from_origin("https://example.com:8443").unwrap();
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 8443);
+    }
+
+    #[test]
+    fn extract_host_port_default_https() {
+        let (host, port) = extract_host_port_from_origin("https://example.com").unwrap();
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 443);
+    }
+
+    #[test]
+    fn extract_host_port_default_http() {
+        let (host, port) = extract_host_port_from_origin("http://example.com").unwrap();
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 80);
+    }
+
+    #[test]
+    fn extract_host_port_invalid_rejected() {
+        let err = extract_host_port_from_origin("not-a-url").unwrap_err();
+        assert!(err.to_string().contains("Invalid origin URL"));
+    }
+}

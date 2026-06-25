@@ -105,6 +105,59 @@ impl PluginManifestList {
         Ok(())
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::plugins::domain::types::PluginManifest;
+
+    fn sample_manifest() -> PluginManifest {
+        PluginManifest {
+            name: "test-plugin".to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("A test plugin".to_string()),
+            author: Some("tester".to_string()),
+            license: Some("MIT".to_string()),
+            url: "https://example.com/plugin".to_string(),
+            frontend_sha256: "a".repeat(64),
+            backend_sha256: "b".repeat(64),
+        }
+    }
+
+    #[test]
+    fn round_trip_empty_list() {
+        let list = PluginManifestList { plugins: vec![] };
+        let json = list.to_json_string().unwrap();
+        let parsed = PluginManifestList::from_json_str(&json).unwrap();
+        assert_eq!(parsed.plugins.len(), 0);
+    }
+
+    #[test]
+    fn round_trip_single_plugin() {
+        let mut list = PluginManifestList { plugins: vec![] };
+        list.plugins.push(sample_manifest());
+        let json = list.to_json_string().unwrap();
+        let parsed = PluginManifestList::from_json_str(&json).unwrap();
+        assert_eq!(parsed.plugins.len(), 1);
+        assert_eq!(parsed.plugins[0].name, "test-plugin");
+        assert_eq!(parsed.plugins[0].version, "1.0.0");
+    }
+
+    #[test]
+    fn from_json_invalid() {
+        let err = PluginManifestList::from_json_str("{invalid json}").unwrap_err();
+        assert!(err.to_string().contains("Failed to parse plugin manifest list JSON"));
+    }
+
+    #[test]
+    fn from_json_empty_string() {
+        let err = PluginManifestList::from_json_str("").unwrap_err();
+        assert!(err.to_string().contains("Failed to parse plugin manifest list JSON"));
+    }
+}
+
+impl PluginManifestList {
     /// 从磁盘重新读取清单列表（忽略当前内存中的 plugins）。
     ///
     /// # 返回值

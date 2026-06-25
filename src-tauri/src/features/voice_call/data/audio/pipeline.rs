@@ -236,11 +236,10 @@ impl AudioPipeline {
     }
 
     pub fn push_participant_packet(&self, participant_id: &str, packet: Vec<u8>) {
-        if let Ok(mut buffers) = self.participant_buffers.lock() {
-            if let Some(buf) = buffers.get_mut(participant_id) {
+        if let Ok(mut buffers) = self.participant_buffers.lock()
+            && let Some(buf) = buffers.get_mut(participant_id) {
                 buf.push(packet);
             }
-        }
     }
 
     pub fn unregister_participant(&self, participant_id: &str) {
@@ -304,11 +303,10 @@ fn process_capture(
     }
 
     // Save leftover for next callback
-    if pos < samples.len() {
-        if let Ok(mut leftover_guard) = leftover.lock() {
+    if pos < samples.len()
+        && let Ok(mut leftover_guard) = leftover.lock() {
             *leftover_guard = samples[pos..].to_vec();
         }
-    }
 }
 
 /// Decode Opus packets into f32 PCM for playback.
@@ -372,8 +370,8 @@ fn process_playback_multi(
     let samples = data.len();
     data.fill(0.0); // start with silence
 
-    if let Ok(mut decoders) = participant_decoders.lock() {
-        if let Ok(mut buffers) = participant_buffers.lock() {
+    if let Ok(mut decoders) = participant_decoders.lock()
+        && let Ok(mut buffers) = participant_buffers.lock() {
             let mut mixed = vec![0.0f32; samples];
 
             for (pid, buf) in buffers.iter_mut() {
@@ -404,7 +402,6 @@ fn process_playback_multi(
                 data[i] = sample.tanh();
             }
         }
-    }
 }
 
 fn apply_noise_gate(samples: &[f32]) -> Vec<f32> {

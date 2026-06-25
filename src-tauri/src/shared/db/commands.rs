@@ -273,8 +273,8 @@ fn validate_single_statement_sql(sql: &str) -> CommandResult<()> {
         return Err(command_error("DB_SQL_REQUIRED", "error.db_sql_required"));
     }
     let mut in_string = false;
-    let mut chars = trimmed.chars().peekable();
-    while let Some(ch) = chars.next() {
+    let chars = trimmed.chars().peekable();
+    for ch in chars {
         if ch == '\'' {
             in_string = !in_string;
         } else if ch == ';' && !in_string {

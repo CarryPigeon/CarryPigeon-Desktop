@@ -1,7 +1,7 @@
 //! plugin_store｜下载逻辑（按同源决定 TLS client）。
 //!
 //! 说明：
-//! - 同源下载需要继承“自签/指纹”TLS 策略，因此必须使用 `server_client`；
+//! - 同源下载需要继承"自签/指纹"TLS 策略，因此必须使用 `server_client`；
 //! - 跨域插件包下载默认拒绝，避免把安装信任面扩大到不受控的域名。
 
 use anyhow::Context;
@@ -36,4 +36,51 @@ pub(super) async fn download_plugin_zip_bytes(
         .await
         .context("Failed to read plugin zip bytes")?
         .to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn same_origin_identical() {
+        let a = reqwest::Url::parse("https://example.com/path").unwrap();
+        let b = reqwest::Url::parse("https://example.com/other").unwrap();
+        assert!(is_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn different_scheme() {
+        let a = reqwest::Url::parse("https://example.com").unwrap();
+        let b = reqwest::Url::parse("http://example.com").unwrap();
+        assert!(!is_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn different_host() {
+        let a = reqwest::Url::parse("https://example.com").unwrap();
+        let b = reqwest::Url::parse("https://other.com").unwrap();
+        assert!(!is_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn different_port_explicit() {
+        let a = reqwest::Url::parse("https://example.com:8080").unwrap();
+        let b = reqwest::Url::parse("https://example.com:8443").unwrap();
+        assert!(!is_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn different_port_implicit_vs_explicit() {
+        let a = reqwest::Url::parse("https://example.com").unwrap();
+        let b = reqwest::Url::parse("https://example.com:8443").unwrap();
+        assert!(!is_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn same_origin_with_default_port() {
+        let a = reqwest::Url::parse("https://example.com").unwrap();
+        let b = reqwest::Url::parse("https://example.com").unwrap();
+        assert!(is_same_origin(&a, &b));
+    }
 }

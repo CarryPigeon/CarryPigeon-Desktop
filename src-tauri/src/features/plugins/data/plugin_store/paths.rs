@@ -171,6 +171,66 @@ pub(super) fn resolve_app_plugins_canonical_file_path(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_valid_segment() {
+        assert!(sanitize_segment("hello_world").is_ok());
+    }
+
+    #[test]
+    fn sanitize_dot_rejected() {
+        assert!(sanitize_segment(".").is_err());
+    }
+
+    #[test]
+    fn sanitize_dot_dot_rejected() {
+        assert!(sanitize_segment("..").is_err());
+    }
+
+    #[test]
+    fn sanitize_backslash_rejected() {
+        assert!(sanitize_segment("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn sanitize_forward_slash_rejected() {
+        assert!(sanitize_segment("foo/bar").is_err());
+    }
+
+    #[test]
+    fn sanitize_colon_rejected() {
+        assert!(sanitize_segment("foo:bar").is_err());
+    }
+
+    #[test]
+    fn sanitize_empty_rejected() {
+        assert!(sanitize_segment("").is_err());
+        assert!(sanitize_segment("   ").is_err());
+    }
+
+    #[test]
+    fn sanitize_trims_whitespace() {
+        let result = sanitize_segment("  hello  ").unwrap();
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn safe_join_combines_segments() {
+        let root = std::path::Path::new("/tmp/app");
+        let segments: Vec<String> = vec!["a".into(), "b".into()];
+        let result = safe_join(root, &segments).unwrap();
+        assert_eq!(result, std::path::Path::new("/tmp/app/a/b"));
+    }
+
+    #[test]
+    fn safe_join_empty_segments() {
+        let root = std::path::Path::new("/tmp/app");
+        let segments: Vec<String> = vec![];
+        let result = safe_join(root, &segments).unwrap();
+        assert_eq!(result, root);
+    }
+
     use super::resolve_app_plugins_canonical_file_path;
     use std::path::PathBuf;
     use std::sync::Mutex;
