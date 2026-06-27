@@ -56,6 +56,9 @@ export function debounceAsync<T extends (...args: any[]) => Promise<any>>(
   const debounced = (...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> => {
     return new Promise((resolve, reject) => {
       if (timer !== null) clearTimeout(timer);
+      if (pending) {
+        pending.reject(new Error("debounce cancelled"));
+      }
       pending = { resolve, reject };
       timer = setTimeout(() => {
         timer = null;
