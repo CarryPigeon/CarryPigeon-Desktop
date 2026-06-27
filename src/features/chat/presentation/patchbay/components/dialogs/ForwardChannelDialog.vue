@@ -6,6 +6,7 @@
 
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
+import { debounce } from "@/shared/utils/rateLimit";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 
 const props = defineProps<{
@@ -27,18 +28,18 @@ const searchQuery = ref("");
 const selectedChannelId = ref("");
 const comment = ref("");
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 const debouncedQuery = ref("");
 
+const updateDebouncedQuery = debounce((val: string) => {
+  debouncedQuery.value = val;
+}, 300);
+
 watch(searchQuery, (val) => {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    debouncedQuery.value = val;
-  }, 300);
+  updateDebouncedQuery(val);
 });
 
 onBeforeUnmount(() => {
-  if (debounceTimer) clearTimeout(debounceTimer);
+  updateDebouncedQuery.cancel();
 });
 
 const filteredChannels = computed(() => {
