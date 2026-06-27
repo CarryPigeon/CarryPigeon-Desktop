@@ -23,6 +23,23 @@ export function getStoredDiagnosticsEnabled(): boolean {
 }
 
 /**
+ * 设置诊断模式开关。
+ *
+ * @param enabled - 是否开启诊断模式
+ */
+export function setDiagnosticsEnabled(enabled: boolean): void {
+  try {
+    if (enabled) {
+      localStorage.setItem(DIAGNOSTICS_STORAGE_KEY, "true");
+    } else {
+      localStorage.removeItem(DIAGNOSTICS_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage 不可用时静默忽略
+  }
+}
+
+/**
  * 判断当前是否启用性能监控。
  *
  * - dev 模式：始终返回 true

@@ -548,6 +548,8 @@ export const zh_cn = {
   settings_runtime: "运行时",
   settings_mock_api: "Mock API",
   settings_mock_mode: "Mock 模式",
+  settings_diagnostics_mode: "诊断模式",
+  settings_diagnostics_mode_desc: "开启后会记录性能监控日志，仅供排查问题使用。",
   settings_runtime_hint: "使用 `.env.local` 启用 mock 模式以进行本地界面预览。",
   settings_business_settings: "业务设置",
   settings_business_settings_sub: "业务侧通知偏好与持久化状态。",
