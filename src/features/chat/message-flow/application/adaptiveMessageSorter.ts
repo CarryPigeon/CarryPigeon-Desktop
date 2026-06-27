@@ -6,6 +6,8 @@
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
 import { compareMessageStubs, type MessageSortStub } from "./messageSort.logic";
 
+export const DEFAULT_WORKER_SORT_THRESHOLD = 2000;
+
 export type AdaptiveMessageSorterOptions = {
   /**
    * 触发 Worker 的消息数量阈值（默认 2000）。
@@ -18,7 +20,7 @@ export type AdaptiveMessageSorterOptions = {
 };
 
 export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptions) {
-  const threshold = options?.threshold ?? 2000;
+  const threshold = options?.threshold ?? DEFAULT_WORKER_SORT_THRESHOLD;
   const hasCustomWorker = !!options?.createWorker;
   const createWorker =
     options?.createWorker ??
@@ -41,29 +43,49 @@ export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptio
   }
 
   function sortOnWorker(messages: readonly ChatMessage[]): Promise<ChatMessage[]> {
-    return new Promise((resolve, reject) => {
-      const stubs = toStubs(messages);
-      const w = getWorker();
+    return new Promise((resolve) => {
+      try {
+        const stubs = toStubs(messages);
+        const w = getWorker();
 
-      function handleMessage(event: MessageEvent<MessageSortStub[]>) {
-        w.removeEventListener("message", handleMessage);
-        w.removeEventListener("error", handleError);
-        const order = new Map(event.data.map((stub, index) => [stub.id, index]));
-        const sorted = [...messages].sort(
-          (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
-        );
-        resolve(sorted);
+        function handleMessage(event: MessageEvent<MessageSortStub[]>) {
+          cleanup();
+          const order = new Map(event.data.map((stub, index) => [stub.id, index]));
+          const sorted = [...messages].sort(
+            (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+          );
+          resolve(sorted);
+        }
+
+        function handleError(_event: ErrorEvent) {
+          cleanup();
+          // Worker 可能已失效，下次排序时重新创建。
+          if (worker === w) {
+            worker = null;
+          }
+          resolve(sortOnMainThread(messages));
+        }
+
+        function cleanup() {
+          w.removeEventListener("message", handleMessage);
+          w.removeEventListener("error", handleError);
+        }
+
+        w.addEventListener("message", handleMessage);
+        w.addEventListener("error", handleError);
+        w.postMessage(stubs);
+      } catch {
+        // createWorker() 抛出或其他同步失败：清理缓存并回退到主线程。
+        if (worker) {
+          try {
+            worker.terminate();
+          } catch {
+            // ignore
+          }
+          worker = null;
+        }
+        resolve(sortOnMainThread(messages));
       }
-
-      function handleError(event: ErrorEvent) {
-        w.removeEventListener("message", handleMessage);
-        w.removeEventListener("error", handleError);
-        reject(event.error ?? new Error(String(event.message)));
-      }
-
-      w.addEventListener("message", handleMessage);
-      w.addEventListener("error", handleError);
-      w.postMessage(stubs);
     });
   }
 
@@ -73,6 +95,12 @@ export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptio
         return Promise.resolve(sortOnMainThread(messages));
       }
       return sortOnWorker(messages);
+    },
+    terminate(): void {
+      if (worker) {
+        worker.terminate();
+        worker = null;
+      }
     },
   };
 }

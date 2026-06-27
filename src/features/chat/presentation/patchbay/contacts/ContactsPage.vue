@@ -89,6 +89,12 @@ const debouncedSearch = debounceAsync(async () => {
   await handleSearch();
 }, 300);
 
+const debouncedSearchSafe = () => {
+  debouncedSearch().catch(() => {
+    // intentional no-op: cancelled by newer input or explicit Enter/button search
+  });
+};
+
 onBeforeUnmount(() => {
   debouncedSearch.cancel();
 });
@@ -157,7 +163,7 @@ loadCurrentUser();
             class="cp-contacts__search-input"
             type="text"
             :placeholder="t('contacts_search_placeholder')"
-            @input="debouncedSearch"
+            @input="debouncedSearchSafe"
             @keydown.enter="handleSearch"
           />
           <button
