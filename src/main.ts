@@ -105,6 +105,10 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   syncTrayLocaleOnStartup();
 
     resolveStartup('ready');
+  if (isPerformanceMonitoringEnabled()) {
+    const durationMs = Math.round(performance.now() - performance.timeOrigin);
+    logger.info("Action: app_startup_ready", { duration_ms: durationMs });
+  }
   return true;
 }
 
