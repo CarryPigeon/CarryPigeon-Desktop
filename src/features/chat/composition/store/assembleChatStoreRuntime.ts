@@ -22,6 +22,7 @@ import { createVoiceCallState, setVoiceCallState } from "@/features/chat/voice-c
 import { getVoiceCallCapabilities } from "@/features/chat/voice-call/api";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
+import { dedupeAsyncByKey } from "@/shared/utils/asyncDedupe";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -197,9 +198,11 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     timelineState,
     unreadProjection,
     readStateProjection,
-    refreshChannels: governance.refreshChannels,
-    refreshChannelLatestPage: messageFlow.refreshChannelLatestPage,
-    refreshMembersRail: governance.refreshMembersRail,
+    refreshChannels: () => dedupeAsyncByKey("refreshChannels", () => governance.refreshChannels()),
+    refreshChannelLatestPage: (channelId: string) =>
+      dedupeAsyncByKey(`refreshChannelLatestPage:${channelId}`, () => messageFlow.refreshChannelLatestPage(channelId)),
+    refreshMembersRail: (channelId: string) =>
+      dedupeAsyncByKey(`refreshMembersRail:${channelId}`, () => governance.refreshMembersRail(channelId)),
     emitChannelProjectionChanged,
     mapWireMessage: messageFlow.mapWireMessage,
     compareMessages: messageFlow.compareMessages,
