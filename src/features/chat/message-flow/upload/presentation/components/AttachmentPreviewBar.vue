@@ -1,7 +1,11 @@
 <script setup lang="ts">
 /**
  * @fileoverview AttachmentPreviewBar.vue
- * @description chat/message-flow/upload｜附件预览条：在 composer 上方展示待发送的图片缩略图。
+ * @description chat/message-flow/upload｜附件预览条：在 composer 上方展示待发送的附件。
+ *
+ * 支持三种附件种类：
+ * - image / video：渲染缩略图，点击触发 lightbox。
+ * - file：渲染文件图标 + 文件名 + 体积，点击不触发 lightbox。
  */
 
 import type { FileAttachment } from "../runtime/fileAttachmentStore";
@@ -23,28 +27,80 @@ const emit = defineEmits<{
    */
   (e: "retry", id: string): void;
   /**
-   * 打开图片灯箱预览。
+   * 打开图片/视频灯箱预览。
    */
-  (e: "openLightbox", payload: { url: string; fileName: string }): void;
+  (e: "openLightbox", payload: { url: string; fileName: string; isVideo?: boolean }): void;
 }>();
+
+/**
+ * 处理附件项点击：仅媒体类型触发灯箱。
+ *
+ * @param att - 被点击的附件。
+ */
+function onItemClick(att: FileAttachment): void {
+  if (att.kind === "file") return;
+  emit("openLightbox", {
+    url: att.blobUrl,
+    fileName: att.file.name,
+    isVideo: att.kind === "video",
+  });
+}
+
+/**
+ * 将字节数格式化为人类可读字符串。
+ *
+ * @param bytes - 字节数。
+ * @returns 形如 `1.2 MB` 的字符串。
+ */
+function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+}
 </script>
 
 <template>
-  <!-- 组件：AttachmentPreviewBar｜职责：展示待发送图片缩略图预览 -->
+  <!-- 组件：AttachmentPreviewBar｜职责：展示待发送图片/视频/文件附件预览 -->
   <div v-if="attachments.length" class="cp-attachmentBar">
     <div class="cp-attachmentBar__list">
       <div
         v-for="att in attachments"
         :key="att.id"
         class="cp-attachmentBar__item"
-        @click="emit('openLightbox', { url: att.blobUrl, fileName: att.file.name })"
+        :class="{ 'cp-attachmentBar__item--file': att.kind === 'file' }"
+        :title="att.file.name"
+        @click="onItemClick(att)"
       >
-        <!-- 缩略图 -->
+        <!-- 媒体缩略图（image/video） -->
         <img
+          v-if="att.kind !== 'file'"
           :src="att.blobUrl"
           :alt="att.file.name"
           class="cp-attachmentBar__thumb"
         />
+
+        <!-- 非媒体文件卡片（图标 + 文件名 + 体积） -->
+        <div
+          v-else
+          class="cp-attachmentBar__fileCard"
+          role="img"
+          :aria-label="`File: ${att.file.name} (${formatSize(att.file.size)})`"
+        >
+          <div class="cp-attachmentBar__fileIcon" aria-hidden="true">
+            <t-icon name="file" />
+          </div>
+          <div class="cp-attachmentBar__fileMeta">
+            <div class="cp-attachmentBar__fileName">{{ att.file.name }}</div>
+            <div class="cp-attachmentBar__fileSize">{{ formatSize(att.file.size) }}</div>
+          </div>
+        </div>
 
         <!-- 上传进度条 -->
         <div
@@ -65,13 +121,13 @@ const emit = defineEmits<{
             :title="att.error || 'Upload failed'"
             @click="emit('retry', att.id)"
           >
-            ↻
+            <t-icon name="refresh" />
           </button>
         </div>
 
         <!-- 完成状态标记 -->
         <div v-if="att.status === 'done'" class="cp-attachmentBar__done">
-          ✓
+          <t-icon name="check" />
         </div>
 
         <!-- 移除按钮（上传中隐藏） -->
@@ -79,10 +135,10 @@ const emit = defineEmits<{
           v-if="att.status !== 'uploading'"
           class="cp-attachmentBar__remove"
           type="button"
-          aria-label="Remove attachment"
+          :aria-label="`Remove ${att.file.name}`"
           @click.stop="emit('remove', att.id)"
         >
-          ×
+          <t-icon name="close" />
         </button>
       </div>
     </div>
@@ -126,6 +182,62 @@ const emit = defineEmits<{
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* 非媒体文件卡片：图标 + 文件名 + 体积 */
+.cp-attachmentBar__item--file {
+  width: auto;
+  min-width: 64px;
+  max-width: 180px;
+  height: 64px;
+  cursor: default;
+}
+
+.cp-attachmentBar__fileCard {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 10px;
+  box-sizing: border-box;
+}
+
+.cp-attachmentBar__fileIcon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--cp-accent, #5865f2) 14%, transparent);
+  color: var(--cp-accent, #5865f2);
+  font-size: 16px;
+}
+
+.cp-attachmentBar__fileMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.cp-attachmentBar__fileName {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cp-text, #222);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.cp-attachmentBar__fileSize {
+  font-size: 10px;
+  color: var(--cp-text-muted, #888);
 }
 
 .cp-attachmentBar__progress {

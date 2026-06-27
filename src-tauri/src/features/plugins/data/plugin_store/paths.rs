@@ -254,11 +254,11 @@ mod tests {
         ))
     }
 
-    fn cleanup_dir(path: &PathBuf) {
+    fn cleanup_dir(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
     }
 
-    fn create_dir_link(link: &PathBuf, target: &PathBuf) {
+    fn create_dir_link(link: &Path, target: &Path) {
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(target, link).expect("create symlink");

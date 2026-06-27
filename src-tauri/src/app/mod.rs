@@ -29,6 +29,12 @@ use crate::features::tray::di::commands::{TrayUnreadState, start_hover_timer};
 use crate::features::tray::domain::tray_i18n::tray_labels;
 use crate::shared::close_to_tray_state::CloseToTrayState;
 use crate::shared::temp_file::TempFileManager;
+use crate::shared::window_bounds::{self, WindowBounds};
+
+/// Wraps the `tracing_appender::WorkerGuard` for managed-state storage
+/// so it is dropped on Tauri shutdown, flushing buffered logs to disk.
+#[allow(dead_code)]
+struct LogFlushGuard(std::sync::Mutex<Option<tracing_appender::non_blocking::WorkerGuard>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 启动 Tauri 应用。
@@ -100,7 +106,9 @@ pub fn run() -> anyhow::Result<()> {
                 // 如果 subscriber 已经设定，file_layer 会失败 — 用 warn 记录（会写入现有 subscriber）
                 tracing::warn!(action = "app_file_logger_already_set", error = %e);
             }
-            std::mem::forget(guard);
+            // Store the log guard as Tauri managed state so it lives for
+            // the app's lifetime and properly flushes buffered logs on drop.
+            app.manage(LogFlushGuard(std::sync::Mutex::new(Some(guard))));
 
             let metadata_db_path = app_data_dir.join("temp_files").join("metadata.db");
             let temp_file_manager = std::thread::spawn({
@@ -117,6 +125,37 @@ pub fn run() -> anyhow::Result<()> {
             .context("TempFileManager init thread panicked")??;
 
             app.manage(temp_file_manager);
+
+            // 恢复主窗口位置/尺寸：读取上次保存的 bounds 并应用，
+            // 然后显示窗口以避免出现默认尺寸闪烁。
+            if let Some(window) = app.get_webview_window("main") {
+                if let Some(bounds) = window_bounds::load() {
+                    if is_bounds_within_monitors(app.handle(), &bounds) {
+                        let _ = window.set_size(tauri::PhysicalSize::new(bounds.width, bounds.height));
+                        let _ = window.set_position(tauri::PhysicalPosition::new(bounds.x, bounds.y));
+                        tracing::info!(
+                            action = "window_bounds_restore_applied",
+                            width = bounds.width,
+                            height = bounds.height,
+                            x = bounds.x,
+                            y = bounds.y
+                        );
+                    } else {
+                        tracing::warn!(
+                            action = "window_bounds_restore_out_of_range",
+                            width = bounds.width,
+                            height = bounds.height,
+                            x = bounds.x,
+                            y = bounds.y
+                        );
+                    }
+                } else {
+                    tracing::info!(action = "window_bounds_restore_none");
+                }
+                let _ = window.show();
+            } else {
+                tracing::warn!(action = "window_bounds_main_window_missing");
+            }
 
             // 同步读取 close_to_tray 设置，缓存到托管状态供窗口关闭事件使用。
             // 优先解析信封格式（迁移后），回退到旧版 Config 格式。
@@ -144,6 +183,10 @@ pub fn run() -> anyhow::Result<()> {
                 let state = handle.state::<TempFileManager>();
                 if let Err(e) = state.cleanup(None, 24).await {
                     tracing::warn!(action = "app_temp_file_startup_cleanup_failed", error = %e);
+                }
+                // 重启后默认不续传：清理未完成的下载 .part 与记录
+                if let Err(e) = state.prune_incomplete_downloads().await {
+                    tracing::warn!(action = "app_temp_file_prune_failed", error = %e);
                 }
             });
 
@@ -240,11 +283,26 @@ pub fn run() -> anyhow::Result<()> {
             {
                 let _ = window.close();
             }
+            // 主窗口 resize/move 时持久化当前 bounds。
+            if label == "main" {
+                match event {
+                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                        if let Some(bounds) = current_main_bounds(window) {
+                            window_bounds::save_async(bounds);
+                        }
+                    }
+                    _ => {}
+                }
+            }
             // 主窗口关闭时，若 close_to_tray 为 true，则阻止关闭并隐藏到托盘。
             if label == "main"
                 && let tauri::WindowEvent::CloseRequested { api, .. } = event
                     && let Some(state) = window.app_handle().try_state::<CloseToTrayState>()
                         && state.0.load(Ordering::SeqCst) {
+                            // 关闭到托盘前最后一次持久化当前 bounds。
+                            if let Some(bounds) = current_main_bounds(window) {
+                                window_bounds::save(bounds);
+                            }
                             api.prevent_close();
                             let _ = window.hide();
                             tracing::info!(action = "app_main_window_hide_to_tray");
@@ -636,5 +694,60 @@ fn handle_app_scheme(
         Some(mime_by_path(&rel_path)),
         bytes,
     ))
+}
+
+/// 读取主窗口当前的物理 bounds。
+///
+/// 当窗口最小化或不可见时 outer_size 可能为 0，跳过保存以避免坏值。
+fn current_main_bounds(window: &tauri::Window) -> Option<WindowBounds> {
+    if !window.is_visible().unwrap_or(false) {
+        return None;
+    }
+    let size = window.outer_size().ok()?;
+    let pos = window.outer_position().ok()?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let width = (f64::from(size.width) / scale).round().max(1.0) as u32;
+    let height = (f64::from(size.height) / scale).round().max(1.0) as u32;
+    let x = (f64::from(pos.x) / scale).round() as i32;
+    let y = (f64::from(pos.y) / scale).round() as i32;
+    Some(WindowBounds {
+        width,
+        height,
+        x,
+        y,
+    })
+}
+
+/// 校验 bounds 是否落在任意可用显示器的工作区内（防止越界）。
+///
+/// 允许较小偏差（窗口标题栏等可能略出屏）。
+fn is_bounds_within_monitors<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    b: &WindowBounds,
+) -> bool {
+    let Ok(monitors) = app.available_monitors() else {
+        // 拿不到显示器列表时不做校验，默认通过。
+        return true;
+    };
+    if monitors.is_empty() {
+        return true;
+    }
+    for m in monitors {
+        let mpos = m.position();
+        let msize = m.size();
+        let mx0 = mpos.x;
+        let my0 = mpos.y;
+        let mx1 = mpos.x + msize.width as i32;
+        let my1 = mpos.y + msize.height as i32;
+        let wx1 = b.x + b.width as i32;
+        let wy1 = b.y + b.height as i32;
+        // 至少 64x64 像素落在某显示器工作区内。
+        let overlap_w = (wx1.min(mx1) - b.x.max(mx0)).max(0);
+        let overlap_h = (wy1.min(my1) - b.y.max(my0)).max(0);
+        if overlap_w >= 64 && overlap_h >= 64 {
+            return true;
+        }
+    }
+    false
 }
 pub mod commands;

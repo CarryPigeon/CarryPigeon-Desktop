@@ -394,11 +394,6 @@ async function handleSaveEdit(): Promise<void> {
           <div class="cp-info__hero-text">
             <div class="cp-info__name">{{ name || t("user_info") }}</div>
             <div class="cp-info__sub">{{ t("profile_subtitle") }}</div>
-            <div class="cp-info__hero-meta">
-              <span class="cp-info__hero-pill">{{ t("profile_uid_available") }}</span>
-              <span class="cp-info__hero-pill">{{ t("profile_email_available") }}</span>
-              <span class="cp-info__hero-pill">{{ t("profile_bio_available") }}</span>
-            </div>
           </div>
         </div>
       </header>

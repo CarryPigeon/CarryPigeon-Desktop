@@ -119,9 +119,9 @@ function domainColor(colorVar: string): string {
         </div>
       </div>
       <div class="cp-module-card__badges">
-        <LabelBadge v-if="props.plugin.required" variant="required" label="REQUIRED" :title="t('module_required')" />
-        <LabelBadge v-if="props.hasUpdate" variant="update" label="UPDATE" :title="t('module_update')" />
-        <LabelBadge v-if="isFailed" variant="failed" label="FAILED" :title="t('module_failed')" />
+        <LabelBadge v-if="props.plugin.required" variant="required" :label="t('badge_required')" :title="t('module_required')" />
+        <LabelBadge v-if="props.hasUpdate" variant="update" :label="t('badge_update')" :title="t('module_update')" />
+        <LabelBadge v-if="isFailed" variant="failed" :label="t('badge_failed')" :title="t('module_failed')" />
       </div>
     </header>
 

@@ -2,12 +2,21 @@
  * @fileoverview fileAttachmentStore.ts
  * @description chat/message-flow/upload｜展示层状态（store）：fileAttachmentStore。
  *
- * 管理待上传图片附件（从剪贴板粘贴或拖拽产生），与 fileUploadStore 分工：
+ * 管理待上传附件（从剪贴板粘贴或拖拽产生），与 fileUploadStore 分工：
  * - fileUploadStore：管理实际上传任务的生命周期（upload_* 前缀）。
  * - fileAttachmentStore：管理 composer 里的“待发送”附件预览（att_* 前缀）。
  */
 
 import { reactive, onUnmounted } from "vue";
+
+/**
+ * 附件种类（用于预览条选择渲染分支）。
+ *
+ * - image: 通过 MIME 识别的图片类型，预览条显示缩略图。
+ * - video: 通过 MIME 识别的视频类型，预览条显示缩略图。
+ * - file: 其他任意文件类型，预览条显示文件图标 + 文件名 + 体积。
+ */
+export type FileAttachmentKind = "image" | "video" | "file";
 
 /**
  * 单个附件展示模型（用于 composer 预览）。
@@ -17,8 +26,10 @@ export type FileAttachment = {
   id: string;
   /** 原始 File 对象。 */
   file: File;
-  /** 通过 URL.createObjectURL 创建的 blob URL（供 `<img>` 使用）。 */
+  /** 通过 URL.createObjectURL 创建的 blob URL（仅 image/video 存在）。 */
   blobUrl: string;
+  /** 附件种类。 */
+  kind: FileAttachmentKind;
   /** 附件状态。 */
   status: "pending" | "uploading" | "done" | "error";
   /** 上传进度（0–100）。 */
@@ -41,25 +52,42 @@ function generateId(): string {
 }
 
 /**
- * 判断 MIME 类型是否为支持的图片或视频格式。
+ * 根据 MIME 类型推导附件种类。
+ *
  * 使用前缀匹配与代码库其他位置保持一致，避免遗漏合法类型（如 image/heic、video/3gpp）。
+ * 空 MIME 退化为 `file`。
+ *
+ * @param mime - 文件 MIME。
+ * @returns 推导出的附件种类。
  */
-function isSupportedMediaType(mime: string): boolean {
+function inferKind(mime: string): FileAttachmentKind {
   const t = mime.trim().toLowerCase();
-  return t.startsWith("image/") || t.startsWith("video/");
+  if (t.startsWith("image/")) return "image";
+  if (t.startsWith("video/")) return "video";
+  return "file";
 }
 
 /**
- * 添加文件（图片和视频）到附件列表。
+ * 添加文件到附件列表。
+ *
+ * 接受任意类型的文件：图片、视频、文档、压缩包等。
+ * 文件大小与类型交由服务端与网络层决定，本地不做硬性限制。
  *
  * @param files - FileList 或 File 数组。
  */
 export function addFiles(files: FileList | File[]): void {
   for (const file of Array.from(files)) {
-    if (!isSupportedMediaType(file.type)) continue;
     const id = generateId();
-    const blobUrl = URL.createObjectURL(file);
-    attachments.set(id, { id, file, blobUrl, status: "pending", progress: 0 });
+    const kind = inferKind(file.type);
+    const blobUrl = kind === "file" ? "" : URL.createObjectURL(file);
+    attachments.set(id, {
+      id,
+      file,
+      blobUrl,
+      kind,
+      status: "pending",
+      progress: 0,
+    });
   }
 }
 

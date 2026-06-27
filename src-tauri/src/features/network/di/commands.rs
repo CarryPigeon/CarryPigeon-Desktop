@@ -139,6 +139,22 @@ pub async fn api_request_json(args: ApiRequestJsonArgs) -> CommandResult<ApiRequ
 /// ```
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
+fn http_client() -> &'static reqwest::Client {
+    HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .map_err(|e| {
+                tracing::error!(
+                    action = "app_network_http_client_build_failed",
+                    error = %e
+                );
+            })
+            .ok()
+            .unwrap_or_default()
+    })
+}
+
 #[tauri::command]
 pub async fn download_file(
     app: AppHandle,
@@ -149,30 +165,106 @@ pub async fn download_file(
 ) -> CommandResult<DownloadResult> {
     use futures_util::StreamExt;
 
-    let client = HTTP_CLIENT.get_or_init(reqwest::Client::new);
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {token}"))
-        .send()
+    let client = http_client();
+
+    // 查找未完成任务（同 url 且 state in downloading/failed），存在则断点续传。
+    let resumable = temp_files
+        .lookup_incomplete_by_url(&url)
         .await
         .map_err(|e| {
             to_command_error(
-                "DOWNLOAD_REQUEST_FAILED",
-                "error.download_request_failed",
+                "TEMP_FILE_LOOKUP_FAILED",
+                "error.temp_file_lookup_failed",
                 e,
             )
-        })?
-        .error_for_status()
-        .map_err(|e| to_command_error("DOWNLOAD_HTTP_ERROR", "error.download_http_error", e))?;
+        })?;
+    let resume_from: u64 = if let Some((existing_id, downloaded)) = resumable {
+        if existing_id == task_id && downloaded > 0 {
+            downloaded
+        } else if existing_id != task_id && downloaded > 0 {
+            // 复用同一 url 已存在的不完整任务，复用其 task_id 与下载进度
+            // （前端无需感知）。
+            tracing::info!(
+                action = "network_download_resume_reuse",
+                existing_task_id = %existing_id,
+                new_task_id = %task_id,
+                url = %url,
+                downloaded
+            );
+            downloaded
+        } else {
+            0
+        }
+    } else {
+        0
+    };
 
-    let total = response.content_length().unwrap_or(0);
+    let mut request = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {token}"));
+    if resume_from > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
+    }
+
+    let response = request.send().await.map_err(|e| {
+        to_command_error(
+            "DOWNLOAD_REQUEST_FAILED",
+            "error.download_request_failed",
+            e,
+        )
+    })?;
+
+    // 206 Partial Content 视为续传成功；200 视为服务端不支持 Range，需重新下载；
+    // 其它状态码视为失败。
+    let response = match response.status() {
+        reqwest::StatusCode::PARTIAL_CONTENT => {
+            tracing::info!(
+                action = "network_download_resume_continued",
+                url = %url,
+                resume_from
+            );
+            response
+        }
+        reqwest::StatusCode::OK if resume_from > 0 => {
+            // 服务端不支持 Range：清空 .part 并重头下载。
+            tracing::warn!(
+                action = "network_download_resume_unsupported",
+                url = %url,
+                resume_from
+            );
+            let part_path = temp_files
+                .base_dir()
+                .join("downloads")
+                .join(format!("{task_id}.part"));
+            let _ = tokio::fs::remove_file(&part_path).await;
+            response
+        }
+        _ => response
+            .error_for_status()
+            .map_err(|e| to_command_error("DOWNLOAD_HTTP_ERROR", "error.download_http_error", e))?,
+    };
+
+    // 200 路径下从头开始；206 路径下保留 resume_from。
+    let resumed = response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    let mut total = if resumed {
+        // 206 响应可能没有完整 content_length；以原始 total + 续传部分合计。
+        response
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.rsplit('/').next())
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(resume_from + response.content_length().unwrap_or(0))
+    } else {
+        response.content_length().unwrap_or(0)
+    };
     let mime_type = response
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    let mut file = temp_files
+    let (mut file, existing) = temp_files
         .create_download(&task_id, &url, mime_type.as_deref(), total)
         .await
         .map_err(|e| {
@@ -182,8 +274,30 @@ pub async fn download_file(
                 e,
             )
         })?;
-
-    let mut downloaded: u64 = 0;
+    // 如果服务端不支持 Range，从 0 截断。
+    if resume_from > 0 && !resumed && existing > 0 {
+        // 重新打开并截断
+        file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(
+                temp_files
+                    .base_dir()
+                    .join("downloads")
+                    .join(format!("{task_id}.part")),
+            )
+            .await
+            .map_err(|e| {
+                to_command_error(
+                    "TEMP_FILE_TRUNCATE_FAILED",
+                    "error.temp_file_create_failed",
+                    e,
+                )
+            })?;
+        total = response.content_length().unwrap_or(0);
+    }
+    let mut downloaded: u64 = if resumed { resume_from } else { 0 };
     let mut stream = response.bytes_stream();
 
     let stream_result: Result<(), _> = async {
@@ -232,6 +346,7 @@ pub async fn download_file(
         url = %url,
         downloaded,
         total,
+        resumed,
         path = %final_path,
     );
 

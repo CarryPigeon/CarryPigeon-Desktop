@@ -776,16 +776,13 @@ async fn run_migrations(key: &str, kind: ManagedDbKind) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::OnceLock;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    static TEST_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
-    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
-        TEST_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .expect("test lock")
+    async fn test_lock() -> tokio::sync::MutexGuard<'static, ()> {
+        TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await
     }
 
     fn test_app_data_dir() -> PathBuf {
@@ -813,7 +810,7 @@ mod tests {
 
     #[tokio::test]
     async fn db_init_uses_managed_path_for_system_db() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
 
@@ -836,7 +833,7 @@ mod tests {
 
     #[tokio::test]
     async fn db_init_rejects_custom_path_and_invalid_kind() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
 
@@ -871,7 +868,7 @@ mod tests {
 
     #[tokio::test]
     async fn db_remove_rejects_outside_root_registry_paths() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         let outside = app_dir.join("outside-root");
         std::fs::create_dir_all(&outside).expect("outside dir");

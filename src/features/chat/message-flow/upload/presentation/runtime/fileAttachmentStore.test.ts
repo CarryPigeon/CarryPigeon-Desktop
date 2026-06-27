@@ -55,19 +55,35 @@ describe("addFiles", () => {
     expect(att.status).toBe("pending");
     expect(att.progress).toBe(0);
     expect(att.id).toMatch(/^att_/);
+    expect(att.kind).toBe("image");
+    expect(att.blobUrl).not.toBe("");
   });
 
   it("should add video files to attachments", () => {
     const file = makeFile("clip.mp4", "video/mp4");
     addFiles([file]);
     expect(getAttachments().size).toBe(1);
+    const att = Array.from(getAttachments().values())[0];
+    expect(att.kind).toBe("video");
   });
 
-  it("should skip non-media files (text, application)", () => {
+  it("should accept any file type (text, application, octet-stream) and tag as file", () => {
     const textFile = makeFile("notes.txt", "text/plain");
     const jsonFile = makeFile("data.json", "application/json");
     addFiles([textFile, jsonFile]);
-    expect(getAttachments().size).toBe(0);
+    expect(getAttachments().size).toBe(2);
+    for (const att of getAttachments().values()) {
+      expect(att.kind).toBe("file");
+      expect(att.blobUrl).toBe("");
+    }
+  });
+
+  it("should accept files with empty MIME and tag as file", () => {
+    const noType = makeFile("archive.bin", "");
+    addFiles([noType]);
+    expect(getAttachments().size).toBe(1);
+    const att = Array.from(getAttachments().values())[0];
+    expect(att.kind).toBe("file");
   });
 
   it("should accept uncommon but valid image/video MIME types", () => {
@@ -77,10 +93,13 @@ describe("addFiles", () => {
     expect(getAttachments().size).toBe(2);
   });
 
-  it("should accept FileList with multiple mixed files and filter correctly", () => {
+  it("should accept FileList with multiple mixed files and tag each by kind", () => {
     const fileList = [makeFile("a.png", "image/png"), makeFile("b.txt", "text/plain"), makeFile("c.webm", "video/webm")] as unknown as FileList;
     addFiles(fileList);
-    expect(getAttachments().size).toBe(2);
+    expect(getAttachments().size).toBe(3);
+    const all = Array.from(getAttachments().values());
+    const kinds = all.map((a) => a.kind).sort();
+    expect(kinds).toEqual(["file", "image", "video"]);
   });
 
   it("should generate unique IDs for each attachment", () => {

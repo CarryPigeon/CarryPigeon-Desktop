@@ -9,7 +9,7 @@ import type { SettingsPort } from "../domain/ports/SettingsPort";
 import { localStorageSettingsPort } from "../data/localStorageSettingsPort";
 import { mockSettingsPort } from "../mock/mockSettingsPort";
 import { GetSettings } from "../domain/usecases/GetSettings";
-import { SetTheme } from "../domain/usecases/SetTheme";
+import { SetAccent, SetTheme } from "../domain/usecases/SetTheme";
 
 let settingsPort: SettingsPort | null = null;
 
@@ -44,4 +44,11 @@ export function getSettingsUseCase(): GetSettings {
  */
 export function getSetThemeUseCase(): SetTheme {
   return new SetTheme(getSettingsPort());
+}
+
+/**
+ * 获取 `SetAccent` 用例实例。
+ */
+export function getSetAccentUseCase(): SetAccent {
+  return new SetAccent(getSettingsPort());
 }

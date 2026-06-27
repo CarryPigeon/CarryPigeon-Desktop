@@ -16,13 +16,13 @@ const emit = defineEmits<{
 
 <template>
   <div class="cp-failedIndicator">
-    <span class="cp-failedIndicator__icon">⚠️</span>
+    <span class="cp-failedIndicator__icon"><t-icon name="error-circle" /></span>
     <span class="cp-failedIndicator__text">{{ error || $t("send_failed") }}</span>
     <button class="cp-failedIndicator__btn" @click="emit('retry', messageId)">
       {{ $t("retry") }}
     </button>
     <button class="cp-failedIndicator__dismiss" @click="emit('remove', messageId)">
-      ✕
+      <t-icon name="close" />
     </button>
   </div>
 </template>
@@ -41,7 +41,11 @@ const emit = defineEmits<{
   color: var(--cp-text);
 }
 .cp-failedIndicator__icon {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  color: var(--cp-danger);
+  font-size: 14px;
 }
 .cp-failedIndicator__text {
   color: var(--cp-text-muted);
@@ -61,11 +65,13 @@ const emit = defineEmits<{
   background: var(--cp-hover-bg);
 }
 .cp-failedIndicator__dismiss {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: transparent;
   color: var(--cp-text-muted);
   cursor: pointer;
   padding: 0 2px;
-  font-size: 11px;
+  font-size: 12px;
 }
 </style>

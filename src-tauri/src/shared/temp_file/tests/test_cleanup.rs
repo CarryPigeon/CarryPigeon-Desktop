@@ -15,7 +15,7 @@ async fn create_test_manager() -> (TempFileManager, TempDir) {
 async fn test_cleanup_expired_downloading() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut file = manager
+    let (mut file, _existing) = manager
         .create_download("old-dl", "https://example.com/old.bin", None, 100)
         .await
         .unwrap();
@@ -33,7 +33,7 @@ async fn test_cleanup_expired_downloading() {
 async fn test_cleanup_skips_complete() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut file = manager
+    let (mut file, _existing) = manager
         .create_download("keep", "https://example.com/keep.bin", None, 0)
         .await
         .unwrap();
@@ -52,7 +52,7 @@ async fn test_cleanup_skips_complete() {
 async fn test_cleanup_by_namespace() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut f1 = manager
+    let (mut f1, _existing) = manager
         .create_download("ns1", "https://example.com/a.bin", None, 0)
         .await
         .unwrap();

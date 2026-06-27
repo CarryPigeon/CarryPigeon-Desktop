@@ -284,16 +284,21 @@ function handleDragEnter(e: DragEvent): void {
 /**
  * 处理文件拖出。
  */
-function handleDragLeave(): void {
-  dragCounter--;
-  if (dragCounter <= 0) {
-    dragCounter = 0;
-    isDragOver.value = false;
+function handleDragLeave(e: DragEvent): void {
+  if (e.dataTransfer?.types.includes("Files")) {
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      isDragOver.value = false;
+    }
   }
 }
 
 /**
  * 处理文件放下。
+ *
+ * 接受任意类型文件：图片、视频、文档、压缩包等。
+ * 复用 `addFiles`（原 `addImageFiles` 别名）统一处理。
  *
  * @param e - DragEvent。
  */
@@ -680,7 +685,7 @@ function getReplyText(m: VirtualMessageItem): string {
         :title="t('jump_to_bottom')"
         @click="props.onJumpToBottom"
       >
-        ↓
+        <t-icon name="arrow-down" />
       </button>
     </div>
 

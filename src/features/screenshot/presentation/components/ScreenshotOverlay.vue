@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
-import { listen } from "@tauri-apps/api/event";
+import { safeListen } from "@/shared/tauri/events";
 import { getScreenshotData, finishScreenshot, cancelScreenshot } from "../../data/screenshotCommands";
 import AnnotationToolbar from "./tools/AnnotationToolbar.vue";
 import type { ScreenCapture } from "../../api-types";
@@ -47,6 +47,7 @@ type Annotation = {
 const annotations = ref<Annotation[]>([]);
 
 let textInput: HTMLTextAreaElement | null = null;
+let textInputCleanup: (() => void) | null = null;
 let isTextPlacing = false;
 let isComposing = false;
 let penPoints: { x: number; y: number }[] = [];
@@ -75,7 +76,12 @@ async function initOverlay(data: ScreenCapture[]) {
   bgCanvas = document.createElement("canvas");
   bgCanvas.width = virtualW;
   bgCanvas.height = virtualH;
-  const bgCtx = bgCanvas.getContext("2d")!;
+  const bgCtx = bgCanvas.getContext("2d");
+  if (!bgCtx) {
+    error.value = "Canvas context not available";
+    loading.value = false;
+    return;
+  }
 
   loading.value = false;
   await nextTick();
@@ -176,7 +182,7 @@ onMounted(async () => {
       loading.value = false;
     }, 15000);
 
-    dataReadyUnlisten = await listen("screenshot-data-ready", async () => {
+    dataReadyUnlisten = await safeListen("screenshot-data-ready", async () => {
       clearTimeout(dataReadyTimeout!);
       if (timedOut) return;
       dataReadyUnlisten?.();
@@ -378,7 +384,7 @@ function confirmText(textVal: string, vx: number, vy: number) {
 }
 
 function showTextInput(vx: number, vy: number, cvx: number, cvy: number) {
-  textInput?.remove();
+  cleanupTextInput();
   const input = document.createElement("textarea");
   input.className = "cp-screenshot-text-input";
   input.style.left = `${vx}px`;
@@ -394,30 +400,42 @@ function showTextInput(vx: number, vy: number, cvx: number, cvy: number) {
     if (isComposing) return;
     confirmText(input.value, cvx, cvy);
   };
-  input.addEventListener("blur", () => {
+  const onBlur = () => {
     setTimeout(() => {
       if (isComposing) return;
       confirmText(input.value, cvx, cvy);
     }, 0);
-  });
-  input.addEventListener("compositionstart", () => {
+  };
+  const onCompositionStart = () => {
     isComposing = true;
-  });
-  input.addEventListener("compositionend", () => {
+  };
+  const onCompositionEnd = () => {
     isComposing = false;
-  });
+  };
+  input.addEventListener("blur", onBlur);
+  input.addEventListener("compositionstart", onCompositionStart);
+  input.addEventListener("compositionend", onCompositionEnd);
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey && !isComposing) {
       ev.preventDefault();
       finish();
     }
     if (ev.key === "Escape") {
+      input.removeEventListener("blur", onBlur);
+      input.removeEventListener("compositionstart", onCompositionStart);
+      input.removeEventListener("compositionend", onCompositionEnd);
       input.remove();
       textInput = null;
       isTextPlacing = false;
       isDrawing = false;
     }
   });
+  textInputCleanup = () => {
+    input.removeEventListener("blur", onBlur);
+    input.removeEventListener("compositionstart", onCompositionStart);
+    input.removeEventListener("compositionend", onCompositionEnd);
+    input.remove();
+  };
 }
 
 function drawPreviewLine(ctx: CanvasRenderingContext2D, sx: number, sy: number, ex: number, ey: number) {
@@ -842,9 +860,16 @@ onBeforeUnmount(() => {
   if (dataReadyTimeout) clearTimeout(dataReadyTimeout);
   dataReadyUnlisten?.();
   if (escKeyHandler) document.removeEventListener("keydown", escKeyHandler);
-  textInput?.remove();
+  cleanupTextInput();
   resizeObserver?.disconnect();
 });
+
+function cleanupTextInput() {
+  textInputCleanup?.();
+  textInputCleanup = null;
+  textInput?.remove();
+  textInput = null;
+}
 </script>
 
 <template>

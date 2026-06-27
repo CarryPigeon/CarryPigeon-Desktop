@@ -46,7 +46,9 @@ function handleToggle(): void {
     @keydown.enter="handleToggle"
     @keydown.space.prevent="handleToggle"
   >
-    <span class="cp-categoryHeader__arrow" :data-collapsed="collapsed">▾</span>
+    <span class="cp-categoryHeader__arrow" :data-collapsed="collapsed">
+      <t-icon name="chevron-down" />
+    </span>
     <span class="cp-categoryHeader__name">{{ displayName }}</span>
     <span class="cp-categoryHeader__count">{{ count }}</span>
   </div>
@@ -78,7 +80,9 @@ function handleToggle(): void {
 
 /* 折叠/展开箭头 */
 .cp-categoryHeader__arrow {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
   transition: transform var(--cp-fast) var(--cp-ease);
 }
 

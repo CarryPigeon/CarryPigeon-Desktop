@@ -49,10 +49,7 @@ mod tests {
 
     #[test]
     fn eq_hash_exact_match() {
-        assert!(eq_hash_hex(
-            "a1b2c3d4e5f60708",
-            "a1b2c3d4e5f60708"
-        ));
+        assert!(eq_hash_hex("a1b2c3d4e5f60708", "a1b2c3d4e5f60708"));
     }
 
     #[test]

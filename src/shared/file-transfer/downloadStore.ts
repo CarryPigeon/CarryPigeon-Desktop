@@ -6,7 +6,7 @@
 import { reactive, ref } from "vue";
 import { invokeTauri } from "@/shared/tauri/invokeClient";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
-import { listen } from "@tauri-apps/api/event";
+import { safeListen } from "@/shared/tauri/events";
 
 export interface DownloadResult {
   fileId: string;
@@ -41,7 +41,7 @@ function formatFilename(url: string): string {
 
 async function ensureProgressListener(): Promise<void> {
   if (progressUnlisten) return;
-  progressUnlisten = await listen<{ taskId: string; downloaded: number; total: number }>(
+  progressUnlisten = await safeListen<{ taskId: string; downloaded: number; total: number }>(
     "download:progress",
     (event) => {
       const { taskId, downloaded, total } = event.payload;
@@ -60,16 +60,42 @@ export function destroyProgressListener(): void {
 }
 
 export async function downloadFile(url: string, token: string): Promise<string> {
-  const taskId = generateTaskId();
-  const task: DownloadTask = {
-    id: taskId,
-    filename: formatFilename(url),
-    status: "pending",
-    progress: 0,
-    downloaded: 0,
-    total: 0,
-  };
-  downloadTasks.set(taskId, task);
+  return startDownload(url, token);
+}
+
+/**
+ * 续传下载：复用后端同 URL 未完成任务（state=downloading/failed）。
+ *
+ * 后端在同会话内会保留 `.part` 与 SQLite 记录，再次调用 `download_file`
+ * 命令即触发 `Range: bytes={N}-` 请求；服务端若支持则返 206 续传，
+ * 不支持则降级为全新下载。
+ */
+export async function resumeDownload(taskId: string, url: string, token: string): Promise<string> {
+  const task = downloadTasks.get(taskId);
+  if (task) {
+    task.status = "downloading";
+    task.error = undefined;
+  }
+  return startDownload(url, token, taskId);
+}
+
+async function startDownload(url: string, token: string, reuseTaskId?: string): Promise<string> {
+  const taskId = reuseTaskId ?? generateTaskId();
+  let task = downloadTasks.get(taskId);
+  if (!task) {
+    task = {
+      id: taskId,
+      filename: formatFilename(url),
+      status: "pending",
+      progress: 0,
+      downloaded: 0,
+      total: 0,
+    };
+    downloadTasks.set(taskId, task);
+  } else {
+    task.status = "pending";
+    task.error = undefined;
+  }
   currentTaskId.value = taskId;
 
   try {

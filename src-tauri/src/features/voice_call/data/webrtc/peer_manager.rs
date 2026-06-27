@@ -128,9 +128,10 @@ impl WebRtcPeerManager {
 
         pc.on_ice_candidate(Box::new(move |candidate| {
             if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c) {
-                    let _ = candidate_tx.try_send(json);
-                }
+                && let Ok(json) = serde_json::to_string(&c)
+            {
+                let _ = candidate_tx.try_send(json);
+            }
             Box::pin(async {})
         }));
 
@@ -208,9 +209,10 @@ impl WebRtcPeerManager {
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
         pc.on_ice_candidate(Box::new(move |candidate| {
             if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c) {
-                    let _ = candidate_tx.try_send(json);
-                }
+                && let Ok(json) = serde_json::to_string(&c)
+            {
+                let _ = candidate_tx.try_send(json);
+            }
             Box::pin(async {})
         }));
 
@@ -448,9 +450,10 @@ impl WebRtcPeerManager {
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
         pc.on_ice_candidate(Box::new(move |candidate| {
             if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c) {
-                    let _ = candidate_tx.try_send(json);
-                }
+                && let Ok(json) = serde_json::to_string(&c)
+            {
+                let _ = candidate_tx.try_send(json);
+            }
             Box::pin(async {})
         }));
 
@@ -521,9 +524,10 @@ impl WebRtcPeerManager {
         let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
         pc.on_ice_candidate(Box::new(move |candidate| {
             if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c) {
-                    let _ = candidate_tx.try_send(json);
-                }
+                && let Ok(json) = serde_json::to_string(&c)
+            {
+                let _ = candidate_tx.try_send(json);
+            }
             Box::pin(async {})
         }));
 

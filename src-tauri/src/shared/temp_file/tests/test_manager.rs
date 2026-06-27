@@ -15,7 +15,7 @@ async fn create_test_manager() -> (TempFileManager, TempDir) {
 async fn test_create_download_and_mark_complete() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut file = manager
+    let (mut file, _existing) = manager
         .create_download(
             "test-1",
             "https://example.com/file.bin",
@@ -51,7 +51,7 @@ async fn test_create_download_and_mark_complete() {
 async fn test_mark_failed() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut file = manager
+    let (mut file, _existing) = manager
         .create_download("test-fail", "https://example.com/fail.bin", None, 0)
         .await
         .unwrap();
@@ -68,7 +68,7 @@ async fn test_mark_failed() {
 async fn test_remove_temp_file() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut file = manager
+    let (mut file, _existing) = manager
         .create_download("test-rm", "https://example.com/rm.bin", None, 0)
         .await
         .unwrap();
@@ -85,7 +85,7 @@ async fn test_remove_temp_file() {
 async fn test_save_to() {
     let (manager, _dir) = create_test_manager().await;
 
-    let mut file = manager
+    let (mut file, _existing) = manager
         .create_download("test-save", "https://example.com/save.bin", None, 0)
         .await
         .unwrap();
@@ -107,7 +107,7 @@ async fn test_save_to() {
 async fn test_save_to_fails_if_not_complete() {
     let (manager, _dir) = create_test_manager().await;
 
-    let _file = manager
+    let (_file, _existing) = manager
         .create_download("test-nc", "https://example.com/nc.bin", None, 0)
         .await
         .unwrap();
@@ -115,4 +115,103 @@ async fn test_save_to_fails_if_not_complete() {
     let dest = manager.base_dir().join("should-not-exist.txt");
     let result = manager.save_to("test-nc", &dest.to_string_lossy()).await;
     assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_create_download_appends_to_existing_part() {
+    let (manager, _dir) = create_test_manager().await;
+
+    // 第一次：写入 5 字节
+    let (mut file, existing1) = manager
+        .create_download(
+            "resume-1",
+            "https://example.com/big.bin",
+            Some("application/octet-stream"),
+            100,
+        )
+        .await
+        .unwrap();
+    assert_eq!(existing1, 0);
+    file.write_all(b"hello").await.unwrap();
+    drop(file);
+
+    // 第二次：应保留已有字节
+    let (mut file, existing2) = manager
+        .create_download(
+            "resume-1",
+            "https://example.com/big.bin",
+            Some("application/octet-stream"),
+            100,
+        )
+        .await
+        .unwrap();
+    assert_eq!(existing2, 5);
+    file.write_all(b" world").await.unwrap();
+    drop(file);
+
+    let part = manager.base_dir().join("downloads").join("resume-1.part");
+    let bytes = std::fs::read(&part).unwrap();
+    assert_eq!(bytes, b"hello world");
+}
+
+#[tokio::test]
+async fn test_lookup_incomplete_by_url_returns_in_progress_only() {
+    let (manager, _dir) = create_test_manager().await;
+    // 没有记录
+    let r = manager
+        .lookup_incomplete_by_url("https://example.com/none")
+        .await
+        .unwrap();
+    assert!(r.is_none());
+
+    // 创建并失败
+    let (mut file, _) = manager
+        .create_download("dl-fail", "https://example.com/x.bin", None, 0)
+        .await
+        .unwrap();
+    file.write_all(b"abc").await.unwrap();
+    drop(file);
+    manager.update_progress("dl-fail", 3).await.unwrap();
+    manager.mark_failed("dl-fail").await.unwrap();
+
+    // 失败任务也应被检索到
+    let r = manager
+        .lookup_incomplete_by_url("https://example.com/x.bin")
+        .await
+        .unwrap();
+    assert!(r.is_some());
+    let (id, downloaded) = r.unwrap();
+    assert_eq!(id, "dl-fail");
+    assert_eq!(downloaded, 3);
+}
+
+#[tokio::test]
+async fn test_prune_incomplete_downloads_removes_part_files() {
+    let (manager, _dir) = create_test_manager().await;
+    // 创建两个未完成任务
+    let (mut f1, _) = manager
+        .create_download("prune-1", "https://example.com/a.bin", None, 0)
+        .await
+        .unwrap();
+    f1.write_all(b"data1").await.unwrap();
+    drop(f1);
+    let (mut f2, _) = manager
+        .create_download("prune-2", "https://example.com/b.bin", None, 0)
+        .await
+        .unwrap();
+    f2.write_all(b"data2").await.unwrap();
+    drop(f2);
+    manager.mark_failed("prune-2").await.unwrap();
+
+    let part1 = manager.base_dir().join("downloads").join("prune-1.part");
+    let part2 = manager.base_dir().join("downloads").join("prune-2.part");
+    assert!(part1.exists());
+    assert!(part2.exists());
+
+    let count = manager.prune_incomplete_downloads().await.unwrap();
+    assert_eq!(count, 2);
+    assert!(!part1.exists());
+    assert!(!part2.exists());
+    assert!(manager.get_metadata("prune-1").await.is_err());
+    assert!(manager.get_metadata("prune-2").await.is_err());
 }

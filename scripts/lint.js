@@ -9,6 +9,7 @@ if (!isWin) {
   console.log("Skipping bash-dependent checks on Windows");
 }
 checks.push("lint:docs");
+checks.push("lint:color:literals");
 
 let exitCode = 0;
 for (const check of checks) {

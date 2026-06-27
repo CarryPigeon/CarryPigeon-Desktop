@@ -28,10 +28,7 @@ function togglePanel(): void {
 <template>
   <div class="cp-notif-bell">
     <button class="cp-notif-bell__btn" @click="togglePanel" :title="t('notifications')">
-      <svg class="cp-notif-bell__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 01-3.46 0" />
-      </svg>
+      <t-icon name="notification" class="cp-notif-bell__icon" />
       <span v-if="unreadCount > 0" class="cp-notif-bell__badge">{{ unreadCount > 99 ? "99+" : unreadCount }}</span>
     </button>
     <NotificationPanel v-if="showPanel" @close="showPanel = false" />
@@ -60,8 +57,7 @@ function togglePanel(): void {
 }
 
 .cp-notif-bell__icon {
-  width: 20px;
-  height: 20px;
+  font-size: 20px;
 }
 
 .cp-notif-bell__badge {

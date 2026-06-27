@@ -46,10 +46,7 @@ mod tests {
 
     #[test]
     fn normalize_trims_and_lowercases() {
-        assert_eq!(
-            normalize_sha256_fingerprint("  A1B2C3  "),
-            "a1b2c3"
-        );
+        assert_eq!(normalize_sha256_fingerprint("  A1B2C3  "), "a1b2c3");
     }
 
     #[test]
@@ -63,7 +60,9 @@ mod tests {
     #[test]
     fn normalize_filters_colons_and_spaces() {
         assert_eq!(
-            normalize_sha256_fingerprint("A1:B2:C3:D4 E5:F6:G7:H8 I9:J0:K1:L2 M3:N4:O5:P6 Q7:R8:S9:T0 U1:V2:W3:X4 Y5:Z6"),
+            normalize_sha256_fingerprint(
+                "A1:B2:C3:D4 E5:F6:G7:H8 I9:J0:K1:L2 M3:N4:O5:P6 Q7:R8:S9:T0 U1:V2:W3:X4 Y5:Z6"
+            ),
             "a1b2c3d4e5f678901234567890123456"
         );
     }

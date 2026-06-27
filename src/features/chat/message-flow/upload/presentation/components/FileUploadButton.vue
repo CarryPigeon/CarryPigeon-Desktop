@@ -3,8 +3,10 @@
  * @fileoverview FileUploadButton.vue
  * @description chat/message-flow/upload｜组件：FileUploadButton。
  *
- * 选择文件后将图片加入附件预览条（AttachmentPreviewBar），
+ * 选择文件后将其加入附件预览条（AttachmentPreviewBar），
  * 上传统一在发送消息时由 sendMessageWithAttachments 执行。
+ *
+ * 支持任意类型文件：图片、视频、文档、压缩包等。
  */
 
 import { ref } from "vue";
@@ -33,7 +35,10 @@ function handleClick(): void {
 }
 
 /**
- * 处理文件选择：将图片文件加入附件预览条。
+ * 处理文件选择：将任意类型的文件加入附件预览条。
+ *
+ * 文件大小校验仍按 `maxSize` 执行（外部传入时启用）。
+ * 文件类型不限，由服务端/网络层做最终约束。
  *
  * @param e - 文件 input 的 change 事件。
  */
@@ -53,29 +58,20 @@ function handleFileChange(e: Event): void {
     }
   }
 
-  // 只保留图片和视频类型
-  const mediaFiles = selectedFiles.filter(
-    (f) => f.type.startsWith("image/") || f.type.startsWith("video/"),
-  );
-  if (mediaFiles.length === 0) {
-    emit("error", t("file_type_not_supported") || "Only image and video files are supported");
-    return;
-  }
-
-  // 加入附件预览条
-  addFiles(mediaFiles);
-  emit("filesSelected", mediaFiles);
+  // 加入附件预览条（任意类型）
+  addFiles(selectedFiles);
+  emit("filesSelected", selectedFiles);
 }
 </script>
 
 <template>
-  <!-- 组件：FileUploadButton｜职责：选择图片文件并加入附件预览 -->
+  <!-- 组件：FileUploadButton｜职责：选择任意类型文件并加入附件预览 -->
   <div class="cp-fileUpload">
     <input
       ref="fileInput"
       type="file"
       class="cp-fileUpload__input"
-      :accept="accept ?? 'image/*,video/*'"
+      :accept="accept"
       multiple
       @change="handleFileChange"
     />

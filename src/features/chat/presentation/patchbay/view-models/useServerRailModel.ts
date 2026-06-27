@@ -15,7 +15,10 @@ export type UseServerRailModelDeps = {
 
 export type ServerRailModel = {
   serverMuted: ComputedRef<boolean>;
+  serverMutedUntil: ComputedRef<number | null>;
   toggleServerMute(): Promise<void>;
+  muteServerForDuration(durationMs?: number): Promise<void>;
+  unmuteServer(): Promise<void>;
 };
 
 export function useServerRailModel(deps?: UseServerRailModelDeps): ServerRailModel {
@@ -26,6 +29,7 @@ export function useServerRailModel(deps?: UseServerRailModelDeps): ServerRailMod
   }));
 
   const serverMuted = computed(() => notifPrefCapability.mode.value === "muted");
+  const serverMutedUntil = computed(() => notifPrefCapability.mutedUntil.value);
 
   onMounted(() => {
     notifPrefCapability.refresh();
@@ -35,5 +39,18 @@ export function useServerRailModel(deps?: UseServerRailModelDeps): ServerRailMod
     await notifPrefCapability.toggleServerMute();
   }
 
-  return { serverMuted, toggleServerMute };
+  async function muteServerForDuration(durationMs?: number): Promise<void> {
+    if (notifPrefCapability.mode.value === "muted") {
+      await notifPrefCapability.toggleServerMute();
+      return;
+    }
+    await notifPrefCapability.toggleServerMuteForDuration(durationMs);
+  }
+
+  async function unmuteServer(): Promise<void> {
+    if (notifPrefCapability.mode.value !== "muted") return;
+    await notifPrefCapability.clearMutedUntil();
+  }
+
+  return { serverMuted, serverMutedUntil, toggleServerMute, muteServerForDuration, unmuteServer };
 }

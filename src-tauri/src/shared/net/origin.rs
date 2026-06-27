@@ -91,27 +91,42 @@ mod tests {
 
     #[test]
     fn map_ws_to_http() {
-        assert_eq!(map_socket_to_url_candidate("ws://host:1234"), "http://host:1234");
+        assert_eq!(
+            map_socket_to_url_candidate("ws://host:1234"),
+            "http://host:1234"
+        );
     }
 
     #[test]
     fn map_wss_to_https() {
-        assert_eq!(map_socket_to_url_candidate("wss://host:1234"), "https://host:1234");
+        assert_eq!(
+            map_socket_to_url_candidate("wss://host:1234"),
+            "https://host:1234"
+        );
     }
 
     #[test]
     fn map_tcp_to_http() {
-        assert_eq!(map_socket_to_url_candidate("tcp://host:8080"), "http://host:8080");
+        assert_eq!(
+            map_socket_to_url_candidate("tcp://host:8080"),
+            "http://host:8080"
+        );
     }
 
     #[test]
     fn map_tls_to_https() {
-        assert_eq!(map_socket_to_url_candidate("tls://host:8443"), "https://host:8443");
+        assert_eq!(
+            map_socket_to_url_candidate("tls://host:8443"),
+            "https://host:8443"
+        );
     }
 
     #[test]
     fn map_tls_insecure_to_https() {
-        assert_eq!(map_socket_to_url_candidate("tls-insecure://host:8443"), "https://host:8443");
+        assert_eq!(
+            map_socket_to_url_candidate("tls-insecure://host:8443"),
+            "https://host:8443"
+        );
     }
 
     #[test]
@@ -132,17 +147,26 @@ mod tests {
 
     #[test]
     fn map_http_passthrough() {
-        assert_eq!(map_socket_to_url_candidate("http://example.com"), "http://example.com");
+        assert_eq!(
+            map_socket_to_url_candidate("http://example.com"),
+            "http://example.com"
+        );
     }
 
     #[test]
     fn map_https_passthrough() {
-        assert_eq!(map_socket_to_url_candidate("https://example.com"), "https://example.com");
+        assert_eq!(
+            map_socket_to_url_candidate("https://example.com"),
+            "https://example.com"
+        );
     }
 
     #[test]
     fn map_bare_host_defaults_to_https() {
-        assert_eq!(map_socket_to_url_candidate("example.com:443"), "https://example.com:443");
+        assert_eq!(
+            map_socket_to_url_candidate("example.com:443"),
+            "https://example.com:443"
+        );
     }
 
     #[test]

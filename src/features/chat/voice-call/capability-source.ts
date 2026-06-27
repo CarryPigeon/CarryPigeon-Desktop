@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invokeTauri } from "@/shared/tauri/invokeClient";
+import { safeListen } from "@/shared/tauri/events";
 import { clonePlainData } from "@/shared/utils/clonePlainData";
 import { createWatchedSnapshotObserver } from "@/shared/utils/createWatchedSnapshotObserver";
 import type { VoiceCallCapabilities, VoiceCallSnapshot } from "./api-types";
@@ -93,7 +93,7 @@ export function createVoiceCallCapabilitySource(): VoiceCallCapabilities {
 
     async startDirectCall(targetUserId: string): Promise<CallSession> {
       const sessionId = generateId();
-      const wire = await invoke<CallSessionWire>("start_direct_call", {
+      const wire = await invokeTauri<CallSessionWire>("start_direct_call", {
         session_id: sessionId,
         target_user_id: targetUserId,
         room_id: generateId(),
@@ -103,7 +103,7 @@ export function createVoiceCallCapabilitySource(): VoiceCallCapabilities {
 
     async startConference(): Promise<CallSession> {
       const sessionId = generateId();
-      const wire = await invoke<CallSessionWire>("start_conference", {
+      const wire = await invokeTauri<CallSessionWire>("start_conference", {
         session_id: sessionId,
         room_id: generateId(),
       });
@@ -113,47 +113,47 @@ export function createVoiceCallCapabilitySource(): VoiceCallCapabilities {
     async acceptCall(): Promise<void> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      await invoke("accept_call", { session_id: session.sessionId });
+      await invokeTauri("accept_call", { session_id: session.sessionId });
     },
 
     async rejectCall(reason?: string): Promise<void> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      await invoke("reject_call", { session_id: session.sessionId, reason: reason ?? null });
+      await invokeTauri("reject_call", { session_id: session.sessionId, reason: reason ?? null });
     },
 
     async hangup(): Promise<void> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      await invoke("hangup_call", { session_id: session.sessionId });
+      await invokeTauri("hangup_call", { session_id: session.sessionId });
     },
 
     async toggleMute(): Promise<boolean> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      return invoke<boolean>("toggle_mute", { session_id: session.sessionId });
+      return invokeTauri<boolean>("toggle_mute", { session_id: session.sessionId });
     },
 
     async toggleNoiseSuppression(): Promise<boolean> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      return invoke<boolean>("toggle_noise_suppression", { session_id: session.sessionId });
+      return invokeTauri<boolean>("toggle_noise_suppression", { session_id: session.sessionId });
     },
 
     async selectInputDevice(deviceId: string): Promise<void> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      await invoke("select_input_device", { session_id: session.sessionId, device_id: deviceId });
+      await invokeTauri("select_input_device", { session_id: session.sessionId, device_id: deviceId });
     },
 
     async selectOutputDevice(deviceId: string): Promise<void> {
       const session = activeSession.value;
       if (!session) throw new Error("No active call session");
-      await invoke("select_output_device", { session_id: session.sessionId, device_id: deviceId });
+      await invokeTauri("select_output_device", { session_id: session.sessionId, device_id: deviceId });
     },
 
     async connectSignaling(wsUrl: string, accessToken: string): Promise<void> {
-      await invoke("connect_signaling", {
+      await invokeTauri("connect_signaling", {
         ws_url: wsUrl,
         access_token: accessToken,
         user_id: currentChatUserId.value,
@@ -162,16 +162,16 @@ export function createVoiceCallCapabilitySource(): VoiceCallCapabilities {
     },
 
     async joinConference(sessionId: string): Promise<CallSession> {
-      const wire = await invoke<CallSessionWire>("join_conference", { session_id: sessionId });
+      const wire = await invokeTauri<CallSessionWire>("join_conference", { session_id: sessionId });
       return mapCallSessionWire(wire);
     },
 
     async leaveConference(sessionId: string): Promise<void> {
-      await invoke("leave_conference", { session_id: sessionId });
+      await invokeTauri("leave_conference", { session_id: sessionId });
     },
 
     async listenForIncomingCalls(): Promise<() => void> {
-      return listen<{
+      return safeListen<{
         session_id: string;
         call_kind: string;
         from_user_id: string;

@@ -16,7 +16,9 @@
         >
           <t-icon name="close" />
         </button>
-        <span class="voice-call-panel__toggle">{{ minimized ? "▲" : "▼" }}</span>
+        <span class="voice-call-panel__toggle">
+          <t-icon :name="minimized ? 'chevron-up' : 'chevron-down'" />
+        </span>
       </div>
 
       <div v-if="!minimized && isConference && participants.length > 0" class="voice-call-panel__roster">
@@ -237,7 +239,9 @@ const formattedDuration = computed(() => {
   }
 
   &__toggle {
-    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
     color: var(--cp-text-light);
   }
 

@@ -6,6 +6,7 @@
 
 import { ref, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import StickerPickerPanel from "./StickerPickerPanel.vue";
 
 const props = defineProps<{
@@ -31,8 +32,9 @@ const popupVisible = ref(false);
 function onPopupVisibleChange(visible: boolean): void {
   popupVisible.value = visible;
   if (visible) {
+    if (_popupFixTimer !== null) clearInterval(_popupFixTimer);
     // 防止 popup 超出视口顶部被 Windows 窗口栏遮挡
-    _popupFixTimer = setInterval(() => {
+    const timer = setInterval(() => {
       const popup = document.querySelector('[data-td-popup] > .t-popup__content');
       if (!popup) return;
       const rect = popup.getBoundingClientRect();
@@ -44,9 +46,11 @@ function onPopupVisibleChange(visible: boolean): void {
         }
       }
     }, 100);
+    _popupFixTimer = timer;
+    const stopTimer = timer;
     setTimeout(() => {
-      if (_popupFixTimer !== null) {
-        clearInterval(_popupFixTimer);
+      clearInterval(stopTimer);
+      if (_popupFixTimer === stopTimer) {
         _popupFixTimer = null;
       }
     }, 3000);
@@ -76,7 +80,7 @@ function onEmojiSelect(emoji: string): void {
     }"
   >
     <button class="cp-stickerBtn" type="button">
-      <span class="cp-stickerBtn__icon">😊</span>
+      <span class="cp-stickerBtn__icon"><AppIcon name="smile" :size="16" /></span>
       <span class="cp-stickerBtn__text">{{ t("emoji") || "表情" }}</span>
     </button>
     <template #content>
@@ -110,8 +114,11 @@ function onEmojiSelect(emoji: string): void {
 }
 
 .cp-stickerBtn__icon {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  color: var(--cp-text);
 }
 
 .cp-stickerBtn__text {

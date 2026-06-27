@@ -8,7 +8,7 @@
  * - `mock/` 提供内存实现，供本地预览与测试隔离。
  */
 
-import type { AppSettings, AppTheme } from "../types/SettingsTypes";
+import type { AppAccent, AppSettings, AppTheme } from "../types/SettingsTypes";
 
 /**
  * settings 领域端口。
@@ -23,4 +23,9 @@ export interface SettingsPort {
    * 更新当前应用主题。
    */
   setTheme(theme: AppTheme): Promise<void>;
+
+  /**
+   * 更新当前应用强调色（accent）。
+   */
+  setAccent(accent: AppAccent): Promise<void>;
 }

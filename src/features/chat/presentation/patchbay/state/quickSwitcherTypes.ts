@@ -4,7 +4,7 @@
  */
 
 export type QuickSwitcherItem = {
-  kind: "server" | "channel" | "module" | "route";
+  kind: "server" | "channel" | "module" | "route" | "next_unread";
   id: string;
   title: string;
   subtitle: string;

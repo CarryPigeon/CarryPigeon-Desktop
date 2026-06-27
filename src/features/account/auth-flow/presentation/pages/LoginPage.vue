@@ -5,6 +5,7 @@
  */
 
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import {
   authConnectionDetail as connectionDetail,
   authConnectionPhase as connectionPhase,
@@ -20,6 +21,7 @@ import { useLoginHotkeys } from "@/features/account/auth-flow/presentation/compo
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const router = useRouter();
+const { t } = useI18n();
 
 const { email, code, sending, loggingIn, banner, countdown, clearBanner, handleSendCode, handleLogin } = useLoginEmailAuth({
   router,
@@ -103,7 +105,7 @@ useLoginHotkeys(router);
               <MonoTag :value="serverInfo?.serverId || '—'" title="server_id" :copyable="true" />
             </div>
             <div class="cp-login__transportHint">
-              server_id is required for plugin isolation. If missing, Plugin Center will be disabled.
+              {{ t("login_server_id_hint") }}
             </div>
           </div>
         </div>
@@ -112,7 +114,7 @@ useLoginHotkeys(router);
           <div class="cp-login__monoBlock">
             <div class="cp-login__monoTitle">Tip</div>
             <div class="cp-login__monoText">
-              In mock mode, any email + code works — unless required modules are missing. Install them via the Power Latch.
+              {{ t("login_tip_power_latch") }}
             </div>
           </div>
           <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">Open Server Manager</button>
@@ -151,6 +153,13 @@ useLoginHotkeys(router);
             <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
               {{ loggingIn ? "Signing in…" : "Sign In / Register" }}
             </button>
+
+            <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
+              <span style="font-size: 12px; color: var(--cp-text-muted);">Don't have an account?</span>
+              <button class="cp-login__ghost" type="button" @click="$router.push('/register')" style="margin-top: 6px;">
+                Register
+              </button>
+            </div>
 
             <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
           </div>

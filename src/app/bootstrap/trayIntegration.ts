@@ -12,30 +12,19 @@
  */
 
 import { watch, type WatchStopHandle } from "vue";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invokeTauri, TAURI_COMMANDS } from "@/shared/tauri";
+import { safeListen } from "@/shared/tauri/events";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import { IS_MOCK_ENABLED } from "@/shared/config/runtime";
 import { createLogger } from "@/shared/utils/logger";
 import { getStoredLocale } from "@/shared/utils/locale";
-import { decideNotification } from "@/features/chat/message-flow/domain/usecases/notificationDecider";
-import { sendDesktopNotification } from "@/features/chat/message-flow/domain/usecases/notificationSender";
+import { decideNotification, sendDesktopNotification, getChatCapabilities } from "@/features/chat/public/api";
 import { getNotificationCapabilities } from "@/features/notifications/api";
 import { playNotificationSound } from "@/shared/utils/notificationSound";
-import type { UnreadMessagePreview } from "@/features/chat/public/api-types";
-import type { ChatMessage } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage } from "@/features/chat/public/api-types";
 
 const logger = createLogger("trayIntegration");
-
-let chatPromise: Promise<unknown> | null = null;
-
-async function getChatLazy() {
-  if (!chatPromise) {
-    chatPromise = import("@/features/chat/public/api").then((m) => m.getChatCapabilities());
-  }
-  return chatPromise;
-}
 
 // ============ 托盘未读闪烁 ============
 
@@ -48,18 +37,16 @@ export function registerTrayUnreadBridge(): WatchStopHandle | null {
   let lastState: boolean | null = null;
   let innerStop: WatchStopHandle | null = null;
 
-  void getChatLazy().then((raw) => {
-    const chat = raw as { session: { directory: { totalUnreadCount: { value: number } } } };
-    innerStop = watch(
-      () => chat.session.directory.totalUnreadCount.value > 0,
-      (hasUnread) => {
-        if (hasUnread === lastState) return;
-        lastState = hasUnread;
-        void setTrayUnreadFlashing(hasUnread);
-      },
-      { immediate: true },
-    );
-  });
+  const chat = getChatCapabilities();
+  innerStop = watch(
+    () => chat.session.directory.totalUnreadCount.value > 0,
+    (hasUnread) => {
+      if (hasUnread === lastState) return;
+      lastState = hasUnread;
+      void setTrayUnreadFlashing(hasUnread);
+    },
+    { immediate: true },
+  );
 
   return () => {
     innerStop?.();
@@ -94,17 +81,10 @@ export function registerTrayHoverBridge(): (() => void) | null {
 
   const unlisteners: (() => void)[] = [];
 
-  void getChatLazy().then(async (raw) => {
-    const chat = raw as {
-      getUnreadMessagePreviews(maxCount: number): UnreadMessagePreview[];
-      session: {
-        currentChannel: {
-          selectChannel(channelId: string): Promise<unknown>;
-        };
-      };
-    };
+  void (async () => {
+    const chat = getChatCapabilities();
 
-    const unlistenHover = await listen<{ x: number; y: number }>("tray-hover-settled", async (event) => {
+    const unlistenHover = await safeListen<{ x: number; y: number }>("tray-hover-settled", async (event) => {
       const previews = chat.getUnreadMessagePreviews(4);
       if (previews.length === 0) return;
 
@@ -125,7 +105,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
     });
     unlisteners.push(unlistenHover);
 
-    const unlistenJump = await listen<{ channelId: string }>("jump-to-channel", async (event) => {
+    const unlistenJump = await safeListen<{ channelId: string }>("jump-to-channel", async (event) => {
       try {
         await chat.session.currentChannel.selectChannel(event.payload.channelId);
       } catch (err) {
@@ -133,7 +113,7 @@ export function registerTrayHoverBridge(): (() => void) | null {
       }
     });
     unlisteners.push(unlistenJump);
-  });
+  })();
 
   return () => {
     for (const unlisten of unlisteners) {

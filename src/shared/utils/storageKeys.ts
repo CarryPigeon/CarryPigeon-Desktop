@@ -45,6 +45,12 @@ export const KEY_THEME = "carrypigeon:theme";
 
 /**
  * @constant
+ * @description 强调色（accent）持久化 key（全局）。与主题解耦，承载品牌色。
+ */
+export const KEY_ACCENT = "carrypigeon:accent";
+
+/**
+ * @constant
  * @description 应用语言 key（全局）。
  */
 export const KEY_APP_LOCALE = "carrypigeon:appLocale";

@@ -1,5 +1,6 @@
 import { ref, watch, readonly, computed, onUnmounted } from "vue";
 import type { CallState, CallSession, AudioDeviceInfo, CallParticipant, CallSummary } from "../../domain/contracts";
+import { useRingtone } from "./useRingtone";
 
 export interface UseVoiceCallOptions {
   statePort: {
@@ -33,6 +34,35 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   const duration = ref(0);
   const isMuted = ref(false);
   const isNoiseSuppressionOn = ref(true);
+  const ringtone = useRingtone();
+  const ringStartedAt = ref<number>(0);
+  const ringTimeoutMs = 60_000;
+  const ringRemainingSecs = ref<number>(ringTimeoutMs / 1000);
+  let ringCountdownTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startRingCountdown(): void {
+    if (ringCountdownTimer) return;
+    ringStartedAt.value = Date.now();
+    ringRemainingSecs.value = ringTimeoutMs / 1000;
+    ringCountdownTimer = setInterval(() => {
+      const elapsed = Date.now() - ringStartedAt.value;
+      const remaining = Math.max(0, Math.ceil((ringTimeoutMs - elapsed) / 1000));
+      ringRemainingSecs.value = remaining;
+      if (remaining <= 0 && ringCountdownTimer) {
+        clearInterval(ringCountdownTimer);
+        ringCountdownTimer = null;
+      }
+    }, 500);
+  }
+
+  function stopRingCountdown(): void {
+    if (ringCountdownTimer) {
+      clearInterval(ringCountdownTimer);
+      ringCountdownTimer = null;
+    }
+    ringRemainingSecs.value = ringTimeoutMs / 1000;
+    ringStartedAt.value = 0;
+  }
 
   let timerHandle: ReturnType<typeof setInterval> | null = null;
   let pollHandle: ReturnType<typeof setInterval> | null = null;
@@ -74,6 +104,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     activeSession.value = session;
     participants.value = session.participants;
     startPoll();
+    ringtone.play();
+    startRingCountdown();
   }
 
   /** 外部状态变更同步（被动更新本地状态） */
@@ -85,6 +117,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
       activeSession.value = session;
       stopTimer();
       stopPoll();
+      ringtone.stop();
+      stopRingCountdown();
       activeSummary.value = {
         sessionId: session.sessionId,
         kind: session.kind,
@@ -100,22 +134,30 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
       activeSession.value = session;
       participants.value = session.participants;
       isMuted.value = session.participants.find(p => p.userId === userId())?.isMuted ?? false;
+      if (state === "active" || state === "idle" || state === "connecting") {
+        ringtone.stop();
+        stopRingCountdown();
+      }
     }
   }
 
   async function startDirectCall(targetUserId: string): Promise<CallSession> {
     callState.value = "dialing";
-    startPoll();
     const session = await statePort.startCall("direct", roomId(), targetUserId);
     activeSession.value = session;
+    startPoll();
+    ringtone.play();
+    startRingCountdown();
     return session;
   }
 
   async function startConference(): Promise<CallSession> {
     callState.value = "dialing";
-    startPoll();
     const session = await statePort.startCall("conference", roomId());
     activeSession.value = session;
+    startPoll();
+    ringtone.play();
+    startRingCountdown();
     return session;
   }
 
@@ -123,8 +165,10 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     const session = activeSession.value;
     if (!session) return;
     callState.value = "connecting";
-    startPoll();
     await statePort.acceptCall(session.sessionId);
+    startPoll();
+    ringtone.stop();
+    stopRingCountdown();
   }
 
   async function rejectCall(reason?: string): Promise<void> {
@@ -134,6 +178,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     await statePort.rejectCall(session.sessionId, reason);
     stopTimer();
     stopPoll();
+    ringtone.stop();
+    stopRingCountdown();
     activeSummary.value = {
       sessionId: session.sessionId,
       kind: session.kind,
@@ -157,6 +203,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     await statePort.cancelCall(session.sessionId);
     stopTimer();
     stopPoll();
+    ringtone.stop();
+    stopRingCountdown();
     activeSummary.value = {
       sessionId: session.sessionId,
       kind: session.kind,
@@ -280,6 +328,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     callState.value = session.state;
     activeSession.value = session;
     startPoll();
+    ringtone.stop();
+    stopRingCountdown();
     return session;
   }
 
@@ -290,6 +340,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     await statePort.leaveConference(session.sessionId);
     stopTimer();
     stopPoll();
+    ringtone.stop();
+    stopRingCountdown();
     activeSummary.value = {
       sessionId: session.sessionId,
       kind: session.kind,
@@ -319,6 +371,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   onUnmounted(() => {
     stopTimer();
     stopPoll();
+    stopRingCountdown();
+    ringtone.stop();
   });
 
   return {
@@ -331,6 +385,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     inputDevices: readonly(inputDevices),
     outputDevices: readonly(outputDevices),
     activeSummary: readonly(activeSummary),
+    ringRemainingSecs: readonly(ringRemainingSecs),
+    ringTimeoutMs,
 
     connectSignaling,
     startDirectCall,
@@ -351,5 +407,6 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     isConferenceHost,
     onIncomingCall,
     syncState,
+    setRingtoneAudio: ringtone.setAudioElement,
   };
 }

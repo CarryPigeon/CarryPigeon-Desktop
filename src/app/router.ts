@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { LoginPage, RequiredSetupPage, UserInfoPage } from '@/features/account/routes';
+import { LoginPage, RegisterPage, RequiredSetupPage, UserInfoPage } from '@/features/account/routes';
 import { ChatMainPage, ChannelInfoPage, ChannelMembersPage, JoinApplicationsPage, ChannelBansPage } from '@/features/chat/public/routes';
 import { PluginCenterPage, DomainCatalogPage, PluginDetailPage } from '@/features/plugins/routes';
 import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
@@ -24,6 +24,7 @@ const router = createRouter({
     // 核心页面 —— 较快展示
     { path: '/chat', component: ChatMainPage, name: 'chat' },
     { path: '/login', component: LoginPage, name: 'login' },
+    { path: '/register', component: RegisterPage, name: 'register' },
     { path: '/required-setup', component: RequiredSetupPage, name: 'required-setup' },
     { path: '/user-info', component: UserInfoPage, name: 'user-info' },
     // 功能页面

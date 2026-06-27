@@ -8,6 +8,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useFocusTrap } from "@/shared/utils/useFocusTrap";
 import { createLogger } from "@/shared/utils/logger";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const logger = createLogger("ImageLightbox");
 const { t } = useI18n();
@@ -306,7 +307,7 @@ watch(
             title="Rotate 90°"
             @click="rotateClockwise"
           >
-            ↻
+            <t-icon name="refresh" />
           </button>
           <button
             v-if="currentImage?.url"
@@ -317,7 +318,7 @@ watch(
             :disabled="isDownloading"
             @click="downloadImage"
           >
-            {{ isDownloading ? "⋯" : "↓" }}
+            <t-icon :name="isDownloading ? 'loading' : 'download'" />
           </button>
           <button
             class="cp-lightbox__closeBtn"
@@ -325,7 +326,7 @@ watch(
             aria-label="Close lightbox"
             @click="close"
           >
-            ×
+            <t-icon name="close" />
           </button>
         </div>
       </div>
@@ -340,7 +341,7 @@ watch(
           aria-label="Previous image"
           @click="prev"
         >
-          ‹
+          <t-icon name="chevron-left" />
         </button>
 
         <!-- 媒体容器 -->
@@ -381,7 +382,7 @@ watch(
           aria-label="Next image"
           @click="next"
         >
-          ›
+          <t-icon name="chevron-right" />
         </button>
       </div>
 
@@ -406,14 +407,14 @@ watch(
       <!-- 底部提示栏 -->
       <div class="cp-lightbox__hintBar">
         <template v-if="isVideo">
-          <span>▶ {{ t("video_playing") }}</span>
-          <span>← → {{ t("navigate") }}</span>
+          <span><AppIcon name="play" :size="11" :stroke-width="2" /> {{ t("video_playing") }}</span>
+          <span><AppIcon name="arrow-left-key" :size="11" :stroke-width="2" /> <AppIcon name="arrow-right-key" :size="11" :stroke-width="2" /> {{ t("navigate") }}</span>
         </template>
         <template v-else>
-          <span>🖱 {{ t("scroll_to_zoom") }}</span>
-          <span>🖐 {{ t("drag_to_pan") }}</span>
-          <span>↻ {{ t("r_to_rotate") }}</span>
-          <span>← → {{ t("navigate") }}</span>
+          <span><AppIcon name="circle-dot" :size="11" :stroke-width="2" /> {{ t("scroll_to_zoom") }}</span>
+          <span><AppIcon name="hand" :size="11" :stroke-width="2" /> {{ t("drag_to_pan") }}</span>
+          <span><AppIcon name="rotate-cw" :size="11" :stroke-width="2" /> {{ t("r_to_rotate") }}</span>
+          <span><AppIcon name="arrow-left-key" :size="11" :stroke-width="2" /> <AppIcon name="arrow-right-key" :size="11" :stroke-width="2" /> {{ t("navigate") }}</span>
         </template>
       </div>
     </div>
@@ -476,7 +477,7 @@ watch(
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
   transition: background 120ms ease;
 }
@@ -500,7 +501,7 @@ watch(
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
   transition: background 120ms ease;
 }
@@ -551,7 +552,7 @@ watch(
   border: none;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  font-size: 40px;
+  font-size: 24px;
   width: 48px;
   height: 80px;
   display: grid;
@@ -629,6 +630,13 @@ watch(
   pointer-events: none;
   opacity: 0;
   transition: opacity 300ms ease;
+  align-items: center;
+}
+
+.cp-lightbox__hintBar span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .cp-lightbox__backdrop:hover .cp-lightbox__hintBar {

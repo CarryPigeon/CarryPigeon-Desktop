@@ -1,7 +1,17 @@
 <script setup lang="ts">
+/**
+ * @fileoverview 频道右键菜单｜频道设置/通知级别/定时静音子菜单。
+ * @description chat｜presentation component：频道右键菜单。
+ */
 import { useI18n } from "vue-i18n";
 import type { ChannelContextAction } from "@/features/chat/presentation/patchbay/interactions/useChannelContextMenu";
 import type { NotificationLevel } from "@/features/chat/presentation/patchbay/view-models/useChannelMuteStore";
+import {
+  MUTE_DURATION_1H,
+  MUTE_DURATION_8H,
+  MUTE_DURATION_24H,
+  MUTE_DURATION_FOREVER,
+} from "@/features/chat/presentation/patchbay/view-models/useChannelMuteStore";
 
 const props = defineProps<{
   open: boolean;
@@ -21,6 +31,13 @@ const levels: { key: NotificationLevel; labelKey: string }[] = [
   { key: "all", labelKey: "notif_level_all" },
   { key: "mentions_only", labelKey: "notif_level_mentions_only" },
   { key: "muted", labelKey: "notif_level_muted" },
+];
+
+const muteDurations: { key: ChannelContextAction; labelKey: string }[] = [
+  { key: `mute_for:${MUTE_DURATION_1H}`, labelKey: "mute_for_1h" },
+  { key: `mute_for:${MUTE_DURATION_8H}`, labelKey: "mute_for_8h" },
+  { key: `mute_for:${MUTE_DURATION_24H}`, labelKey: "mute_for_24h" },
+  { key: `mute_for:${MUTE_DURATION_FOREVER}`, labelKey: "mute_for_manual" },
 ];
 
 function onAction(action: ChannelContextAction): void {
@@ -57,6 +74,17 @@ function onAction(action: ChannelContextAction): void {
       >
         <span class="cp-contextMenu__radio" :class="{ 'cp-contextMenu__radio--checked': notificationLevel === lv.key }" />
         {{ t(lv.labelKey) }}
+      </button>
+      <div class="cp-contextMenu__sep" />
+      <div class="cp-contextMenu__label">{{ t("mute_for") }}</div>
+      <button
+        v-for="d in muteDurations"
+        :key="d.key"
+        class="cp-contextMenu__item"
+        type="button"
+        @click="onAction(d.key)"
+      >
+        {{ t(d.labelKey) }}
       </button>
     </div>
     <div v-if="open" class="cp-contextMenu__backdrop" @click="emit('close')" />

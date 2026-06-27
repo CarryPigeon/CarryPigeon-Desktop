@@ -5,8 +5,8 @@ use std::sync::Mutex;
 
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use super::capture::{capture_all_screens, ScreenCapture};
-use crate::shared::error::{command_error, CommandResult};
+use super::capture::{ScreenCapture, capture_all_screens};
+use crate::shared::error::{CommandResult, command_error};
 
 /// 截图数据缓存状态：从 `start_screenshot` 暂存，供遮罩窗口 `get_screenshot_data` 取用。
 pub struct ScreenshotCaptureState(pub Mutex<Option<Vec<ScreenCapture>>>);
@@ -18,23 +18,22 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
     tracing::info!(action = "screenshot_start", hide_window = hide_window);
 
     // 1. 隐藏主窗口（可选）
-    if hide_window
-        && let Some(main_window) = app.get_webview_window("main") {
-            main_window
-                .hide()
-                .map_err(|e| command_error("SCREENSHOT_HIDE_WINDOW_FAIL", &e.to_string()))?;
+    if hide_window && let Some(main_window) = app.get_webview_window("main") {
+        main_window
+            .hide()
+            .map_err(|e| command_error("SCREENSHOT_HIDE_WINDOW_FAIL", &e.to_string()))?;
 
-            // 轮询等待窗口完全隐藏（最多 100ms）
-            for _ in 0..20 {
-                if !main_window
-                    .is_visible()
-                    .map_err(|e| command_error("SCREENSHOT_VISIBLE_FAIL", &e.to_string()))?
-                {
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        // 轮询等待窗口完全隐藏（最多 100ms）
+        for _ in 0..20 {
+            if !main_window
+                .is_visible()
+                .map_err(|e| command_error("SCREENSHOT_VISIBLE_FAIL", &e.to_string()))?
+            {
+                break;
             }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
         }
+    }
 
     // 2. 先打开遮罩窗口（让用户立即看到 loading 界面）
     let url = WebviewUrl::App("index.html?window=screenshot-overlay".into());
@@ -62,10 +61,9 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
         Err(e) => {
             // 失败时关闭遮罩、恢复主窗口
             let _ = window.close();
-            if hide_window
-                && let Some(main_window) = app.get_webview_window("main") {
-                    let _ = main_window.show();
-                }
+            if hide_window && let Some(main_window) = app.get_webview_window("main") {
+                let _ = main_window.show();
+            }
             return Err(command_error("SCREENSHOT_CAPTURE_FAIL", &e));
         }
     };
@@ -92,9 +90,7 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
 
 /// 遮罩窗口调用：获取截图数据（取走后缓存即清除）。
 #[tauri::command]
-pub async fn get_screenshot_data(
-    app: AppHandle,
-) -> CommandResult<Vec<ScreenCapture>> {
+pub async fn get_screenshot_data(app: AppHandle) -> CommandResult<Vec<ScreenCapture>> {
     if let Some(state) = app.try_state::<ScreenshotCaptureState>() {
         let mut guard = state
             .0
@@ -149,7 +145,6 @@ pub async fn finish_screenshot(app: AppHandle, data: Vec<u8>) -> CommandResult<S
 
     // 5. 清理临时截图文件（best-effort）
     let _ = std::fs::remove_dir_all(app_data.join("temp-screenshots"));
-
 
     Ok(path_str)
 }

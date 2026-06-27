@@ -224,11 +224,16 @@ onBeforeUnmount(() => {
       <ServerRail
         :racks="page.serverRail.racks"
         :active-socket="page.serverRail.activeSocket"
+        :server-muted="page.serverRail.serverMuted"
+        :server-muted-until="page.serverRail.serverMutedUntil"
         @switch="page.serverRail.handleSwitchServer"
         @open-servers="page.serverRail.handleOpenServers"
         @open-plugins="page.serverRail.goPlugins"
         @open-settings="page.serverRail.handleOpenSettings"
         @open-files="page.serverRail.handleOpenFiles"
+        @toggle-server-mute="page.serverRail.toggleServerMute"
+        @mute-server-for-duration="(durationMs) => page.serverRail.muteServerForDuration(durationMs)"
+        @unmute-server="page.serverRail.unmuteServer"
       />
 
       <button

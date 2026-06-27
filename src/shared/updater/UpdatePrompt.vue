@@ -4,7 +4,7 @@
  * @description 检测到新版本时提示用户，点击跳转 GitHub Releases 手动下载。
  */
 import { useI18n } from 'vue-i18n';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeTauri } from '@/shared/tauri/invokeClient';
 const { t } = useI18n();
 
 const props = defineProps<{
@@ -17,7 +17,7 @@ const emit = defineEmits<{
 }>();
 
 function handleOpenRelease(): void {
-  invoke('plugin:opener|open_url', { url: props.releaseUrl }).catch(() => {
+  void invokeTauri('plugin:opener|open_url', { url: props.releaseUrl }).catch(() => {
     window.open(props.releaseUrl, '_blank');
   });
   emit('dismiss');
@@ -27,7 +27,7 @@ function handleOpenRelease(): void {
 <template>
   <div class="update-prompt-overlay">
     <div class="update-prompt-card">
-      <div class="update-prompt-icon">🔄</div>
+      <div class="update-prompt-icon"><t-icon name="refresh" size="40" /></div>
       <h3 class="update-prompt-title">{{ t('updater_new_version', { version: props.version }) }}</h3>
       <p class="update-prompt-body">{{ t('updater_manual_hint') }}</p>
       <div class="update-prompt-actions">
@@ -74,7 +74,10 @@ function handleOpenRelease(): void {
 }
 
 .update-prompt-icon {
-  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-accent);
   margin-bottom: 16px;
 }
 

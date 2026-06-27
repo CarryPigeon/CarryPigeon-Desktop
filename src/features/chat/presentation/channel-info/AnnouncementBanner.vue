@@ -32,7 +32,7 @@ const summary = computed(() => {
     <span v-if="hasUnread" class="cp-annBanner__dot" />
     <span class="cp-annBanner__text">{{ summary }}</span>
     <button class="cp-annBanner__btn" @click="emit('viewDetail')">{{ t('view_detail') }}</button>
-    <button class="cp-annBanner__close" @click="emit('dismiss')">✕</button>
+    <button class="cp-annBanner__close" @click="emit('dismiss')"><t-icon name="close" /></button>
   </div>
 </template>
 
@@ -71,11 +71,14 @@ const summary = computed(() => {
   flex-shrink: 0;
 }
 .cp-annBanner__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--cp-text-muted);
   cursor: pointer;
   padding: 2px;
-  font-size: 12px;
+  font-size: 13px;
 }
 </style>

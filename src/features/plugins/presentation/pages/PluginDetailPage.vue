@@ -156,9 +156,9 @@ onMounted(handleMounted);
           </div>
         </div>
         <div class="cp-plugin-detail__badges">
-          <LabelBadge v-if="plugin?.required" variant="required" label="REQUIRED" />
-          <LabelBadge v-if="hasUpdate" variant="update" label="UPDATE" />
-          <LabelBadge v-if="installed?.status === 'failed'" variant="failed" label="FAILED" />
+          <LabelBadge v-if="plugin?.required" variant="required" :label="t('badge_required')" />
+          <LabelBadge v-if="hasUpdate" variant="update" :label="t('badge_update')" />
+          <LabelBadge v-if="installed?.status === 'failed'" variant="failed" :label="t('badge_failed')" />
         </div>
       </header>
 

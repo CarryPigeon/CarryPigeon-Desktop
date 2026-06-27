@@ -142,9 +142,10 @@ where
         return config_usecases::update_config_bool(key, boolean, adapter).await;
     }
     if let Some(number) = json.as_u64()
-        && TypeId::of::<T>() == TypeId::of::<u32>() {
-            return config_usecases::update_config_u32(key, number as u32, adapter).await;
-        }
+        && TypeId::of::<T>() == TypeId::of::<u32>()
+    {
+        return config_usecases::update_config_u32(key, number as u32, adapter).await;
+    }
     if let Some(text) = json.as_str() {
         return config_usecases::update_config_string(key, text.to_string(), adapter).await;
     }

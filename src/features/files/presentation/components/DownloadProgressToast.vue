@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * @fileoverview DownloadProgressToast.vue
- * @description files｜下载进度提示组件。
+ * @description files｜下载进度提示组件。失败态展示「下载失败」并保留 taskId
+ *              以便调用方（行级按钮）触发续传。
  */
 
 import { computed } from "vue";
@@ -16,16 +17,27 @@ const currentTask = computed(() => {
   return getDownloadTasks().get(id) || null;
 });
 
-const show = computed(() => currentTask.value != null && (currentTask.value.status === "downloading" || currentTask.value.status === "pending"));
+const isActive = computed(() => {
+  const task = currentTask.value;
+  return task != null && (task.status === "downloading" || task.status === "pending");
+});
+
+const isError = computed(() => currentTask.value?.status === "error");
+
+const show = computed(() => currentTask.value != null && (isActive.value || isError.value));
 </script>
 
 <template>
   <Transition name="cp-toast">
-    <div v-if="show && currentTask" class="cp-downloadToast">
-      <span class="cp-downloadToast__icon">⬇</span>
-      <span class="cp-downloadToast__text">{{ t("file_downloading") }}</span>
-      <span class="cp-downloadToast__progress">{{ currentTask.progress }}%</span>
-      <div class="cp-downloadToast__bar">
+    <div v-if="show && currentTask" class="cp-downloadToast" :class="{ 'cp-downloadToast--error': isError }">
+      <span class="cp-downloadToast__icon">
+        <t-icon :name="isError ? 'close-circle' : 'download'" />
+      </span>
+      <span class="cp-downloadToast__text">
+        {{ isError ? t("download_failed") : t("file_downloading") }}
+      </span>
+      <span v-if="!isError" class="cp-downloadToast__progress">{{ currentTask.progress }}%</span>
+      <div v-if="!isError" class="cp-downloadToast__bar">
         <div class="cp-downloadToast__fill" :style="{ width: currentTask.progress + '%' }" />
       </div>
     </div>
@@ -49,10 +61,21 @@ const show = computed(() => currentTask.value != null && (currentTask.value.stat
   z-index: 9500;
   font-size: 12px;
   min-width: 200px;
+
+  &--error {
+    border-color: var(--cp-warning, #d97706);
+  }
 }
 
 .cp-downloadToast__icon {
+  display: inline-flex;
+  align-items: center;
   font-size: 14px;
+  color: var(--cp-accent);
+}
+
+.cp-downloadToast--error .cp-downloadToast__icon {
+  color: var(--cp-warning, #d97706);
 }
 
 .cp-downloadToast__text {
@@ -71,14 +94,14 @@ const show = computed(() => currentTask.value != null && (currentTask.value.stat
   width: 60px;
   height: 4px;
   background: var(--cp-panel-muted);
-  border-radius: 2px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
 .cp-downloadToast__fill {
   height: 100%;
   background: var(--cp-accent, #3b82f6);
-  border-radius: 2px;
+  border-radius: 4px;
   transition: width 0.3s ease;
 }
 

@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
 use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement, StatementBuilder, Value};
+use tokio::io::AsyncSeekExt;
 use tracing::warn;
 
 use crate::shared::db::{CPDatabase, sqlite_url_for_path};
@@ -126,13 +127,16 @@ impl TempFileManager {
     }
 
     /// 注册一个新的下载任务，创建 .part 文件并写入 SQLite 记录。
+    ///
+    /// 若已存在同名任务（按 `id`）的 .part 文件，则**追加**写入而非截断，
+    /// 返回文件句柄与已存在的字节数，供调用方判断是否可断点续传。
     pub async fn create_download(
         &self,
         id: &str,
         url: &str,
         mime_type: Option<&str>,
         total_size: u64,
-    ) -> anyhow::Result<tokio::fs::File> {
+    ) -> anyhow::Result<(tokio::fs::File, u64)> {
         let now = Self::now();
         let part = self.part_path(id);
 
@@ -152,10 +156,24 @@ impl TempFileManager {
             .await
             .context("Failed to insert temp_file metadata")?;
 
-        let file = tokio::fs::File::create(&part)
+        // 使用追加模式打开现有 .part 文件，保留已下载字节以支持断点续传。
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(true)
+            .open(&part)
             .await
-            .with_context(|| format!("Failed to create temp file: {}", part.display()))?;
-        Ok(file)
+            .with_context(|| format!("Failed to open temp file: {}", part.display()))?;
+        let existing = file
+            .metadata()
+            .await
+            .map(|m| m.len())
+            .with_context(|| format!("Failed to stat temp file: {}", part.display()))?;
+        if existing > 0 {
+            // seek 到文件末尾，避免 reopen 后位置不确定。
+            let _ = file.seek(std::io::SeekFrom::End(0)).await;
+        }
+        Ok((file, existing))
     }
 
     /// 更新下载进度（更新 SQLite 中的 downloaded 字段）。
@@ -360,5 +378,89 @@ impl TempFileManager {
     /// 获取 DB 连接引用（供 cleanup 等方法使用）。
     pub fn connection(&self) -> &sea_orm::DatabaseConnection {
         &self.db
+    }
+
+    /// 按 URL 查找未完成的下载任务（state=downloading 或 state=failed），返回 `(task_id, downloaded)`。
+    ///
+    /// 仅匹配 `namespace='downloads'` 且 `url` 完全相同的最新记录；
+    /// 若有多条，仅返回 `accessed_at` 最大的。
+    pub async fn lookup_incomplete_by_url(
+        &self,
+        url: &str,
+    ) -> anyhow::Result<Option<(String, u64)>> {
+        let sql = "SELECT id, downloaded FROM temp_files \
+                   WHERE namespace='downloads' AND url=$1 AND state IN ('downloading','failed') \
+                   ORDER BY accessed_at DESC LIMIT 1";
+        let rows = self
+            .db
+            .query_all(&RawStmt::with_values(
+                sql,
+                vec![Value::String(Some(url.to_string()))],
+            ))
+            .await
+            .context("Failed to query incomplete download")?;
+        if let Some(row) = rows.first() {
+            let id: String = row.try_get_by_index(0)?;
+            let downloaded: i64 = row.try_get_by_index(1)?;
+            return Ok(Some((id, downloaded.max(0) as u64)));
+        }
+        Ok(None)
+    }
+
+    /// 启动时清理未完成下载：删除 state=downloading/failed 的 .part 文件与元数据记录。
+    /// 重启后默认不续传。
+    pub async fn prune_incomplete_downloads(&self) -> anyhow::Result<usize> {
+        let sql = "SELECT id, file_path FROM temp_files \
+                   WHERE namespace='downloads' AND state IN ('downloading','failed')";
+        let rows = self
+            .db
+            .query_all(&RawStmt::raw(sql))
+            .await
+            .context("Failed to query incomplete downloads for prune")?;
+        let mut count = 0usize;
+        for row in &rows {
+            let id: String = match row.try_get_by_index(0) {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!(action = "db_temp_file_prune_id_read_failed", error = %e);
+                    continue;
+                }
+            };
+            let path: String = match row.try_get_by_index(1) {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!(action = "db_temp_file_prune_path_read_failed", error = %e);
+                    continue;
+                }
+            };
+            if let Err(e) = tokio::fs::remove_file(&path).await {
+                // .part 文件可能已被外部清理，记录但不阻断
+                tracing::debug!(
+                    action = "db_temp_file_prune_remove_part_failed",
+                    path = %path,
+                    error = %e
+                );
+            }
+            let del_sql = "DELETE FROM temp_files WHERE id=$1";
+            if let Err(e) = self
+                .db
+                .execute(&RawStmt::with_values(
+                    del_sql,
+                    vec![Value::String(Some(id.clone()))],
+                ))
+                .await
+            {
+                warn!(action = "db_temp_file_prune_delete_record_failed", id = %id, error = %e);
+                continue;
+            }
+            count += 1;
+        }
+        if count > 0 {
+            tracing::info!(
+                action = "db_temp_file_prune_incomplete_downloads",
+                removed = count
+            );
+        }
+        Ok(count)
     }
 }

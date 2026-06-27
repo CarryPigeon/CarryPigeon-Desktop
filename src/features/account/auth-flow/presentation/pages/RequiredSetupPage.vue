@@ -36,7 +36,7 @@ const {
     <ErrorBoundary>
       <header class="cp-required__banner" :data-ok="latchClosed" :data-just-closed="justClosedLatch">
         <div class="cp-required__title">
-          <span class="cp-required__mono">{{ latchClosed ? "POWER LATCH CLOSED" : "POWER LATCH OPEN" }}</span>
+          <span class="cp-required__mono">{{ latchClosed ? t("power_latch_label_closed") : t("power_latch_label_open") }}</span>
           <div class="cp-required__titleZh">{{ latchClosed ? t("power_latch_closed") : t("power_latch_open") }}</div>
         </div>
         <div class="cp-required__desc">
@@ -47,17 +47,17 @@ const {
             {{ t("required_setup_ready") }}
           </div>
           <div class="cp-required__socket">
-            <MonoTag :value="serverSocket || 'no-server'" title="server socket" :copyable="true" />
-            <MonoTag :value="serverId || 'missing-server_id'" title="server_id" :copyable="true" />
-            <LabelBadge v-if="!latchClosed" variant="required" label="BLOCKED" />
-            <LabelBadge v-else variant="info" label="READY" />
+            <MonoTag :value="serverSocket || t('plugins_no_server')" :title="t('server_socket_label')" :copyable="true" />
+            <MonoTag :value="serverId || t('plugins_missing_server_id')" :title="t('server_id_label')" :copyable="true" />
+            <LabelBadge v-if="!latchClosed" variant="required" :label="t('badge_blocked')" />
+            <LabelBadge v-else variant="info" :label="t('badge_ready')" />
           </div>
         </div>
         <div v-if="serverSocket && !serverId" class="cp-required__hint">
-          <div class="cp-required__hintTitle">Locked</div>
+          <div class="cp-required__hintTitle">{{ t("required_lock_title") }}</div>
           <div class="cp-required__hintTags">
-            <MonoTag value="missing server_id" />
-            <MonoTag value="plugins disabled" />
+            <MonoTag :value="t('required_lock_missing_server_id')" />
+            <MonoTag :value="t('required_lock_plugins_disabled')" />
           </div>
         </div>
         <div v-if="missingIdsHint.length > 0" class="cp-required__hint">
@@ -72,10 +72,10 @@ const {
         <div class="cp-required__bodyHead">
           <div class="cp-required__bodyTitle">{{ t("required_setup_title") }}</div>
           <div class="cp-required__bodyMeta">
-            <span class="cp-required__muted">missing</span>
+            <span class="cp-required__muted">{{ t("required_kv_missing") }}</span>
             <span class="cp-required__mono">{{ plugins.missingRequiredIds.value.length }}</span>
             <span class="cp-required__dot"></span>
-            <span class="cp-required__muted">required</span>
+            <span class="cp-required__muted">{{ t("required_kv_required") }}</span>
             <span class="cp-required__mono">{{ requiredEntries.length }}</span>
           </div>
         </div>
@@ -88,24 +88,24 @@ const {
               <div class="cp-required__itemLeft">
                 <div class="cp-required__itemName">{{ p.name }}</div>
                 <div class="cp-required__itemMeta">
-                  <MonoTag :value="p.pluginId" title="plugin_id" :copyable="true" />
+                  <MonoTag :value="p.pluginId" :title="t('server_id_label')" :copyable="true" />
                   <span class="cp-required__mini">{{ latestVersion(p) || "—" }}</span>
                 </div>
               </div>
               <div class="cp-required__itemBadges">
-                <LabelBadge variant="required" label="REQUIRED" />
+                <LabelBadge variant="required" :label="t('badge_required')" />
                 <LabelBadge
                   v-if="plugins.installedById.value[p.pluginId]?.status === 'failed'"
                   variant="failed"
-                  label="FAILED"
+                  :label="t('badge_failed')"
                 />
                 <LabelBadge
                   v-else-if="plugins.installedById.value[p.pluginId]?.enabled"
                   variant="info"
-                  label="ENABLED"
+                  :label="t('badge_enabled')"
                 />
-                <LabelBadge v-else-if="plugins.installedById.value[p.pluginId]?.currentVersion" variant="info" label="INSTALLED" />
-                <LabelBadge v-else variant="info" label="MISSING" />
+                <LabelBadge v-else-if="plugins.installedById.value[p.pluginId]?.currentVersion" variant="info" :label="t('badge_installed')" />
+                <LabelBadge v-else variant="info" :label="t('badge_missing')" />
               </div>
             </header>
 

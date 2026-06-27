@@ -357,9 +357,17 @@ export function connectChatWs(
    *
    * @returns 无返回值。
    */
+  let openHandler: (() => void) | null = null;
+  let closeHandler: (() => void) | null = null;
+  let errorHandler: (() => void) | null = null;
+
   function connect(): void {
     stopPing();
     if (ws) {
+      if (openHandler) ws.removeEventListener("open", openHandler);
+      ws.removeEventListener("message", handleMessage);
+      if (closeHandler) ws.removeEventListener("close", closeHandler);
+      if (errorHandler) ws.removeEventListener("error", errorHandler);
       try {
         ws.close();
       } catch {
@@ -369,24 +377,25 @@ export function connectChatWs(
 
     ws = new WebSocket(wsUrl);
 
-    ws.addEventListener("open", () => {
+    openHandler = () => {
       reconnectAttempt = 0;
       void sendAuth().catch((error) => {
         logger.warn("Action: chat_ws_auth_failed_last_event_load_failed", { wsUrl, error: String(error) });
       });
-    });
-
-    ws.addEventListener("message", handleMessage);
-
-    ws.addEventListener("close", () => {
+    };
+    closeHandler = () => {
       stopPing();
       logger.warn("Action: chat_ws_connection_closed", { wsUrl });
       scheduleReconnect();
-    });
-
-    ws.addEventListener("error", () => {
+    };
+    errorHandler = () => {
       logger.warn("Action: chat_ws_receive_failed", { wsUrl });
-    });
+    };
+
+    ws.addEventListener("open", openHandler);
+    ws.addEventListener("message", handleMessage);
+    ws.addEventListener("close", closeHandler);
+    ws.addEventListener("error", errorHandler);
   }
 
   connect();

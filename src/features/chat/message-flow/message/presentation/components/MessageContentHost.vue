@@ -10,6 +10,7 @@
 
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import UnknownDomainCard from "./UnknownDomainCard.vue";
 import ImageMessageBubble from "./ImageMessageBubble.vue";
 import VideoMessageBubble from "./VideoMessageBubble.vue";
@@ -207,7 +208,7 @@ function handleInstall(): void {
   <template v-else>
     <div class="cp-messageContent">
       <!-- 置顶标记 -->
-      <span v-if="isPinned" class="cp-pinBadge" :title="t('pinned_message')">📌</span>
+      <span v-if="isPinned" class="cp-pinBadge" :title="t('pinned_message')"><AppIcon name="pin" :size="12" :stroke-width="1.75" /></span>
       <!-- 语音消息（Voice:Message） -->
       <VoiceMessageBubble
       v-if="isVoiceMessage && voiceMessageData && voiceMessageData.shareKey"
@@ -344,7 +345,7 @@ function handleInstall(): void {
   position: relative;
 }
 
-/* 置顶标记（📌） */
+/* 置顶标记（pin 图标） */
 .cp-pinBadge {
   position: absolute;
   top: 4px;
@@ -352,5 +353,9 @@ function handleInstall(): void {
   font-size: 12px;
   user-select: none;
   pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-accent);
 }
 </style>

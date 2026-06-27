@@ -1,0 +1,23 @@
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+
+@mixin button-size($size) {
+  @if $size == "sm" {
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+  } @else if $size == "md" {
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+  } @else if $size == "lg" {
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+  } @else if $size == "pill" {
+    padding: 8px 14px;
+    font-size: 13px;
+    line-height: 1.4;
+  } @else {
+    @error "button-size: unknown size #{$size}";
+  }
+}

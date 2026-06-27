@@ -4,7 +4,8 @@
  */
 
 import { watch, type WatchStopHandle } from "vue";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { type UnlistenFn } from "@tauri-apps/api/event";
+import { safeListen } from "@/shared/tauri/events";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import { IS_MOCK_ENABLED } from "@/shared/config/runtime";
 import { createLogger } from "@/shared/utils/logger";
@@ -93,7 +94,7 @@ export function createTrayNotificationRuntime(
   async function startHoverListener(): Promise<() => void> {
     const unlisteners: UnlistenFn[] = [];
 
-    const unlistenHover = await listen<{ x: number; y: number }>("tray-hover-settled", async (event) => {
+    const unlistenHover = await safeListen<{ x: number; y: number }>("tray-hover-settled", async (event) => {
       const previews = deps.getUnreadPreviews(MAX_PREVIEW_COUNT);
       if (previews.length === 0) return;
 
@@ -105,7 +106,7 @@ export function createTrayNotificationRuntime(
     });
     unlisteners.push(unlistenHover);
 
-    const unlistenJump = await listen<{ channelId: string }>("jump-to-channel", async (event) => {
+    const unlistenJump = await safeListen<{ channelId: string }>("jump-to-channel", async (event) => {
       if (deps.selectChannel) {
         try {
           await deps.selectChannel(event.payload.channelId);

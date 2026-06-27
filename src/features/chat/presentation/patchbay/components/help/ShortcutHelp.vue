@@ -112,7 +112,7 @@ const metaSymbol = computed(() => {
               :aria-label="t('close')"
               @click="emit('close')"
             >
-              ✕
+              <t-icon name="close" />
             </button>
           </div>
 

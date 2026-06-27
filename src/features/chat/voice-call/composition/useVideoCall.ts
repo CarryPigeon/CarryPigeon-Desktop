@@ -1,6 +1,7 @@
 import { ref, onUnmounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { type UnlistenFn } from "@tauri-apps/api/event";
+import { safeListen } from "@/shared/tauri/events";
+import { invokeTauri } from "@/shared/tauri/invokeClient";
 import { createLogger } from "@/shared/utils/logger";
 
 const STUN_SERVERS: RTCIceServer[] = [
@@ -29,7 +30,7 @@ export function useVideoCall(initialSessionId: string) {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        invoke("send_video_signaling", {
+        void invokeTauri("send_video_signaling", {
           sessionId: sessionId.value,
           signalType: "ice_candidate",
           payload: e.candidate.toJSON(),
@@ -67,7 +68,7 @@ export function useVideoCall(initialSessionId: string) {
     const offer = await p.createOffer();
     await p.setLocalDescription(offer);
 
-    await invoke("send_video_signaling", {
+    await invokeTauri("send_video_signaling", {
       sessionId: sessionId.value,
       signalType: "offer",
       payload: {
@@ -101,7 +102,7 @@ export function useVideoCall(initialSessionId: string) {
     const answer = await p.createAnswer();
     await p.setLocalDescription(answer);
 
-    await invoke("send_video_signaling", {
+    await invokeTauri("send_video_signaling", {
       sessionId: sessionId.value,
       signalType: "answer",
       payload: {
@@ -119,7 +120,7 @@ export function useVideoCall(initialSessionId: string) {
       t.enabled = !t.enabled;
     });
     cameraEnabled.value = tracks.some((t) => t.enabled);
-    await invoke("send_video_signaling", {
+    await invokeTauri("send_video_signaling", {
       sessionId: sessionId.value,
       signalType: "video_mute",
       payload: { muted: !cameraEnabled.value },
@@ -128,7 +129,7 @@ export function useVideoCall(initialSessionId: string) {
 
   function setupListener() {
     if (unlisten) return;
-    listen<{
+    safeListen<{
       sessionId: string;
       signalType: string;
       payload: any;
@@ -144,7 +145,7 @@ export function useVideoCall(initialSessionId: string) {
           );
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          await invoke("send_video_signaling", {
+          await invokeTauri("send_video_signaling", {
             sessionId: sessionId.value,
             signalType: "answer",
             payload: { sdp: answer.sdp, type: answer.type, candidates: [] },

@@ -5,6 +5,7 @@
  */
 
 export const LoginPage = () => import("./auth-flow/presentation/pages/LoginPage.vue");
+export const RegisterPage = () => import("./auth-flow/presentation/pages/RegisterPage.vue");
 export const RequiredSetupPage = () => import("./auth-flow/presentation/pages/RequiredSetupPage.vue");
 export const UserInfoPage = () => import("./profile/presentation/pages/UserInfoPage.vue");
 export const UserPopoverPage = () => import("./current-user/presentation/pages/UserPopoverPage.vue");

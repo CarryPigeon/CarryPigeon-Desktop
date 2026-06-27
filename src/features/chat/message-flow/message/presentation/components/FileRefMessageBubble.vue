@@ -10,7 +10,7 @@ import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
 import { readAuthToken } from "@/shared/utils/localState";
-import { downloadFile, getDownloadTasks } from "@/shared/file-transfer";
+import { downloadFile, getDownloadTasks, resumeDownload } from "@/shared/file-transfer";
 import { createLogger } from "@/shared/utils/logger";
 import DownloadProgress from "@/features/chat/message-flow/download/presentation/components/DownloadProgress.vue";
 
@@ -99,6 +99,17 @@ async function handleDownload(): Promise<void> {
   }
 }
 
+async function handleResume(): Promise<void> {
+  if (!downloadUrl.value) return;
+  try {
+    const socket = getActiveChatServerSocket();
+    const token = readAuthToken(socket) || "";
+    currentTaskId.value = await resumeDownload(currentTaskId.value, downloadUrl.value, token);
+  } catch (e) {
+    createLogger("FileRefMessageBubble").error("Action: chat_file_resume_failed", { url: downloadUrl.value, error: String(e) });
+  }
+}
+
 function handleDismissTask(): void {
   showDownloadProgress.value = false;
   currentTaskId.value = "";
@@ -118,8 +129,11 @@ function handleDismissTask(): void {
         <div v-if="props.sizeBytes" class="cp-fileBubble__size">{{ formatFileSize(props.sizeBytes) }}</div>
       </div>
     </div>
-    <button v-if="downloadUrl" class="cp-fileBubble__btn" type="button" @click="handleDownload">
+    <button v-if="downloadUrl && (!downloadTask || downloadTask.status !== 'error')" class="cp-fileBubble__btn" type="button" @click="handleDownload">
       {{ t("download") }}
+    </button>
+    <button v-if="downloadUrl && downloadTask && downloadTask.status === 'error'" class="cp-fileBubble__btn cp-fileBubble__btn--resume" type="button" @click="handleResume">
+      {{ t("retry") }}
     </button>
     <DownloadProgress
       v-if="downloadTask"
@@ -201,5 +215,11 @@ function handleDismissTask(): void {
 .cp-fileBubble__btn:hover {
   transform: translateY(-1px);
   background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+}
+
+.cp-fileBubble__btn--resume {
+  background: color-mix(in oklab, var(--cp-warning, #d97706) 15%, var(--cp-panel-muted));
+  border-color: color-mix(in oklab, var(--cp-warning, #d97706) 40%, var(--cp-border));
+  color: var(--cp-text);
 }
 </style>

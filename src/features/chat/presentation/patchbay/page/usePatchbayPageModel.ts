@@ -4,7 +4,7 @@
  * 收敛 MainPage 所需的页面级状态、导航、浮层、快捷键与生命周期装配，使页面本身只承担模板入口职责。
  */
 
-import { computed, onMounted, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, proxyRefs, ref, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
@@ -18,7 +18,7 @@ import {
   retryChatConnection,
 } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
-import type { DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage, DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
@@ -54,6 +54,7 @@ import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { useChannelMuteStore, type NotificationLevel } from "../view-models/useChannelMuteStore";
+import { useServerRailModel } from "../view-models/useServerRailModel";
 import { useChannelContextMenu, type ChannelContextAction } from "../interactions/useChannelContextMenu";
 import { currentServerSocket } from "@/features/server-connection/api";
 import { readAuthToken } from "@/shared/utils/localState";
@@ -144,6 +145,29 @@ export type PatchbayPageModel = ShallowUnwrapRef<PatchbayPageRawModel>;
  * 2. 再看 workspace / section model / lifecycle 各自怎么组装；
  * 3. 最后才回到具体组件。
  */
+
+function toThreadRootMessage(
+  msg: ChatMessage | null,
+  channelId: string,
+): ChatMessageRecord | undefined {
+  if (!msg) return undefined;
+  return {
+    id: msg.id,
+    channelId,
+    userId: msg.from.id,
+    sender: {
+      id: msg.from.id,
+      nickname: msg.from.name,
+      avatar: msg.from.avatarUrl,
+    },
+    sentTime: msg.timeMs,
+    domain: msg.domain.label,
+    domainVersion: msg.domain.version ?? "",
+    data: undefined,
+    preview: "preview" in msg ? (msg.preview as string | undefined) : undefined,
+  };
+}
+
 export function usePatchbayPageModel(): PatchbayPageModel {
   const router = useRouter();
   const route = useRoute();
@@ -311,6 +335,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   });
 
   const channelMuteStore = useChannelMuteStore();
+  const serverRailModel = useServerRailModel();
   const channelContextMenu = useChannelContextMenu({
     isMuted: (channelId) => channelMuteStore.isMuted(channelId),
     getNotificationLevel: (channelId) => channelMuteStore.getNotificationLevel(channelId),
@@ -329,7 +354,17 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       const socket = currentServerSocket.value ?? "";
       const token = readAuthToken(socket) ?? "";
       try {
-        await channelMuteStore.setNotificationLevel(channelId, level, socket, token);
+        await channelMuteStore.setNotificationLevel(channelId, level, socket, token, null);
+        toast.success(t("notif_level_updated"));
+      } catch {
+        toast.error(t("settings_save_business_preference_failed"));
+      }
+    },
+    setNotificationLevelForDuration: async (channelId, level, durationMs) => {
+      const socket = currentServerSocket.value ?? "";
+      const token = readAuthToken(socket) ?? "";
+      try {
+        await channelMuteStore.setNotificationLevelForDuration(channelId, level, durationMs, socket, token);
         toast.success(t("notif_level_updated"));
       } catch {
         toast.error(t("settings_save_business_preference_failed"));
@@ -348,6 +383,19 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       channelMuteStore.refresh(socket, token);
     }
   });
+
+  // 定时免打扰：每 30s 检查频道静音是否到期；服务端级在 useServerRailModel 内随 refresh 处理。
+  if (typeof window !== "undefined") {
+    const reapTimer = window.setInterval(() => {
+      const expired = channelMuteStore.reapExpiredMutes(Date.now());
+      if (expired.length > 0) {
+        logger.info("Action: chat_channel_mute_reap_expired", { count: expired.length });
+      }
+    }, 30 * 1000);
+    onBeforeUnmount(() => {
+      window.clearInterval(reapTimer);
+    });
+  }
 
   const channelRail = useChannelRailModel({
     directory: roomDirectory,
@@ -554,7 +602,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
         data: { text, threadRootId: rootMessageId },
       });
     },
-    findMessageById: (id) => currentChannelMessageFlow.findMessageById(id) as unknown as ChatMessageRecord | undefined,
+    findMessageById: (id) =>
+      toThreadRootMessage(
+        currentChannelMessageFlow.findMessageById(id),
+        currentSessionSnapshot.value.currentChannelId,
+      ),
     currentChannelId: currentSessionSnapshot.value.currentChannelId,
   });
 
@@ -804,6 +856,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const serverRail = createPatchbayServerRailSection({
     racks: serverRacks,
     activeSocket: socket,
+    serverMuted: serverRailModel.serverMuted,
+    serverMutedUntil: serverRailModel.serverMutedUntil,
     handleSwitchServer: runServerSwitch,
     handleOpenServers,
     handleOpenSettings,
@@ -814,6 +868,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleOpenContacts: () => {
       void router.push("/contacts");
     },
+    toggleServerMute: serverRailModel.toggleServerMute,
+    muteServerForDuration: serverRailModel.muteServerForDuration,
+    unmuteServer: serverRailModel.unmuteServer,
   });
 
   const chatViewport = createPatchbayChatViewportSection({
