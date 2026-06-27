@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@/shared/utils/logger";
+import { isPerformanceMonitoringEnabled } from "@/shared/config/performance";
 
 const logger = createLogger("memory_monitor");
 
@@ -80,11 +81,13 @@ export class MemoryMonitor {
 
   constructor(config: Partial<MemoryMonitorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    logger.info("Action: network_memory_monitor_initialized", {
-      sampleIntervalMs: this.config.sampleIntervalMs,
-      warningThreshold: this.config.warningThreshold,
-      criticalThreshold: this.config.criticalThreshold,
-    });
+    if (isPerformanceMonitoringEnabled()) {
+      logger.info("Action: network_memory_monitor_initialized", {
+        sampleIntervalMs: this.config.sampleIntervalMs,
+        warningThreshold: this.config.warningThreshold,
+        criticalThreshold: this.config.criticalThreshold,
+      });
+    }
   }
 
   /**
@@ -231,6 +234,10 @@ export class MemoryMonitor {
    * 启动内存监控。
    */
   start(): void {
+    if (!isPerformanceMonitoringEnabled()) {
+      return;
+    }
+
     if (this.isRunning) {
       logger.warn("Action: network_memory_monitor_already_running");
       return;
@@ -252,6 +259,10 @@ export class MemoryMonitor {
    * 停止内存监控。
    */
   stop(): void {
+    if (!isPerformanceMonitoringEnabled()) {
+      return;
+    }
+
     if (!this.isRunning) {
       return;
     }
@@ -268,6 +279,10 @@ export class MemoryMonitor {
    * 注册内存清理回调。
    */
   registerCleanupCallback(callback: MemoryCleanupCallback): () => void {
+    if (!isPerformanceMonitoringEnabled()) {
+      return () => {};
+    }
+
     this.cleanupCallbacks.add(callback);
     logger.debug("Action: network_memory_cleanup_callback_registered", {
       totalCallbacks: this.cleanupCallbacks.size,
@@ -286,6 +301,10 @@ export class MemoryMonitor {
    * 注册内存状态变化回调。
    */
   registerStatusCallback(callback: MemoryStatusCallback): () => void {
+    if (!isPerformanceMonitoringEnabled()) {
+      return () => {};
+    }
+
     this.statusCallbacks.add(callback);
     logger.debug("Action: network_memory_status_callback_registered", {
       totalCallbacks: this.statusCallbacks.size,
@@ -304,6 +323,10 @@ export class MemoryMonitor {
    * 手动触发内存清理。
    */
   async triggerCleanup(): Promise<void> {
+    if (!isPerformanceMonitoringEnabled()) {
+      return;
+    }
+
     logger.info("Action: network_memory_cleanup_manually_triggered");
     await this.performCleanup();
   }
@@ -396,7 +419,9 @@ export class MemoryMonitor {
   clearHistory(): void {
     this.history = [];
     this.lastSnapshot = null;
-    logger.info("Action: network_memory_history_cleared");
+    if (isPerformanceMonitoringEnabled()) {
+      logger.info("Action: network_memory_history_cleared");
+    }
   }
 
   /**
@@ -407,7 +432,9 @@ export class MemoryMonitor {
     this.cleanupCallbacks.clear();
     this.statusCallbacks.clear();
     this.clearHistory();
-    logger.info("Action: network_memory_monitor_destroyed");
+    if (isPerformanceMonitoringEnabled()) {
+      logger.info("Action: network_memory_monitor_destroyed");
+    }
   }
 }
 

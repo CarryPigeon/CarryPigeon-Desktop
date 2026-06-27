@@ -40,6 +40,7 @@ import { checkForUpdateSilently } from "@/shared/updater/checkUpdate";
 
 import { resolveStartup } from '@/app/bootstrap/startupState';
 import { getMemoryMonitor, destroyMemoryMonitor } from "@/shared/monitoring/memoryMonitor";
+import { isPerformanceMonitoringEnabled } from "@/shared/config/performance";
 
 const UPDATE_CHECK_DELAY_MS = 5000;
 
@@ -185,7 +186,8 @@ if (!isSubWindow && hasTauriRuntime) {
 }
 
 // 启动内存监控（延迟启动，避免干扰首帧渲染和关键启动流程）
-if (hasTauriRuntime) {
+// release 构建中默认关闭性能监控，因此不创建监控实例也不启动定时器。
+if (hasTauriRuntime && isPerformanceMonitoringEnabled()) {
   const memoryMonitor = getMemoryMonitor();
   memoryMonitorStartTimer = window.setTimeout(() => {
     memoryMonitor.start();
