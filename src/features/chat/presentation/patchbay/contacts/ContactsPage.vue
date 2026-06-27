@@ -4,7 +4,7 @@
  * @description 联系人管理页面：搜索用户、查看资料、发起私聊。
  */
 
-import { ref } from "vue";
+import { ref, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
@@ -13,6 +13,7 @@ import { getAccountCapabilities } from "@/features/account/api";
 import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { createLogger } from "@/shared/utils/logger";
+import { debounceAsync } from "@/shared/utils/rateLimit";
 import type { UserPublic, CurrentUser } from "@/features/account/api-types";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import EmptyState from "@/shared/ui/EmptyState.vue";
@@ -56,6 +57,7 @@ async function loadCurrentUser(): Promise<void> {
 
 // 搜索用户
 async function handleSearch(): Promise<void> {
+  debouncedSearch.cancel();
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return;
 
@@ -82,6 +84,14 @@ async function handleSearch(): Promise<void> {
     searching.value = false;
   }
 }
+
+const debouncedSearch = debounceAsync(async () => {
+  await handleSearch();
+}, 300);
+
+onBeforeUnmount(() => {
+  debouncedSearch.cancel();
+});
 
 // 发起私聊
 async function handleStartChat(user: UserPublic): Promise<void> {
@@ -147,6 +157,7 @@ loadCurrentUser();
             class="cp-contacts__search-input"
             type="text"
             :placeholder="t('contacts_search_placeholder')"
+            @input="debouncedSearch"
             @keydown.enter="handleSearch"
           />
           <button
