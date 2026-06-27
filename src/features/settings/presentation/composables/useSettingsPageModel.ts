@@ -4,7 +4,8 @@
  */
 
 import type { Ref } from "vue";
-import type { AppTheme } from "@/features/settings/domain/types/SettingsTypes";
+import type { AppAccent, AppTheme } from "@/features/settings/domain/types/SettingsTypes";
+import { useAccentPreferenceModel } from "./useAccentPreferenceModel";
 import { useThemePreferenceModel } from "./useThemePreferenceModel";
 import { useGeneralPreferencesModel } from "./useGeneralPreferencesModel";
 import { useBusinessPreferencesModel } from "./useBusinessPreferencesModel";
@@ -15,6 +16,9 @@ export type SettingsPageModel = {
   theme: Ref<AppTheme>;
   themeError: Ref<string>;
   pickTheme(v: AppTheme): void;
+  accent: Ref<AppAccent>;
+  accentError: Ref<string>;
+  pickAccent(v: AppAccent): void;
   language: Ref<AppLocale>;
   preferencesError: Ref<string>;
   autoLogin: Ref<boolean>;
@@ -42,11 +46,13 @@ export type SettingsPageModel = {
 export function useSettingsPageModel(deps: UseSettingsPageModelDeps = {}): SettingsPageModel {
   void deps;
   const themeModel = useThemePreferenceModel();
+  const accentModel = useAccentPreferenceModel();
   const generalPreferencesModel = useGeneralPreferencesModel();
   const businessPreferencesModel = useBusinessPreferencesModel();
 
   return {
     ...themeModel,
+    ...accentModel,
     ...generalPreferencesModel,
     ...businessPreferencesModel,
   };

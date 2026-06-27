@@ -163,7 +163,7 @@ function handleClose(): void {
       <div class="cp-drawer__sub">
         <div class="cp-drawer__tagline">{{ props.plugin.tagline }}</div>
         <div class="cp-drawer__badges">
-          <LabelBadge v-if="props.plugin.required" variant="required" label="REQUIRED" :title="t('module_required')" />
+          <LabelBadge v-if="props.plugin.required" variant="required" :label="t('badge_required')" :title="t('module_required')" />
           <LabelBadge v-if="props.hasUpdate" variant="update" label="UPDATE" :title="t('module_update')" />
           <LabelBadge v-if="props.installed?.status === 'failed'" variant="failed" label="FAILED" :title="t('module_failed')" />
         </div>

@@ -28,6 +28,7 @@ import {
   type ServerRack,
 } from "../store";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import PageHeader from '@/shared/ui/PageHeader.vue';
 
 type DraftRack = {
   id: string;
@@ -52,7 +53,7 @@ const {
   scopeKey,
   clearCurrentWorkspaceLocalData,
 } = useCurrentWorkspaceMaintenance();
-const clearConfirmPlaceholder = computed(() => `Type "${clearConfirmToken}" to confirm`);
+const clearConfirmPlaceholder = computed(() => t("clear_confirm_placeholder", { token: clearConfirmToken }));
 
 const creating = reactive({
   name: "",
@@ -185,6 +186,16 @@ function handleRemove(id: string): void {
   const rack = serverRacks.value.find((item) => item.id === id) ?? null;
   removeServerById(id);
   logger.info("Action: servers_server_removed", { id, socket: rack?.serverSocket ?? "" });
+  if (serverRacks.value.length === 0) {
+    void router.replace("/login");
+  }
+}
+
+async function handleClearWorkspace(): Promise<void> {
+  await clearCurrentWorkspaceLocalData();
+  if (!clearError.value) {
+    void router.replace("/login");
+  }
 }
 
 /**
@@ -223,67 +234,68 @@ watch(watchActiveSocket, handleActiveSocketChange);
   <main class="cp-servers">
     <ErrorBoundary>
       <!-- Header -->
-      <header class="cp-servers__head">
-        <!-- 返回 -->
-        <button class="cp-servers__back" type="button" @click="router.back()">Back</button>
-        <!-- 标题 -->
-        <div class="cp-servers__title">
-          <div class="cp-servers__name">{{ t("server_manager") }}</div>
-          <div class="cp-servers__sub">Racks · TLS policy · Notify mode</div>
-        </div>
-        <!-- 当前 socket -->
-        <div class="cp-servers__active">
-          <div class="cp-servers__activeK">active</div>
-          <MonoTag :value="activeSocket || '—'" title="current server socket" :copyable="true" />
-        </div>
-      </header>
+      <PageHeader
+        :title="t('server_manager')"
+        :subtitle="t('servers_subtitle')"
+        back
+        :back-label="t('back')"
+        data-testid="servers-header"
+        @back="router.back()"
+      >
+        <template #actions>
+          <div class="cp-servers__active">
+            <div class="cp-servers__activeK">{{ t("servers_active_label") }}</div>
+            <MonoTag :value="activeSocket || '—'" :title="t('current_server_socket')" :copyable="true" />
+          </div>
+        </template>
+      </PageHeader>
 
       <!-- Create -->
       <section class="cp-servers__create">
         <!-- 新增表单 -->
-        <div class="cp-servers__createTitle">Add rack</div>
+        <div class="cp-servers__createTitle">{{ t("servers_add_rack") }}</div>
         <div class="cp-servers__createGrid">
           <div class="cp-servers__field">
             <div class="cp-servers__label">{{ t("server_name_placeholder") }}</div>
-            <t-input v-model="creating.name" placeholder="Mock Rack" clearable />
+            <t-input v-model="creating.name" :placeholder="t('server_name_placeholder')" clearable />
           </div>
           <div class="cp-servers__field wide">
             <div class="cp-servers__label">{{ t("server_socket_required") }}</div>
-            <t-input v-model="creating.serverSocket" placeholder="tls://host:port or mock://handshake" clearable />
+            <t-input v-model="creating.serverSocket" :placeholder="t('server_socket_placeholder')" clearable />
           </div>
           <div class="cp-servers__actions">
             <button class="cp-servers__btn primary" type="button" @click="handleCreate">{{ t("server_add") }}</button>
-            <button class="cp-servers__btn" type="button" @click="$router.push('/chat')">Open Patchbay</button>
+            <button class="cp-servers__btn" type="button" @click="$router.push('/chat')">{{ t("servers_open_patchbay") }}</button>
           </div>
         </div>
       </section>
 
       <section class="cp-servers__maintenance">
-        <div class="cp-servers__createTitle">Workspace maintenance</div>
+        <div class="cp-servers__createTitle">{{ t("workspace_maintenance") }}</div>
         <div class="cp-servers__maintenanceGrid">
           <div class="cp-servers__field">
-            <div class="cp-servers__label">server socket</div>
-            <MonoTag :value="maintenanceSocket || '—'" title="server socket" :copyable="true" />
+            <div class="cp-servers__label">{{ t("server_socket_label") }}</div>
+            <MonoTag :value="maintenanceSocket || '—'" :title="t('server_socket_label')" :copyable="true" />
           </div>
           <div class="cp-servers__field">
-            <div class="cp-servers__label">known server_id</div>
-            <MonoTag :value="knownServerId || '—'" title="server id" :copyable="true" />
+            <div class="cp-servers__label">{{ t("known_server_id") }}</div>
+            <MonoTag :value="knownServerId || '—'" :title="t('known_server_id')" :copyable="true" />
           </div>
           <div class="cp-servers__field">
-            <div class="cp-servers__label">scope key</div>
-            <MonoTag :value="scopeKey || '—'" title="scope key" :copyable="true" />
+            <div class="cp-servers__label">{{ t("scope_key") }}</div>
+            <MonoTag :value="scopeKey || '—'" :title="t('scope_key_title')" :copyable="true" />
           </div>
           <div class="cp-servers__field wide">
-            <div class="cp-servers__label">local cleanup</div>
+            <div class="cp-servers__label">{{ t("local_cleanup") }}</div>
             <div class="cp-servers__maintenanceHint">
-              Clear removes the current server's local session, resume data, mock plugin state, and local DB cache. It does not affect server-side data.
+              {{ t("local_cleanup_desc") }}
             </div>
           </div>
           <div class="cp-servers__field wide">
             <div class="cp-servers__maintenanceActions">
               <t-input v-model="clearConfirm" :placeholder="clearConfirmPlaceholder" clearable />
-              <button class="cp-servers__btn danger" type="button" :disabled="clearing" @click="clearCurrentWorkspaceLocalData">
-                {{ clearing ? "Clearing…" : "Clear Current Workspace Local Data" }}
+              <button class="cp-servers__btn danger" type="button" :disabled="clearing" @click="handleClearWorkspace">
+                {{ clearing ? t("clearing") : t("clear_workspace_data") }}
               </button>
             </div>
             <div v-if="clearError" class="cp-servers__error">{{ clearError }}</div>
@@ -295,9 +307,9 @@ watch(watchActiveSocket, handleActiveSocketChange);
       <section class="cp-servers__listWrap">
         <!-- 服务器列表 -->
         <header class="cp-servers__listHead">
-          <div class="cp-servers__listTitle">Rack list</div>
+          <div class="cp-servers__listTitle">{{ t("rack_list") }}</div>
           <div class="cp-servers__listMeta">
-            <span class="cp-servers__muted">count</span>
+            <span class="cp-servers__muted">{{ t("rack_list_count") }}</span>
             <span class="cp-servers__mono">{{ serverRacks.length }}</span>
           </div>
         </header>
@@ -312,7 +324,7 @@ watch(watchActiveSocket, handleActiveSocketChange);
             <!-- 选择当前 rack -->
             <button class="cp-rackRow__select" type="button" @click="selectRack(rack.serverSocket)">
               <span class="cp-rackRow__led" aria-hidden="true"></span>
-              <span class="cp-rackRow__selectText">Use</span>
+              <span class="cp-rackRow__selectText">{{ t("rack_use") }}</span>
             </button>
 
             <!-- 内容 -->
@@ -320,26 +332,26 @@ watch(watchActiveSocket, handleActiveSocketChange);
               <div class="cp-rackRow__top">
                 <div class="cp-rackRow__name">{{ rack.name }}</div>
                 <div class="cp-rackRow__tags">
-                  <MonoTag :value="rack.serverSocket" title="server socket" :copyable="true" />
-                  <span v-if="rack.pinned" class="cp-rackRow__pill">PINNED</span>
+                  <MonoTag :value="rack.serverSocket" :title="t('server_socket_label')" :copyable="true" />
+                  <span v-if="rack.pinned" class="cp-rackRow__pill">{{ t("rack_pinned") }}</span>
                 </div>
               </div>
 
               <div v-if="editingId !== rack.id" class="cp-rackRow__meta">
                 <div class="cp-rackRow__kv">
-                  <span class="cp-rackRow__k">tls</span>
+                  <span class="cp-rackRow__k">{{ t("rack_kv_tls") }}</span>
                   <span class="cp-rackRow__v">{{ rack.tlsPolicy }}</span>
                 </div>
                 <div v-if="rack.tlsPolicy === 'trust_fingerprint' && rack.tlsFingerprint" class="cp-rackRow__kv wide">
-                  <span class="cp-rackRow__k">fp</span>
+                  <span class="cp-rackRow__k">{{ t("rack_kv_fp") }}</span>
                   <span class="cp-rackRow__v">{{ rack.tlsFingerprint.slice(0, 12) }}…</span>
                 </div>
                 <div class="cp-rackRow__kv">
-                  <span class="cp-rackRow__k">notify</span>
+                  <span class="cp-rackRow__k">{{ t("rack_kv_notify") }}</span>
                   <span class="cp-rackRow__v">{{ rack.notifyMode }}</span>
                 </div>
                 <div v-if="rack.note" class="cp-rackRow__kv wide">
-                  <span class="cp-rackRow__k">note</span>
+                  <span class="cp-rackRow__k">{{ t("rack_kv_note") }}</span>
                   <span class="cp-rackRow__v">{{ rack.note }}</span>
                 </div>
               </div>
@@ -348,27 +360,27 @@ watch(watchActiveSocket, handleActiveSocketChange);
               <div v-else class="cp-rackRow__edit">
                 <div class="cp-rackRow__editGrid">
                   <div class="cp-rackRow__field">
-                    <div class="cp-rackRow__label">name</div>
+                    <div class="cp-rackRow__label">{{ t("rack_edit_name") }}</div>
                     <t-input v-model="draft.name" clearable />
                   </div>
                   <div class="cp-rackRow__field">
-                    <div class="cp-rackRow__label">socket</div>
+                    <div class="cp-rackRow__label">{{ t("rack_edit_socket") }}</div>
                     <t-input v-model="draft.serverSocket" clearable />
                   </div>
                   <div class="cp-rackRow__field">
-                    <div class="cp-rackRow__label">tls policy</div>
+                    <div class="cp-rackRow__label">{{ t("rack_edit_tls_policy") }}</div>
                     <t-select v-model="draft.tlsPolicy">
-                      <t-option value="strict" label="strict (default)" />
-                      <t-option value="trust_fingerprint" label="trust_fingerprint" />
-                      <t-option value="insecure" label="insecure (dev only)" />
+                      <t-option value="strict" :label="t('tls_policy_strict')" />
+                      <t-option value="trust_fingerprint" :label="t('tls_policy_trust_fingerprint')" />
+                      <t-option value="insecure" :label="t('tls_policy_insecure')" />
                     </t-select>
                   </div>
                   <div v-if="draft.tlsPolicy === 'trust_fingerprint'" class="cp-rackRow__field wide">
-                    <div class="cp-rackRow__label">tls fingerprint (sha256)</div>
-                    <t-input v-model="draft.tlsFingerprint" placeholder="64 hex chars (colons/spaces ok)" clearable />
+                    <div class="cp-rackRow__label">{{ t("rack_edit_tls_fingerprint") }}</div>
+                    <t-input v-model="draft.tlsFingerprint" :placeholder="t('fp_placeholder')" clearable />
                   </div>
                   <div class="cp-rackRow__field">
-                    <div class="cp-rackRow__label">notify mode</div>
+                    <div class="cp-rackRow__label">{{ t("rack_edit_notify_mode") }}</div>
                     <t-select v-model="draft.notifyMode">
                       <t-option value="notify" :label="t('settings_recv_notify')" />
                       <t-option value="silent" :label="t('settings_recv_silent')" />
@@ -376,14 +388,14 @@ watch(watchActiveSocket, handleActiveSocketChange);
                     </t-select>
                   </div>
                   <div class="cp-rackRow__field wide">
-                    <div class="cp-rackRow__label">note</div>
-                    <t-input v-model="draft.note" placeholder="Optional note…" />
+                    <div class="cp-rackRow__label">{{ t("rack_edit_note") }}</div>
+                    <t-input v-model="draft.note" :placeholder="t('rack_note_placeholder')" />
                   </div>
                 </div>
 
                 <div class="cp-rackRow__editActions">
-                  <button class="cp-rackRow__btn primary" type="button" @click="saveEdit">Save</button>
-                  <button class="cp-rackRow__btn" type="button" @click="cancelEdit">Cancel</button>
+                  <button class="cp-rackRow__btn primary" type="button" @click="saveEdit">{{ t("rack_edit_save") }}</button>
+                  <button class="cp-rackRow__btn" type="button" @click="cancelEdit">{{ t("rack_edit_cancel") }}</button>
                 </div>
               </div>
             </div>
@@ -413,56 +425,7 @@ watch(watchActiveSocket, handleActiveSocketChange);
   gap: 12px;
 }
 
-/* Header */
-.cp-servers__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-/* Back button */
-.cp-servers__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* Back hover */
-.cp-servers__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Title block */
-.cp-servers__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
-}
-
-/* Subtitle */
-.cp-servers__sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
+/* Header 由 PageHeader 组件承载；以下保留右侧 action 区域样式 */
 /* Active chip block */
 .cp-servers__active {
   display: flex;

@@ -23,7 +23,7 @@ const { t } = useI18n();
   <Teleport to="body">
     <div v-if="visible" class="cp-deleteOverlay" @click.self="emit('cancel')">
       <div class="cp-deleteDialog">
-        <div class="cp-deleteDialog__icon">🗑️</div>
+        <div class="cp-deleteDialog__icon"><t-icon name="delete" size="32" /></div>
         <div class="cp-deleteDialog__title">{{ t("file_delete_confirm_title") }}</div>
         <div class="cp-deleteDialog__msg">
           {{ t("file_delete_confirm_message", { count }) }}
@@ -62,7 +62,10 @@ const { t } = useI18n();
 }
 
 .cp-deleteDialog__icon {
-  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-danger);
   margin-bottom: 12px;
 }
 

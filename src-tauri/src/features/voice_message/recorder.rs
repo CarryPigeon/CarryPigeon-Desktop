@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -45,6 +45,7 @@ enum RecorderCommand {
 pub struct VoiceRecorder {
     command_tx: Option<mpsc::Sender<RecorderCommand>>,
     result: Arc<Mutex<Option<RecordingResult>>>,
+    done: Option<mpsc::Receiver<()>>,
 }
 
 impl VoiceRecorder {
@@ -82,6 +83,7 @@ impl VoiceRecorder {
 
         // 控制通道
         let (cmd_tx, cmd_rx) = mpsc::channel::<RecorderCommand>();
+        let (done_tx, done_rx) = mpsc::channel::<()>();
         let result: Arc<Mutex<Option<RecordingResult>>> = Arc::new(Mutex::new(None));
         let result_clone = result.clone();
         let start_time = Instant::now();
@@ -137,11 +139,13 @@ impl VoiceRecorder {
                     }
                 }
             }
+            let _ = done_tx.send(());
         });
 
         Ok(Self {
             command_tx: Some(cmd_tx),
             result,
+            done: Some(done_rx),
         })
     }
 
@@ -153,8 +157,9 @@ impl VoiceRecorder {
         if let Some(tx) = self.command_tx.take() {
             let _ = tx.send(RecorderCommand::Stop);
         }
-        // 等待后台线程完成 WAV 写入
-        std::thread::sleep(std::time::Duration::from_millis(300));
+        if let Some(rx) = self.done.take() {
+            let _ = rx.recv_timeout(Duration::from_secs(30));
+        }
         self.result
             .lock()
             .map_err(|e| anyhow::anyhow!("lock failure: {}", e))?
@@ -171,9 +176,9 @@ impl VoiceRecorder {
     /// # 返回值
     /// 写入的字节数。
     fn write_wav(buffer: &Mutex<Vec<f32>>, path: &PathBuf) -> std::io::Result<u64> {
-        let samples = buffer.lock().map_err(|e| {
-            std::io::Error::other(format!("Lock error: {}", e))
-        })?;
+        let samples = buffer
+            .lock()
+            .map_err(|e| std::io::Error::other(format!("Lock error: {}", e)))?;
 
         let num_samples = samples.len() as u32;
         let bytes_per_sample: u16 = 2; // 16-bit

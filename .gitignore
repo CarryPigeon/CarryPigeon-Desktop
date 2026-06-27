@@ -26,7 +26,6 @@ dist-ssr
 *.sln
 *.sw?
 /target/
-/Cargo.lock
 /database.carrypigeon
 
 /src-tauri/config
@@ -39,10 +38,10 @@ docs/superpowers/
 .worktrees/
 .playwright-mcp/
 .sisyphus/
+.opencode/
 data/db/*.db
 
 # Local workflow docs
-AGENTS.md
 CLAUDE.md
 .claude/
 

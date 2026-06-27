@@ -3,6 +3,7 @@
     <VoiceCallBanner
       :caller-name="callerName"
       :visible="callState === 'ringing'"
+      :ring-remaining-secs="ringRemainingSecs"
       @accept="handleAccept"
       @reject="handleReject"
     />
@@ -81,6 +82,7 @@ const {
   isNoiseSuppressionOn,
   inputDevices,
   outputDevices,
+  ringRemainingSecs,
   startDirectCall,
   startConference,
   acceptCall,

@@ -4,6 +4,7 @@
  */
 
 import { computed, watch, type ComputedRef, type Ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ChannelSelectionOutcome } from "@/features/chat/room-session/api-types";
 import type { QuickSwitcherItem } from "@/features/chat/presentation/patchbay/state/quickSwitcherTypes";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
@@ -18,7 +19,7 @@ import {
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 
 type ServerQuickItem = { serverSocket: string; name: string };
-type ChannelQuickItem = { id: string; name: string; joined?: boolean };
+type ChannelQuickItem = { id: string; name: string; joined?: boolean; unread?: number };
 type PluginQuickItem = { pluginId: string; name: string };
 
 const QUICK_ROUTE_ITEMS: QuickSwitcherItem[] = [
@@ -44,15 +45,51 @@ export type UseQuickSwitcherDeps = {
   onAsyncError(action: string, error: unknown): void;
 };
 
-function buildQuickSwitcherItems(deps: UseQuickSwitcherDeps): QuickSwitcherItem[] {
+/**
+ * 在已加入频道中找到首个有未读的频道。
+ *
+ * @param channels - 频道摘要列表（含 `unread` 字段）。
+ * @returns 首个未读频道；不存在时返回 `undefined`。
+ */
+function findFirstUnreadChannel(
+  channels: readonly ChannelQuickItem[],
+): ChannelQuickItem | undefined {
+  for (const c of channels) {
+    if (c.joined && typeof c.unread === "number" && c.unread > 0) {
+      return c;
+    }
+  }
+  return undefined;
+}
+
+function buildQuickSwitcherItems(
+  deps: UseQuickSwitcherDeps,
+  t: (key: string) => string,
+): QuickSwitcherItem[] {
   const normalizedQuery = quickSwitcherQuery.value.trim().toLowerCase();
   const items: QuickSwitcherItem[] = [...QUICK_ROUTE_ITEMS];
+
+  // 「下一条未读」特殊项：仅在存在已加入且未读 > 0 的频道时显示。
+  const nextUnread = findFirstUnreadChannel(deps.allChannels.value);
+  if (nextUnread) {
+    const unreadLabel = t("quick_switcher_next_unread");
+    const subtitle = `${unreadLabel} · ${nextUnread.name} (${nextUnread.unread})`;
+    items.push({ kind: "next_unread", id: nextUnread.id, title: unreadLabel, subtitle });
+  }
 
   for (const rack of deps.serverRacks.value) {
     items.push({ kind: "server", id: rack.serverSocket, title: rack.name, subtitle: rack.serverSocket });
   }
-  for (const channel of deps.allChannels.value) {
-    items.push({ kind: "channel", id: channel.id, title: channel.name, subtitle: channel.id });
+
+  // 频道列表排序：已加入且未读 > 0 的频道按未读数降序置前，其余保持原序。
+  const sortedChannels = [...deps.allChannels.value].sort((a, b) => {
+    const aUnread = a.joined && typeof a.unread === "number" ? a.unread : 0;
+    const bUnread = b.joined && typeof b.unread === "number" ? b.unread : 0;
+    return bUnread - aUnread;
+  });
+  for (const channel of sortedChannels) {
+    const suffix = channel.joined && channel.unread && channel.unread > 0 ? ` · ${channel.unread}` : "";
+    items.push({ kind: "channel", id: channel.id, title: channel.name + suffix, subtitle: channel.id });
   }
   for (const plugin of deps.plugins.value) {
     items.push({ kind: "module", id: plugin.pluginId, title: plugin.name, subtitle: plugin.pluginId });
@@ -71,7 +108,8 @@ function buildQuickSwitcherItems(deps: UseQuickSwitcherDeps): QuickSwitcherItem[
  * `QuickSwitcherItem` 抽离到独立类型文件，避免 composable 反向依赖具体 SFC。
  */
 export function useQuickSwitcher(deps: UseQuickSwitcherDeps) {
-  const qsItems = computed(() => buildQuickSwitcherItems(deps));
+  const { t } = useI18n();
+  const qsItems = computed(() => buildQuickSwitcherItems(deps, t));
   const runAsyncTask = createAsyncTaskRunner(deps.onAsyncError);
 
   function setQuickOpen(open: boolean): void {
@@ -84,6 +122,23 @@ export function useQuickSwitcher(deps: UseQuickSwitcherDeps) {
 
   function setQuickActiveIndex(index: number): void {
     quickSwitcherActiveIndex.value = index;
+  }
+
+  /**
+   * 跳转到首个未读频道（复用 `onChannelSelect` 的选择流程与错误处理）。
+   */
+  function jumpToFirstUnread(): void {
+    const target = findFirstUnreadChannel(deps.allChannels.value);
+    if (!target) return;
+    runAsyncTask(
+      deps.onChannelSelect(target.id).then((outcome) => {
+        if (!outcome.ok) {
+          deps.onAsyncError("chat_select_channel_from_quick_switcher_failed", outcome.error.message);
+        }
+        return outcome;
+      }),
+      "chat_select_channel_from_quick_switcher_failed",
+    );
   }
 
   function handleQuickSelect(item: QuickSwitcherItem): void {
@@ -116,6 +171,9 @@ export function useQuickSwitcher(deps: UseQuickSwitcherDeps) {
         }
         break;
       }
+      case "next_unread":
+        jumpToFirstUnread();
+        break;
     }
     closeQuickSwitcher();
   }

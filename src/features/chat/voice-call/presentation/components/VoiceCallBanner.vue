@@ -5,6 +5,9 @@
         <t-icon name="call" class="voice-call-banner__icon" />
         <div class="voice-call-banner__info">
           <span class="voice-call-banner__title">{{ t("voice_call_caller_invite", { name: callerName }) }}</span>
+          <span v-if="ringRemainingSecs > 0" class="voice-call-banner__countdown">
+            {{ t("voice_call_ring_countdown", { secs: ringRemainingSecs }) }}
+          </span>
         </div>
         <div class="voice-call-banner__actions">
           <button class="voice-call-banner__btn voice-call-banner__btn--accept" @click="$emit('accept')">
@@ -27,6 +30,7 @@ const { t } = useI18n();
 defineProps<{
   callerName: string;
   visible: boolean;
+  ringRemainingSecs: number;
 }>();
 
 defineEmits<{
@@ -66,6 +70,14 @@ defineEmits<{
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
+  }
+
+  &__countdown {
+    display: block;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 2px;
   }
 
   &__actions {

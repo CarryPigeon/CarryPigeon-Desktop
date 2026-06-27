@@ -5,6 +5,7 @@
 defineOptions({ name: "App" });
 import StartupShell from '@/app/bootstrap/StartupShell.vue';
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import GlobalHotkeyHint from '@/shared/ui/GlobalHotkeyHint.vue';
 </script>
 
 <template>
@@ -12,6 +13,7 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
     <StartupShell>
       <router-view></router-view>
     </StartupShell>
+    <GlobalHotkeyHint />
   </ErrorBoundary>
 </template>
 
@@ -41,8 +43,8 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --cp-border-light: rgba(20, 32, 29, 0.09);
 
   --cp-text: #14201d;
-  --cp-text-muted: rgba(20, 32, 29, 0.62);
-  --cp-text-light: rgba(20, 32, 29, 0.44);
+  --cp-text-muted: rgba(20, 32, 29, 0.72);
+  --cp-text-light: rgba(20, 32, 29, 0.52);
 
   --cp-accent: #0f766e;
   --cp-accent-hover: #115e59;
@@ -169,22 +171,13 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --cp-text-muted: rgba(226, 232, 240, 0.62);
   --cp-text-light: rgba(226, 232, 240, 0.42);
 
-  /* 状态色 */
-  --cp-accent: #22c55e;
-  --cp-accent-hover: #16a34a;
-  --cp-accent-soft: rgba(34, 197, 94, 0.16);
-  --cp-accent-2: #38bdf8;
-  --cp-accent-2-soft: rgba(56, 189, 248, 0.16);
+  /* 状态色（与背景耦合的部分：warn / danger / skeleton / warning） */
   --cp-warn: #f59e0b;
   --cp-danger: #ef4444;
-  --cp-info: #38bdf8;
-  --cp-accent-shadow: rgba(34, 197, 94, 0.22);
-  --cp-success: #22c55e;
-  --cp-primary: #38bdf8;
   --cp-skeleton: rgba(148, 163, 184, 0.10);
   --cp-warning: var(--cp-warn);
 
-  /* 高亮（与主题相关的选中/聚焦强调色） */
+  /* 高亮（依赖 --cp-info；info 放在 accent 块） */
   --cp-highlight: var(--cp-info);
   --cp-highlight-border: color-mix(in oklab, var(--cp-highlight) 40%, var(--cp-border));
   --cp-highlight-border-strong: color-mix(in oklab, var(--cp-highlight) 58%, var(--cp-border));
@@ -195,7 +188,6 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --cp-focus-ring: var(--cp-highlight-ring);
 
   /* 聚焦环（Ring） */
-  --cp-ring: 0 0 0 3px rgba(56, 189, 248, 0.28);
   --cp-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
   /* 输入控件 */
@@ -206,21 +198,11 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --cp-field-border-hover: rgba(148, 163, 184, 0.30);
   --cp-field-placeholder: rgba(226, 232, 240, 0.42);
 
-  /* 领域（Domain）线缆颜色（通用扩展通道） */
-  --cp-domain-core: #2dd4bf;
-  --cp-domain-ext-a: #60a5fa;
-  --cp-domain-ext-b: #f472b6;
-  --cp-domain-ext-c: #a78bfa;
-  --cp-domain-unknown: #94a3b8;
-
   /* 交互态 */
   --cp-hover-bg: rgba(148, 163, 184, 0.08);
   --cp-hover-bg-2: rgba(148, 163, 184, 0.14);
   --cp-scroll-thumb: rgba(148, 163, 184, 0.18);
   --cp-scroll-thumb-hover: rgba(148, 163, 184, 0.26);
-  --cp-glow-a: rgba(56, 189, 248, 0.10);
-  --cp-glow-b: rgba(34, 197, 94, 0.10);
-  --cp-glow-c: rgba(244, 114, 182, 0.08);
 
   /* 阴影层级（Elevation） */
   --cp-shadow: 0 18px 56px rgba(0, 0, 0, 0.56);
@@ -228,9 +210,7 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --cp-elev-1: var(--cp-shadow-soft);
   --cp-elev-2: var(--cp-shadow);
 
-  /* 组件库（TDesign）覆盖 */
-  --td-brand-color: rgba(56, 189, 248, 1);
-  --td-brand-color-hover: rgba(125, 211, 252, 1);
+  /* 组件库（TDesign）覆盖（与背景/字体耦合） */
   --td-text-color-primary: var(--cp-text);
   --td-text-color-secondary: var(--cp-text-muted);
   --td-bg-color-input: var(--cp-field-bg);
@@ -239,13 +219,70 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --td-bg-color-secondarycontainer: rgba(148, 163, 184, 0.06);
   --td-border-level-1-color: var(--cp-border);
   --td-border-level-2-color: var(--cp-border);
-  --td-brand-color-focus: rgba(56, 189, 248, 0.28);
   --td-mask-active: rgba(0, 0, 0, 0.55);
   --td-text-color-placeholder: var(--cp-field-placeholder);
   --td-text-color-disabled: var(--cp-text-light);
   --td-bg-color-specialcomponent: var(--cp-field-bg);
   --td-bg-color-component-disabled: var(--cp-field-bg-disabled);
   --td-font-family: var(--cp-font-body);
+}
+
+/* 强调色（独立于主题）：patchbay 翡翠绿 + 天空蓝的品牌色组合。
+   可与任何 theme 组合（light/legacy/patchbay），让聊天等页面在用户偏好的背景下仍保留品牌识别色。 */
+:root[data-accent="patchbay"] {
+  --cp-accent: #22c55e;
+  --cp-accent-hover: #16a34a;
+  --cp-accent-soft: rgba(34, 197, 94, 0.16);
+  --cp-accent-2: #38bdf8;
+  --cp-accent-2-soft: rgba(56, 189, 248, 0.16);
+  --cp-info: #38bdf8;
+  --cp-accent-shadow: rgba(34, 197, 94, 0.22);
+  --cp-success: #22c55e;
+  --cp-primary: #38bdf8;
+  --cp-ring: 0 0 0 3px rgba(56, 189, 248, 0.28);
+
+  /* 领域（Domain）线缆颜色（patchbay 配色版本） */
+  --cp-domain-core: #2dd4bf;
+  --cp-domain-ext-a: #60a5fa;
+  --cp-domain-ext-b: #f472b6;
+  --cp-domain-ext-c: #a78bfa;
+  --cp-domain-unknown: #94a3b8;
+
+  /* 光晕（Glow） */
+  --cp-glow-a: rgba(56, 189, 248, 0.10);
+  --cp-glow-b: rgba(34, 197, 94, 0.10);
+  --cp-glow-c: rgba(244, 114, 182, 0.08);
+
+  /* 组件库（TDesign）品牌色 */
+  --td-brand-color: rgba(56, 189, 248, 1);
+  --td-brand-color-hover: rgba(125, 211, 252, 1);
+  --td-brand-color-focus: rgba(56, 189, 248, 0.28);
+}
+
+/* 兼容：旧用户仅设置 data-theme="patchbay" 时，沿用 patchbay 强调色。
+   新逻辑下，用户独立设置 accent，可选 default/patchbay 来覆盖这里。 */
+:root[data-theme="patchbay"]:not([data-accent="default"]) {
+  --cp-accent: #22c55e;
+  --cp-accent-hover: #16a34a;
+  --cp-accent-soft: rgba(34, 197, 94, 0.16);
+  --cp-accent-2: #38bdf8;
+  --cp-accent-2-soft: rgba(56, 189, 248, 0.16);
+  --cp-info: #38bdf8;
+  --cp-accent-shadow: rgba(34, 197, 94, 0.22);
+  --cp-success: #22c55e;
+  --cp-primary: #38bdf8;
+  --cp-ring: 0 0 0 3px rgba(56, 189, 248, 0.28);
+  --cp-domain-core: #2dd4bf;
+  --cp-domain-ext-a: #60a5fa;
+  --cp-domain-ext-b: #f472b6;
+  --cp-domain-ext-c: #a78bfa;
+  --cp-domain-unknown: #94a3b8;
+  --cp-glow-a: rgba(56, 189, 248, 0.10);
+  --cp-glow-b: rgba(34, 197, 94, 0.10);
+  --cp-glow-c: rgba(244, 114, 182, 0.08);
+  --td-brand-color: rgba(56, 189, 248, 1);
+  --td-brand-color-hover: rgba(125, 211, 252, 1);
+  --td-brand-color-focus: rgba(56, 189, 248, 0.28);
 }
 
 *,
@@ -327,16 +364,16 @@ body::before {
       rgba(20, 32, 29, 0.04),
       rgba(20, 32, 29, 0.04) 1px,
       transparent 1px,
-      transparent 6px
+      transparent 10px
     ),
     repeating-linear-gradient(
       90deg,
       rgba(20, 32, 29, 0.03),
       rgba(20, 32, 29, 0.03) 1px,
       transparent 1px,
-      transparent 10px
+      transparent 16px
     );
-  opacity: 0.14;
+  opacity: 0.10;
   mix-blend-mode: multiply;
 }
 
@@ -347,16 +384,16 @@ body::before {
       rgba(148, 163, 184, 0.06),
       rgba(148, 163, 184, 0.06) 1px,
       transparent 1px,
-      transparent 12px
+      transparent 20px
     ),
     repeating-linear-gradient(
       90deg,
       rgba(148, 163, 184, 0.045),
       rgba(148, 163, 184, 0.045) 1px,
       transparent 1px,
-      transparent 12px
+      transparent 20px
     );
-  opacity: 0.26;
+  opacity: 0.14;
   mix-blend-mode: normal;
 }
 
@@ -541,6 +578,12 @@ select.cp-field {
   box-shadow: var(--cp-shadow) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+/* 组件库（TDesign）：图标基线统一 */
+t-icon {
+  font-size: 1em;
+  vertical-align: -0.15em;
 }
 
 .t-dialog__mask {

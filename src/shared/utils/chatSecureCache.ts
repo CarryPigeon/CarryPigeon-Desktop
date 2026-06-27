@@ -110,9 +110,17 @@ function collectLegacyEntries(): Array<[string, string]> {
   const entries: Array<[string, string]> = [];
   const direct = localStorage.getItem(KEY_SERVER_ID_BY_SOCKET);
   if (direct != null) entries.push([KEY_SERVER_ID_BY_SOCKET, direct]);
-  entries.push(...legacyKeysForPrefix(KEY_AUTH_SESSION_PREFIX));
-  entries.push(...legacyKeysForPrefix(KEY_AUTH_TOKEN_PREFIX));
-  entries.push(...legacyKeysForPrefix(KEY_LAST_EVENT_ID_PREFIX));
+
+  const prefixes = [KEY_AUTH_SESSION_PREFIX, KEY_AUTH_TOKEN_PREFIX, KEY_LAST_EVENT_ID_PREFIX];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    const prefix = prefixes.find((p) => key.startsWith(p));
+    if (!prefix) continue;
+    const value = localStorage.getItem(key);
+    if (value != null) entries.push([key, value]);
+  }
+
   return entries;
 }
 

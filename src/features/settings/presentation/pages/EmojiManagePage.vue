@@ -9,10 +9,15 @@ import { useI18n } from "vue-i18n";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEmojiManageModel } from "../composables/useEmojiManageModel";
 import { createLogger } from "@/shared/utils/logger";
-import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
+import { getAccountCapabilities } from "@/features/account/api";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const logger = createLogger("emoji");
+
+const accountCapabilities = getAccountCapabilities();
+function getCurrentChatUserId(): string {
+  return accountCapabilities.currentUser.getSnapshot().id;
+}
 
 const { t } = useI18n();
 const { emojis, loading, loadEmojis, addEmoji, deleteEmoji, getImagePath } = useEmojiManageModel();

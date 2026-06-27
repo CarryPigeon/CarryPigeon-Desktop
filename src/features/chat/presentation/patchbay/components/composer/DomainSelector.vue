@@ -62,7 +62,7 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
   <div v-if="props.collapsed" class="cp-domain-collapsed" role="button" :tabindex="0" @click="$emit('toggleExpand')" @keydown.enter="$emit('toggleExpand')">
     <span class="cp-domain__dot" :style="activeOption ? { background: `var(${activeOption.colorVar})` } : {}" aria-hidden="true"></span>
     <span class="cp-domain-collapsed__label">{{ activeOption?.label ?? '' }}</span>
-    <span class="cp-domain-collapsed__arrow">▾</span>
+    <span class="cp-domain-collapsed__arrow"><t-icon name="chevron-down" /></span>
   </div>
   <!-- 区块：<div> .cp-domain-selector (展开模式) -->
   <div
@@ -166,7 +166,9 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
   white-space: nowrap;
 }
 .cp-domain-collapsed__arrow {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
   color: var(--cp-text-muted);
   margin-left: 2px;
 }

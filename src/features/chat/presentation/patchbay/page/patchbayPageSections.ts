@@ -13,12 +13,17 @@ type RefLike<T> = Ref<T> | ComputedRef<T>;
 type PatchbayServerRailRawModel = {
   racks: RefLike<readonly { serverSocket: string; name: string }[]>;
   activeSocket: RefLike<string>;
+  serverMuted: RefLike<boolean>;
+  serverMutedUntil: RefLike<number | null>;
   handleSwitchServer(serverSocket: string): void;
   handleOpenServers(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
   handleOpenContacts(): void;
+  toggleServerMute(): Promise<void>;
+  muteServerForDuration(durationMs?: number): Promise<void>;
+  unmuteServer(): Promise<void>;
 };
 /**
  * Patchbay 页面服务器侧栏 section model。
@@ -115,24 +120,34 @@ export type PatchbayQuickSwitcherModel = ShallowUnwrapRef<PatchbayQuickSwitcherR
 type CreatePatchbayServerRailSectionDeps = {
   racks: RefLike<readonly { serverSocket: string; name: string }[]>;
   activeSocket: RefLike<string>;
+  serverMuted: RefLike<boolean>;
+  serverMutedUntil: RefLike<number | null>;
   handleSwitchServer(serverSocket: string): void;
   handleOpenServers(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
   handleOpenContacts(): void;
+  toggleServerMute(): Promise<void>;
+  muteServerForDuration(durationMs?: number): Promise<void>;
+  unmuteServer(): Promise<void>;
 };
 
 export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSectionDeps): PatchbayServerRailModel {
   return proxyRefs({
     racks: deps.racks,
     activeSocket: deps.activeSocket,
+    serverMuted: deps.serverMuted,
+    serverMutedUntil: deps.serverMutedUntil,
     handleSwitchServer: deps.handleSwitchServer,
     handleOpenServers: deps.handleOpenServers,
     handleOpenSettings: deps.handleOpenSettings,
     goPlugins: deps.goPlugins,
     handleOpenFiles: deps.handleOpenFiles,
     handleOpenContacts: deps.handleOpenContacts,
+    toggleServerMute: deps.toggleServerMute,
+    muteServerForDuration: deps.muteServerForDuration,
+    unmuteServer: deps.unmuteServer,
   });
 }
 

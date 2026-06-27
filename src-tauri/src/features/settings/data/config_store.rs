@@ -619,16 +619,13 @@ mod tests {
     use crate::features::settings::domain::settings_schema::{
         SettingsTheme, parse_settings_import_envelope,
     };
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::OnceLock;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    static TEST_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
-    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
-        TEST_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .expect("test lock")
+    async fn test_lock() -> tokio::sync::MutexGuard<'static, ()> {
+        TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await
     }
 
     fn test_temp_dir() -> PathBuf {
@@ -704,7 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn legacy_config_is_migrated_to_versioned_envelope() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
@@ -733,7 +730,7 @@ mod tests {
 
     #[tokio::test]
     async fn import_export_round_trip_persists_envelope() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
@@ -757,7 +754,7 @@ mod tests {
 
     #[tokio::test]
     async fn import_rejects_version_mismatch_and_unknown_fields() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
@@ -822,7 +819,7 @@ mod tests {
 
     #[tokio::test]
     async fn reset_settings_writes_default_envelope() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();
@@ -849,7 +846,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_config_bool_and_theme_are_persisted_atomically() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let _ = crate::shared::app_data_dir::reset_app_data_dir();
         let prev = std::env::current_dir().expect("cwd");
         let dir = test_temp_dir();

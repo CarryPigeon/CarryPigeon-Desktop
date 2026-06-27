@@ -61,9 +61,10 @@ impl AudioDeviceManager {
         // 某些 Windows 系统上 WASAPI 枚举可能因兼容性问题返回空迭代器。
         if devices.is_empty()
             && let Some(ref device) = default_device
-                && let Some(info) = device_info(device, &default_id) {
-                    devices.push(info);
-                }
+            && let Some(info) = device_info(device, &default_id)
+        {
+            devices.push(info);
+        }
 
         // 当枚举结果非空但没有任何设备被标记为默认时（常见于 WASAPI 下
         // default_input_device().id() 与 input_devices() 返回的 ID 格式不一致），
@@ -71,14 +72,15 @@ impl AudioDeviceManager {
         let has_default = devices.iter().any(|d| d.is_default);
         if !has_default
             && let Some(ref device) = default_device
-                && let Ok(id) = device.id()
-                    && let Ok(description) = device.description() {
-                        devices.push(AudioDeviceInfo {
-                            device_id: id.to_string(),
-                            name: description.to_string(),
-                            is_default: true,
-                        });
-                    }
+            && let Ok(id) = device.id()
+            && let Ok(description) = device.description()
+        {
+            devices.push(AudioDeviceInfo {
+                device_id: id.to_string(),
+                name: description.to_string(),
+                is_default: true,
+            });
+        }
 
         Ok(devices)
     }
@@ -111,22 +113,24 @@ impl AudioDeviceManager {
         // 当系统枚举返回空列表但存在默认设备时，将其作为兜底项加入。
         if devices.is_empty()
             && let Some(ref device) = default_device
-                && let Some(info) = device_info(device, &default_id) {
-                    devices.push(info);
-                }
+            && let Some(info) = device_info(device, &default_id)
+        {
+            devices.push(info);
+        }
 
         // 当枚举结果非空但没有任何设备被标记为默认时，将系统默认设备强制追加。
         let has_default = devices.iter().any(|d| d.is_default);
         if !has_default
             && let Some(ref device) = default_device
-                && let Ok(id) = device.id()
-                    && let Ok(description) = device.description() {
-                        devices.push(AudioDeviceInfo {
-                            device_id: id.to_string(),
-                            name: description.to_string(),
-                            is_default: true,
-                        });
-                    }
+            && let Ok(id) = device.id()
+            && let Ok(description) = device.description()
+        {
+            devices.push(AudioDeviceInfo {
+                device_id: id.to_string(),
+                name: description.to_string(),
+                is_default: true,
+            });
+        }
 
         Ok(devices)
     }

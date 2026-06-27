@@ -6,8 +6,9 @@
 
 import { computed, ref, type Component, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { safeListen } from "@/shared/tauri/events";
+import { invokeTauri } from "@/shared/tauri/invokeClient";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import DomainSelector from "./DomainSelector.vue";
 import ScreenshotButton from "@/features/screenshot/presentation/components/ScreenshotButton.vue";
 import StickerPickerButton from "@/features/chat/presentation/patchbay/components/composer/StickerPickerButton.vue";
@@ -54,7 +55,7 @@ const emit = defineEmits<{
   (e: "sticker", payload: { fileId: string; shareKey: string }): void;
   (e: "send-text", text: string): void;
   (e: "file-upload-error", error: string): void;
-  (e: "openLightbox", payload: { url: string; fileName: string }): void;
+  (e: "openLightbox", payload: { url: string; fileName: string; isVideo?: boolean }): void;
 }>();
 
 /**
@@ -72,7 +73,7 @@ const isPluginComposerActive = computed(computeIsPluginComposerActive);
  * 判断当前是否允许发送。
  *
  * 规则：
- * - Draft 至少包含一个非空白字符，或存在待发送的图片附件。
+ * - Draft 至少包含一个非空白字符，或存在任意类型的待发送附件。
  *
  * @returns 允许发送则为 `true`。
  */
@@ -83,9 +84,7 @@ function computeCanSend(): boolean {
   // "done" 表示上传已完成（可发送），"pending" 表示等待上传。
   // 两者均视为"有待发送内容"，允许启用发送按钮。
   const hasPendingAttachments = attachments.value.some(
-    (att) =>
-      (att.file.type.startsWith("image/") || att.file.type.startsWith("video/")) &&
-      (att.status === "done" || att.status === "pending"),
+    (att) => att.status === "done" || att.status === "pending",
   );
   return hasText || hasPendingAttachments;
 }
@@ -103,7 +102,7 @@ const attachments = computed(() => Array.from(getAttachments().values()));
 async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
   isUploadingVoice.value = true;
   try {
-    const base64 = await invoke<string>("read_file_base64", { path: payload.filePath });
+    const base64 = await invokeTauri<string>("read_file_base64", { path: payload.filePath });
     const binaryStr = atob(base64);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
@@ -123,7 +122,7 @@ let unlistenScreenshot: UnlistenFn | null = null;
 
 async function handleScreenshotCompleted(event: { payload: string }): Promise<void> {
   try {
-    const base64 = await invoke<string>("read_file_base64", { path: event.payload });
+    const base64 = await invokeTauri<string>("read_file_base64", { path: event.payload });
     const binaryStr = atob(base64);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
@@ -137,13 +136,16 @@ async function handleScreenshotCompleted(event: { payload: string }): Promise<vo
   }
 }
 
+let mounted = true;
+
 onMounted(() => {
-  listen("screenshot-completed", handleScreenshotCompleted).then((unlisten) => {
-    unlistenScreenshot = unlisten;
+  safeListen("screenshot-completed", handleScreenshotCompleted).then((unlisten) => {
+    if (mounted) unlistenScreenshot = unlisten;
   });
 });
 
 onBeforeUnmount(() => {
+  mounted = false;
   unlistenScreenshot?.();
 });
 
@@ -156,24 +158,27 @@ function handleStickerText(text: string): void {
 }
 
 /**
- * 处理粘贴事件：检测剪贴板中的图片并添加到附件列表。
+ * 处理粘贴事件：检测剪贴板中的文件并添加到附件列表。
+ *
+ * 支持任意类型文件：图片、视频、文档、压缩包等。
+ * 仅在剪贴板中包含 `kind === 'file'` 的条目时才阻止默认粘贴行为。
  *
  * @param e - 原生剪贴板事件。
  */
 function handlePaste(e: ClipboardEvent): void {
   const items = e.clipboardData?.items;
   if (!items) return;
-  const imageFiles: File[] = [];
+  const pastedFiles: File[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item.type.startsWith("image/")) {
+    if (item.kind === "file") {
       const file = item.getAsFile();
-      if (file) imageFiles.push(file);
+      if (file) pastedFiles.push(file);
     }
   }
-  if (imageFiles.length > 0) {
+  if (pastedFiles.length > 0) {
     e.preventDefault();
-    addFiles(imageFiles);
+    addFiles(pastedFiles);
   }
 }
 
@@ -315,7 +320,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
         <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
         <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
       </div>
-      <button class="cp-reply__btn" type="button" @click="handleCancelReply">×</button>
+      <button class="cp-reply__btn" type="button" @click="handleCancelReply"><t-icon name="close" /></button>
     </div>
 
     <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
@@ -381,7 +386,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
           :attachments="attachments"
           @remove="removeAttachment"
           @retry="handleRetryAttachment"
-          @openLightbox="(payload: { url: string; fileName: string }) => emit('openLightbox', payload)"
+          @openLightbox="(payload: { url: string; fileName: string; isVideo?: boolean }) => emit('openLightbox', payload)"
         />
         <t-textarea
           :model-value="props.draft"

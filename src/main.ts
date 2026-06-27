@@ -16,7 +16,7 @@ import App from "./App.vue";
 import { router } from "./app/router";
 import { i18n } from "./app/i18n";
 import "tdesign-vue-next/es/style/index.css";
-import { getStoredTheme, setTheme } from "@/shared/utils/theme";
+import { getStoredAccent, getStoredTheme, setAccent, setTheme } from "@/shared/utils/theme";
 import "@/shared/serverIdentity";
 import { routeIfSubWindow } from "@/app/bootstrap/subWindowRouting";
 import { registerUserProfileBridge } from "@/app/bootstrap/userProfileBridge";
@@ -63,8 +63,16 @@ serverConnectionCapabilities.scopeLifecycle.registerCleanupHandler(() => {
   serverConnectionCapabilities.workspace.selectSocket("");
 });
 
-// 首帧渲染前应用主题，尽量减少主题切换的“闪烁”。
-setTheme(getStoredTheme() ?? "patchbay");
+// 首帧渲染前应用主题与强调色，尽量减少主题切换的“闪烁”。
+//
+// 兼容策略：旧用户可能仅持久化了 `data-theme=patchbay`（无 accent）。
+// - 若存储中没有 accent，则根据已存储的 theme 推断默认 accent：
+//   - `theme=patchbay` → `accent=patchbay`（沿用原本的视觉）
+//   - 其他 → `accent=default`（与新拆分后的默认强调色对齐）
+const initialTheme = getStoredTheme() ?? "patchbay";
+const initialAccent = getStoredAccent() ?? (initialTheme === "patchbay" ? "patchbay" : "default");
+setTheme(initialTheme);
+setAccent(initialAccent);
 
 const searchParams = new URLSearchParams(window.location.search);
 const isSubWindow = routeIfSubWindow(router, searchParams);

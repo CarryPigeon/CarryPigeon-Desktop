@@ -570,13 +570,10 @@ mod tests {
     use std::sync::{Mutex, OnceLock};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    static TEST_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
-    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
-        match TEST_LOCK.get_or_init(|| Mutex::new(())).lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
+    async fn test_lock() -> tokio::sync::MutexGuard<'static, ()> {
+        TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await
     }
 
     fn test_app_data_dir() -> PathBuf {
@@ -594,10 +591,10 @@ mod tests {
     }
 
     fn reset_test_state() {
-        if let Some(cell) = CHAT_CACHE_DB.get() {
-            if let Ok(mut guard) = cell.lock() {
-                *guard = None;
-            }
+        if let Some(cell) = CHAT_CACHE_DB.get()
+            && let Ok(mut guard) = cell.lock()
+        {
+            *guard = None;
         }
         let _ = forget_master_key();
         let _ = crate::shared::app_data_dir::reset_app_data_dir();
@@ -613,7 +610,7 @@ mod tests {
 
     #[tokio::test]
     async fn load_all_empty_db_without_master_key() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
@@ -625,7 +622,7 @@ mod tests {
 
     #[tokio::test]
     async fn clear_all_removes_data_and_key() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
@@ -655,7 +652,7 @@ mod tests {
 
     #[tokio::test]
     async fn load_all_treats_missing_master_key_as_empty_cache() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
@@ -695,7 +692,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_treats_missing_master_key_as_missing_value() {
-        let _guard = test_lock();
+        let _guard = test_lock().await;
         let app_dir = init_test_app_data_dir();
         std::fs::create_dir_all(&app_dir).expect("app dir");
         reset_test_state();
@@ -728,9 +725,9 @@ mod tests {
         assert_eq!(plain, "hello world");
     }
 
-    #[test]
-    fn forget_master_key_is_idempotent() {
-        let _guard = test_lock();
+    #[tokio::test]
+    async fn forget_master_key_is_idempotent() {
+        let _guard = test_lock().await;
         reset_test_state();
         let _ = forget_master_key();
         let _ = forget_master_key();

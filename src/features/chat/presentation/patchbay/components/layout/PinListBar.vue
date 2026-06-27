@@ -9,6 +9,7 @@
  */
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import type { ChatPinRecord } from "@/features/chat/domain/types/chatApiModels";
 
 /**
@@ -94,7 +95,7 @@ function fmtTime(ms: number): string {
 <template>
   <div v-if="hasPins" class="cp-pinListBar" role="region" :aria-label="t('pinned_messages')">
     <div class="cp-pinListBar__header" @click="toggleExpanded">
-      <span class="cp-pinListBar__icon">📌</span>
+      <span class="cp-pinListBar__icon"><AppIcon name="pin" :size="13" :stroke-width="1.75" /></span>
       <span class="cp-pinListBar__count">{{ props.pins.length }} {{ props.pins.length === 1 ? t('pinned_message') : t('pinned_messages') }}</span>
       <button
         class="cp-pinListBar__toggle"
@@ -102,7 +103,7 @@ function fmtTime(ms: number): string {
         :aria-expanded="expanded"
         :aria-label="expanded ? t('collapse') : t('expand')"
       >
-        {{ expanded ? '▴' : '▾' }}
+        <t-icon :name="expanded ? 'chevron-up' : 'chevron-down'" />
       </button>
     </div>
 
@@ -134,7 +135,7 @@ function fmtTime(ms: number): string {
           :title="t('unpin_message')"
           @click.stop="handleUnpin(entry.pin.messageId)"
         >
-          ✕
+          <t-icon name="close" />
         </button>
       </div>
     </div>
@@ -146,12 +147,12 @@ function fmtTime(ms: number): string {
       :title="t('close')"
       @click="handleDismiss"
     >
-      ✕
+      <t-icon name="close" />
     </button>
   </div>
 
   <div v-else-if="loading" class="cp-pinListBar cp-pinListBar--loading" role="region" :aria-label="t('loading')">
-    <span class="cp-pinListBar__icon">📌</span>
+    <span class="cp-pinListBar__icon"><AppIcon name="pin" :size="13" :stroke-width="1.75" /></span>
     <span>{{ t('loading') }}...</span>
   </div>
 </template>
@@ -190,8 +191,11 @@ function fmtTime(ms: number): string {
 }
 
 .cp-pinListBar__icon {
+  display: inline-flex;
+  align-items: center;
   font-size: 13px;
   flex-shrink: 0;
+  color: var(--cp-accent);
 }
 
 .cp-pinListBar__count {
@@ -203,9 +207,11 @@ function fmtTime(ms: number): string {
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cp-text-muted);
   padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .cp-pinListBar__items {
@@ -275,10 +281,13 @@ function fmtTime(ms: number): string {
 }
 
 .cp-pinListBar__itemUnpin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--cp-text-muted);
   padding: 2px;
   border-radius: 2px;
@@ -297,10 +306,13 @@ function fmtTime(ms: number): string {
 }
 
 .cp-pinListBar__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cp-text-muted);
   padding: 2px 4px;
   border-radius: 2px;

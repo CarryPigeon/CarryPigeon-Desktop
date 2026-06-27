@@ -46,7 +46,7 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { createLogger } from "@/shared/utils/logger";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { safeListen } from "@/shared/tauri/events";
 import { startScreenshot } from "../../data/screenshotCommands";
 
 const { t } = useI18n();
@@ -73,16 +73,17 @@ async function handleClick(hideWindow: boolean) {
   }
 }
 
-let unlistenCompleted: UnlistenFn | null = null;
-let unlistenCancelled: UnlistenFn | null = null;
+let unlistenCompleted: (() => void) | null = null;
+let unlistenCancelled: (() => void) | null = null;
+let mounted = true;
 
 onMounted(() => {
-  listen("screenshot-completed", () => {
-    loading.value = false;
-  }).then((u) => { unlistenCompleted = u; });
-  listen("screenshot-cancelled", () => {
-    loading.value = false;
-  }).then((u) => { unlistenCancelled = u; });
+  void safeListen("screenshot-completed", () => {
+    if (mounted) loading.value = false;
+  }).then((u) => { if (mounted) unlistenCompleted = u; });
+  void safeListen("screenshot-cancelled", () => {
+    if (mounted) loading.value = false;
+  }).then((u) => { if (mounted) unlistenCancelled = u; });
 
   const listener = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -95,6 +96,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  mounted = false;
   unlistenCompleted?.();
   unlistenCancelled?.();
   if (outsideClickListener) {

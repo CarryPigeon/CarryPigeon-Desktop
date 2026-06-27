@@ -15,7 +15,9 @@ import {
   migrateLegacyBookmarks,
   type BookmarkEntry,
 } from "../storage/localBookmarkStorage";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
+import EmptyState from "@/shared/ui/EmptyState.vue";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -87,9 +89,9 @@ function fmtTime(ms: number): string {
     <div class="cp-savedMessages">
       <header class="cp-savedMessages__header">
         <button class="cp-savedMessages__back" type="button" @click="router.push('/chat')">
-          ← {{ t("back") }}
+          <t-icon name="chevron-left" /> {{ t("back") }}
         </button>
-        <h1 class="cp-savedMessages__title">⭐ {{ t("saved_messages") }}</h1>
+        <h1 class="cp-savedMessages__title"><AppIcon name="bookmark" :size="16" :stroke-width="1.75" /> {{ t("saved_messages") }}</h1>
         <button
           v-if="bookmarks.length > 0"
           class="cp-savedMessages__clearAll"
@@ -104,11 +106,15 @@ function fmtTime(ms: number): string {
         {{ t("loading") }}...
       </div>
 
-      <div v-else-if="sortedBookmarks.length === 0" class="cp-savedMessages__empty">
-        <div class="cp-savedMessages__emptyIcon">🔖</div>
-        <div class="cp-savedMessages__emptyTitle">{{ t("no_saved_messages") }}</div>
-        <div class="cp-savedMessages__emptyDesc">{{ t("no_saved_messages_hint") }}</div>
-      </div>
+      <EmptyState
+        v-else-if="sortedBookmarks.length === 0"
+        :title="t('no_saved_messages')"
+        :description="t('no_saved_messages_hint')"
+      >
+        <template #icon>
+          <AppIcon name="bookmark" :size="40" :stroke-width="1.5" />
+        </template>
+      </EmptyState>
 
       <ul v-else class="cp-savedMessages__list">
         <li
@@ -141,7 +147,7 @@ function fmtTime(ms: number): string {
               :title="t('remove_bookmark')"
               @click.stop="handleRemove(entry.messageId)"
             >
-              ✕
+              <t-icon name="close" />
             </button>
           </div>
         </li>
@@ -168,10 +174,13 @@ function fmtTime(ms: number): string {
 }
 
 .cp-savedMessages__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--cp-accent);
   padding: 4px 8px;
   border-radius: 4px;
@@ -188,6 +197,9 @@ function fmtTime(ms: number): string {
   font-size: 16px;
   font-weight: 600;
   color: var(--cp-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .cp-savedMessages__clearAll {
@@ -205,8 +217,7 @@ function fmtTime(ms: number): string {
   background: color-mix(in oklab, var(--cp-danger) 8%, transparent);
 }
 
-.cp-savedMessages__loading,
-.cp-savedMessages__empty {
+.cp-savedMessages__loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -216,22 +227,6 @@ function fmtTime(ms: number): string {
   text-align: center;
   flex: 1;
   color: var(--cp-text-muted);
-}
-
-.cp-savedMessages__emptyIcon {
-  font-size: 40px;
-  opacity: 0.6;
-}
-
-.cp-savedMessages__emptyTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--cp-text);
-}
-
-.cp-savedMessages__emptyDesc {
-  font-size: 13px;
-  max-width: 280px;
 }
 
 .cp-savedMessages__list {
@@ -305,10 +300,13 @@ function fmtTime(ms: number): string {
 }
 
 .cp-savedMessages__itemRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cp-text-muted);
   padding: 2px 4px;
   border-radius: 2px;

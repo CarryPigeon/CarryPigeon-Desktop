@@ -7,6 +7,7 @@ export { PerformFileUpload } from "./usecases/PerformFileUpload";
 export { RequestFileUpload } from "./usecases/RequestFileUpload";
 export {
   downloadFile,
+  resumeDownload,
   getDownloadTasks,
   getCurrentTaskId,
   clearCompletedTasks,

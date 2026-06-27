@@ -5,10 +5,11 @@
  * 隐藏 DI 与 domain use case 的组装细节。
  */
 
-import { getSetThemeUseCase, getSettingsUseCase } from "../di/settings.di";
-import type { AppSettings, AppTheme } from "../domain/types/SettingsTypes";
+import { getSetAccentUseCase, getSetThemeUseCase, getSettingsUseCase } from "../di/settings.di";
+import type { AppAccent, AppSettings, AppTheme } from "../domain/types/SettingsTypes";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
-import { invokeTauri } from "@/shared/tauri/invokeClient";
+import { invokeTauri, safeInvokeTauri } from "@/shared/tauri/invokeClient";
+import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 
 export type GeneralPreferenceKey = "auto_login" | "auto_launch" | "close_to_tray" | "check_for_updates";
 
@@ -56,15 +57,34 @@ export async function updateTheme(theme: AppTheme): Promise<void> {
   }
 }
 
+/**
+ * 更新当前应用强调色（accent）。
+ */
+export async function updateAccent(accent: AppAccent): Promise<void> {
+  await getSetAccentUseCase().execute(accent);
+  // Also persist to backend config for import/export consistency
+  try {
+    await invokeTauri<void>(TAURI_COMMANDS.settingsUpdateConfigString, { key: "accent", value: accent });
+  } catch {
+    // Accent is local-cache primary; backend persistence is best-effort
+  }
+}
+
 async function readConfigBool(key: BooleanPreferenceKey): Promise<boolean> {
-  return invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key });
+  if (!isTauriRuntimeAvailable()) return false;
+  const value = await safeInvokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key });
+  return value ?? false;
 }
 
 async function updateConfigBool(key: BooleanPreferenceKey, value: boolean): Promise<void> {
+  if (!isTauriRuntimeAvailable()) return;
   await invokeTauri<void>(TAURI_COMMANDS.settingsUpdateConfigBool, { key, value });
 }
 
 export async function readGeneralPreferences(): Promise<GeneralPreferencesSnapshot> {
+  if (!isTauriRuntimeAvailable()) {
+    return { autoLogin: false, autoLaunch: false, closeToTray: false, checkForUpdates: false };
+  }
   const [autoLogin, autoLaunch, closeToTray, checkForUpdates] = await Promise.all(
     GENERAL_PREFERENCE_KEYS.map((key) => readConfigBool(key)),
   );
@@ -89,6 +109,9 @@ export type BusinessPreferencesSnapshot = {
 };
 
 export async function readBusinessPreferences(): Promise<BusinessPreferencesSnapshot> {
+  if (!isTauriRuntimeAvailable()) {
+    return { emailNotifications: true, desktopNotifications: true, globalDnd: false, notificationSound: true };
+  }
   const [emailNotifications, desktopNotifications, globalDnd, notificationSound] = await Promise.all(
     BUSINESS_PREFERENCE_KEYS.map((key) => readConfigBool(key)),
   );

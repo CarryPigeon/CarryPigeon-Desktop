@@ -87,16 +87,5 @@ gif = "0.14"
 # 截图
 xcap = "0.5"
 
-[profile.dev]
-opt-level = 0             # 不优化，最快编译
-codegen-units = 256       # 最大并行编译单元
-lto = false               # 关闭 LTO
-
-[profile.release]
-opt-level = "z"          # 优先优化体积
-lto = true               # 跨 crate 死代码消除
-strip = true             # 去除调试符号
-panic = "abort"          # 移除 unwind 回滚表
-
 [dev-dependencies]
 tempfile = "3"

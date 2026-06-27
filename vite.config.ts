@@ -34,6 +34,14 @@ export default defineConfig(() => ({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern-compiler",
+        additionalData: `@use "@/styles/button-size" as *;\n`,
+      },
+    },
+  },
   define: {
     "import.meta.env.PACKAGE_VERSION": JSON.stringify(pkg.version),
   },

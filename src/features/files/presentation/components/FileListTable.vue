@@ -6,6 +6,7 @@
 
 import { ref, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import type { FileRecord, FileSortField, SortOrder } from "../../domain/contracts";
 
 const props = defineProps<{
@@ -46,9 +47,9 @@ const columns: { field: FileSortField | null; label: string; sortable: boolean }
   { field: null, label: t("file_actions"), sortable: false },
 ];
 
-function getSortIndicator(field: FileSortField): string {
+function getSortIndicator(field: FileSortField): "sort-asc" | "sort-desc" | "" {
   if (props.sortBy !== field) return "";
-  return props.sortOrder === "asc" ? " ▲" : " ▼";
+  return props.sortOrder === "asc" ? "sort-asc" : "sort-desc";
 }
 
 function handleHeaderClick(field: FileSortField): void {
@@ -123,7 +124,9 @@ function formatTime(iso: string): string {
         @click="col.sortable && col.field && handleHeaderClick(col.field)"
       >
         {{ col.label }}
-        <span v-if="col.sortable && col.field" class="cp-fileTable__sortIcon">{{ getSortIndicator(col.field) }}</span>
+        <span v-if="col.sortable && col.field" class="cp-fileTable__sortIcon">
+          <AppIcon v-if="getSortIndicator(col.field) !== ''" :name="getSortIndicator(col.field)" :size="10" :stroke-width="2" />
+        </span>
       </span>
     </div>
 
@@ -151,7 +154,9 @@ function formatTime(iso: string): string {
       <span class="cp-fileTable__cell">{{ formatTime(file.uploadedAt) }}</span>
       <span class="cp-fileTable__cell">{{ file.uploaderName || "-" }}</span>
       <span class="cp-fileTable__actions">
-        <button class="cp-fileTable__actionBtn" type="button" :title="t('download')" @click.stop="emit('download', file)">⬇</button>
+        <button class="cp-fileTable__actionBtn" type="button" :title="t('download')" @click.stop="emit('download', file)">
+          <t-icon name="download" />
+        </button>
       </span>
     </div>
   </div>
@@ -165,21 +170,21 @@ function formatTime(iso: string): string {
       @click.stop="closeContextMenu"
     >
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('preview', contextMenu.file)">
-        👁 {{ t("file_preview") }}
+        <t-icon name="view" /> {{ t("file_preview") }}
       </div>
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('download', contextMenu.file)">
-        ⬇ {{ t("download") }}
+        <t-icon name="download" /> {{ t("download") }}
       </div>
       <div class="cp-contextMenu__divider" />
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('openChannel', contextMenu.file)">
-        # {{ t("file_open_channel") }}
+        <t-icon name="chat" /> {{ t("file_open_channel") }}
       </div>
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('copyLink', contextMenu.file)">
-        🔗 {{ t("file_copy_link") }}
+        <t-icon name="link" /> {{ t("file_copy_link") }}
       </div>
       <div class="cp-contextMenu__divider" />
       <div class="cp-contextMenu__item cp-contextMenu__item--danger" @click="contextMenu.file && emit('delete', contextMenu.file)">
-        🗑 {{ t("file_delete") }}
+        <t-icon name="delete" /> {{ t("file_delete") }}
       </div>
     </div>
   </Teleport>
@@ -221,7 +226,11 @@ function formatTime(iso: string): string {
 }
 
 .cp-fileTable__sortIcon {
+  display: inline-flex;
+  align-items: center;
   font-size: 10px;
+  margin-left: 2px;
+  vertical-align: -1px;
 }
 
 .cp-fileTable__checkbox {
@@ -236,7 +245,8 @@ function formatTime(iso: string): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
+  min-height: 44px;
   border-bottom: 1px solid var(--cp-border);
   transition: background var(--cp-fast) var(--cp-ease);
   cursor: pointer;
@@ -303,6 +313,9 @@ function formatTime(iso: string): string {
 }
 
 .cp-fileTable__actionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   color: var(--cp-text-muted);

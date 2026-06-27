@@ -237,9 +237,10 @@ impl AudioPipeline {
 
     pub fn push_participant_packet(&self, participant_id: &str, packet: Vec<u8>) {
         if let Ok(mut buffers) = self.participant_buffers.lock()
-            && let Some(buf) = buffers.get_mut(participant_id) {
-                buf.push(packet);
-            }
+            && let Some(buf) = buffers.get_mut(participant_id)
+        {
+            buf.push(packet);
+        }
     }
 
     pub fn unregister_participant(&self, participant_id: &str) {
@@ -304,9 +305,10 @@ fn process_capture(
 
     // Save leftover for next callback
     if pos < samples.len()
-        && let Ok(mut leftover_guard) = leftover.lock() {
-            *leftover_guard = samples[pos..].to_vec();
-        }
+        && let Ok(mut leftover_guard) = leftover.lock()
+    {
+        *leftover_guard = samples[pos..].to_vec();
+    }
 }
 
 /// Decode Opus packets into f32 PCM for playback.
@@ -371,37 +373,38 @@ fn process_playback_multi(
     data.fill(0.0); // start with silence
 
     if let Ok(mut decoders) = participant_decoders.lock()
-        && let Ok(mut buffers) = participant_buffers.lock() {
-            let mut mixed = vec![0.0f32; samples];
+        && let Ok(mut buffers) = participant_buffers.lock()
+    {
+        let mut mixed = vec![0.0f32; samples];
 
-            for (pid, buf) in buffers.iter_mut() {
-                if let Some(dec) = decoders.get_mut(pid) {
-                    let mut offset = 0;
-                    while offset + FRAME_SIZE <= samples {
-                        if let Some(packet) = buf.pop() {
-                            let mut frame = vec![0.0f32; FRAME_SIZE];
-                            if dec
-                                .decode_float(Some(&packet), &mut frame, FRAME_SIZE as i32, false)
-                                .is_ok()
-                            {
-                                for (i, sample) in frame.iter().enumerate() {
-                                    mixed[offset + i] += sample;
-                                }
+        for (pid, buf) in buffers.iter_mut() {
+            if let Some(dec) = decoders.get_mut(pid) {
+                let mut offset = 0;
+                while offset + FRAME_SIZE <= samples {
+                    if let Some(packet) = buf.pop() {
+                        let mut frame = vec![0.0f32; FRAME_SIZE];
+                        if dec
+                            .decode_float(Some(&packet), &mut frame, FRAME_SIZE as i32, false)
+                            .is_ok()
+                        {
+                            for (i, sample) in frame.iter().enumerate() {
+                                mixed[offset + i] += sample;
                             }
                         }
-                        offset += FRAME_SIZE;
                     }
-                } else {
-                    // Decoder missing — drain buffer
-                    buf.clear();
+                    offset += FRAME_SIZE;
                 }
-            }
-
-            // Copy mixed output, soft-clip to prevent distortion
-            for (i, sample) in mixed.iter().enumerate() {
-                data[i] = sample.tanh();
+            } else {
+                // Decoder missing — drain buffer
+                buf.clear();
             }
         }
+
+        // Copy mixed output, soft-clip to prevent distortion
+        for (i, sample) in mixed.iter().enumerate() {
+            data[i] = sample.tanh();
+        }
+    }
 }
 
 fn apply_noise_gate(samples: &[f32]) -> Vec<f32> {

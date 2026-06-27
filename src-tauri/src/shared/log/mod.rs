@@ -8,6 +8,8 @@
 //! - 注释统一使用中文，便于团队维护与交接。
 //! - 日志输出统一使用英文，便于跨端检索与与上游/第三方日志对齐。
 
+use std::sync::OnceLock;
+
 use tracing::{debug, error, info, warn};
 
 use crate::shared::error::CommandResult;
@@ -56,30 +58,43 @@ fn split_action_and_body(message: &str) -> Option<(String, &str)> {
     }
 }
 
+struct LogRedactRules {
+    bearer: Regex,
+    kv: [Regex; 7],
+}
+
+fn redact_rules() -> Option<&'static LogRedactRules> {
+    static RULES: OnceLock<Option<LogRedactRules>> = OnceLock::new();
+    RULES
+        .get_or_init(|| {
+            let bearer = Regex::new(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+").ok()?;
+            let kv: [Regex; 7] = [
+                Regex::new(r#"(?i)(["']?token["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+                Regex::new(r#"(?i)(["']?authorization["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+                Regex::new(r#"(?i)(["']?password["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+                Regex::new(r#"(?i)(["']?secret["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+                Regex::new(r#"(?i)(["']?key["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+                Regex::new(r#"(?i)(["']?code["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+                Regex::new(r#"(?i)(["']?verification["']?\s*[:=]\s*["'])[^"']*(["'])"#).ok()?,
+            ];
+            Some(LogRedactRules { bearer, kv })
+        })
+        .as_ref()
+}
+
 fn redact_sensitive_message_body(body: &str) -> String {
-    static KEY_VALUE_PATTERNS: &[&str] = &[
-        r#"(?i)(["']?token["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-        r#"(?i)(["']?authorization["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-        r#"(?i)(["']?password["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-        r#"(?i)(["']?secret["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-        r#"(?i)(["']?key["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-        r#"(?i)(["']?code["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-        r#"(?i)(["']?verification["']?\s*[:=]\s*["'])[^"']*(["'])"#,
-    ];
+    let Some(rules) = redact_rules() else {
+        return body.to_string();
+    };
 
-    let mut sanitized = body.to_string();
-    if let Ok(bearer_re) = Regex::new(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+") {
-        sanitized = bearer_re.replace_all(&sanitized, "[REDACTED]").into_owned();
-    }
+    let mut sanitized = rules.bearer.replace_all(body, "[REDACTED]").into_owned();
 
-    for pattern in KEY_VALUE_PATTERNS {
-        if let Ok(re) = Regex::new(pattern) {
-            sanitized = re
-                .replace_all(&sanitized, |caps: &Captures<'_>| {
-                    format!("{}[REDACTED]{}", &caps[1], &caps[2])
-                })
-                .into_owned();
-        }
+    for re in &rules.kv {
+        sanitized = re
+            .replace_all(&sanitized, |caps: &Captures<'_>| {
+                format!("{}[REDACTED]{}", &caps[1], &caps[2])
+            })
+            .into_owned();
     }
 
     sanitized

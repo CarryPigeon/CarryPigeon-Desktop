@@ -17,12 +17,12 @@ const emit = defineEmits<{
 }>();
 
 const tools: Array<{ id: Tool; label: string; icon: string }> = [
-  { id: "select", label: "Select", icon: "⤡" },
-  { id: "pen", label: "Pen", icon: "✏" },
-  { id: "arrow", label: "Arrow", icon: "→" },
-  { id: "rect", label: "Rectangle", icon: "□" },
-  { id: "text", label: "Text", icon: "T" },
-  { id: "mosaic", label: "Mosaic", icon: "▣" },
+  { id: "select", label: "Select", icon: "arrow-up-right" },
+  { id: "pen", label: "Pen", icon: "edit" },
+  { id: "arrow", label: "Arrow", icon: "arrow-right" },
+  { id: "rect", label: "Rectangle", icon: "rectangle" },
+  { id: "text", label: "Text", icon: "text" },
+  { id: "mosaic", label: "Mosaic", icon: "view-module" },
 ];
 
 const colors = ["#ff4444", "#ff8c00", "#ffd700", "#44ff44", "#44aaff", "#ffffff", "#000000"];
@@ -41,7 +41,7 @@ const presetWidths = [2, 4, 6, 10, 16];
         :title="tool.label"
         @click="emit('toolChange', tool.id)"
       >
-        {{ tool.icon }}
+        <t-icon :name="tool.icon" />
       </button>
     </div>
 
@@ -81,7 +81,7 @@ const presetWidths = [2, 4, 6, 10, 16];
         title="Undo"
         @click="emit('undo')"
       >
-        ↶
+        <t-icon name="undo" />
       </button>
     </div>
   </div>
@@ -117,7 +117,7 @@ const presetWidths = [2, 4, 6, 10, 16];
   color: #ccc;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   transition: background 0.12s ease;
 }
 .cp-annotation-tool:hover {

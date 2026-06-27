@@ -72,11 +72,11 @@ function handleBackToChat(): void {
     <div class="cp-plugins__headLeft">
       <div class="cp-plugins__headTitle">{{ t("plugin_center") }}</div>
       <div class="cp-plugins__headMeta">
-        <span class="cp-plugins__mono">{{ serverSocket || "no-server" }}</span>
+        <span class="cp-plugins__mono">{{ serverSocket || t("plugins_no_server") }}</span>
         <span class="cp-plugins__dot"></span>
-        <span class="cp-plugins__mono">{{ serverId || "missing-server_id" }}</span>
+        <span class="cp-plugins__mono">{{ serverId || t("plugins_missing_server_id") }}</span>
         <span class="cp-plugins__dot"></span>
-        <span class="cp-plugins__muted">{{ modulesCount }} modules</span>
+        <span class="cp-plugins__muted">{{ modulesCount }} {{ t("plugins_modules_suffix") }}</span>
       </div>
     </div>
     <div class="cp-plugins__headRight">

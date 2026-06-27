@@ -82,7 +82,9 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
         <aside class="cp-previewPanel" @click.stop>
           <header class="cp-previewPanel__head">
             <span class="cp-previewPanel__filename">{{ file.filename }}</span>
-            <button class="cp-previewPanel__close" type="button" @click="emit('close')">✕</button>
+            <button class="cp-previewPanel__close" type="button" @click="emit('close')">
+              <t-icon name="close" />
+            </button>
           </header>
 
           <div class="cp-previewPanel__body">
@@ -155,16 +157,16 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
 
           <div class="cp-previewPanel__actions">
             <button class="cp-previewPanel__actionBtn" type="button" @click="emit('download', file)">
-              ⬇ {{ t("download") }}
+              <t-icon name="download" /> {{ t("download") }}
             </button>
             <button class="cp-previewPanel__actionBtn cp-previewPanel__actionBtn--danger" type="button" @click="emit('delete', file)">
-              🗑 {{ t("file_delete") }}
+              <t-icon name="delete" /> {{ t("file_delete") }}
             </button>
             <button v-if="file.channelId" class="cp-previewPanel__actionBtn" type="button" @click="emit('openChannel', file)">
-              # {{ t("file_open_channel") }}
+              <t-icon name="chat" /> {{ t("file_open_channel") }}
             </button>
             <button class="cp-previewPanel__actionBtn" type="button" @click="handleCopyLink(file)">
-              🔗 {{ t("file_copy_link") }}
+              <t-icon name="link" /> {{ t("file_copy_link") }}
             </button>
           </div>
         </aside>
@@ -212,6 +214,9 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
 }
 
 .cp-previewPanel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   color: var(--cp-text-muted);

@@ -15,6 +15,9 @@ import { getVoiceCallCapabilities } from "../voice-call/api";
 import { getActiveChatServerSocket } from "../composition/serverWorkspaceAdapter";
 import type { ChatCapabilities, UnreadMessagePreview } from "./api-types";
 
+export { decideNotification } from "../message-flow/domain/usecases/notificationDecider";
+export { sendDesktopNotification } from "../message-flow/domain/usecases/notificationSender";
+
 let cachedChatCapabilities: ChatCapabilities | null = null;
 
 /**

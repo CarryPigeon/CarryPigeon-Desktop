@@ -32,11 +32,14 @@ pub fn capture_all_screens(save_dir: &Path) -> Result<Vec<ScreenCapture>, String
     std::fs::create_dir_all(save_dir)
         .map_err(|e| format!("capture_all_screens create save_dir failed: {e:?}"))?;
 
-    let monitors = Monitor::all().map_err(|e| format!("capture_all_screens monitor list failed: {e:?}"))?;
+    let monitors =
+        Monitor::all().map_err(|e| format!("capture_all_screens monitor list failed: {e:?}"))?;
 
     let mut captures = Vec::new();
     for monitor in &monitors {
-        let image = monitor.capture_image().map_err(|e| format!("capture_all_screens capture_image failed: {e:?}"))?;
+        let image = monitor
+            .capture_image()
+            .map_err(|e| format!("capture_all_screens capture_image failed: {e:?}"))?;
 
         let width = image.width();
         let height = image.height();
@@ -58,12 +61,21 @@ pub fn capture_all_screens(save_dir: &Path) -> Result<Vec<ScreenCapture>, String
         let data_base64 = use_base64_encode(&png_bytes);
 
         captures.push(ScreenCapture {
-            monitor_id: monitor.id().map_err(|e| format!("monitor id failed: {e:?}"))?,
+            monitor_id: monitor
+                .id()
+                .map_err(|e| format!("monitor id failed: {e:?}"))?,
             width,
             height,
-            x: monitor.x().map_err(|e| format!("monitor x failed: {e:?}"))?,
-            y: monitor.y().map_err(|e| format!("monitor y failed: {e:?}"))?,
-            scale_factor: monitor.scale_factor().map_err(|e| format!("monitor scale_factor failed: {e:?}"))? as f64,
+            x: monitor
+                .x()
+                .map_err(|e| format!("monitor x failed: {e:?}"))?,
+            y: monitor
+                .y()
+                .map_err(|e| format!("monitor y failed: {e:?}"))?,
+            scale_factor: monitor
+                .scale_factor()
+                .map_err(|e| format!("monitor scale_factor failed: {e:?}"))?
+                as f64,
             data_base64,
             file_path: Some(file_path.to_string_lossy().to_string()),
         });

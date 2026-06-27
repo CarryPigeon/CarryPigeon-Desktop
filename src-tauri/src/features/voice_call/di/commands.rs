@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 use super::super::data::audio::device::AudioDeviceManager;
 use super::super::data::audio::pipeline::AudioPipeline;
@@ -19,14 +19,14 @@ pub struct VoiceCallService {
 pub struct VoiceCallInner {
     audio: Mutex<Option<AudioDeviceManager>>,
     sessions: Mutex<HashMap<String, CallSession>>,
-    session_offers: tokio::sync::Mutex<HashMap<String, String>>,
+    session_offers: Mutex<HashMap<String, String>>,
     selected_input: Mutex<Option<String>>,
     selected_output: Mutex<Option<String>>,
-    webrtc: tokio::sync::Mutex<Option<WebRtcPeerManager>>,
-    signaling: tokio::sync::Mutex<Option<SignalingClient>>,
-    audio_pipeline: tokio::sync::Mutex<Option<Arc<AudioPipeline>>>,
-    local_user_id: tokio::sync::Mutex<Option<String>>,
-    local_display_name: tokio::sync::Mutex<Option<String>>,
+    webrtc: Mutex<Option<WebRtcPeerManager>>,
+    signaling: Mutex<Option<SignalingClient>>,
+    audio_pipeline: Mutex<Option<Arc<AudioPipeline>>>,
+    local_user_id: Mutex<Option<String>>,
+    local_display_name: Mutex<Option<String>>,
 }
 
 impl VoiceCallInner {
@@ -44,14 +44,14 @@ impl VoiceCallInner {
         Self {
             audio: Mutex::new(audio),
             sessions: Mutex::new(HashMap::new()),
-            session_offers: tokio::sync::Mutex::new(HashMap::new()),
+            session_offers: Mutex::new(HashMap::new()),
             selected_input: Mutex::new(None),
             selected_output: Mutex::new(None),
-            webrtc: tokio::sync::Mutex::new(None),
-            signaling: tokio::sync::Mutex::new(None),
-            audio_pipeline: tokio::sync::Mutex::new(None),
-            local_user_id: tokio::sync::Mutex::new(None),
-            local_display_name: tokio::sync::Mutex::new(None),
+            webrtc: Mutex::new(None),
+            signaling: Mutex::new(None),
+            audio_pipeline: Mutex::new(None),
+            local_user_id: Mutex::new(None),
+            local_display_name: Mutex::new(None),
         }
     }
 
@@ -111,16 +111,11 @@ async fn spawn_call_timeout(
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(CALL_TIMEOUT_SECS)).await;
 
-        let should_cancel = {
-            if let Ok(sessions) = inner.sessions.lock() {
-                sessions
-                    .get(&session_id)
-                    .map(|s| s.state == CallState::Dialing || s.state == CallState::Ringing)
-                    .unwrap_or(false)
-            } else {
-                false
-            }
-        };
+        let sessions = inner.sessions.lock().await;
+        let should_cancel = sessions
+            .get(&session_id)
+            .map(|s| s.state == CallState::Dialing || s.state == CallState::Ringing)
+            .unwrap_or(false);
 
         if should_cancel {
             tracing::warn!(action = "app_voice_call_timeout", session_id = %session_id);
@@ -139,11 +134,11 @@ async fn spawn_call_timeout(
 
             // End session
             {
-                if let Ok(mut sessions) = inner.sessions.lock()
-                    && let Some(s) = sessions.get_mut(&session_id) {
-                        s.state = CallState::Ended;
-                        s.ended_at = Some(now_secs());
-                    }
+                let mut sessions = inner.sessions.lock().await;
+                if let Some(s) = sessions.get_mut(&session_id) {
+                    s.state = CallState::Ended;
+                    s.ended_at = Some(now_secs());
+                }
             }
 
             inner.cleanup_session(&session_id).await;
@@ -203,7 +198,7 @@ pub async fn start_direct_call(
     inner
         .sessions
         .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
+        .await
         .insert(session_id.clone(), session.clone());
 
     // Create WebRTC offer and send via signaling
@@ -285,7 +280,7 @@ pub async fn start_conference(
     inner
         .sessions
         .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
+        .await
         .insert(session_id.clone(), session.clone());
 
     // Start audio pipeline + enable conference mode
@@ -293,16 +288,8 @@ pub async fn start_conference(
     pipeline.enable_conference_mode();
     let _ = pipeline.register_participant(&user_id);
 
-    let input_id = inner
-        .selected_input
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
-        .clone();
-    let output_id = inner
-        .selected_output
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
-        .clone();
+    let input_id = inner.selected_input.lock().await.clone();
+    let output_id = inner.selected_output.lock().await.clone();
 
     pipeline
         .start_capture(input_id.as_deref())
@@ -387,7 +374,7 @@ pub async fn join_conference(
     inner
         .sessions
         .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
+        .await
         .insert(session_id.clone(), session.clone());
 
     // Start audio capture
@@ -395,16 +382,8 @@ pub async fn join_conference(
     pipeline.enable_conference_mode();
     let _ = pipeline.register_participant(&user_id);
 
-    let input_id = inner
-        .selected_input
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
-        .clone();
-    let output_id = inner
-        .selected_output
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
-        .clone();
+    let input_id = inner.selected_input.lock().await.clone();
+    let output_id = inner.selected_output.lock().await.clone();
 
     pipeline
         .start_capture(input_id.as_deref())
@@ -458,10 +437,7 @@ pub async fn leave_conference(
 
     // End session（先持 sessions 锁，再持 audio_pipeline 锁，保持一致顺序避免死锁）
     let session_ended = {
-        let mut sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = inner.sessions.lock().await;
         if let Some(s) = sessions.get_mut(&session_id) {
             s.state = CallState::Ended;
             s.ended_at = Some(now_secs());
@@ -519,10 +495,7 @@ pub async fn accept_call(
 
     // Update state to connecting
     {
-        let mut sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = inner.sessions.lock().await;
         let session = sessions
             .get_mut(&session_id)
             .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
@@ -545,14 +518,15 @@ pub async fn accept_call(
     {
         let offers = inner.session_offers.lock().await;
         if let Some(candidates_json) = offers.get(&format!("{}:candidates", session_id))
-            && let Ok(candidates) = serde_json::from_str::<Vec<String>>(candidates_json) {
-                let webrtc_guard = inner.webrtc.lock().await;
-                if let Some(ref wm) = *webrtc_guard {
-                    for c in &candidates {
-                        let _ = wm.add_remote_candidate(&session_id, c).await;
-                    }
+            && let Ok(candidates) = serde_json::from_str::<Vec<String>>(candidates_json)
+        {
+            let webrtc_guard = inner.webrtc.lock().await;
+            if let Some(ref wm) = *webrtc_guard {
+                for c in &candidates {
+                    let _ = wm.add_remote_candidate(&session_id, c).await;
                 }
             }
+        }
     }
 
     // Send CallAccept via signaling
@@ -572,16 +546,8 @@ pub async fn accept_call(
 
     // Start audio pipeline
     let pipeline = inner.get_pipeline().await?;
-    let input_id = inner
-        .selected_input
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
-        .clone();
-    let output_id = inner
-        .selected_output
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?
-        .clone();
+    let input_id = inner.selected_input.lock().await.clone();
+    let output_id = inner.selected_output.lock().await.clone();
 
     pipeline
         .start_capture(input_id.as_deref())
@@ -611,10 +577,7 @@ pub async fn accept_call(
 
     // Update state to active
     {
-        let mut sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = inner.sessions.lock().await;
         if let Some(session) = sessions.get_mut(&session_id) {
             session.state = CallState::Active;
         }
@@ -668,10 +631,7 @@ pub async fn reject_call(
     }
 
     {
-        let mut sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = inner.sessions.lock().await;
         let session = sessions
             .get_mut(&session_id)
             .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
@@ -690,10 +650,7 @@ pub async fn hangup_call(
     let inner = service.inner.clone();
 
     let is_conference = {
-        let sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let sessions = inner.sessions.lock().await;
         sessions
             .get(&session_id)
             .map(|s| s.call_kind == CallKind::Conference)
@@ -742,10 +699,7 @@ pub async fn hangup_call(
     }
 
     {
-        let mut sessions = inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = inner.sessions.lock().await;
         let session = sessions
             .get_mut(&session_id)
             .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
@@ -769,11 +723,7 @@ pub async fn toggle_mute(
         .unwrap_or_default();
 
     let muted = {
-        let mut sessions = service
-            .inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = service.inner.sessions.lock().await;
         let session = sessions
             .get_mut(&session_id)
             .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
@@ -807,11 +757,7 @@ pub async fn toggle_noise_suppression(
     session_id: String,
 ) -> CommandResult<bool> {
     let ns = {
-        let mut sessions = service
-            .inner
-            .sessions
-            .lock()
-            .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+        let mut sessions = service.inner.sessions.lock().await;
         let session = sessions
             .get_mut(&session_id)
             .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
@@ -833,11 +779,7 @@ pub async fn toggle_noise_suppression(
 pub async fn enumerate_input_devices(
     service: State<'_, VoiceCallService>,
 ) -> CommandResult<Vec<AudioDeviceInfo>> {
-    let audio = service
-        .inner
-        .audio
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let audio = service.inner.audio.lock().await;
     match audio.as_ref() {
         Some(manager) => manager.enumerate_input_devices().map_err(|e| {
             format!(
@@ -853,11 +795,7 @@ pub async fn enumerate_input_devices(
 pub async fn enumerate_output_devices(
     service: State<'_, VoiceCallService>,
 ) -> CommandResult<Vec<AudioDeviceInfo>> {
-    let audio = service
-        .inner
-        .audio
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let audio = service.inner.audio.lock().await;
     match audio.as_ref() {
         Some(manager) => manager.enumerate_output_devices().map_err(|e| {
             format!(
@@ -873,11 +811,7 @@ pub async fn enumerate_output_devices(
 pub async fn enumerate_audio_devices(
     service: State<'_, VoiceCallService>,
 ) -> CommandResult<AudioDevicesInfo> {
-    let audio = service
-        .inner
-        .audio
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let audio = service.inner.audio.lock().await;
     match audio.as_ref() {
         Some(manager) => {
             let input = manager
@@ -901,11 +835,7 @@ pub async fn select_input_device(
     _session_id: String,
     device_id: String,
 ) -> CommandResult<()> {
-    let mut input = service
-        .inner
-        .selected_input
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let mut input = service.inner.selected_input.lock().await;
     *input = Some(device_id);
     Ok(())
 }
@@ -916,11 +846,7 @@ pub async fn select_output_device(
     _session_id: String,
     device_id: String,
 ) -> CommandResult<()> {
-    let mut output = service
-        .inner
-        .selected_output
-        .lock()
-        .map_err(|e| format!("[VOICE_CALL_FAILED] Lock poisoned: {}", e))?;
+    let mut output = service.inner.selected_output.lock().await;
     *output = Some(device_id);
     Ok(())
 }
@@ -1063,9 +989,8 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                     media_settings: empty_media_settings(),
                 };
 
-                if let Ok(mut sessions) = inner.sessions.lock() {
-                    sessions.insert(session_id.clone(), session);
-                }
+                let mut sessions = inner.sessions.lock().await;
+                sessions.insert(session_id.clone(), session);
 
                 let _ = app_handle.emit(
                     "voice_call:incoming",
@@ -1100,10 +1025,10 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 }
 
                 // Update session state to active
-                if let Ok(mut sessions) = inner.sessions.lock()
-                    && let Some(s) = sessions.get_mut(&session_id) {
-                        s.state = CallState::Active;
-                    }
+                let mut sessions = inner.sessions.lock().await;
+                if let Some(s) = sessions.get_mut(&session_id) {
+                    s.state = CallState::Active;
+                }
 
                 let _ = app_handle.emit(
                     "voice_call:state_change",
@@ -1130,11 +1055,11 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             }
 
             SignalingMessage::CallReject { session_id, reason } => {
-                if let Ok(mut sessions) = inner.sessions.lock()
-                    && let Some(s) = sessions.get_mut(&session_id) {
-                        s.state = CallState::Ended;
-                        s.ended_at = Some(now_secs());
-                    }
+                let mut sessions = inner.sessions.lock().await;
+                if let Some(s) = sessions.get_mut(&session_id) {
+                    s.state = CallState::Ended;
+                    s.ended_at = Some(now_secs());
+                }
                 let _ = app_handle.emit(
                     "voice_call:state_change",
                     CallStateChangeEvent {
@@ -1146,11 +1071,11 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             }
 
             SignalingMessage::CallHangup { session_id } => {
-                if let Ok(mut sessions) = inner.sessions.lock()
-                    && let Some(s) = sessions.get_mut(&session_id) {
-                        s.state = CallState::Ended;
-                        s.ended_at = Some(now_secs());
-                    }
+                let mut sessions = inner.sessions.lock().await;
+                if let Some(s) = sessions.get_mut(&session_id) {
+                    s.state = CallState::Ended;
+                    s.ended_at = Some(now_secs());
+                }
                 let _ = app_handle.emit(
                     "voice_call:state_change",
                     CallStateChangeEvent {
@@ -1182,21 +1107,18 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             } => {
                 // Add joiner to session participants
                 let initiator_id = {
-                    if let Ok(mut sessions) = inner.sessions.lock() {
-                        if let Some(s) = sessions.get_mut(&session_id) {
-                            let participant = Participant {
-                                user_id: user_id.clone(),
-                                display_name: display_name.clone(),
-                                is_muted: false,
-                                is_speaking: false,
-                                audio_level: 0.0,
-                                joined_at: Some(now_secs()),
-                            };
-                            s.participants.push(participant);
-                            s.initiator.clone()
-                        } else {
-                            String::new()
-                        }
+                    let mut sessions = inner.sessions.lock().await;
+                    if let Some(s) = sessions.get_mut(&session_id) {
+                        let participant = Participant {
+                            user_id: user_id.clone(),
+                            display_name: display_name.clone(),
+                            is_muted: false,
+                            is_speaking: false,
+                            audio_level: 0.0,
+                            joined_at: Some(now_secs()),
+                        };
+                        s.participants.push(participant);
+                        s.initiator.clone()
                     } else {
                         String::new()
                     }
@@ -1228,16 +1150,17 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
 
                 // Send offer to joiner via signaling
                 if let Some(offer) = offer
-                    && let Some(ref client) = *inner.signaling.lock().await {
-                        let _ = client
-                            .send(&SignalingMessage::ConferenceSdpOffer {
-                                session_id: session_id.clone(),
-                                target_user_id: user_id.clone(),
-                                sdp_offer: offer.sdp,
-                                ice_candidates: offer.candidates,
-                            })
-                            .await;
-                    }
+                    && let Some(ref client) = *inner.signaling.lock().await
+                {
+                    let _ = client
+                        .send(&SignalingMessage::ConferenceSdpOffer {
+                            session_id: session_id.clone(),
+                            target_user_id: user_id.clone(),
+                            sdp_offer: offer.sdp,
+                            ice_candidates: offer.candidates,
+                        })
+                        .await;
+                }
 
                 // Register on_track for joiner's audio → push to pipeline
                 {
@@ -1259,14 +1182,11 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 }
 
                 // Send ack to joiner with full participant list
-                let participants = if let Ok(sessions) = inner.sessions.lock() {
-                    sessions
-                        .get(&session_id)
-                        .map(|s| s.participants.clone())
-                        .unwrap_or_default()
-                } else {
-                    vec![]
-                };
+                let sessions = inner.sessions.lock().await;
+                let participants = sessions
+                    .get(&session_id)
+                    .map(|s| s.participants.clone())
+                    .unwrap_or_default();
 
                 // Emit participant update to frontend (before moving participants)
                 let _ = app_handle.emit(
@@ -1334,10 +1254,10 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 }
 
                 // Update joiner's local state to Active
-                if let Ok(mut sessions) = inner.sessions.lock()
-                    && let Some(s) = sessions.get_mut(&session_id) {
-                        s.state = CallState::Active;
-                    }
+                let mut sessions = inner.sessions.lock().await;
+                if let Some(s) = sessions.get_mut(&session_id) {
+                    s.state = CallState::Active;
+                }
 
                 let sid_clone = session_id.clone();
                 let _ = app_handle.emit(
@@ -1362,18 +1282,15 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
             } => {
                 // Remove from participant list
                 let remaining: Vec<Participant> = {
-                    if let Ok(mut sessions) = inner.sessions.lock() {
-                        if let Some(s) = sessions.get_mut(&session_id) {
-                            s.participants.retain(|p| p.user_id != user_id);
-                            let participants = s.participants.clone();
-                            if participants.is_empty() {
-                                s.state = CallState::Ended;
-                                s.ended_at = Some(now_secs());
-                            }
-                            participants
-                        } else {
-                            Vec::new()
+                    let mut sessions = inner.sessions.lock().await;
+                    if let Some(s) = sessions.get_mut(&session_id) {
+                        s.participants.retain(|p| p.user_id != user_id);
+                        let participants = s.participants.clone();
+                        if participants.is_empty() {
+                            s.state = CallState::Ended;
+                            s.ended_at = Some(now_secs());
                         }
+                        participants
                     } else {
                         Vec::new()
                     }
@@ -1445,16 +1362,17 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                 }
 
                 if let Some(answer) = answer
-                    && let Some(ref client) = *inner.signaling.lock().await {
-                        let _ = client
-                            .send(&SignalingMessage::ConferenceSdpAnswer {
-                                session_id,
-                                target_user_id,
-                                sdp_answer: answer.sdp,
-                                ice_candidates: answer.candidates,
-                            })
-                            .await;
-                    }
+                    && let Some(ref client) = *inner.signaling.lock().await
+                {
+                    let _ = client
+                        .send(&SignalingMessage::ConferenceSdpAnswer {
+                            session_id,
+                            target_user_id,
+                            sdp_answer: answer.sdp,
+                            ice_candidates: answer.candidates,
+                        })
+                        .await;
+                }
             }
 
             // Joiner receives ack — returns immediately; state changes are driven
@@ -1494,11 +1412,8 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
         let mut webrtc = inner.webrtc.lock().await;
         if let Some(ref wm) = *webrtc {
             let sessions: Vec<String> = {
-                if let Ok(s) = inner.sessions.lock() {
-                    s.keys().cloned().collect()
-                } else {
-                    Vec::new()
-                }
+                let s = inner.sessions.lock().await;
+                s.keys().cloned().collect()
             };
             for sid in &sessions {
                 wm.close_all_for_session(sid).await;
@@ -1509,10 +1424,7 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
 
     // End all sessions and notify frontend
     {
-        let mut sessions = match inner.sessions.lock() {
-            Ok(s) => s,
-            Err(_) => return,
-        };
+        let mut sessions = inner.sessions.lock().await;
         for (sid, session) in sessions.iter_mut() {
             session.state = CallState::Ended;
             session.ended_at = Some(now_secs());

@@ -13,6 +13,7 @@ const authFlowCapabilities = getAuthFlowCapabilities();
 
 export type UseLoginEmailAuthDeps = {
   router: Router;
+  mode?: "login" | "register";
 };
 
 export type LoginEmailAuthModel = {
@@ -126,6 +127,10 @@ export function useLoginEmailAuth(deps: UseLoginEmailAuthDeps): LoginEmailAuthMo
     try {
       const outcome = await authServer.signInWithEmailCode(credential.email, credential.code);
       if (outcome.ok && outcome.kind === "signed_in") {
+        if (deps.mode === "register" && !outcome.login.isNewUser) {
+          banner.value = "Account already exists. Please sign in instead.";
+          return;
+        }
         void router.replace({ path: outcome.redirectTo, query: outcome.login.isNewUser ? { welcome: "new" } : undefined });
         return;
       }

@@ -23,7 +23,7 @@
     <!-- 错误状态 -->
     <div v-if="loadState === 'error'" class="video-error">
       <div class="error-content">
-        <div class="error-icon">⚠️</div>
+        <div class="error-icon"><t-icon name="error-circle" size="24" /></div>
         <p class="error-message">{{ t("video_load_failed") }}</p>
         <button v-if="retryCount < maxRetries" @click="retryLoad" class="retry-button">
           {{ t("retry") }} ({{ retryCount + 1 }}/{{ maxRetries }})
@@ -165,7 +165,10 @@ onMounted(() => {
 }
 
 .error-icon {
-  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-danger);
   margin-bottom: 8px;
 }
 

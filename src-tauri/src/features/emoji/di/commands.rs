@@ -70,7 +70,9 @@ pub async fn write_temp_emoji_file(
     data: Vec<u8>,
 ) -> CommandResult<String> {
     use std::io::Write;
-    let tmp_dir = repository::emoji_dir(&app_handle).join("_upload_tmp");
+    let tmp_dir = repository::emoji_dir(&app_handle)
+        .map_err(|e| e.to_string())?
+        .join("_upload_tmp");
     std::fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
     let path = tmp_dir.join(&name);
     let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
@@ -86,6 +88,8 @@ pub async fn get_emoji_image_path(app_handle: AppHandle, id: String) -> CommandR
         .iter()
         .find(|e| e.id == id)
         .ok_or("emoji not found")?;
-    let full_path = repository::emoji_dir(&app_handle).join(&entry.file_path);
+    let full_path = repository::emoji_dir(&app_handle)
+        .map_err(|e| e.to_string())?
+        .join(&entry.file_path);
     Ok(full_path.to_string_lossy().to_string())
 }

@@ -105,6 +105,15 @@ impl PluginManifestList {
         Ok(())
     }
 
+    /// 从磁盘重新读取清单列表（忽略当前内存中的 plugins）。
+    ///
+    /// # 返回值
+    /// - `Ok(Self)`：读取成功。
+    /// - `Err(anyhow::Error)`：读取失败原因。
+    pub async fn load_from_file(&self) -> anyhow::Result<Self> {
+        let list = tokio::fs::read_to_string(PLUGIN_CONFIG).await?;
+        Self::from_json_str(&list)
+    }
 }
 
 #[cfg(test)]
@@ -147,24 +156,18 @@ mod tests {
     #[test]
     fn from_json_invalid() {
         let err = PluginManifestList::from_json_str("{invalid json}").unwrap_err();
-        assert!(err.to_string().contains("Failed to parse plugin manifest list JSON"));
+        assert!(
+            err.to_string()
+                .contains("Failed to parse plugin manifest list JSON")
+        );
     }
 
     #[test]
     fn from_json_empty_string() {
         let err = PluginManifestList::from_json_str("").unwrap_err();
-        assert!(err.to_string().contains("Failed to parse plugin manifest list JSON"));
-    }
-}
-
-impl PluginManifestList {
-    /// 从磁盘重新读取清单列表（忽略当前内存中的 plugins）。
-    ///
-    /// # 返回值
-    /// - `Ok(Self)`：读取成功。
-    /// - `Err(anyhow::Error)`：读取失败原因。
-    pub async fn load_from_file(&self) -> anyhow::Result<Self> {
-        let list = tokio::fs::read_to_string(PLUGIN_CONFIG).await?;
-        Self::from_json_str(&list)
+        assert!(
+            err.to_string()
+                .contains("Failed to parse plugin manifest list JSON")
+        );
     }
 }

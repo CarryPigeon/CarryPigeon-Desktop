@@ -111,7 +111,7 @@ function isLocked(): boolean {
       :focused="p.pluginId === selectedId || p.pluginId === focusPluginId"
       :has-update="hasUpdate(p.pluginId)"
       :disabled="isLocked()"
-      disabled-reason="Missing server_id — plugin operations are disabled"
+      :disabled-reason="t('plugins_locked_reason')"
       @install="emit('install', p)"
       @update="emit('update', p)"
       @enable="emit('enable', p.pluginId)"

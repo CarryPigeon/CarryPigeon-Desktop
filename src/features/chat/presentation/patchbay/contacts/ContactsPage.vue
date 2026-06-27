@@ -15,7 +15,9 @@ import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { createLogger } from "@/shared/utils/logger";
 import type { UserPublic, CurrentUser } from "@/features/account/api-types";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
+import EmptyState from "@/shared/ui/EmptyState.vue";
 import SkeletonBlock from "@/shared/ui/SkeletonBlock.vue";
+import PageHeader from "@/shared/ui/PageHeader.vue";
 
 const logger = createLogger("ContactsPage");
 const router = useRouter();
@@ -115,10 +117,12 @@ loadCurrentUser();
 <template>
   <main class="cp-contacts">
     <ErrorBoundary>
-      <header class="cp-contacts__head">
-        <button class="cp-contacts__back" type="button" @click="router.back()">{{ t("back") }}</button>
-        <div class="cp-contacts__title">{{ t("contacts_title") }}</div>
-      </header>
+      <PageHeader
+        :title="t('contacts_title')"
+        back
+        data-testid="contacts-header"
+        @back="router.back()"
+      />
 
       <!-- 当前用户资料卡 -->
       <section v-if="currentUser" class="cp-contacts__section">
@@ -206,12 +210,16 @@ loadCurrentUser();
             </div>
           </div>
         </div>
-        <div v-else class="cp-contacts__empty">
-          <p>{{ t("contacts_empty_hint") }}</p>
-          <button class="cp-contacts__action-btn" type="button" @click="handleQuickChat">
-            {{ t("contacts_go_chat") }}
-          </button>
-        </div>
+        <EmptyState
+          v-else
+          :description="t('contacts_empty_hint')"
+        >
+          <template #action>
+            <button class="cp-contacts__action-btn" type="button" @click="handleQuickChat">
+              {{ t("contacts_go_chat") }}
+            </button>
+          </template>
+        </EmptyState>
       </section>
     </ErrorBoundary>
   </main>
@@ -225,46 +233,6 @@ loadCurrentUser();
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-}
-
-.cp-contacts__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.cp-contacts__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-contacts__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-contacts__title {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
 }
 
 .cp-contacts__section {
@@ -390,18 +358,6 @@ loadCurrentUser();
   padding: 24px;
   color: var(--cp-text-muted);
   font-size: 13px;
-}
-
-.cp-contacts__empty {
-  text-align: center;
-  padding: 40px 24px;
-  color: var(--cp-text-muted);
-  font-size: 13px;
-
-  p {
-    margin: 0 0 16px;
-    line-height: 1.5;
-  }
 }
 
 .cp-contacts__list {

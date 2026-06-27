@@ -36,7 +36,7 @@ function handleRetry(): void {
 
   <!-- 启动失败 -->
   <div v-else class="startup-shell startup-shell--failed">
-    <div class="startup-logo">⚠️</div>
+    <div class="startup-logo"><t-icon name="warn-circle" size="40" /></div>
     <p class="startup-text">{{ t('startup_failed') }}</p>
     <p class="startup-hint">{{ t('startup_failed_hint') }}</p>
     <button class="cp-field startup-retry-btn" @click="handleRetry">
@@ -70,6 +70,13 @@ function handleRetry(): void {
   font-size: 13px;
   color: var(--cp-text-muted);
   margin: 0;
+}
+
+.startup-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-warn, var(--cp-danger));
 }
 
 .startup-spinner {

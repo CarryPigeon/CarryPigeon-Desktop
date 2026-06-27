@@ -48,9 +48,10 @@ onBeforeUnmount(() => {
 function onPickerVisibleChange(visible: boolean): void {
   pickerVisible.value = visible;
   if (visible) {
+    if (_popupFixTimer !== null) clearInterval(_popupFixTimer);
     // 持续修正位置：emoji-picker 异步加载后可能触发 Popper.js 重新定位，
     // 如果超出视口则强制固定在视口内，防止被 Windows 窗口栏遮挡
-    _popupFixTimer = setInterval(() => {
+    const timer = setInterval(() => {
       const popup = document.querySelector('[data-td-popup] > .t-popup__content');
       if (!popup) return;
       const rect = popup.getBoundingClientRect();
@@ -62,10 +63,12 @@ function onPickerVisibleChange(visible: boolean): void {
         }
       }
     }, 100);
+    _popupFixTimer = timer;
     // 3 秒后停止检查（此时内容应已完全加载）
+    const stopTimer = timer;
     setTimeout(() => {
-      if (_popupFixTimer !== null) {
-        clearInterval(_popupFixTimer);
+      clearInterval(stopTimer);
+      if (_popupFixTimer === stopTimer) {
         _popupFixTimer = null;
       }
     }, 3000);

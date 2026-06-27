@@ -26,7 +26,7 @@ export function dedupeAsyncByKey<T>(key: string, fn: () => Promise<T>): Promise<
   const existing = inFlight.get(k) as Promise<T> | undefined;
   if (existing) return existing;
 
-  const p = fn().finally(() => {
+  const p = Promise.resolve().then(() => fn()).finally(() => {
     if (inFlight.get(k) === p) inFlight.delete(k);
   });
   inFlight.set(k, p as Promise<unknown>);

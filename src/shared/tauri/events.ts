@@ -2,6 +2,7 @@
  * @fileoverview Tauri 事件名与监听工具。
  */
 import { emit, listen, type Event, type UnlistenFn } from "@tauri-apps/api/event";
+import { isTauriRuntimeAvailable } from "./runtime";
 
 /**
  * @constant
@@ -78,7 +79,7 @@ export type UserProfileResponse = { id: string; ok: boolean; message?: string };
 export function listenTcpMessage(
   handler: (event: Event<TcpMessageEvent>) => void,
 ): Promise<UnlistenFn> {
-  return listen<TcpMessageEvent>(TAURI_EVENTS.tcpMessage, handler);
+  return safeListen<TcpMessageEvent>(TAURI_EVENTS.tcpMessage, handler);
 }
 
 /**
@@ -90,7 +91,7 @@ export function listenTcpMessage(
 export function listenTcpFrame(
   handler: (event: Event<TcpMessageEvent>) => void,
 ): Promise<UnlistenFn> {
-  return listen<TcpMessageEvent>(TAURI_EVENTS.tcpFrame, handler);
+  return safeListen<TcpMessageEvent>(TAURI_EVENTS.tcpFrame, handler);
 }
 
 /**
@@ -102,7 +103,27 @@ export function listenTcpFrame(
 export function listenTcpState(
   handler: (event: Event<TcpStateEvent>) => void,
 ): Promise<UnlistenFn> {
-  return listen<TcpStateEvent>(TAURI_EVENTS.tcpState, handler);
+  return safeListen<TcpStateEvent>(TAURI_EVENTS.tcpState, handler);
+}
+
+/**
+ * 通用 Tauri 事件监听（带浏览器环境静默回退）。
+ *
+ * 在浏览器预览（无 Tauri bridge）下直接 resolve 一个 noop 卸载函数，避免调用方
+ * 触发 "transformCallback is not defined" 等 console 错误。
+ *
+ * @param event - 事件名。
+ * @param handler - 事件处理函数。
+ * @returns 取消监听函数（UnlistenFn）的 Promise。
+ */
+export function safeListen<T>(
+  event: string,
+  handler: (event: Event<T>) => void,
+): Promise<UnlistenFn> {
+  if (!isTauriRuntimeAvailable()) {
+    return Promise.resolve(() => {});
+  }
+  return listen<T>(event, handler);
 }
 
 /**

@@ -24,7 +24,7 @@
       <!-- Error state with retry -->
       <div v-else-if="loadState === 'error'" class="image-error">
         <div class="error-content">
-          <div class="error-icon">⚠️</div>
+          <div class="error-icon"><t-icon name="error-circle" size="32" /></div>
           <p class="error-message">{{ t("image_load_failed") }}</p>
           <button v-if="retryCount < maxRetries" @click="retryLoad" class="retry-button">
             {{ t("image_retry") }} ({{ retryCount + 1 }}/{{ maxRetries }})
@@ -288,7 +288,10 @@ onUnmounted(() => {
 }
 
 .error-icon {
-  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-danger);
   margin-bottom: 10px;
 }
 

@@ -15,9 +15,10 @@
  */
 
 export type AppTheme = "patchbay" | "legacy" | "light";
+export type AppAccent = "default" | "patchbay";
 
 import { readString, writeString } from "./localStore";
-import { KEY_THEME } from "./storageKeys";
+import { KEY_THEME, KEY_ACCENT } from "./storageKeys";
 
 /**
  * 从 `localStorage` 读取已持久化的主题。
@@ -29,6 +30,18 @@ export function getStoredTheme(): AppTheme | null {
   if (raw === "patchbay") return "patchbay";
   if (raw === "legacy") return "legacy";
   if (raw === "light") return "light";
+  return null;
+}
+
+/**
+ * 从 `localStorage` 读取已持久化的强调色（accent）。
+ *
+ * @returns 当存储值合法时返回 `"default"` / `"patchbay"`；否则返回 `null`。
+ */
+export function getStoredAccent(): AppAccent | null {
+  const raw = readString(KEY_ACCENT).trim().toLowerCase();
+  if (raw === "default") return "default";
+  if (raw === "patchbay") return "patchbay";
   return null;
 }
 
@@ -45,4 +58,19 @@ export function setTheme(theme: AppTheme): void {
   writeString(KEY_THEME, theme);
   document.documentElement.dataset.theme = theme;
   if (document.body) document.body.dataset.theme = theme;
+}
+
+/**
+ * 持久化强调色（accent）选择，并将其应用到 DOM。
+ *
+ * 副作用：
+ * - 写入 `localStorage`。
+ * - 更新 `<html>`（始终）与 `<body>`（存在时）的 `data-accent`。
+ *
+ * @param accent - 要应用的目标强调色。
+ */
+export function setAccent(accent: AppAccent): void {
+  writeString(KEY_ACCENT, accent);
+  document.documentElement.dataset.accent = accent;
+  if (document.body) document.body.dataset.accent = accent;
 }

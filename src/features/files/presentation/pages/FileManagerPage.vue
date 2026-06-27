@@ -21,6 +21,7 @@ import DownloadProgressToast from "../components/DownloadProgressToast.vue";
 import type { FileListQuery, FileRecord, FileSortField, SortOrder } from "../../domain/contracts";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import SkeletonBlock from "@/shared/ui/SkeletonBlock.vue";
+import PageHeader from "@/shared/ui/PageHeader.vue";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("files");
@@ -272,10 +273,12 @@ onUnmounted(() => {
 <template>
   <main class="cp-fileManager">
     <ErrorBoundary>
-      <header class="cp-fileManager__head">
-        <button class="cp-fileManager__back" type="button" @click="router.back()">{{ t("back") }}</button>
-        <div class="cp-fileManager__title">{{ t("file_manager") }}</div>
-      </header>
+      <PageHeader
+        :title="t('file_manager')"
+        back
+        data-testid="files-header"
+        @back="router.back()"
+      />
 
       <FileSearchBar @search="handleSearch" />
 
@@ -363,42 +366,7 @@ onUnmounted(() => {
 }
 
 .cp-fileManager__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.cp-fileManager__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-fileManager__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-fileManager__title {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
+  /* 旧 head 样式已迁移至 PageHeader 组件 */
 }
 
 .cp-fileManager__skeleton {

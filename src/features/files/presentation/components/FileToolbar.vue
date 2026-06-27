@@ -5,6 +5,7 @@
  */
 
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import type { FileSortField, SortOrder } from "../../domain/contracts";
 
 const props = defineProps<{
@@ -52,7 +53,7 @@ function handleSortOrderToggle(): void {
         :title="sortOrder === 'asc' ? t('file_sort_asc') : t('file_sort_desc')"
         @click="handleSortOrderToggle"
       >
-        {{ sortOrder === "asc" ? "↑" : "↓" }}
+        <AppIcon :name="sortOrder === 'asc' ? 'sort-asc' : 'sort-desc'" :size="12" :stroke-width="2" />
       </button>
     </div>
 
@@ -100,6 +101,9 @@ function handleSortOrderToggle(): void {
 }
 
 .cp-fileToolbar__orderBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text);

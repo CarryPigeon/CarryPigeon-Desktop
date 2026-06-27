@@ -13,7 +13,7 @@ import { getAboutCapabilities } from "@/features/about/api";
 import type { AppInfo } from "@/features/about/api-types";
 import { checkForUpdate, type UpdateStatus } from "@/shared/updater/checkUpdate";
 import { useSettingsPageModel } from "@/features/settings/presentation/composables/useSettingsPageModel";
-import { DEFAULT_APP_THEME, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
+import { DEFAULT_APP_THEME, type AppAccent, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
 import { DEFAULT_APP_LOCALE } from "@/shared/utils/locale";
 import {
   exportSettingsEnvelope,
@@ -22,9 +22,11 @@ import {
 } from "@/features/settings/application/settingsService";
 import type { SettingsSchemaEnvelopeV1 } from "@/features/settings/api-types";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import PageHeader from '@/shared/ui/PageHeader.vue';
 import { currentServerSocket } from "@/features/server-connection/api";
 import { getAccountCapabilities } from "@/features/account/api";
 import { readRefreshToken, clearAuthAndResumeState } from "@/shared/utils/localState";
+import { getScopeLifecycleCapabilities } from "@/features/server-connection/scope-lifecycle/api";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -32,6 +34,9 @@ const {
   theme,
   themeError,
   pickTheme,
+  accent,
+  accentError,
+  pickAccent,
   language,
   preferencesError,
   autoLogin,
@@ -156,6 +161,10 @@ function normalizeImportTheme(raw: unknown): AppTheme | null {
   return raw === "patchbay" || raw === "legacy" || raw === "light" ? raw : null;
 }
 
+function normalizeImportAccent(raw: unknown): AppAccent | null {
+  return raw === "default" || raw === "patchbay" ? raw : null;
+}
+
 function triggerImportDialog(): void {
   importFileInput.value?.click();
 }
@@ -194,6 +203,14 @@ async function handleImportFileChange(event: Event): Promise<void> {
       const currentTheme = theme.value;
       if (currentTheme !== importedTheme) {
         pickTheme(importedTheme);
+      }
+    }
+
+    const importedAccent = normalizeImportAccent(parsed?.localCache?.accent);
+    if (importedAccent) {
+      const currentAccent = accent.value;
+      if (currentAccent !== importedAccent) {
+        pickAccent(importedAccent);
       }
     }
 
@@ -239,6 +256,11 @@ async function handleLogout(): Promise<void> {
         }
       }
       clearAuthAndResumeState(socket);
+      try {
+        await getScopeLifecycleCapabilities().clearCurrentWorkspace(socket);
+      } catch {
+        // best-effort: workspace cleanup may fail but logout should proceed
+      }
     }
     getAccountCapabilities().currentUser.clearSnapshot();
     void router.replace("/login");
@@ -254,16 +276,19 @@ async function handleLogout(): Promise<void> {
   <!-- 区块：<main> .cp-settings -->
   <main class="cp-settings">
     <ErrorBoundary>
-      <header class="cp-settings__head">
-        <button class="cp-settings__back" data-testid="settings-back" type="button" @click="router.back()">{{ t("back") }}</button>
-        <div class="cp-settings__title">
-          <div class="cp-settings__name">{{ t("settings_title") }}</div>
-          <div class="cp-settings__sub">{{ t("settings_subtitle") }}</div>
-        </div>
-        <button class="cp-settings__btn" data-testid="settings-open-patchbay" type="button" @click="openPatchbay">
-          {{ t("settings_open_patchbay") }}
-        </button>
-      </header>
+      <PageHeader
+        :title="t('settings_title')"
+        :subtitle="t('settings_subtitle')"
+        back
+        data-testid="settings-header"
+        @back="router.back()"
+      >
+        <template #actions>
+          <button class="cp-settings__btn" data-testid="settings-open-patchbay" type="button" @click="openPatchbay">
+            {{ t("settings_open_patchbay") }}
+          </button>
+        </template>
+      </PageHeader>
 
       <section class="cp-settings__toolbar">
         <div class="cp-settings__status" :data-tone="shellStatus.tone">
@@ -337,6 +362,34 @@ async function handleLogout(): Promise<void> {
                   </button>
                 </div>
                 <div v-if="themeError" class="cp-settings__err">{{ themeError }}</div>
+              </div>
+            </div>
+
+            <div class="cp-settings__card">
+              <div class="cp-settings__k">{{ t("settings_accent") }}</div>
+              <div class="cp-settings__v">
+                <div class="cp-settings__seg">
+                  <button
+                    class="cp-settings__segBtn"
+                    :data-active="accent === 'default'"
+                    data-testid="settings-accent-default"
+                    type="button"
+                    @click="pickAccent('default')"
+                  >
+                    {{ t("settings_accent_default") }}
+                  </button>
+                  <button
+                    class="cp-settings__segBtn"
+                    :data-active="accent === 'patchbay'"
+                    data-testid="settings-accent-patchbay"
+                    type="button"
+                    @click="pickAccent('patchbay')"
+                  >
+                    {{ t("settings_accent_patchbay") }}
+                  </button>
+                </div>
+                <div class="cp-settings__hint">{{ t("settings_accent_hint") }}</div>
+                <div v-if="accentError" class="cp-settings__err">{{ accentError }}</div>
               </div>
             </div>
 
@@ -493,6 +546,7 @@ async function handleLogout(): Promise<void> {
 
         <!-- 退出登录确认弹窗 -->
         <t-dialog
+          attach="body"
           v-model:visible="showLogoutConfirm"
           :header="t('logout')"
           :confirm-btn="{
@@ -626,64 +680,13 @@ async function handleLogout(): Promise<void> {
   gap: 12px;
 }
 
-/* 选择器：`.cp-settings__head`｜用途：头部卡片（返回/标题/动作） */
-.cp-settings__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-/* 选择器：`.cp-settings__back`｜用途：返回按钮 */
-.cp-settings__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* 选择器：`.cp-settings__back:hover`｜用途：悬停上浮 + 高亮边框 */
-.cp-settings__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* 选择器：`.cp-settings__name`｜用途：主标题 */
-.cp-settings__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
-}
-
-/* 选择器：`.cp-settings__sub`｜用途：副标题 */
-.cp-settings__sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
 /* 选择器：`.cp-settings__btn`｜用途：动作按钮（打开页面） */
 .cp-settings__btn {
+  @include button-size('md');
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 9px 12px;
-  font-size: 12px;
   cursor: pointer;
   transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }

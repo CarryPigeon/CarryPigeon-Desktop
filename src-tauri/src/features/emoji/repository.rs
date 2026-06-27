@@ -12,24 +12,27 @@ use uuid::Uuid;
 
 use crate::features::emoji::domain::types::{EmojiEntry, EmojiIndex};
 
-pub fn emoji_dir(app_handle: &tauri::AppHandle) -> PathBuf {
-    app_handle
+pub fn emoji_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
+    let dir = app_handle
         .path()
         .app_data_dir()
-        .unwrap_or_default()
-        .join("custom-emoji")
+        .context("EMOJI_DIR_UNAVAILABLE")?
+        .join("custom-emoji");
+    Ok(dir)
 }
 
-fn index_path(app_handle: &tauri::AppHandle) -> PathBuf {
-    emoji_dir(app_handle).join("index.json")
+fn index_path(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
+    Ok(emoji_dir(app_handle)?.join("index.json"))
 }
 
-fn images_dir(app_handle: &tauri::AppHandle) -> PathBuf {
-    emoji_dir(app_handle).join("images")
+fn images_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
+    Ok(emoji_dir(app_handle)?.join("images"))
 }
 
 pub fn load_index(app_handle: &tauri::AppHandle) -> EmojiIndex {
-    let path = index_path(app_handle);
+    let Ok(path) = index_path(app_handle) else {
+        return EmojiIndex::default();
+    };
     if !path.exists() {
         return EmojiIndex::default();
     }
@@ -40,10 +43,10 @@ pub fn load_index(app_handle: &tauri::AppHandle) -> EmojiIndex {
 }
 
 pub fn save_index(app_handle: &tauri::AppHandle, index: &EmojiIndex) -> Result<()> {
-    let dir = emoji_dir(app_handle);
+    let dir = emoji_dir(app_handle)?;
     fs::create_dir_all(&dir).context("create dir")?;
     let json = serde_json::to_string_pretty(index).context("serialize")?;
-    fs::write(index_path(app_handle), json).context("write")
+    fs::write(index_path(app_handle)?, json).context("write")
 }
 
 /// 检测图像是否为动画格式（GIF 多帧 / APNG / WebP 动画）。
@@ -122,7 +125,7 @@ pub fn add_emoji(
     tags: &[String],
     owner_uid: &str,
 ) -> Result<EmojiEntry> {
-    let imgs = images_dir(app_handle);
+    let imgs = images_dir(app_handle)?;
     fs::create_dir_all(&imgs).context("create images dir")?;
 
     let ext = source_path
@@ -173,7 +176,10 @@ pub fn delete_emoji(app_handle: &tauri::AppHandle, id: &str, owner_uid: &str) ->
     let entry = index.items.remove(idx);
 
     // Remove image file
-    let img_path = emoji_dir(app_handle).join(&entry.file_path);
+    let Ok(img_path) = emoji_dir(app_handle) else {
+        return Err(anyhow::anyhow!("EMOJI_DIR_UNAVAILABLE"));
+    };
+    let img_path = img_path.join(&entry.file_path);
     if img_path.exists() {
         let _ = fs::remove_file(img_path);
     }
@@ -195,7 +201,7 @@ pub fn copy_emoji(
         .find(|e| e.id == source_id)
         .context("source emoji not found")?;
 
-    let src_path = emoji_dir(app_handle).join(&source.file_path);
+    let src_path = emoji_dir(app_handle)?.join(&source.file_path);
     if !src_path.exists() {
         anyhow::bail!("source emoji file not found on disk");
     }
@@ -205,9 +211,9 @@ pub fn copy_emoji(
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("png");
-    let dest = images_dir(app_handle).join(format!("{}.{}", new_id, ext));
+    let dest = images_dir(app_handle)?.join(format!("{}.{}", new_id, ext));
 
-    let imgs = images_dir(app_handle);
+    let imgs = images_dir(app_handle)?;
     fs::create_dir_all(&imgs).context("create images dir")?;
     fs::copy(&src_path, &dest).context("copy emoji file")?;
 
