@@ -78,6 +78,52 @@ RESULTS=$(echo "$RESULTS" | jq --arg v "$TEST_MS" '. + {"cargo_test_time_ms": ($
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 RESULTS=$(echo "$RESULTS" | jq --arg v "$COMMIT" '. + {"commit": $v}' 2>/dev/null || echo "$RESULTS")
 
+DATA_DIR="docs/performance-benchmarks/data"
+mkdir -p "$DATA_DIR"
+LATEST_FILE="$DATA_DIR/latest.json"
+BASELINE_FILE="$DATA_DIR/baseline.json"
+
+echo "$RESULTS" > "$LATEST_FILE"
+
 echo ""
 echo "===== 基准测试完成 ====="
 echo "$RESULTS" | jq '.' 2>/dev/null || echo "$RESULTS"
+
+# ---------- 回归检测 ----------
+echo ""
+if command -v node >/dev/null 2>&1; then
+  node scripts/benchmark-compare.mjs
+  COMPARE_STATUS=$?
+else
+  echo "node not available, skipping regression check"
+  COMPARE_STATUS=0
+fi
+
+# ---------- 基线管理 ----------
+if [ ! -f "$BASELINE_FILE" ]; then
+  echo "Creating initial baseline..."
+  cp "$LATEST_FILE" "$BASELINE_FILE"
+fi
+
+# ---------- Markdown 报告追加 ----------
+REPORT_FILE="docs/performance-benchmarks.md"
+REPORT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+{
+  echo ""
+  echo "## Benchmark $REPORT_DATE"
+  echo ""
+  echo "- Commit: $COMMIT"
+  echo "- build_time_ms: $BUILD_MS"
+  echo "- main_js_bytes: ${TOTAL_SIZE:-0}"
+  echo "- all_js_bytes: ${ALL_JS_SIZE:-0}"
+  echo "- typecheck_time_ms: $TSC_MS"
+  echo "- cargo_check_time_ms: $CARGO_MS"
+  echo "- cargo_test_time_ms: $TEST_MS"
+  if [ $COMPARE_STATUS -eq 2 ]; then
+    echo "- **Status: REGRESSION DETECTED**"
+  else
+    echo "- Status: OK"
+  fi
+} >> "$REPORT_FILE"
+
+exit $COMPARE_STATUS
