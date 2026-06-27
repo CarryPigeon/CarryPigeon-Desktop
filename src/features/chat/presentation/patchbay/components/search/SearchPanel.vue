@@ -4,8 +4,9 @@
  * @description 消息搜索面板独立组件，支持键盘导航与关键词高亮。
  */
 
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
+import { debounce } from "@/shared/utils/rateLimit";
 
 /** 搜索结果项接口。 */
 interface SearchResultItem {
@@ -76,9 +77,18 @@ function handleInput(v: string): void {
  * 触发搜索。
  */
 function handleSearch(): void {
+  debouncedSearch.cancel();
   const q = localQuery.value.trim();
   if (q) emit("search", q);
 }
+
+const debouncedSearch = debounce(() => {
+  handleSearch();
+}, 300);
+
+onBeforeUnmount(() => {
+  debouncedSearch.cancel();
+});
 
 /**
  * 重试当前搜索。
@@ -188,7 +198,7 @@ function escapeRegex(s: string): string {
       <t-input
         :value="localQuery"
         :placeholder="t('search_current_channel')"
-        @input="handleInput"
+        @input="(v: string) => { handleInput(v); debouncedSearch(); }"
         @enter="handleSearch"
       />
       <button

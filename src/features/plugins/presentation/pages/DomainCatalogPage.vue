@@ -10,17 +10,31 @@
  * - `GET /api/domains/catalog` (`docs/api/11-HTTP端点清单（v1，标准版）.md`)
  */
 
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
 import { createDomainCatalogContext } from "@/features/plugins/presentation/composables/useDomainCatalogContext";
+import { debounce } from "@/shared/utils/rateLimit";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const router = useRouter();
 const { t } = useI18n();
 const q = ref("");
+const debouncedQ = ref("");
+
+const updateDebouncedQ = debounce((val: string) => {
+  debouncedQ.value = val;
+}, 200);
+
+watch(q, (val) => {
+  updateDebouncedQ(val);
+});
+
+onBeforeUnmount(() => {
+  updateDebouncedQ.cancel();
+});
 
 const { socket, serverId, refreshServerInfo } = usePluginsServerWorkspace();
 const { domainCatalogStore, refreshDomainCatalog } = createDomainCatalogContext(socket);
@@ -40,7 +54,7 @@ async function refresh(): Promise<void> {
  * @returns 过滤后的列表。
  */
 function computeFiltered() {
-  const needle = q.value.trim().toLowerCase();
+  const needle = debouncedQ.value.trim().toLowerCase();
   const items = domainCatalogStore.value.items.value;
   if (!needle) return items;
   return items.filter((it) => String(it.domain ?? "").toLowerCase().includes(needle));
