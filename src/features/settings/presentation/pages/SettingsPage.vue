@@ -9,6 +9,10 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { IS_MOCK_ENABLED, MOCK_MODE } from "@/shared/config/runtime";
+import {
+  getStoredDiagnosticsEnabled,
+  setDiagnosticsEnabled,
+} from "@/shared/config/performance";
 import { getAboutCapabilities } from "@/features/about/api";
 import type { AppInfo } from "@/features/about/api-types";
 import { checkForUpdate, type UpdateStatus } from "@/shared/updater/checkUpdate";
@@ -111,6 +115,16 @@ onBeforeUnmount(() => {
 
 const appInfo = ref<AppInfo | null>(null);
 const updateCheckState = ref<UpdateStatus | { kind: 'checking' }>({ kind: 'checking' });
+const diagnosticsMode = ref(false);
+
+function toggleDiagnosticsMode(next: boolean): void {
+  setDiagnosticsEnabled(next);
+  diagnosticsMode.value = getStoredDiagnosticsEnabled();
+}
+
+onMounted(() => {
+  diagnosticsMode.value = getStoredDiagnosticsEnabled();
+});
 
 async function handleCheckUpdate(): Promise<void> {
   updateCheckState.value = { kind: 'checking' };
@@ -468,6 +482,13 @@ async function handleLogout(): Promise<void> {
                   <span class="cp-settings__muted">{{ t("settings_mock_mode") }}</span>
                   <MonoTag :value="MOCK_MODE" title="VITE_MOCK_MODE" :copyable="true" />
                 </div>
+                <div class="cp-settings__row">
+                  <span class="cp-settings__muted">{{ t("settings_diagnostics_mode") }}</span>
+                  <button class="cp-settings__segBtn" data-testid="settings-diagnostics-mode" :data-active="diagnosticsMode" type="button" @click="toggleDiagnosticsMode(!diagnosticsMode)">
+                    {{ diagnosticsMode ? t("enabled") : t("disabled") }}
+                  </button>
+                </div>
+                <div class="cp-settings__hint">{{ t("settings_diagnostics_mode_desc") }}</div>
                 <div class="cp-settings__hint">{{ t("settings_runtime_hint") }}</div>
               </div>
             </div>

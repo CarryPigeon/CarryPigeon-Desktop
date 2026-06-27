@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   getStoredDiagnosticsEnabled,
   isPerformanceMonitoringEnabled,
+  setDiagnosticsEnabled,
 } from "./performance";
 
 describe("performance monitoring switch", () => {
@@ -25,6 +26,13 @@ describe("performance monitoring switch", () => {
 
     it("returns false for non-true values in localStorage", () => {
       localStorage.setItem("cp_diagnostics_enabled", "1");
+      expect(getStoredDiagnosticsEnabled()).toBe(false);
+    });
+
+    it("can be enabled and disabled via setter", () => {
+      setDiagnosticsEnabled(true);
+      expect(getStoredDiagnosticsEnabled()).toBe(true);
+      setDiagnosticsEnabled(false);
       expect(getStoredDiagnosticsEnabled()).toBe(false);
     });
   });
