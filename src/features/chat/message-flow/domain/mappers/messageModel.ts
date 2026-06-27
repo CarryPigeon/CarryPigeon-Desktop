@@ -194,28 +194,30 @@ export function compareMessages(a: ChatMessage, b: ChatMessage): number {
 }
 
 /**
- * 合并两组消息并去重。
- *
- * 使用场景：
- * - 最新页覆盖刷新；
- * - 历史分页追加；
- * - 事件流插入与已有列表对齐。
+ * 对消息数组去重（保留第一次出现的项）。
  */
-export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+export function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
   const seen = new Set<string>();
   const out: ChatMessage[] = [];
-  for (const m of existing) {
+  for (const m of messages) {
     if (!m?.id) continue;
     if (seen.has(m.id)) continue;
     seen.add(m.id);
     out.push(m);
   }
-  for (const m of incoming) {
-    if (!m?.id) continue;
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
-    out.push(m);
-  }
-  out.sort(compareMessages);
   return out;
+}
+
+/**
+ * 对消息数组按稳定顺序排序。
+ */
+export function sortMessages(messages: ChatMessage[]): ChatMessage[] {
+  return [...messages].sort(compareMessages);
+}
+
+/**
+ * 合并两组消息并去重、排序。
+ */
+export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+  return sortMessages(dedupeMessages([...existing, ...incoming]));
 }

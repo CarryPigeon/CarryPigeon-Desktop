@@ -36,7 +36,7 @@ import type {
 } from "../ports";
 
 type MapWireMessage = (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
-type MergeMessages = (existing: ChatMessage[], incoming: ChatMessage[]) => ChatMessage[];
+type MergeMessages = (existing: ChatMessage[], incoming: ChatMessage[]) => Promise<ChatMessage[]>;
 
 const LATEST_PAGE_LIMIT = 50;
 
@@ -750,7 +750,7 @@ export class MessageFlowApplicationService {
   async loadChannelMessages(cid: string): Promise<void> {
     const page = await this.fetchLatestPage(cid);
     if (!page) return;
-    this.deps.timelineState.replaceTimeline(page.channelId, this.deps.mergeMessages([], page.mapped));
+    this.deps.timelineState.replaceTimeline(page.channelId, await this.deps.mergeMessages([], page.mapped));
     this.deps.timelineState.writeNextCursor(page.channelId, page.nextCursor);
     this.deps.timelineState.writeHasMore(page.channelId, page.hasMore && Boolean(page.nextCursor));
   }
@@ -767,7 +767,7 @@ export class MessageFlowApplicationService {
     const page = await this.fetchLatestPage(cid);
     if (!page) return;
     const existing = [...this.deps.timelineState.listMessages(page.channelId)];
-    this.deps.timelineState.replaceTimeline(page.channelId, this.deps.mergeMessages(existing, page.mapped));
+    this.deps.timelineState.replaceTimeline(page.channelId, await this.deps.mergeMessages(existing, page.mapped));
 
     if (!this.deps.timelineState.readNextCursor(page.channelId) && !this.deps.timelineState.readHasMore(page.channelId)) {
       this.deps.timelineState.writeNextCursor(page.channelId, page.nextCursor);
@@ -804,7 +804,7 @@ export class MessageFlowApplicationService {
       for (const message of items) mapped.push(this.deps.mapWireMessage(socket, message));
 
       const existing = [...this.deps.timelineState.listMessages(channelId)];
-      this.deps.timelineState.replaceTimeline(channelId, this.deps.mergeMessages(existing, mapped));
+      this.deps.timelineState.replaceTimeline(channelId, await this.deps.mergeMessages(existing, mapped));
 
       const nextCursor = String(res.nextCursor ?? "").trim();
       const hasMore = Boolean(res.hasMore);
