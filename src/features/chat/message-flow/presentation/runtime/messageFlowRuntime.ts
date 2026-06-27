@@ -11,8 +11,9 @@ import {
   createAvailableDomains,
   createMessageMapper,
   MessageFlowApplicationService,
-  mergeMessages,
 } from "@/features/chat/message-flow/internal";
+import { createAdaptiveMergeMessages } from "@/features/chat/message-flow/application/createAdaptiveMergeMessages";
+import { createAdaptiveMessageSorter } from "@/features/chat/message-flow/application/adaptiveMessageSorter";
 import type { ChatApiGateway } from "@/features/chat/composition/contracts/chatGateway";
 import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import {
@@ -130,6 +131,9 @@ export function createChatMessageFlowRuntime(
     saveChannelDraft: draftSaveChannelDraft,
     clearChannelDraft: draftClearChannelDraft,
   });
+
+  const messageSorter = createAdaptiveMessageSorter();
+  const mergeMessages = createAdaptiveMergeMessages(messageSorter);
 
   /**
    * message-flow runtime 不自己编写业务动作，
