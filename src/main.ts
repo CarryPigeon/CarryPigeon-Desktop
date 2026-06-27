@@ -197,3 +197,10 @@ if (hasTauriRuntime && isPerformanceMonitoringEnabled()) {
     memoryMonitor.start();
   }, 10000); // 应用初始化后 10 秒启动
 }
+
+// dev-only：暴露内存长测入口，便于开发/诊断时手动调用
+if (import.meta.env.DEV) {
+  void import("@/shared/monitoring/memoryLongTest").then((m) => {
+    (window as unknown as Record<string, unknown>).runMemoryLongTest = m.runMemoryLongTest;
+  });
+}
