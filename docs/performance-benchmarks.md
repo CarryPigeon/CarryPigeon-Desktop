@@ -52,6 +52,11 @@
 - 趋势分析：增长 / 稳定 / 下降，含增长率计算
 - 注册清理回调机制，支持手动触发 GC
 
+### 交互性能工程化（Phase 2）
+- 搜索输入统一使用 `rateLimit.debounce` / `debounceAsync`（ContactsPage、DomainCatalogPage、SearchPanel、ForwardChannelDialog）。
+- chat 刷新函数（`refreshChannels`、`refreshChannelLatestPage`、`refreshMembersRail`）使用 `asyncDedupe` 去重。
+- 消息排序引入 Web Worker 自适应：合并后消息数 > 2000 时 offload 到 Worker，小数据量 fallback 主线程。
+
 ### 构建性能
 | 指标 | 优化前 | 当前 |
 |------|--------|------|
@@ -121,8 +126,8 @@ Action: ws_pool_evict_lru              { socket, lastActiveAt }
 - [x] 前端内存监控（定时采样 + 趋势分析 + 阈值告警）
 - [x] 路由懒加载（全部路由内联动态导入，MainPage 435KB→222KB）
 - [x] 组件懒加载（ImageLightbox defineAsyncComponent）
-- [x] 防抖/节流工具（rateLimit.ts，已应用于 FileSearchBar）
-- [ ] Web Worker（评估后延期：加密使用异步 Web Crypto，不阻塞主线程）
+- [x] 防抖/节流工具（rateLimit.ts，已应用于 ContactsPage、DomainCatalogPage、SearchPanel、ForwardChannelDialog、FileSearchBar）
+- [x] Web Worker（消息排序自适应 Worker 化：大数据量 offload 到 Worker，小数据量 fallback 主线程）
 
 ### 后端优化
 - [x] WebSocket 连接池（连接复用 + LRU 驱逐 + 闲置清理）
@@ -134,7 +139,7 @@ Action: ws_pool_evict_lru              { socket, lastActiveAt }
 
 ### 网络优化
 - 桌面应用场景，大部分优化不适用（HTTP/2、CDN、Gzip 等由服务端控制）
-- [ ] 请求去重（asyncDedupe 已有，可按需应用）
+- [x] 请求去重（asyncDedupe 已应用于 refreshChannels、refreshChannelLatestPage、refreshMembersRail）
 
 ## 性能测试与基础设施
 

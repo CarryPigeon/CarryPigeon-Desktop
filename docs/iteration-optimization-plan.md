@@ -132,10 +132,16 @@
 5. ✅ `pnpm benchmark` 输出 JSON/Markdown 报告，支持回归检测
 6. ✅ dev-only 内存长测入口（`memoryLongTest.ts`），release 产物不包含
 
-#### 阶段 2：交互性能工程化
-1. 替换手写防抖为 `rateLimit.ts` 工具
-2. 搜索/滚动/刷新逻辑系统化应用 debounce / throttle / asyncDedupe
-3. Web Worker 试点：消息排序自适应 Worker 化
+#### 阶段 2：交互性能工程化（已完成）
+1. ✅ 替换手写防抖为 `rateLimit.ts` 工具
+2. ✅ 搜索输入统一使用 `rateLimit.debounce` / `debounceAsync`（ContactsPage、DomainCatalogPage、SearchPanel、ForwardChannelDialog）
+3. ✅ chat 刷新函数（`refreshChannels`、`refreshChannelLatestPage`、`refreshMembersRail`）使用 `asyncDedupe` 去重
+4. ✅ Web Worker 试点：消息排序自适应 Worker 化，合并后消息数 > 2000 时 offload 到 Worker，小数据量 fallback 主线程
+
+**关键产出**：
+- `src/shared/utils/rateLimit.ts` 统一防抖/节流/异步去重 API，覆盖搜索与刷新场景。
+- `src/features/chat/adaptiveMessageSorter.ts` / `adaptiveMergeMessages.ts` 实现消息排序 Web Worker 自适应逻辑。
+- 聊天、联系人、域目录、搜索面板、转发频道对话框等高频交互组件完成防抖与去重改造。
 
 #### 阶段 3：后端 Rust 优化
 1. 文件 IO 流式化（上传/下载/语音/截图）
