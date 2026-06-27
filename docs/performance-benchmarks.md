@@ -76,11 +76,16 @@ export RUST_LOG=info,carrypigeon_desktop_lib=debug
 
 ### 前端性能监控
 ```javascript
-// 使用 Performance API 监控渲染性能
+// 使用 Performance API 监控渲染性能（仅在 dev 或诊断模式下启用）
 const perfData = window.performance.timing;
 const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
 console.log('Page load time:', pageLoadTime);
 ```
+
+### 性能监控分级（release 行为）
+- **release 默认**：不启动内存监控、不记录启动耗时、不输出性能监控日志；仅保留 ERROR 级别错误日志。
+- **诊断模式**：在设置 → 运行时中开启，手动启用 dev 级性能监控（内存采样、启动耗时、性能日志）。
+- **统一开关**：所有性能监控逻辑通过 `isPerformanceMonitoringEnabled()` 判断，入口位于 `src/shared/config/performance.ts`。
 
 ### 内存监控日志（`memory_monitor` scope）
 可在应用日志中搜索 `Action: memory_*` 查看内存状态：
@@ -136,7 +141,11 @@ Action: ws_pool_evict_lru              { socket, lastActiveAt }
 ### 基准测试
 ```bash
 # 全流程基准（build + typecheck + cargo check + cargo test）
+# 结果写入 docs/performance-benchmarks/data/latest.json，并与 baseline.json 做回归检测。
 pnpm benchmark
+
+# 手动对比当前结果与基线
+node scripts/benchmark-compare.mjs
 
 # 前端构建时间测试
 time pnpm run build
@@ -144,6 +153,18 @@ time pnpm run build
 # Rust 测试
 cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
 ```
+
+### 回归阈值
+| 指标 | 阈值（相对 baseline） |
+|------|----------------------|
+| build_time_ms | +20% |
+| typecheck_time_ms | +20% |
+| cargo_check_time_ms | +20% |
+| cargo_test_time_ms | +20% |
+| main_js_bytes | +5% |
+| all_js_bytes | +5% |
+
+超过阈值时 `scripts/benchmark-compare.mjs` 返回退出码 2。
 
 ### 前端测试基础设施
 ```bash
@@ -180,7 +201,8 @@ console.log('Memory trend:', trend);
 1. ~~实施图片懒加载~~ ✅ 已完成
 2. ~~优化 WebSocket 连接管理~~ ✅ 已完成（连接池已集成）
 3. ~~添加性能监控日志~~ ✅ 已完成（内存监控 + WS 连接池日志）
-4. 建立性能测试自动化（集成 CI 性能回归检测）
-5. 定期性能回归测试
-6. 系统化防抖/节流检查
-7. 探索 Web Worker 处理序列化/加密等繁重计算
+4. ~~建立性能测试自动化（集成 CI 性能回归检测）~~ ✅ 已完成（`scripts/perf-benchmark.sh` + `scripts/benchmark-compare.mjs`）
+5. ~~release 默认关闭性能监控，提供诊断模式开关~~ ✅ 已完成
+6. 定期性能回归测试
+7. 系统化防抖/节流检查
+8. 探索 Web Worker 处理序列化/加密等繁重计算

@@ -8,7 +8,7 @@
 - ✅ 修复了 `ManagedDbKind::as_str` 未使用方法的警告
 - ✅ Rust 代码通过规范检查（39个测试全部通过，0 failed）
 - ✅ TypeScript 类型检查通过
-- ✅ Frontend Vitest 测试全部通过（10 suites, 125 tests）
+- ✅ Frontend Vitest 测试全部通过（14 suites, 145 tests）
 - ✅ 修复 config_store 测试因 `APP_DATA_DIR` 全局状态污染导致的 5 个测试失败
 
 #### 构建优化
@@ -76,7 +76,7 @@
 #### 质量保证
 - ✅ TypeScript 类型检查通过
 - ✅ Rust 测试全部通过（39个，0 failed）
-- ✅ Frontend Vitest 测试通过（125个）
+- ✅ Frontend Vitest 测试通过（145个）
 - ✅ 代码规范检查通过（日志、Rust、feature boundaries、文档）
 - ✅ 构建流程正常
 - ✅ Screenshot 叠加层测试（2 个测试文件）
@@ -93,8 +93,9 @@
 - ✅ Rust 侧 i18n 完整覆盖（119 个错误键，双语）
 - ✅ 消息编辑状态视觉反馈
 - ✅ SearchPanel i18n 修复
-- ⚠️ 启动时间：需实际环境测试
-- ⚠️ 内存使用：需长时间运行测试
+- ✅ 启动时间：通过 `Action: app_startup_ready` 埋点量化（默认关闭，诊断模式可开启）
+- ✅ 内存使用：内存监控 + dev-only 长测入口，release 默认关闭采样
+- ✅ 性能监控分级：release 默认关闭所有监控，仅保留 ERROR 错误日志；诊断模式手动开启
 
 #### 安全性
 - ✅ 依赖安全审计（基础检查）
@@ -150,5 +151,5 @@
 
 #### 建议完成
 - ✅ 性能基准测试（typecheck + build ~3s, Rust tests ~9s）
-- ✅ 前端测试基础（10 test files, 125 tests）
-- ⚠️ 长时间运行测试（需实际环境验证内存稳定性）
+- ✅ 前端测试基础（14 test files, 145 tests）
+- ✅ 长时间运行测试：dev-only 内存长测入口已提供，release 产物不包含相关代码
