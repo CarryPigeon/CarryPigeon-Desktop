@@ -2,11 +2,16 @@
  * @fileoverview 消息排序 Web Worker。
  */
 
-import { sortMessageStubs, type MessageSortStub } from "./messageSort.logic";
+import {
+  sortMessageStubs,
+  type MessageSortRequest,
+  type MessageSortResponse,
+} from "./messageSort.logic";
 
-self.onmessage = (event: MessageEvent<MessageSortStub[]>) => {
-  const sorted = sortMessageStubs(event.data);
-  self.postMessage(sorted);
+self.onmessage = (event: MessageEvent<MessageSortRequest>) => {
+  const { id, stubs } = event.data;
+  const sorted = sortMessageStubs(stubs);
+  self.postMessage({ id, sorted } satisfies MessageSortResponse);
 };
 
 export {};

@@ -4,7 +4,12 @@
  */
 
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
-import { compareMessageStubs, type MessageSortStub } from "./messageSort.logic";
+import {
+  compareMessageStubs,
+  type MessageSortRequest,
+  type MessageSortResponse,
+  type MessageSortStub,
+} from "./messageSort.logic";
 
 export const DEFAULT_WORKER_SORT_THRESHOLD = 2000;
 
@@ -26,6 +31,7 @@ export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptio
     options?.createWorker ??
     (() => new Worker(new URL("./messageSort.worker.ts", import.meta.url)));
   let worker: Worker | null = null;
+  let nextRequestId = 0;
 
   function getWorker(): Worker {
     if (!worker) worker = createWorker();
@@ -47,10 +53,14 @@ export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptio
       try {
         const stubs = toStubs(messages);
         const w = getWorker();
+        const requestId = String(++nextRequestId);
 
-        function handleMessage(event: MessageEvent<MessageSortStub[]>) {
+        function handleMessage(event: MessageEvent<MessageSortResponse>) {
+          if (event.data.id !== requestId) {
+            return;
+          }
           cleanup();
-          const order = new Map(event.data.map((stub, index) => [stub.id, index]));
+          const order = new Map(event.data.sorted.map((stub, index) => [stub.id, index]));
           const sorted = [...messages].sort(
             (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
           );
@@ -73,7 +83,7 @@ export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptio
 
         w.addEventListener("message", handleMessage);
         w.addEventListener("error", handleError);
-        w.postMessage(stubs);
+        w.postMessage({ id: requestId, stubs } satisfies MessageSortRequest);
       } catch {
         // createWorker() 抛出或其他同步失败：清理缓存并回退到主线程。
         if (worker) {
