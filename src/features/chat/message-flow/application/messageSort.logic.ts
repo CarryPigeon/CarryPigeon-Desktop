@@ -8,6 +8,16 @@ export type MessageSortStub = {
   timeMs: number;
 };
 
+export type MessageSortRequest = {
+  id: string;
+  stubs: MessageSortStub[];
+};
+
+export type MessageSortResponse = {
+  id: string;
+  sorted: MessageSortStub[];
+};
+
 export function compareMessageStubs(a: MessageSortStub, b: MessageSortStub): number {
   if (a.timeMs !== b.timeMs) return a.timeMs - b.timeMs;
   return a.id.localeCompare(b.id);
