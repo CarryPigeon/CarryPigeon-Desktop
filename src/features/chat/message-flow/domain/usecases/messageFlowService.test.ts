@@ -79,7 +79,7 @@ function makeMockDeps(overrides: Record<string, unknown> = {}): MessageFlowAppli
       preview: (msg as any).data?.text ?? "",
       timeMs: Date.now(),
     })),
-    mergeMessages: vi.fn((_existing, incoming) => incoming),
+    mergeMessages: vi.fn((_existing, incoming) => Promise.resolve(incoming)),
     readStateReporter: {
       advanceLocalReadTime: vi.fn().mockReturnValue(Date.now()),
       reportIfAllowed: vi.fn().mockResolvedValue(undefined),
