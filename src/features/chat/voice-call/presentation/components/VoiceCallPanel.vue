@@ -10,8 +10,10 @@
           {{ t("voice_call_participants", { count: participants.length }) }}
         </span>
         <button
+          type="button"
           class="voice-call-panel__bar-hangup"
           :title="t('voice_call_hangup')"
+          :aria-label="t('voice_call_hangup')"
           @click.stop="$emit('hangup')"
         >
           <t-icon name="close" />
@@ -44,39 +46,48 @@
 
       <div v-if="!minimized" class="voice-call-panel__controls">
         <button
+          type="button"
           class="voice-call-panel__ctrl-btn"
           :class="{ 'is-muted': isMuted }"
           :title="isMuted ? t('voice_call_unmute') : t('voice_call_mute')"
+          :aria-label="isMuted ? t('voice_call_unmute') : t('voice_call_mute')"
           @click="$emit('toggleMute')"
         >
           <t-icon name="microphone" />
         </button>
         <button
+          type="button"
           class="voice-call-panel__ctrl-btn"
           :class="{ 'is-off': !isNoiseSuppressionOn }"
           :title="isNoiseSuppressionOn ? t('voice_call_noise_off') : t('voice_call_noise_on')"
+          :aria-label="isNoiseSuppressionOn ? t('voice_call_noise_off') : t('voice_call_noise_on')"
           @click="$emit('toggleNoiseSuppression')"
         >
           <t-icon name="sound-mute" />
         </button>
         <button
+          type="button"
           class="voice-call-panel__ctrl-btn"
           :class="{ 'is-muted': !cameraEnabled }"
           :title="cameraEnabled ? t('voice_call_camera_off') : t('voice_call_camera_on')"
+          :aria-label="cameraEnabled ? t('voice_call_camera_off') : t('voice_call_camera_on')"
           @click="$emit('toggleCamera')"
         >
           <t-icon name="camera" />
         </button>
         <button
+          type="button"
           class="voice-call-panel__ctrl-btn"
           :class="{ 'is-active': isSharing }"
           :title="isSharing ? t('voice_call_screen_share_stop') : t('voice_call_screen_share_start')"
+          :aria-label="isSharing ? t('voice_call_screen_share_stop') : t('voice_call_screen_share_start')"
           @click="$emit('toggleScreenShare')"
         >
           <t-icon name="share" />
         </button>
         <select
           class="voice-call-panel__device-select"
+          :aria-label="t('voice_call_input_device')"
           :value="currentInputDeviceId ?? ''"
           @change="$emit('selectInputDevice', ($event.target as HTMLSelectElement).value)"
         >
@@ -91,6 +102,7 @@
         </select>
         <select
           class="voice-call-panel__device-select"
+          :aria-label="t('voice_call_output_device')"
           :value="currentOutputDeviceId ?? ''"
           @change="$emit('selectOutputDevice', ($event.target as HTMLSelectElement).value)"
         >
@@ -104,8 +116,10 @@
           </option>
         </select>
         <button
+          type="button"
           class="voice-call-panel__ctrl-btn voice-call-panel__ctrl-btn--hangup"
           :title="t('voice_call_hangup')"
+          :aria-label="t('voice_call_hangup')"
           @click="$emit('hangup')"
         >
           <t-icon name="close" />

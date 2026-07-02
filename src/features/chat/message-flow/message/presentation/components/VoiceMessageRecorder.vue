@@ -9,7 +9,11 @@
  */
 
 import { ref, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<{
   /**
@@ -54,7 +58,7 @@ async function startRecording(): Promise<void> {
         void stopRecording();
       }
     }, 100);
-    await invoke("start_voice_recording");
+    await invoke(TAURI_COMMANDS.startVoiceRecording);
   } catch (e) {
     state.value = "idle";
     cleanupTimer();
@@ -71,7 +75,7 @@ async function stopRecording(): Promise<void> {
   cleanupTimer();
   try {
     const result = await invoke<{ file_path: string; duration_ms: number; size_bytes: number }>(
-      "stop_voice_recording",
+      TAURI_COMMANDS.stopVoiceRecording,
     );
     emit("recorded", {
       filePath: result.file_path,
@@ -120,7 +124,8 @@ onUnmounted(() => {
       'cp-voiceRecorder--processing': state === 'processing',
     }"
     :disabled="state === 'processing' || props.disabled"
-    :title="state === 'idle' ? '录制语音' : state === 'recording' ? '停止录制' : '处理中…'"
+    :title="state === 'idle' ? t('voice_record_start') : state === 'recording' ? t('voice_record_stop') : t('voice_record_processing')"
+    :aria-label="state === 'idle' ? t('voice_record_start') : state === 'recording' ? t('voice_record_stop') : t('voice_record_processing')"
     @click="toggleRecording"
   >
     <t-icon v-if="state === 'idle'" name="microphone" class="cp-voiceRecorder__icon" />

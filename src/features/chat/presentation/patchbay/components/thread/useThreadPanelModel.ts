@@ -64,5 +64,5 @@ export function useThreadPanelModel(deps: ThreadPanelDeps) {
     }
   }
 
-  return { open, rootMessageId, rootMessage, replies, loading, draft, sending, openThread, closeThread, sendReply };
+  return { open, rootMessageId, rootMessage, replies, loading, draft, sending, currentChannelId: deps.currentChannelId, openThread, closeThread, sendReply };
 }

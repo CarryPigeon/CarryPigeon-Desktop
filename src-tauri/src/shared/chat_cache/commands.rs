@@ -17,6 +17,13 @@ use crate::shared::error::{CommandResult, command_error, to_command_error};
 const SERVICE: &str = "carrypigeon-desktop";
 const ACCOUNT: &str = "chat-cache-master-key";
 
+/// 聊天缓存条目数上限。
+/// 生产环境保持 8192；测试环境降低以便验证淘汰逻辑。
+#[cfg(not(test))]
+const CHAT_CACHE_MAX_ENTRIES: usize = 8_192;
+#[cfg(test)]
+const CHAT_CACHE_MAX_ENTRIES: usize = 5;
+
 static CHAT_CACHE_DB: OnceLock<Mutex<Option<Arc<sea_orm::DatabaseConnection>>>> = OnceLock::new();
 static CHAT_CACHE_MASTER_KEY: OnceLock<Mutex<Option<[u8; 32]>>> = OnceLock::new();
 
@@ -430,6 +437,65 @@ pub async fn chat_cache_get(key: String) -> CommandResult<Option<String>> {
     Ok(Some(value))
 }
 
+/// 如果聊天缓存条目数超过上限，按 `updated_at` 升序淘汰最旧的条目，直到剩余量约为上限的 80%。
+///
+/// 说明：
+/// - 在写入事务内执行，避免 put 与 prune 之间出现不一致。
+/// - 淘汰失败仅记录日志，不阻塞正常写入，防止因统计查询异常导致缓存不可用。
+async fn prune_chat_cache_if_needed<C>(conn: &C) -> Result<()>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let max = CHAT_CACHE_MAX_ENTRIES;
+    if max == 0 {
+        return Ok(());
+    }
+
+    let count_stmt = RawStatement::new(
+        "SELECT COUNT(*) AS cnt FROM chat_cache".to_string(),
+        Vec::new(),
+    );
+    let count: i64 = conn
+        .query_all(&count_stmt)
+        .await?
+        .first()
+        .and_then(|row| row.try_get::<Option<i64>>("", "cnt").ok().flatten())
+        .unwrap_or(0);
+
+    let max_i64 = max as i64;
+    if count <= max_i64 {
+        return Ok(());
+    }
+
+    let target = (max as u64).saturating_mul(4).saturating_div(5).max(1) as i64;
+    let to_remove = count.saturating_sub(target);
+    if to_remove <= 0 {
+        return Ok(());
+    }
+
+    let delete_stmt = RawStatement::new(
+        "DELETE FROM chat_cache WHERE key IN (SELECT key FROM chat_cache ORDER BY updated_at ASC LIMIT ?)"
+            .to_string(),
+        vec![Value::BigInt(Some(to_remove))],
+    );
+    if let Err(e) = conn.execute(&delete_stmt).await {
+        tracing::warn!(
+            action = "chat_cache_prune_failed",
+            count = count,
+            to_remove = to_remove,
+            error = %e
+        );
+    } else {
+        tracing::debug!(
+            action = "chat_cache_pruned",
+            count = count,
+            to_remove = to_remove,
+            target = target
+        );
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
     ensure_schema().await.map_err(|e| {
@@ -483,6 +549,8 @@ pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
             e,
         )
     })?;
+    // 写入成功后按需淘汰旧条目，防止缓存无限增长。
+    let _ = prune_chat_cache_if_needed(&txn).await;
     txn.commit().await.map_err(|e| {
         to_command_error(
             "CHAT_CACHE_TXN_COMMIT_FAILED",
@@ -731,6 +799,44 @@ mod tests {
         reset_test_state();
         let _ = forget_master_key();
         let _ = forget_master_key();
+        reset_test_state();
+    }
+
+    #[tokio::test]
+    async fn prunes_oldest_entries_when_over_limit() {
+        let _guard = test_lock().await;
+        let app_dir = init_test_app_data_dir();
+        std::fs::create_dir_all(&app_dir).expect("app dir");
+        reset_test_state();
+        let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir);
+
+        ensure_test_master_key();
+        // 插入 6 条（上限 5，目标保留 4），确保每条 updated_at 有差异。
+        for i in 0..6 {
+            chat_cache_put(ChatCachePutRequest {
+                key: format!("chat-cache-prune-{i}"),
+                value: format!("value-{i}"),
+            })
+            .await
+            .expect("put");
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+
+        let loaded = chat_cache_load_all().await.expect("load after prune");
+        assert_eq!(
+            loaded.len(),
+            4,
+            "oldest entries should be pruned down to 80% of limit"
+        );
+        assert!(
+            !loaded.contains_key("chat-cache-prune-0"),
+            "oldest entry should be evicted"
+        );
+        assert!(
+            loaded.contains_key("chat-cache-prune-5"),
+            "newest entry should remain"
+        );
+
         reset_test_state();
     }
 }

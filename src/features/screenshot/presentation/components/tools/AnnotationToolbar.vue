@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 type Tool = "select" | "pen" | "arrow" | "rect" | "text" | "mosaic";
 
 const props = defineProps<{
@@ -16,13 +18,15 @@ const emit = defineEmits<{
   (e: "undo"): void;
 }>();
 
+const { t } = useI18n();
+
 const tools: Array<{ id: Tool; label: string; icon: string }> = [
-  { id: "select", label: "Select", icon: "arrow-up-right" },
-  { id: "pen", label: "Pen", icon: "edit" },
-  { id: "arrow", label: "Arrow", icon: "arrow-right" },
-  { id: "rect", label: "Rectangle", icon: "rectangle" },
-  { id: "text", label: "Text", icon: "text" },
-  { id: "mosaic", label: "Mosaic", icon: "view-module" },
+  { id: "select", label: t("annotation_tool_select"), icon: "arrow-up-right" },
+  { id: "pen", label: t("annotation_tool_pen"), icon: "edit" },
+  { id: "arrow", label: t("annotation_tool_arrow"), icon: "arrow-right" },
+  { id: "rect", label: t("annotation_tool_rect"), icon: "rectangle" },
+  { id: "text", label: t("annotation_tool_text"), icon: "text" },
+  { id: "mosaic", label: t("annotation_tool_mosaic"), icon: "view-module" },
 ];
 
 const colors = ["#ff4444", "#ff8c00", "#ffd700", "#44ff44", "#44aaff", "#ffffff", "#000000"];
@@ -36,9 +40,11 @@ const presetWidths = [2, 4, 6, 10, 16];
       <button
         v-for="tool in tools"
         :key="tool.id"
+        type="button"
         class="cp-annotation-tool"
         :class="{ 'cp-annotation-tool--active': activeTool === tool.id }"
         :title="tool.label"
+        :aria-label="tool.label"
         @click="emit('toolChange', tool.id)"
       >
         <t-icon :name="tool.icon" />
@@ -52,6 +58,7 @@ const presetWidths = [2, 4, 6, 10, 16];
           :checked="strokeColor === c"
           :value="c"
           class="cp-annotation-color-input"
+          :aria-label="t('annotation_color', { color: c })"
           @change="emit('colorChange', c)"
         />
         <label
@@ -66,9 +73,11 @@ const presetWidths = [2, 4, 6, 10, 16];
       <button
         v-for="w in presetWidths"
         :key="w"
+        type="button"
         class="cp-annotation-width"
         :class="{ 'cp-annotation-width--active': strokeWidth === w }"
-        :title="`${w}px`"
+        :title="t('annotation_width', { width: w })"
+        :aria-label="t('annotation_width', { width: w })"
         @click="emit('widthChange', w)"
       >
         <span class="cp-annotation-width__line" :style="{ height: `${Math.min(w, 14)}px` }"></span>
@@ -77,8 +86,10 @@ const presetWidths = [2, 4, 6, 10, 16];
 
     <div class="cp-annotation-toolbar__group">
       <button
+        type="button"
         class="cp-annotation-tool"
-        title="Undo"
+        :title="t('annotation_tool_undo')"
+        :aria-label="t('annotation_tool_undo')"
         @click="emit('undo')"
       >
         <t-icon name="undo" />

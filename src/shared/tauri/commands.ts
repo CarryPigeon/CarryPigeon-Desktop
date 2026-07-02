@@ -74,6 +74,54 @@ export const TAURI_COMMANDS = {
 
   downloadFile: "download_file",
 
+  // opener plugin
+  openUrl: "plugin:opener|open_url",
+
+  // link preview
+  fetchLinkPreview: "fetch_link_preview",
+
+  // voice message
+  startVoiceRecording: "start_voice_recording",
+  stopVoiceRecording: "stop_voice_recording",
+  readFileBase64: "read_file_base64",
+  readFileBase64Chunk: "read_file_base64_chunk",
+
+  // emoji
+  listCustomEmojis: "list_custom_emojis",
+  saveEmoji: "save_emoji",
+  deleteEmoji: "delete_emoji",
+  copyEmoji: "copy_emoji",
+  writeTempEmojiFile: "write_temp_emoji_file",
+  getEmojiImagePath: "get_emoji_image_path",
+
+  // screenshot
+  startScreenshot: "start_screenshot",
+  getScreenshotData: "get_screenshot_data",
+  finishScreenshot: "finish_screenshot",
+  cancelScreenshot: "cancel_screenshot",
+
+  // voice call
+  connectSignaling: "connect_signaling",
+  startDirectCall: "start_direct_call",
+  startConference: "start_conference",
+  acceptCall: "accept_call",
+  rejectCall: "reject_call",
+  hangupCall: "hangup_call",
+  toggleMute: "toggle_mute",
+  toggleNoiseSuppression: "toggle_noise_suppression",
+  enumerateInputDevices: "enumerate_input_devices",
+  enumerateOutputDevices: "enumerate_output_devices",
+  enumerateAudioDevices: "enumerate_audio_devices",
+  selectInputDevice: "select_input_device",
+  selectOutputDevice: "select_output_device",
+  joinConference: "join_conference",
+  leaveConference: "leave_conference",
+  sendVideoSignaling: "send_video_signaling",
+
+  // logs
+  writeAppLog: "write_app_log",
+  readAppLogLines: "read_app_log_lines",
+
   // temp_file
   cleanupTempFiles: "cleanup_temp_files",
   removeTempFile: "remove_temp_file",

@@ -71,6 +71,7 @@ const replyVirtualizer = useVirtualizer(
                 >
                   <MessageContentHost
                     :message="(props.model.replies.value[vr.index] as unknown) as ChatMessage"
+                    :channel-id="props.model.currentChannelId"
                     :domain-registry-store="props.domainRegistryStore"
                   />
                 </div>

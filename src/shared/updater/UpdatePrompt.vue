@@ -4,6 +4,7 @@
  * @description 检测到新版本时提示用户，点击跳转 GitHub Releases 手动下载。
  */
 import { useI18n } from 'vue-i18n';
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { invokeTauri } from '@/shared/tauri/invokeClient';
 const { t } = useI18n();
 
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 }>();
 
 function handleOpenRelease(): void {
-  void invokeTauri('plugin:opener|open_url', { url: props.releaseUrl }).catch(() => {
+  void invokeTauri(TAURI_COMMANDS.openUrl, { url: props.releaseUrl }).catch(() => {
     window.open(props.releaseUrl, '_blank');
   });
   emit('dismiss');

@@ -2,6 +2,7 @@ import { ref, onUnmounted } from "vue";
 import { type UnlistenFn } from "@tauri-apps/api/event";
 import { safeListen } from "@/shared/tauri/events";
 import { invokeTauri } from "@/shared/tauri/invokeClient";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createLogger } from "@/shared/utils/logger";
 
 const STUN_SERVERS: RTCIceServer[] = [
@@ -30,7 +31,7 @@ export function useVideoCall(initialSessionId: string) {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        void invokeTauri("send_video_signaling", {
+        void invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
           sessionId: sessionId.value,
           signalType: "ice_candidate",
           payload: e.candidate.toJSON(),
@@ -68,7 +69,7 @@ export function useVideoCall(initialSessionId: string) {
     const offer = await p.createOffer();
     await p.setLocalDescription(offer);
 
-    await invokeTauri("send_video_signaling", {
+    await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
       sessionId: sessionId.value,
       signalType: "offer",
       payload: {
@@ -102,7 +103,7 @@ export function useVideoCall(initialSessionId: string) {
     const answer = await p.createAnswer();
     await p.setLocalDescription(answer);
 
-    await invokeTauri("send_video_signaling", {
+    await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
       sessionId: sessionId.value,
       signalType: "answer",
       payload: {
@@ -120,7 +121,7 @@ export function useVideoCall(initialSessionId: string) {
       t.enabled = !t.enabled;
     });
     cameraEnabled.value = tracks.some((t) => t.enabled);
-    await invokeTauri("send_video_signaling", {
+    await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
       sessionId: sessionId.value,
       signalType: "video_mute",
       payload: { muted: !cameraEnabled.value },
@@ -145,7 +146,7 @@ export function useVideoCall(initialSessionId: string) {
           );
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          await invokeTauri("send_video_signaling", {
+          await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
             sessionId: sessionId.value,
             signalType: "answer",
             payload: { sdp: answer.sdp, type: answer.type, candidates: [] },

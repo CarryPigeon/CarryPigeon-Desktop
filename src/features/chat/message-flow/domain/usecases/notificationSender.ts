@@ -7,6 +7,7 @@
 
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { createLogger } from "@/shared/utils/logger";
+import { IS_MOCK_ENABLED } from "@/shared/config/runtime";
 
 const logger = createLogger("notification");
 
@@ -51,7 +52,7 @@ export async function sendDesktopNotification(params: {
       return;
     }
 
-    if (import.meta.env.VITE_USE_MOCK_API === "true") {
+    if (IS_MOCK_ENABLED) {
       logger.debug("Action: chat_notification_mock_send", { title: params.title, body: params.body });
       return;
     }

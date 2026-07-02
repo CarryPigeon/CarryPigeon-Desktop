@@ -310,7 +310,6 @@ pub fn run() -> anyhow::Result<()> {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(crate::features::voice_call::di::commands::VoiceCallService::new())
         .manage(crate::features::voice_message::di::commands::VoiceRecorderState(
             std::sync::Mutex::new(None),
@@ -354,6 +353,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::shared::chat_cache::commands::chat_cache_remove_many,
             // logs
             crate::app::log_commands::write_app_log,
+            crate::app::log_commands::read_app_log_lines,
             crate::shared::log::log_info,
             crate::shared::log::log_error,
             crate::shared::log::log_warning,
@@ -397,6 +397,7 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::voice_message::di::commands::start_voice_recording,
             crate::features::voice_message::di::commands::stop_voice_recording,
             crate::features::voice_message::di::commands::read_file_base64,
+            crate::features::voice_message::di::commands::read_file_base64_chunk,
             // emoji
             crate::features::emoji::di::commands::list_custom_emojis,
             crate::features::emoji::di::commands::save_emoji,

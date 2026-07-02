@@ -3,6 +3,7 @@
 //! 约定：注释中文，日志英文（tracing）。
 
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::features::network::data::http_client::ReqwestApiRequestAdapter;
@@ -299,6 +300,10 @@ pub async fn download_file(
     }
     let mut downloaded: u64 = if resumed { resume_from } else { 0 };
     let mut stream = response.bytes_stream();
+    let mut last_emit = Instant::now();
+    let mut last_emitted_downloaded = downloaded;
+    const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_millis(100);
+    const PROGRESS_EMIT_BYTES: u64 = 64 * 1024;
 
     let stream_result: Result<(), _> = async {
         while let Some(chunk) = stream.next().await {
@@ -315,14 +320,21 @@ pub async fn download_file(
                 tracing::warn!(action = "network_temp_file_update_progress_failed", task_id = %task_id, error = %e);
             }
 
-            let _ = app.emit(
-                "download:progress",
-                serde_json::json!({
-                    "taskId": task_id,
-                    "downloaded": downloaded,
-                    "total": total,
-                }),
-            );
+            let should_emit = downloaded == total
+                || downloaded.saturating_sub(last_emitted_downloaded) >= PROGRESS_EMIT_BYTES
+                || last_emit.elapsed() >= PROGRESS_EMIT_INTERVAL;
+            if should_emit {
+                last_emit = Instant::now();
+                last_emitted_downloaded = downloaded;
+                let _ = app.emit(
+                    "download:progress",
+                    serde_json::json!({
+                        "taskId": task_id,
+                        "downloaded": downloaded,
+                        "total": total,
+                    }),
+                );
+            }
         }
         Ok::<_, String>(())
     }

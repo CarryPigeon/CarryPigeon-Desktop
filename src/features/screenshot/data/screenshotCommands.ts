@@ -1,18 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import type { ScreenCapture } from "../domain/contracts";
 
 export function startScreenshot(hideWindow?: boolean): Promise<void> {
-  return invoke("start_screenshot", { hideWindow });
+  return invoke(TAURI_COMMANDS.startScreenshot, { hideWindow });
 }
 
 export function getScreenshotData(): Promise<ScreenCapture[]> {
-  return invoke("get_screenshot_data");
+  return invoke(TAURI_COMMANDS.getScreenshotData);
 }
 
 export function finishScreenshot(data: number[]): Promise<string> {
-  return invoke("finish_screenshot", { data });
+  return invoke(TAURI_COMMANDS.finishScreenshot, { data });
 }
 
 export function cancelScreenshot(): Promise<void> {
-  return invoke("cancel_screenshot");
+  return invoke(TAURI_COMMANDS.cancelScreenshot);
 }

@@ -8,8 +8,10 @@ import { computed, onBeforeUnmount, onMounted, proxyRefs, ref, type ComputedRef,
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createLogger } from "@/shared/utils/logger";
 import { toast } from "@/shared/utils/toast";
+import { debounce } from "@/shared/utils/rateLimit";
 import type { ChatLinkPreview, ChatMessageRecord } from "@/features/chat/domain/types/chatApiModels";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
@@ -195,16 +197,25 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const editingMessageId = ref<string>("");
   const linkPreview = ref<ChatLinkPreview | null>(null);
 
-  async function fetchLinkPreview(url: string): Promise<void> {
+  const LINK_PREVIEW_DEBOUNCE_MS = 400;
+
+  async function doFetchLinkPreview(url: string): Promise<void> {
     try {
-      const result = await invoke<ChatLinkPreview>("fetch_link_preview", { url });
+      const result = await invoke<ChatLinkPreview>(TAURI_COMMANDS.fetchLinkPreview, { url });
       linkPreview.value = result;
     } catch {
       linkPreview.value = null;
     }
   }
 
+  const fetchLinkPreviewDebounced = debounce(doFetchLinkPreview, LINK_PREVIEW_DEBOUNCE_MS);
+
+  async function fetchLinkPreview(url: string): Promise<void> {
+    fetchLinkPreviewDebounced(url);
+  }
+
   function dismissLinkPreview(): void {
+    fetchLinkPreviewDebounced.cancel();
     linkPreview.value = null;
   }
 
@@ -394,6 +405,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     }, 30 * 1000);
     onBeforeUnmount(() => {
       window.clearInterval(reapTimer);
+      fetchLinkPreviewDebounced.cancel();
     });
   }
 

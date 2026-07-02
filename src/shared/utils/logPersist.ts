@@ -2,6 +2,7 @@
  * @fileoverview 前端日志持久化到 Tauri app data 目录。
  */
 import { createLogger, type Logger } from './logger';
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 
 const logger = createLogger('logPersist');
 
@@ -17,7 +18,7 @@ async function flushBuffer(): Promise<void> {
   const content = lines.join('\n') + '\n';
   try {
     const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('write_app_log', { content });
+    await invoke(TAURI_COMMANDS.writeAppLog, { content });
   } catch {
     // 写入失败时静默处理，避免循环日志
   }

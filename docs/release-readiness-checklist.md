@@ -6,10 +6,11 @@
 
 #### 代码质量改进
 - ✅ 修复了 `ManagedDbKind::as_str` 未使用方法的警告
-- ✅ Rust 代码通过规范检查（39个测试全部通过，0 failed）
+- ✅ Rust 代码通过规范检查（150个测试全部通过，0 failed）
 - ✅ TypeScript 类型检查通过
-- ✅ Frontend Vitest 测试全部通过（14 suites, 145 tests）
+- ✅ Frontend Vitest 测试全部通过（19 suites, 165 tests）
 - ✅ 修复 config_store 测试因 `APP_DATA_DIR` 全局状态污染导致的 5 个测试失败
+- ✅ Tauri 命令名全量收敛到 `TAURI_COMMANDS`，消除前端散落硬编码字符串
 
 #### 构建优化
 - ✅ Vite 构建配置优化完成
@@ -28,6 +29,16 @@
 - ✅ 图片懒加载（IntersectionObserver + 重试退避）
 - ✅ WebSocket 连接池（连接复用、LRU 驱逐、闲置清理）
 - ✅ 前端内存监控（定时采样、趋势分析、阈值告警）
+- ✅ 下载进度事件节流（按 100ms / 64KB 聚合）
+- ✅ 聊天缓存上限（8192 条 LRU 式淘汰）
+- ✅ TCP 状态事件节流（200ms 同状态去重）
+- ✅ `get_config_value` TTL 内存缓存 + 高频写入 100ms 批量 flush
+- ✅ 聊天内代码片段审查（localStorage MVP、行级注释）
+- ✅ 文件 IO 流式化：新增 `read_file_base64_chunk` 分块读取本地文件，上传直接传递 `File`/`Blob` 避免整文件进内存
+- ✅ 语音通话超时取消（Dialing/Ringing 60s 超时自动结束并通知前端）
+- ✅ Composer 链接预览防抖：输入含 URL 时 400ms 防抖后请求 `fetch_link_preview`，减少高频 IPC
+- ✅ 附件转换优化：语音消息、截图插入改为分块读取后流式组装 Blob，避免单条 base64 内存尖峰
+- ✅ 启动反馈增强：`StartupShell` 根据初始化阶段显示“初始化运行时 / 连接服务器 / 检查必要组件 / 恢复会话”文案（i18n 中英双语）
 
 #### 用户体验
 - ✅ 消息编辑状态视觉反馈（虚线边框 + 背景色高亮）
@@ -64,7 +75,7 @@
 - ✅ 插件系统（安装、更新、卸载、沙箱）
 - ✅ 设置管理（导入/导出/重置/主题）
 - ✅ 关闭到托盘（可配置，窗口关闭隐藏到托盘）
-- ✅ 系统托盘（未读徽标闪烁、本地化菜单、自动更新检查）
+- ✅ 系统托盘（未读徽标闪烁、本地化菜单、手动版本检查）
 - ✅ 消息操作（编辑、撤回、转发、引用回复、多选批量）
 - ✅ 关于页面（/about 路由）
 - ✅ 通知中心（应用内铃铛图标 + 通知面板）
@@ -75,9 +86,12 @@
 
 #### 质量保证
 - ✅ TypeScript 类型检查通过
-- ✅ Rust 测试全部通过（39个，0 failed）
-- ✅ Frontend Vitest 测试通过（145个）
+- ✅ Rust 测试全部通过（150个，0 failed）
+- ✅ Frontend Vitest 测试通过（165个）
 - ✅ 代码规范检查通过（日志、Rust、feature boundaries、文档）
+- ✅ cargo audit 通过（忽略 RUSTSEC-2023-0071，项目仅使用 SQLite 不触发 MySQL 路径）
+- ✅ cargo deny check 通过（advisories / bans / licenses / sources 均 ok）
+- ⚠️ Windows 本地 Tauri build：release 后端编译通过，`target/release/carrypigeon-desktop.exe` 生成并启动成功；安装包 bundling 因本机缺少 WiX/NSIS 且下载超时失败，CI 跨平台构建会补齐 `.msi` / `.exe`
 - ✅ 构建流程正常
 - ✅ Screenshot 叠加层测试（2 个测试文件）
 - ✅ i18n 键值一致性测试
@@ -89,7 +103,7 @@
 - ✅ 构建体积：MainPage 227KB (-48%)
 - ✅ 图片懒加载已实现
 - ✅ WebSocket 连接池已集成
-- ✅ 前端构建时间约 3.04s
+- ✅ 前端构建时间约 3.6s
 - ✅ Rust 侧 i18n 完整覆盖（119 个错误键，双语）
 - ✅ 消息编辑状态视觉反馈
 - ✅ SearchPanel i18n 修复
@@ -98,7 +112,8 @@
 - ✅ 性能监控分级：release 默认关闭所有监控，仅保留 ERROR 错误日志；诊断模式手动开启
 
 #### 安全性
-- ✅ 依赖安全审计（基础检查）
+- ✅ 依赖安全审计：cargo audit + cargo deny 通过
+- ✅ `.cargo/audit.toml` 记录已接受的 RUSTSEC-2023-0071 风险
 - ✅ 错误处理机制完善
 - ✅ 敏感数据保护
 - ✅ WebRTC P2P 加密
@@ -114,11 +129,11 @@
 ### 📊 构建产物分析
 
 #### 当前构建结果（优化后）
-- **首页入口 (index)**: 121.78 kB (gzip: 36.52 kB)
-- **聊天主页面 (MainPage)**: 227.39 kB (gzip: 69.49 kB)
+- **首页入口 (index)**: 231.07 kB (gzip: 61.32 kB)
+- **聊天主页面 (MainPage)**: 262.69 kB (gzip: 79.93 kB)
 - **Vue 运行时 (vendor-vue)**: 80.80 kB (gzip: 28.37 kB)
-- **TDesign 组件库 (vendor-tdesign)**: 384.97 kB (gzip: 126.54 kB)
-- **Tauri API (vendor-tauri)**: 18.92 kB (gzip: 4.84 kB)
+- **TDesign 组件库 (vendor-tdesign)**: 386.89 kB (gzip: 127.03 kB)
+- **Tauri API (vendor-tauri)**: 19.02 kB (gzip: 4.87 kB)
 - **图片灯箱 (ImageLightbox)**: 懒加载（defineAsyncComponent）
 
 #### 构建优化效果
@@ -134,8 +149,8 @@
 - ✅ 性能优化到位
 - ✅ CHANGELOG 已创建
 - ✅ 构建产物体积合理
-- ✅ 39/39 Rust 测试通过
-- ✅ 125/125 前端测试通过
+- ✅ 150/150 Rust 测试通过
+- ✅ 161/161 前端测试通过
 - ✅ 全部 lint 检查通过
 
 ### 📝 发布前最终检查
@@ -151,5 +166,5 @@
 
 #### 建议完成
 - ✅ 性能基准测试（typecheck + build ~3s, Rust tests ~9s）
-- ✅ 前端测试基础（14 test files, 145 tests）
+- ✅ 前端测试基础（18 test files, 161 tests）
 - ✅ 长时间运行测试：dev-only 内存长测入口已提供，release 产物不包含相关代码

@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
+
+const { t } = useI18n();
 
 defineProps<{
   preview: ChatLinkPreview;
@@ -12,7 +15,7 @@ defineEmits<{
 
 <template>
   <div class="cp-linkPreview">
-    <button class="cp-linkPreview__dismiss" type="button" @click="$emit('dismiss')">&times;</button>
+    <button class="cp-linkPreview__dismiss" type="button" :aria-label="t('close_link_preview')" @click="$emit('dismiss')">&times;</button>
     <div class="cp-linkPreview__body">
       <div class="cp-linkPreview__text">
         <div v-if="preview.siteName || preview.faviconUrl" class="cp-linkPreview__site">

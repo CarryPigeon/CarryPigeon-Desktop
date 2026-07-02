@@ -1,6 +1,7 @@
 import type { CallSession, CallKind, CallParticipant, AudioDeviceInfo, MediaSettings } from "../domain/contracts";
 import type { VoiceCallStatePort } from "../domain/ports";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 
 export function createMockVoiceCallStatePort(): VoiceCallStatePort {
   let _activeSession: CallSession | null = null;
@@ -100,13 +101,13 @@ export function createMockVoiceCallStatePort(): VoiceCallStatePort {
     async enumerateDevices() {
       // 1) 优先使用 Tauri 命令（Tauri webview 环境）
       try {
-        const result = await invoke<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>("enumerate_audio_devices");
+        const result = await invoke<{ input: AudioDeviceInfo[]; output: AudioDeviceInfo[] }>(TAURI_COMMANDS.enumerateAudioDevices);
         if (result.input.length > 0 || result.output.length > 0) return result;
       } catch { /* Tauri 不可用，继续下一步 */ }
 
       try {
-        const input = await invoke<AudioDeviceInfo[]>("enumerate_input_devices");
-        const output = await invoke<AudioDeviceInfo[]>("enumerate_output_devices");
+        const input = await invoke<AudioDeviceInfo[]>(TAURI_COMMANDS.enumerateInputDevices);
+        const output = await invoke<AudioDeviceInfo[]>(TAURI_COMMANDS.enumerateOutputDevices);
         if (input.length > 0 || output.length > 0) return { input, output };
       } catch { /* 继续下一步 */ }
 
