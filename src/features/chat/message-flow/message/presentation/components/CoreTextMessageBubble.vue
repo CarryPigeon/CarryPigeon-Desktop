@@ -5,10 +5,13 @@
  * message-flow/message｜Core:Text 消息气泡（支持 `[file:share_key]` token 分段渲染和 inline 编辑）。
  */
 
-import { ref, nextTick, watch, onMounted } from "vue";
+import { computed, ref, nextTick, watch, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import FileRefMessageBubble from "./FileRefMessageBubble.vue";
+import CodeBlockReviewable from "@/features/chat/message-flow/code-review/presentation/CodeBlockReviewable.vue";
 import { hasFileToken, parseCoreTextParts } from "@/features/chat/message-flow/message/domain/coreTextFileSyntax";
+import { parseCoreTextWithCodeBlocks } from "@/features/chat/message-flow/code-review/domain/codeBlockParser";
 import type { MessageMention, MessageReplySummary } from "@/features/chat/message-flow/api-types";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 
@@ -19,7 +22,7 @@ const customEmojiMap = ref<Map<string, EmojiEntry>>(new Map());
 
 onMounted(async () => {
   try {
-    const entries = await invoke<EmojiEntry[]>("list_custom_emojis");
+    const entries = await invoke<EmojiEntry[]>(TAURI_COMMANDS.listCustomEmojis);
     const map = new Map<string, EmojiEntry>();
     for (const e of entries) {
       map.set(e.name, e);
@@ -64,9 +67,21 @@ const props = defineProps<{
    */
   messageId: string;
   /**
+   * 所属频道 id（用于代码审查注释分区）。
+   */
+  channelId?: string;
+  /**
    * core-text 原始文本。
    */
   text: string;
+  /**
+   * 当前用户 id（用于代码审查注释作者）。
+   */
+  currentUserId?: string;
+  /**
+   * 当前用户显示名（用于代码审查注释展示）。
+   */
+  currentUserName?: string;
   /**
    * 回复预览文本（为空表示不展示）。
    */
@@ -111,7 +126,20 @@ const props = defineProps<{
    * 链接预览卡片数据。
    */
   linkPreview?: ChatLinkPreview | null;
-}>();
+}>()
+
+/**
+ * 把文本拆分为普通文本段与 fenced code block 段，便于分别渲染可评论代码块。
+ */
+const renderSegments = computed(() => {
+  let codeCount = 0;
+  return parseCoreTextWithCodeBlocks(props.text).map((seg) => {
+    if (seg.kind === "code") {
+      return { ...seg, blockIndex: codeCount++ };
+    }
+    return seg;
+  });
+});;
 
 const emit = defineEmits<{
   /**
@@ -273,24 +301,38 @@ function openLink(url: string): void {
         <span v-else>Enter 保存 · Esc 取消</span>
       </div>
     </template>
-    <!-- 普通渲染模式 -->
+    <!-- 普通渲染模式：支持文本、文件引用 token、自定义表情与可评论代码块 -->
     <template v-else>
-      <template v-if="hasFileToken(props.text)">
-        <template v-for="(p, idx) in parseCoreTextParts(props.text)" :key="`${props.messageId}-${idx}`">
-          <span v-if="p.kind === 'text'">
-            <template v-for="(seg, si) in parseCustomEmojis(p.text)" :key="`${props.messageId}-${idx}-${si}`">
-              <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="`:${seg.name}:`" class="cp-customEmoji" :title="`:${seg.name}:`" />
+      <template v-for="(segment, segIdx) in renderSegments" :key="`${props.messageId}-seg-${segIdx}`">
+        <template v-if="segment.kind === 'text'">
+          <template v-if="hasFileToken(segment.text)">
+            <template v-for="(p, idx) in parseCoreTextParts(segment.text)" :key="`${props.messageId}-${segIdx}-${idx}`">
+              <span v-if="p.kind === 'text'">
+                <template v-for="(seg, si) in parseCustomEmojis(p.text)" :key="`${props.messageId}-${segIdx}-${idx}-${si}`">
+                  <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="':' + seg.name + ':'" class="cp-customEmoji" :title="':' + seg.name + ':'" />
+                  <span v-else>{{ seg.value }}</span>
+                </template>
+              </span>
+              <FileRefMessageBubble v-else :filename="p.shareKey" :share-key="p.shareKey" @openLightbox="(payload) => emit('openLightbox', payload)" />
+            </template>
+          </template>
+          <template v-else>
+            <template v-for="(seg, si) in parseCustomEmojis(segment.text)" :key="`${props.messageId}-${segIdx}-text-${si}`">
+              <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="':' + seg.name + ':'" class="cp-customEmoji" :title="':' + seg.name + ':'" />
               <span v-else>{{ seg.value }}</span>
             </template>
-          </span>
-          <FileRefMessageBubble v-else :filename="p.shareKey" :share-key="p.shareKey" @openLightbox="(payload) => emit('openLightbox', payload)" />
+          </template>
         </template>
-      </template>
-      <template v-else>
-        <template v-for="(seg, si) in parseCustomEmojis(props.text)" :key="`${props.messageId}-text-${si}`">
-          <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="`:${seg.name}:`" class="cp-customEmoji" :title="`:${seg.name}:`" />
-          <span v-else>{{ seg.value }}</span>
-        </template>
+        <CodeBlockReviewable
+          v-else
+          :code="segment.code"
+          :language="segment.language"
+          :block-index="segment.blockIndex ?? 0"
+          :message-id="props.messageId"
+          :channel-id="props.channelId ?? ''"
+          :current-user-id="props.currentUserId ?? ''"
+          :current-user-name="props.currentUserName ?? ''"
+        />
       </template>
       <span v-if="props.isEdited" class="cp-bubble__edited">(已编辑)</span>
     </template>

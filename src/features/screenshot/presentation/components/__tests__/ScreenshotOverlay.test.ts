@@ -3,6 +3,10 @@ import { mount, flushPromises } from "@vue/test-utils";
 import ScreenshotOverlay from "../ScreenshotOverlay.vue";
 import type { ScreenCapture } from "@/features/screenshot/api-types";
 
+vi.mock("vue-i18n", () => ({
+  useI18n: vi.fn(() => ({ t: (key: string) => key })),
+}));
+
 const mocks = vi.hoisted(() => ({
   getScreenshotData: vi.fn(),
   finishScreenshot: vi.fn(),

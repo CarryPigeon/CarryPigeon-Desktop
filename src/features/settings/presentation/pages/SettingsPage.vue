@@ -27,6 +27,7 @@ import {
 import type { SettingsSchemaEnvelopeV1 } from "@/features/settings/api-types";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 import PageHeader from '@/shared/ui/PageHeader.vue';
+import DiagnosticsPanel from "@/features/settings/presentation/components/DiagnosticsPanel.vue";
 import { currentServerSocket } from "@/features/server-connection/api";
 import { getAccountCapabilities } from "@/features/account/api";
 import { readRefreshToken, clearAuthAndResumeState } from "@/shared/utils/localState";
@@ -34,6 +35,7 @@ import { getScopeLifecycleCapabilities } from "@/features/server-connection/scop
 
 const router = useRouter();
 const { t } = useI18n();
+const isDev = import.meta.env.DEV;
 const {
   theme,
   themeError,
@@ -116,6 +118,7 @@ onBeforeUnmount(() => {
 const appInfo = ref<AppInfo | null>(null);
 const updateCheckState = ref<UpdateStatus | { kind: 'checking' }>({ kind: 'checking' });
 const diagnosticsMode = ref(false);
+const diagnosticsVisible = ref(false);
 
 function toggleDiagnosticsMode(next: boolean): void {
   setDiagnosticsEnabled(next);
@@ -474,14 +477,16 @@ async function handleLogout(): Promise<void> {
             <div class="cp-settings__card">
               <div class="cp-settings__k">{{ t("settings_runtime") }}</div>
               <div class="cp-settings__v">
-                <div class="cp-settings__row">
-                  <span class="cp-settings__muted">{{ t("settings_mock_api") }}</span>
-                  <MonoTag :value="IS_MOCK_ENABLED ? 'true' : 'false'" title="VITE_USE_MOCK_API" :copyable="true" />
-                </div>
-                <div class="cp-settings__row">
-                  <span class="cp-settings__muted">{{ t("settings_mock_mode") }}</span>
-                  <MonoTag :value="MOCK_MODE" title="VITE_MOCK_MODE" :copyable="true" />
-                </div>
+                <template v-if="isDev">
+                  <div class="cp-settings__row">
+                    <span class="cp-settings__muted">{{ t("settings_mock_api") }}</span>
+                    <MonoTag :value="IS_MOCK_ENABLED ? 'true' : 'false'" title="VITE_USE_MOCK_API" :copyable="true" />
+                  </div>
+                  <div class="cp-settings__row">
+                    <span class="cp-settings__muted">{{ t("settings_mock_mode") }}</span>
+                    <MonoTag :value="MOCK_MODE" title="VITE_MOCK_MODE" :copyable="true" />
+                  </div>
+                </template>
                 <div class="cp-settings__row">
                   <span class="cp-settings__muted">{{ t("settings_diagnostics_mode") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-diagnostics-mode" :data-active="diagnosticsMode" type="button" @click="toggleDiagnosticsMode(!diagnosticsMode)">
@@ -489,6 +494,17 @@ async function handleLogout(): Promise<void> {
                   </button>
                 </div>
                 <div class="cp-settings__hint">{{ t("settings_diagnostics_mode_desc") }}</div>
+                <div class="cp-settings__row">
+                  <span class="cp-settings__muted">{{ t("diagnostics_panel_title") }}</span>
+                  <button
+                    class="cp-settings__segBtn"
+                    type="button"
+                    :disabled="!diagnosticsMode && !isDev"
+                    @click="diagnosticsVisible = true"
+                  >
+                    {{ t("diagnostics_open_panel") }}
+                  </button>
+                </div>
                 <div class="cp-settings__hint">{{ t("settings_runtime_hint") }}</div>
               </div>
             </div>
@@ -687,6 +703,16 @@ async function handleLogout(): Promise<void> {
         </section>
       </section>
     </ErrorBoundary>
+
+    <t-dialog
+      v-model:visible="diagnosticsVisible"
+      :header="t('diagnostics_panel_title')"
+      width="720px"
+      :footer="false"
+      destroy-on-close
+    >
+      <DiagnosticsPanel />
+    </t-dialog>
   </main>
 </template>
 

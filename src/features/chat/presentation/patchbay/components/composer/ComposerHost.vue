@@ -7,7 +7,6 @@
 import { computed, ref, type Component, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { safeListen } from "@/shared/tauri/events";
-import { invokeTauri } from "@/shared/tauri/invokeClient";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import DomainSelector from "./DomainSelector.vue";
 import ScreenshotButton from "@/features/screenshot/presentation/components/ScreenshotButton.vue";
@@ -20,6 +19,7 @@ import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-typ
 import AttachmentPreviewBar from "@/features/chat/message-flow/upload/presentation/components/AttachmentPreviewBar.vue";
 import { addFiles, getAttachments, removeAttachment } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 import { createLogger } from "@/shared/utils/logger";
+import { readLocalFileAsBlob } from "@/shared/utils/readLocalFileAsBlob";
 
 const props = defineProps<{
   domainId: string;
@@ -102,13 +102,7 @@ const attachments = computed(() => Array.from(getAttachments().values()));
 async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
   isUploadingVoice.value = true;
   try {
-    const base64 = await invokeTauri<string>("read_file_base64", { path: payload.filePath });
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: "audio/wav" });
+    const blob = await readLocalFileAsBlob(payload.filePath, "audio/wav");
     const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
     addFiles([file]);
   } catch (e) {
@@ -122,13 +116,7 @@ let unlistenScreenshot: UnlistenFn | null = null;
 
 async function handleScreenshotCompleted(event: { payload: string }): Promise<void> {
   try {
-    const base64 = await invokeTauri<string>("read_file_base64", { path: event.payload });
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: "image/png" });
+    const blob = await readLocalFileAsBlob(event.payload, "image/png");
     const file = new File([blob], `screenshot-${Date.now()}.png`, { type: "image/png" });
     addFiles([file]);
   } catch (e) {
@@ -320,7 +308,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
         <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
         <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
       </div>
-      <button class="cp-reply__btn" type="button" @click="handleCancelReply"><t-icon name="close" /></button>
+      <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><t-icon name="close" /></button>
     </div>
 
     <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
@@ -329,7 +317,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
         <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
         <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
       </div>
-      <button class="cp-quoteBar__close" type="button" @click="$emit('cancel-quote-reply')">&times;</button>
+      <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')">&times;</button>
     </div>
 
     <div v-if="props.error" class="cp-composer__error" role="alert">

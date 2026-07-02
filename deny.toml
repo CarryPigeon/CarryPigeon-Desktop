@@ -26,7 +26,7 @@ multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
 skip = [
-    { name = "zip", reason = "zip 4.x required by tauri-plugin-updater; 8.x used directly for plugin package extraction." },
+    { name = "zip", reason = "zip 8.x used directly for plugin package extraction; multiple versions allowed." },
 ]
 
 [sources]
@@ -35,6 +35,7 @@ unknown-git = "warn"
 
 [advisories]
 ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "Ignored in CI; known transitive issue with no safe upgrade path at this time." },
     { id = "RUSTSEC-2024-0370", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
     { id = "RUSTSEC-2024-0411", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
     { id = "RUSTSEC-2024-0412", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },

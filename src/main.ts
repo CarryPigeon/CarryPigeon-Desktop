@@ -38,7 +38,7 @@ import {
 } from "@/app/bootstrap/trayIntegration";
 import { checkForUpdateSilently } from "@/shared/updater/checkUpdate";
 
-import { resolveStartup } from '@/app/bootstrap/startupState';
+import { resolveStartup, setStartupPhaseLabel } from '@/app/bootstrap/startupState';
 import { getMemoryMonitor, destroyMemoryMonitor } from "@/shared/monitoring/memoryMonitor";
 import { isPerformanceMonitoringEnabled } from "@/shared/config/performance";
 
@@ -80,6 +80,7 @@ const isSubWindow = routeIfSubWindow(router, searchParams);
 const hasTauriRuntime = isTauriRuntimeAvailable();
 
 async function startMainWindowRuntimes(): Promise<boolean> {
+  setStartupPhaseLabel("startup_phase_runtime");
   try {
     const [serverLease, pluginLease] = await Promise.all([
       serverConnectionCapabilities.runtime.acquireLease(),
@@ -104,11 +105,6 @@ async function startMainWindowRuntimes(): Promise<boolean> {
   registerTrayHoverBridge();
   syncTrayLocaleOnStartup();
 
-    resolveStartup('ready');
-  if (isPerformanceMonitoringEnabled()) {
-    const durationMs = Math.round(performance.now() - performance.timeOrigin);
-    logger.info("Action: app_startup_ready", { duration_ms: durationMs });
-  }
   return true;
 }
 
@@ -154,9 +150,16 @@ if (hasTauriRuntime) {
   });
 }
 if (!isSubWindow && hasTauriRuntime) {
-  void startMainWindowRuntimes().then((ok) => {
+  void startMainWindowRuntimes().then(async (ok) => {
     if (ok) {
+      setStartupPhaseLabel("startup_phase_connect");
       ensureInitialServerSelection();
+      await restoreStartupSession(router);
+      resolveStartup('ready');
+      if (isPerformanceMonitoringEnabled()) {
+        const durationMs = Math.round(performance.now() - performance.timeOrigin);
+        logger.info("Action: app_startup_ready", { duration_ms: durationMs });
+      }
       // 启动后 5 秒静默检查更新
       window.setTimeout(() => {
         void checkForUpdateSilently((version, releaseUrl) => {
@@ -178,7 +181,6 @@ if (!isSubWindow && hasTauriRuntime) {
           });
         });
       }, UPDATE_CHECK_DELAY_MS);
-      void restoreStartupSession(router);
     }
   });
 } else if (!isSubWindow) {

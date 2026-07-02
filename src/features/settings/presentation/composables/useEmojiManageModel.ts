@@ -5,6 +5,7 @@
 
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("emoji");
@@ -28,7 +29,7 @@ export function useEmojiManageModel() {
     if (!uid) return;
     loading.value = true;
     try {
-      emojis.value = await invoke<EmojiEntry[]>("list_custom_emojis", { uid });
+      emojis.value = await invoke<EmojiEntry[]>(TAURI_COMMANDS.listCustomEmojis, { uid });
     } catch (e) {
       error.value = String(e);
       logger.error("Action: chat_emoji_load_failed", { error: String(e) });
@@ -39,7 +40,7 @@ export function useEmojiManageModel() {
 
   async function addEmoji(sourcePath: string, name: string, tags: string[] = [], uid: string): Promise<void> {
     try {
-      await invoke("save_emoji", { sourcePath, name, tags, uid });
+      await invoke(TAURI_COMMANDS.saveEmoji, { sourcePath, name, tags, uid });
       await loadEmojis(uid);
     } catch (e) {
       logger.error("Action: chat_emoji_save_failed", { error: String(e) });
@@ -49,7 +50,7 @@ export function useEmojiManageModel() {
 
   async function deleteEmoji(id: string, uid: string): Promise<void> {
     try {
-      await invoke("delete_emoji", { id, uid });
+      await invoke(TAURI_COMMANDS.deleteEmoji, { id, uid });
       await loadEmojis(uid);
     } catch (e) {
       logger.error("Action: chat_emoji_delete_failed", { error: String(e) });
@@ -58,7 +59,7 @@ export function useEmojiManageModel() {
   }
 
   async function getImagePath(id: string): Promise<string> {
-    return invoke<string>("get_emoji_image_path", { id });
+    return invoke<string>(TAURI_COMMANDS.getEmojiImagePath, { id });
   }
 
   return { emojis, loading, error, loadEmojis, addEmoji, deleteEmoji, getImagePath };

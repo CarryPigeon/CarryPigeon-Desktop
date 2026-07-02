@@ -208,9 +208,8 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
             sizeBytes: att.file.size,
           });
           updateProgress(att.id, 50);
-          // 第二步，执行实际上传
-          const buffer = await att.file.arrayBuffer();
-          await fileService.performUpload(socket, result.upload, buffer);
+          // 第二步，执行实际上传（直接传递 File，让 fetch 流式读取）
+          await fileService.performUpload(socket, result.upload, att.file);
           markDone(att.id, result.shareKey);
           // 将 shareKey 追加到 draft
           appendAttachmentShareKey(result.shareKey);

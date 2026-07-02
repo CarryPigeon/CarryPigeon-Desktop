@@ -7,7 +7,7 @@
  * - failed: 错误信息 + 重试按钮
  */
 import { ref, onMounted } from 'vue';
-import { startupPromise, type StartupPhase } from '@/app/bootstrap/startupState';
+import { startupPromise, startupPhaseLabel, type StartupPhase } from '@/app/bootstrap/startupState';
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 
@@ -32,6 +32,7 @@ function handleRetry(): void {
   <div v-else-if="phase === 'initializing'" class="startup-shell">
     <p class="startup-text">CarryPigeon</p>
     <div class="startup-spinner" />
+    <p v-if="startupPhaseLabel" class="startup-phase">{{ t(startupPhaseLabel) }}</p>
   </div>
 
   <!-- 启动失败 -->
@@ -70,6 +71,13 @@ function handleRetry(): void {
   font-size: 13px;
   color: var(--cp-text-muted);
   margin: 0;
+}
+
+.startup-phase {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  margin: 0;
+  min-height: 20px;
 }
 
 .startup-logo {

@@ -14,6 +14,21 @@ import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageRe
 import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 
 /**
+ * 单个频道在内存中保留的最大消息数量。
+ *
+ * 超过该阈值时丢弃最旧的消息，避免长时间运行后前端内存无限增长。
+ */
+const MESSAGE_LIST_MEMORY_WINDOW = 3000;
+
+/**
+ * 将消息列表裁剪到内存窗口大小，保留最新的消息。
+ */
+function trimMessagesToWindow<T>(messages: T[]): T[] {
+  if (messages.length <= MESSAGE_LIST_MEMORY_WINDOW) return messages;
+  return messages.slice(messages.length - MESSAGE_LIST_MEMORY_WINDOW);
+}
+
+/**
  * 创建消息时间线状态端口所需的底层状态容器。
  */
 export type CreateMessageTimelineStatePortDeps = {
@@ -42,17 +57,16 @@ export function createMessageTimelineStatePort(
       return deps.messagesByChannel[channelId] ?? [];
     },
     replaceTimeline(channelId: string, messages: readonly ChatMessage[]): void {
-      deps.messagesByChannel[channelId] = [...messages];
+      deps.messagesByChannel[channelId] = trimMessagesToWindow([...messages]);
     },
     appendMessageIfMissing(
       channelId: string,
       message: ChatMessage,
       compareMessages: (a: ChatMessage, b: ChatMessage) => number,
     ): boolean {
-      const list = deps.messagesByChannel[channelId] ?? (deps.messagesByChannel[channelId] = []);
+      const list = deps.messagesByChannel[channelId] ?? [];
       if (list.some((entry) => entry.id === message.id)) return false;
-      list.push(message);
-      list.sort(compareMessages);
+      deps.messagesByChannel[channelId] = trimMessagesToWindow([...list, message].sort(compareMessages));
       return true;
     },
     beginOptimisticMessageRemoval(channelId: string, messageId: string): { restore(): void } {

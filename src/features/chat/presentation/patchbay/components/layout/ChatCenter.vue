@@ -658,6 +658,7 @@ function getReplyText(m: VirtualMessageItem): string {
                 <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
                 <MessageContentHost
                   :message="virtualListItems[vr.index].m"
+                  :channel-id="props.model.currentChannelId"
                   :reply-text="getReplyText(virtualListItems[vr.index].m)"
                   :domain-registry-store="props.model.domainRegistryStore"
                   :editing-message-id="props.editingMessageId"

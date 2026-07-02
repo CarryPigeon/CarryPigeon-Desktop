@@ -25,12 +25,17 @@ import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
 import MergedForwardBubble from "./MergedForwardBubble.vue";
 import ReactionBar from "./ReactionBar.vue";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
+import { getAccountCapabilities } from "@/features/account/api";
 
 const props = defineProps<{
   /**
    * 原始聊天消息。
    */
   message: RenderableChatMessage;
+  /**
+   * 消息所属频道 id（用于代码审查注释分区）。
+   */
+  channelId?: string;
   /**
    * 回复预览文本（仅 core-text 使用）。
    */
@@ -96,6 +101,14 @@ const renderModel = computed(() =>
  * 判断消息是否属于当前登录用户。
  */
 const isOwn = computed(() => props.message.from.id === currentChatUserId.value);
+
+/**
+ * 当前用户显示名（用于代码审查注释作者展示）。
+ */
+const currentUserName = computed(() => {
+  const snapshot = getAccountCapabilities().currentUser.getSnapshot();
+  return snapshot.username || String(currentChatUserId.value);
+});
 
 /**
  * 消息是否已被编辑过（通过 editedAt 时间戳判断）。
@@ -249,6 +262,7 @@ function handleInstall(): void {
     <CoreTextMessageBubble
       v-else-if="renderModel.kind === 'core'"
       :message-id="renderModel.messageId"
+      :channel-id="props.channelId"
       :text="renderModel.text"
       :reply-text="renderModel.replyText"
       :reply="props.message.kind === 'core_text' ? props.message.replyTo : undefined"
@@ -259,6 +273,8 @@ function handleInstall(): void {
       :is-own="isOwn"
       :editing-message-id="props.editingMessageId"
       :link-preview="messageLinkPreview"
+      :current-user-id="currentChatUserId"
+      :current-user-name="currentUserName"
       @edit="(payload) => emit('edit', payload)"
       @edit-cancel="(messageId) => emit('edit-cancel', messageId)"
       @openLightbox="(payload) => emit('openLightbox', payload)"

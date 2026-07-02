@@ -7,6 +7,7 @@
 import { ref, reactive, onMounted, watch } from "vue";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { invokeTauri } from "@/shared/tauri/invokeClient";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { useI18n } from "vue-i18n";
 import { createLogger } from "@/shared/utils/logger";
 import "emoji-picker-element";
@@ -39,7 +40,7 @@ async function loadEmojis(): Promise<void> {
   if (!props.currentUserId) return;
   loading.value = true;
   try {
-    customEmojis.value = await invokeTauri("list_custom_emojis", { uid: props.currentUserId });
+    customEmojis.value = await invokeTauri(TAURI_COMMANDS.listCustomEmojis, { uid: props.currentUserId });
   } catch (e) {
     logger.error("Action: chat_sticker_load_failed", { error: String(e) });
   } finally {
@@ -59,7 +60,7 @@ function onEmojiPickerClick(e: Event): void {
 
 async function handleStickerClick(sticker: { id: string; name: string; filePath: string }): Promise<void> {
   try {
-    const absPath = await invokeTauri<string>("get_emoji_image_path", { id: sticker.id });
+    const absPath = await invokeTauri<string>(TAURI_COMMANDS.getEmojiImagePath, { id: sticker.id });
     const assetUrl = convertFileSrc(absPath, "asset");
     const ext = sticker.filePath.split(".").pop()?.toLowerCase() ?? "png";
     const mimeMap: Record<string, string> = {
@@ -100,7 +101,7 @@ function handleAddClick(): void {
       uploading.value = true;
       try {
         const bytes = new Uint8Array(await f.arrayBuffer());
-        const tempPath = await invokeTauri<string>("write_temp_emoji_file", { name: f.name, data: Array.from(bytes) });
+        const tempPath = await invokeTauri<string>(TAURI_COMMANDS.writeTempEmojiFile, { name: f.name, data: Array.from(bytes) });
         uploadFilePath.value = tempPath;
       } catch (e) {
         logger.error("Action: chat_sticker_upload_prep_failed", { error: String(e) });
@@ -125,7 +126,7 @@ async function handleUploadConfirm(): Promise<void> {
   uploading.value = true;
   try {
     const tags = uploadTags.value.split(",").map((s) => s.trim()).filter(Boolean);
-    await invokeTauri("save_emoji", {
+    await invokeTauri(TAURI_COMMANDS.saveEmoji, {
       sourcePath: uploadFilePath.value,
       name,
       tags,
@@ -142,7 +143,7 @@ async function handleUploadConfirm(): Promise<void> {
 
 async function handleDeleteSticker(id: string): Promise<void> {
   try {
-    await invokeTauri("delete_emoji", { id, uid: props.currentUserId });
+    await invokeTauri(TAURI_COMMANDS.deleteEmoji, { id, uid: props.currentUserId });
     await loadEmojis();
   } catch (e) {
     logger.error("Action: chat_sticker_delete_failed", { error: String(e) });
@@ -154,7 +155,7 @@ const imageUrlCache = reactive<Record<string, string>>({});
 async function resolveImageUrl(id: string): Promise<string> {
   if (imageUrlCache[id]) return imageUrlCache[id];
   try {
-    const absPath = await invokeTauri<string>("get_emoji_image_path", { id });
+    const absPath = await invokeTauri<string>(TAURI_COMMANDS.getEmojiImagePath, { id });
     const url = convertFileSrc(absPath, "asset");
     imageUrlCache[id] = url;
     return url;

@@ -6,6 +6,7 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import "emoji-picker-element";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/api-types";
 import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
@@ -29,7 +30,7 @@ onMounted(async () => {
   try {
     const uid = getCurrentChatUserId();
     if (uid) {
-      customEmojis.value = await invoke("list_custom_emojis", { uid });
+      customEmojis.value = await invoke(TAURI_COMMANDS.listCustomEmojis, { uid });
     }
   } catch { /* ignore */ }
 });
@@ -112,7 +113,7 @@ function handleCustomEmojiClick(ce: { id: string; name: string }): void {
         overflowY: 'auto',
       }"
     >
-      <button class="cp-reactionAddBtn" type="button">+</button>
+      <button class="cp-reactionAddBtn" type="button" :aria-label="t('add_reaction')">+</button>
       <template #content>
         <div class="cp-emojiTabs">
           <button :class="{ active: emojiTab === 'standard' }" @click="emojiTab = 'standard'">Emoji</button>

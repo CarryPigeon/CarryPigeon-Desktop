@@ -13,6 +13,7 @@ import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
 import { readAuthSession, writeAuthSession } from "@/shared/utils/localState";
 import { createLogger } from "@/shared/utils/logger";
+import { setStartupPhaseLabel } from "@/app/bootstrap/startupState";
 
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 const accountCapabilities = getAccountCapabilities();
@@ -123,7 +124,12 @@ export async function restoreStartupSession(router: Router): Promise<void> {
   const socket = serverConnectionCapabilities.workspace.readSocket();
   if (!socket) return;
 
+  setStartupPhaseLabel("startup_phase_connect");
   if (!(await ensureServerConnectivity(socket))) return;
+
+  setStartupPhaseLabel("startup_phase_required_setup");
   if (await redirectIfRequiredSetupNeeded(router, socket)) return;
+
+  setStartupPhaseLabel("startup_phase_restore");
   await restoreCurrentUserFromSession(router, socket);
 }

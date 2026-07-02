@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("ScreenShare");
@@ -41,7 +42,7 @@ export function useScreenShare(sessionId: string) {
     displayTrack.onended = () => stopScreenShare();
 
     isSharing.value = true;
-    await invoke("send_video_signaling", {
+    await invoke(TAURI_COMMANDS.sendVideoSignaling, {
       sessionId,
       signalType: "screen_share_on",
       payload: {},
@@ -58,7 +59,7 @@ export function useScreenShare(sessionId: string) {
       originalVideoTrack = null;
     }
     isSharing.value = false;
-    await invoke("send_video_signaling", {
+    await invoke(TAURI_COMMANDS.sendVideoSignaling, {
       sessionId,
       signalType: "screen_share_off",
       payload: {},

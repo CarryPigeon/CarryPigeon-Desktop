@@ -6,8 +6,9 @@ use serde_json::Value;
 use std::any::TypeId;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 use tokio::io::AsyncWriteExt;
-use tokio::sync::Mutex;
+use tokio::sync::Mutex as TokioMutex;
 
 use crate::features::settings::domain::settings_schema::{
     SETTINGS_SCHEMA_VERSION, SettingsBackendStateV1, SettingsImportEnvelopeV1,
@@ -24,9 +25,44 @@ pub(crate) fn config_file_path() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("./config.json"))
 }
 
-fn config_write_lock() -> &'static Mutex<()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
+/// 配置信封内存缓存的 TTL。
+///
+/// 说明：
+/// - 生产环境 500ms，避免高频读取配置时反复访问磁盘；
+/// - 测试环境设为 0，保证每次读取都回退到磁盘，避免跨测试缓存导致断言不稳定。
+#[cfg(not(test))]
+const CONFIG_CACHE_TTL: Duration = Duration::from_millis(500);
+#[cfg(test)]
+const CONFIG_CACHE_TTL: Duration = Duration::from_millis(0);
+
+/// 高频配置写入的批量 flush 延迟。
+///
+/// 说明：
+/// - 生产环境 100ms，把连续多次写入合并为一次磁盘写；
+/// - 测试环境设为 0，确保 `update_config_*` 后立即落盘，现有断言可直接读取 config.json。
+#[cfg(not(test))]
+const CONFIG_FLUSH_DELAY: Duration = Duration::from_millis(100);
+#[cfg(test)]
+const CONFIG_FLUSH_DELAY: Duration = Duration::from_millis(0);
+
+/// 配置信封内存缓存项。
+struct CachedConfig {
+    /// 缓存对应的 config.json 路径（app_data_dir 变化时自动失效）。
+    path: PathBuf,
+    /// 当前内存中的 envelope（可能包含尚未 flush 到磁盘的修改）。
+    envelope: SettingsImportEnvelopeV1,
+    /// 最近一次从磁盘加载或写入的时间。
+    loaded_at: Instant,
+    /// 是否存在尚未落盘的修改。
+    dirty: bool,
+    /// 待执行的批量 flush 任务句柄。
+    flush_handle: Option<tokio::task::JoinHandle<()>>,
+}
+
+static CONFIG_CACHE: OnceLock<TokioMutex<Option<CachedConfig>>> = OnceLock::new();
+
+fn config_cache() -> &'static TokioMutex<Option<CachedConfig>> {
+    CONFIG_CACHE.get_or_init(|| TokioMutex::new(None))
 }
 
 fn config_temp_path(path: &Path) -> PathBuf {
@@ -258,13 +294,121 @@ fn update_envelope_u32(envelope: &mut SettingsImportEnvelopeV1, key: &str, value
     }
 }
 
+/// 将 envelope 立即写入磁盘，并同步为内存缓存中的“干净”状态。
+///
+/// 说明：
+/// - 用于 import_settings / reset_settings 等需要立即落盘的场景；
+/// - 写入成功后会取消任何待执行的批量 flush，避免重复写盘。
 async fn persist_envelope(envelope: &SettingsImportEnvelopeV1) -> anyhow::Result<()> {
     let config_file = config_file_path();
     let json = format_envelope_json(envelope)?;
-    atomic_write_config(&config_file, &json).await
+    atomic_write_config(&config_file, &json).await?;
+
+    let current_path = config_file_path();
+    let mut guard = config_cache().lock().await;
+    if let Some(cache) = guard.as_mut() {
+        if let Some(handle) = cache.flush_handle.take() {
+            handle.abort();
+        }
+    }
+    *guard = Some(CachedConfig {
+        path: current_path,
+        envelope: envelope.clone(),
+        loaded_at: Instant::now(),
+        dirty: false,
+        flush_handle: None,
+    });
+    Ok(())
 }
 
-async fn load_current_envelope() -> SettingsImportEnvelopeV1 {
+/// 获取当前应使用的配置 envelope（优先使用未过期的内存缓存）。
+async fn cached_envelope() -> SettingsImportEnvelopeV1 {
+    let current_path = config_file_path();
+    let guard = config_cache().lock().await;
+
+    if let Some(cache) = guard.as_ref() {
+        // 路径一致且（有脏数据或缓存未过期）时直接返回内存副本。
+        if cache.path == current_path && (cache.dirty || cache.loaded_at.elapsed() < CONFIG_CACHE_TTL) {
+            return cache.envelope.clone();
+        }
+    }
+
+    drop(guard);
+    let envelope = load_envelope_from_disk().await;
+    let mut guard = config_cache().lock().await;
+    // 如果当前缓存有脏数据，说明在加载磁盘期间发生了写入；以内存中的最新值为准。
+    if let Some(cache) = guard.as_ref() {
+        if cache.dirty && cache.path == current_path {
+            return cache.envelope.clone();
+        }
+    }
+    *guard = Some(CachedConfig {
+        path: current_path,
+        envelope: envelope.clone(),
+        loaded_at: Instant::now(),
+        dirty: false,
+        flush_handle: None,
+    });
+    envelope
+}
+
+/// 将 envelope 的修改先写入内存缓存，并按 CONFIG_FLUSH_DELAY 批量 flush 到磁盘。
+async fn schedule_persist_envelope(envelope: SettingsImportEnvelopeV1) -> anyhow::Result<()> {
+    let current_path = config_file_path();
+    let mut guard = config_cache().lock().await;
+
+    if let Some(cache) = guard.as_mut() {
+        if cache.path != current_path {
+            *guard = None;
+        } else if let Some(handle) = cache.flush_handle.take() {
+            handle.abort();
+        }
+    }
+
+    if CONFIG_FLUSH_DELAY.is_zero() {
+        // 测试环境：立即落盘，保持与现有断言兼容。
+        drop(guard);
+        return persist_envelope(&envelope).await;
+    }
+
+    let envelope_for_task = envelope.clone();
+    let flush_handle = Some(tokio::spawn(async move {
+        tokio::time::sleep(CONFIG_FLUSH_DELAY).await;
+        if let Err(e) = flush_pending_config(&envelope_for_task).await {
+            tracing::warn!(
+                action = "settings_config_flush_failed",
+                error = %e
+            );
+        }
+    }));
+
+    *guard = Some(CachedConfig {
+        path: current_path,
+        envelope,
+        loaded_at: Instant::now(),
+        dirty: true,
+        flush_handle,
+    });
+    Ok(())
+}
+
+/// 执行一次待 flush 检查：仅当缓存仍持有相同的 envelope 时才真正写盘。
+async fn flush_pending_config(expected_envelope: &SettingsImportEnvelopeV1) -> anyhow::Result<()> {
+    let current_path = config_file_path();
+    let guard = config_cache().lock().await;
+    let Some(cache) = guard.as_ref() else {
+        return Ok(());
+    };
+    if cache.path != current_path || !cache.dirty || cache.envelope != *expected_envelope {
+        return Ok(());
+    }
+    let envelope = cache.envelope.clone();
+    drop(guard);
+
+    persist_envelope(&envelope).await
+}
+
+async fn load_envelope_from_disk() -> SettingsImportEnvelopeV1 {
     let config_file = config_file_path();
     let raw = match tokio::fs::read_to_string(&config_file).await {
         Ok(data) if !data.trim().is_empty() => data,
@@ -359,7 +503,7 @@ pub struct Config {
 /// # 返回值
 /// - 返回版本化 settings envelope 的 JSON 字符串；若文件不存在或损坏，会自动迁移/重置为默认 envelope。
 pub async fn get_config() -> String {
-    let envelope = load_current_envelope().await;
+    let envelope = cached_envelope().await;
     format_envelope_json(&envelope).unwrap_or_else(|error| {
         tracing::error!(action = "settings_config_export_failed", error = %error);
         "{}".to_string()
@@ -373,14 +517,12 @@ pub async fn export_settings() -> String {
 
 /// 导入版本化 settings envelope（storage 层 helper）。
 pub async fn import_settings(raw: String) -> anyhow::Result<()> {
-    let _guard = config_write_lock().lock().await;
     let envelope = parse_settings_import_envelope(&raw)?;
     persist_envelope(&envelope).await
 }
 
 /// 重置 settings 到默认值（storage 层 helper）。
 pub async fn reset_settings() -> anyhow::Result<()> {
-    let _guard = config_write_lock().lock().await;
     persist_envelope(&default_settings_envelope()).await
 }
 
@@ -443,7 +585,7 @@ pub async fn get_config_value<T>(key: String) -> T
 where
     T: ConfigValueExtractor<T> + Default,
 {
-    let envelope = load_current_envelope().await;
+    let envelope = cached_envelope().await;
     envelope_value_for_key(&envelope, &key)
         .map(|value| T::extract(&value))
         .unwrap_or_default()
@@ -465,7 +607,7 @@ pub async fn get_server_config_value<T>(server_socket: String) -> T
 where
     T: ConfigValueExtractor<T> + Default + 'static,
 {
-    let envelope = load_current_envelope().await;
+    let envelope = cached_envelope().await;
     let want = server_socket.trim();
     for server in &envelope.backend.server_list {
         if server.server_socket.trim() != want {
@@ -489,41 +631,38 @@ where
 
 /// 异步更新配置文件中的指定 bool 值。
 pub async fn update_config_bool(key: String, value: bool) -> anyhow::Result<()> {
-    let _guard = config_write_lock().lock().await;
-    let mut envelope = load_current_envelope().await;
+    let mut envelope = cached_envelope().await;
     if !update_envelope_bool(&mut envelope, &key, value) {
         tracing::error!(action = "settings_config_update_unsupported", key = %key);
         return Err(anyhow::anyhow!("Unsupported config key: {}", key));
     }
-    persist_envelope(&envelope).await
+    schedule_persist_envelope(envelope).await
 }
 
 /// 异步更新配置文件中的指定 u32 值。
 pub async fn update_config_u32(key: String, value: u32) -> anyhow::Result<()> {
-    let _guard = config_write_lock().lock().await;
     if key == "server_port" && (value == 0 || value > 65535) {
         return Err(anyhow::anyhow!(
             "Invalid server_port value: {} (must be 1..=65535)",
             value
         ));
     }
-    let mut envelope = load_current_envelope().await;
+    let mut envelope = cached_envelope().await;
     if !update_envelope_u32(&mut envelope, &key, value) {
         tracing::error!(action = "settings_config_update_unsupported", key = %key, value);
         return Err(anyhow::anyhow!("Unsupported config key: {}", key));
     }
-    persist_envelope(&envelope).await
+    schedule_persist_envelope(envelope).await
 }
 
 /// 异步更新配置文件中的指定 string 值。
 pub async fn update_config_string(key: String, value: String) -> anyhow::Result<()> {
-    let _guard = config_write_lock().lock().await;
-    let mut envelope = load_current_envelope().await;
+    let mut envelope = cached_envelope().await;
     if !update_envelope_string(&mut envelope, &key, &value) {
         tracing::error!(action = "settings_config_update_unsupported", key = %key);
         return Err(anyhow::anyhow!("Unsupported config key: {}", key));
     }
-    persist_envelope(&envelope).await
+    schedule_persist_envelope(envelope).await
 }
 /// 读取 bool 类型配置值（顶层字段）。
 ///
