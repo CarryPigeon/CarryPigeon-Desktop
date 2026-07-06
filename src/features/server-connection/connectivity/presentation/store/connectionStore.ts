@@ -24,6 +24,8 @@ export type ConnectionReason =
   | "version_incompatible"
   | "tls_verify_failed"
   | "timeout"
+  | "not_a_carrypigeon_server"
+  | "missing_server_id"
   | "unknown";
 
 /**
@@ -63,9 +65,11 @@ type ConnectErrorRule = {
 
 const CONNECT_ERROR_RULES: ConnectErrorRule[] = [
   { reason: "timeout", patterns: ["timeout", "timed out"] },
-  { reason: "tls_verify_failed", patterns: ["tls", "x509", "certificate", "cert_"] },
+  { reason: "missing_server_id", patterns: ["missing_server_id", "missing server_id", "server_id missing"] },
+  { reason: "not_a_carrypigeon_server", patterns: ["not_a_carrypigeon_server", "not a carrypigeon server", "/api/server"] },
+  { reason: "tls_verify_failed", patterns: ["tls", "x509", "certificate", "cert_", "ssl"] },
   { reason: "version_incompatible", patterns: ["version", "incompatible", "unsupported api", "min_supported"] },
-  { reason: "network_unreachable", patterns: ["unreachable", "network", "econnrefused", "enotfound", "ehostunreach", "econnreset"] },
+  { reason: "network_unreachable", patterns: ["unreachable", "network", "econnrefused", "enotfound", "ehostunreach", "econnreset", "failed to fetch"] },
 ];
 
 const CONNECTION_REASON_DETAIL_PREFIX: Record<ConnectionReason, string> = {
@@ -75,6 +79,8 @@ const CONNECTION_REASON_DETAIL_PREFIX: Record<ConnectionReason, string> = {
   version_incompatible: "Version incompatible",
   network_unreachable: "Network unreachable",
   handshake_failed: "Handshake failed",
+  not_a_carrypigeon_server: "Not a CarryPigeon server",
+  missing_server_id: "Missing server_id",
   unknown: "Unknown error",
 };
 

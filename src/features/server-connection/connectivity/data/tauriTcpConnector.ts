@@ -12,6 +12,7 @@ import { getServerTlsConfig } from "@/shared/net/tls/serverTlsConfigProvider";
 import type { TlsPolicy } from "@/shared/net/tls/tlsTypes";
 import { assertValidTlsFingerprint } from "@/shared/net/tls/tlsPolicyGuards";
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
+import { isApiRequestError } from "@/shared/net/http/apiErrors";
 
 const logger = createLogger("tauriTcpConnector");
 
@@ -117,7 +118,13 @@ function parseMajorVersion(raw: string): number {
  * This makes the "Handshake → Verify → Auth" stages align with `docs/api/*`:
  * - If the host is unreachable, connect should fail early with a meaningful error.
  * - If the API version is incompatible, connect should fail with a version hint.
- * - If `server_id` is missing, we treat it as an invalid server response.
+ * - If `server_id` is missing, we log a warning but allow login to proceed
+ *   (PRD: core chat must stay usable without `server_id`; plugins are disabled).
+ *
+ * 抛出的错误消息会被 `mapConnectErrorReason` 归一化为机器可读 `ConnectionReason`，
+ * 进而在 ConnectionPill 上呈现可行动的中文文案。各失败分支有意在消息里包含
+ * 固定关键字（如 “not a carrypigeon server” / “missing_server_id”），以便在
+ * 不依赖自定义错误类型的前提下被模式匹配识别。
  *
  * @param serverSocket - Raw server socket string.
  * @returns Promise<void>
@@ -130,17 +137,37 @@ async function verifyHttpApi(serverSocket: string): Promise<void> {
   const timeoutMs = 6500;
   let timeoutHandle: ReturnType<typeof globalThis.setTimeout> | undefined;
   try {
-    const json = (await Promise.race([
-      client.requestJson<ApiServerVerifyResponse>("GET", "/server"),
-      new Promise<never>((_resolve, reject) => {
-        timeoutHandle = globalThis.setTimeout(() => reject(new Error(`Handshake timeout: GET /api/server exceeded ${timeoutMs}ms`)), timeoutMs);
-      }),
-    ])) as ApiServerVerifyResponse;
+    let json: ApiServerVerifyResponse | undefined;
+    try {
+      json = (await Promise.race([
+        client.requestJson<ApiServerVerifyResponse>("GET", "/server"),
+        new Promise<never>((_resolve, reject) => {
+          timeoutHandle = globalThis.setTimeout(() => reject(new Error(`Handshake timeout: GET /api/server exceeded ${timeoutMs}ms`)), timeoutMs);
+        }),
+      ])) as ApiServerVerifyResponse;
+    } catch (error) {
+      // 404/非 JSON/非 CarryPigeon 服务器：HTTP 客户端归一化为 ApiRequestError，
+      // 这里再附加明确关键字以驱动 UI 文案分支。
+      if (isApiRequestError(error)) {
+        // 404 或非 /api/server 风格的 reason 视为“不是 CarryPigeon 服务器”。
+        if (error.status === 404 || error.reason === "http_error") {
+          throw new Error(`not a carrypigeon server: GET /api/server returned status=${error.status}`);
+        }
+        throw error;
+      }
+      throw error;
+    }
+
+    if (!json || typeof json !== "object") {
+      throw new Error("not a carrypigeon server: /api/server returned non-object body");
+    }
+
     const serverId = String(json?.server_id ?? "").trim();
     if (serverId) {
       rememberServerId(socket, serverId);
     } else {
       // PRD：核心聊天必须在缺失 `server_id` 时仍可用（插件功能禁用）。
+      // 这里有意不抛错——登录链路继续，由上层 banner 提示插件被禁用。
       logger.warn("Action: network_server_id_missing_plugins_disabled", { socket });
     }
 
@@ -176,7 +203,11 @@ export const tauriTcpConnector: TcpConnectorPort = {
     if (!serverSocketKey) throw new Error("Missing server socket");
     logger.info("Action: network_connect_server_started", { serverSocket: serverSocketKey });
     try {
-      if (isHttpLike(serverSocketKey)) {
+      // 任何“非显式 native transport”的输入（包括纯 `host:port`、`127.0.0.1:8080`、
+      // `example.com:8080` 等）一律走 HTTP 路径，确保 `GET /api/server` 被触发、`server_id` 可被拉取。
+      // 服务端只暴露 HTTP(8080) + 可选 WS(18080)，没有自定义原生 TCP 握手协议，
+      // 因此原生 TCP 分支仅对显式声明 `tcp://`/`tls://`/`mock://` 等 scheme 的输入保留。
+      if (!isExplicitNativeTransport(serverSocketKey)) {
         await Promise.all([ensureServerDb(serverSocketKey), verifyHttpApi(serverSocketKey)]);
         logger.info("Action: network_http_like_socket_tcp_handshake_skipped", { serverSocket: serverSocketKey });
         return;
