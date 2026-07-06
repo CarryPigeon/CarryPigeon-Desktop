@@ -15,6 +15,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { readLastEventId, writeLastEventId } from "@/shared/utils/localState";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { connectProtocolMockChatWs } from "@/shared/mock/protocol/protocolMockTransport";
+import { getKnownServerId, rememberServerId } from "@/shared/serverIdentity";
 import { getWsConnectionPool } from "./wsConnectionPool";
 import type { ChatWsEventWire } from "../protocol/chatWireEvents";
 
@@ -333,6 +334,18 @@ export function connectChatWs(
 
     const ok = parsed as WsCommandOk;
     logger.debug("Action: chat_ws_message_received", { type: ok.type, id: ok.id ?? "" });
+
+    // 兜底恢复 `server_id`：服务端在 `auth.ok` 帧中回显 `data.server_id`。
+    // 当 `GET /api/server` 因某条路径被跳过或失败时，这里作为恢复作用域隔离的备用来源；
+    // 仅在当前未知 `server_id` 时填入，不覆盖已建立的作用域，避免迁移副作用。
+    if (ok.type === "auth.ok" && ok.data && typeof ok.data === "object") {
+      const dataRecord = ok.data as Record<string, unknown>;
+      const serverId = typeof dataRecord.server_id === "string" ? dataRecord.server_id.trim() : "";
+      if (serverId && !getKnownServerId(socket)) {
+        rememberServerId(socket, serverId);
+        logger.info("Action: chat_ws_auth_ok_server_id_recovered", { socket, serverId });
+      }
+    }
   }
 
   /**
