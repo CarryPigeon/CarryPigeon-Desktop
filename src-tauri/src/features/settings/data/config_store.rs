@@ -328,7 +328,9 @@ async fn cached_envelope() -> SettingsImportEnvelopeV1 {
 
     if let Some(cache) = guard.as_ref() {
         // 路径一致且（有脏数据或缓存未过期）时直接返回内存副本。
-        if cache.path == current_path && (cache.dirty || cache.loaded_at.elapsed() < CONFIG_CACHE_TTL) {
+        if cache.path == current_path
+            && (cache.dirty || cache.loaded_at.elapsed() < CONFIG_CACHE_TTL)
+        {
             return cache.envelope.clone();
         }
     }
@@ -764,7 +766,10 @@ mod tests {
     static TEST_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
     async fn test_lock() -> tokio::sync::MutexGuard<'static, ()> {
-        TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await
+        TEST_LOCK
+            .get_or_init(|| tokio::sync::Mutex::new(()))
+            .lock()
+            .await
     }
 
     fn test_temp_dir() -> PathBuf {

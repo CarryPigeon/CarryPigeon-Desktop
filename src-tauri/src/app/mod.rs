@@ -134,7 +134,7 @@ pub fn run() -> anyhow::Result<()> {
                         let _ = window.set_size(tauri::PhysicalSize::new(bounds.width, bounds.height));
                         let _ = window.set_position(tauri::PhysicalPosition::new(bounds.x, bounds.y));
                         tracing::info!(
-                            action = "window_bounds_restore_applied",
+                            action = "windows_bounds_restore_applied",
                             width = bounds.width,
                             height = bounds.height,
                             x = bounds.x,
@@ -142,7 +142,7 @@ pub fn run() -> anyhow::Result<()> {
                         );
                     } else {
                         tracing::warn!(
-                            action = "window_bounds_restore_out_of_range",
+                            action = "windows_bounds_restore_out_of_range",
                             width = bounds.width,
                             height = bounds.height,
                             x = bounds.x,
@@ -150,11 +150,11 @@ pub fn run() -> anyhow::Result<()> {
                         );
                     }
                 } else {
-                    tracing::info!(action = "window_bounds_restore_none");
+                    tracing::info!(action = "windows_bounds_restore_none");
                 }
                 let _ = window.show();
             } else {
-                tracing::warn!(action = "window_bounds_main_window_missing");
+                tracing::warn!(action = "windows_bounds_main_window_missing");
             }
 
             // 同步读取 close_to_tray 设置，缓存到托管状态供窗口关闭事件使用。

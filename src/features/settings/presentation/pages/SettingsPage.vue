@@ -28,10 +28,9 @@ import type { SettingsSchemaEnvelopeV1 } from "@/features/settings/api-types";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 import PageHeader from '@/shared/ui/PageHeader.vue';
 import DiagnosticsPanel from "@/features/settings/presentation/components/DiagnosticsPanel.vue";
-import { currentServerSocket } from "@/features/server-connection/api";
+import { currentServerSocket, getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { getAccountCapabilities } from "@/features/account/api";
 import { readRefreshToken, clearAuthAndResumeState } from "@/shared/utils/localState";
-import { getScopeLifecycleCapabilities } from "@/features/server-connection/scope-lifecycle/api";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -274,7 +273,7 @@ async function handleLogout(): Promise<void> {
       }
       clearAuthAndResumeState(socket);
       try {
-        await getScopeLifecycleCapabilities().clearCurrentWorkspace(socket);
+        await getServerConnectionCapabilities().scopeLifecycle.clearCurrentWorkspace(socket);
       } catch {
         // best-effort: workspace cleanup may fail but logout should proceed
       }

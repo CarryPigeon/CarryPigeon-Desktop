@@ -782,7 +782,10 @@ mod tests {
     static TEST_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
     async fn test_lock() -> tokio::sync::MutexGuard<'static, ()> {
-        TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await
+        TEST_LOCK
+            .get_or_init(|| tokio::sync::Mutex::new(()))
+            .lock()
+            .await
     }
 
     fn test_app_data_dir() -> PathBuf {

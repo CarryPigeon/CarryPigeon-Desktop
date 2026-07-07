@@ -15,7 +15,7 @@ pub struct ScreenshotCaptureState(pub Mutex<Option<Vec<ScreenCapture>>>);
 #[tauri::command]
 pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> CommandResult<()> {
     let hide_window = hide_window.unwrap_or(true);
-    tracing::info!(action = "screenshot_start", hide_window = hide_window);
+    tracing::info!(action = "app_screenshot_start", hide_window = hide_window);
 
     // 1. 隐藏主窗口（可选）
     if hide_window && let Some(main_window) = app.get_webview_window("main") {
@@ -84,7 +84,7 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
         let _ = overlay.emit("screenshot-data-ready", ());
     }
 
-    tracing::info!(action = "screenshot_overlay_opened");
+    tracing::info!(action = "app_screenshot_overlay_opened");
     Ok(())
 }
 
@@ -106,7 +106,7 @@ pub async fn get_screenshot_data(app: AppHandle) -> CommandResult<Vec<ScreenCapt
 /// 完成截图：保存图片 → 通知主窗口 → 关闭遮罩 → 显示主窗口。
 #[tauri::command]
 pub async fn finish_screenshot(app: AppHandle, data: Vec<u8>) -> CommandResult<String> {
-    tracing::info!(action = "screenshot_finish", size = data.len());
+    tracing::info!(action = "app_screenshot_finish", size = data.len());
 
     // 1. 保存到临时目录
     let app_data = app
@@ -141,7 +141,7 @@ pub async fn finish_screenshot(app: AppHandle, data: Vec<u8>) -> CommandResult<S
     app.emit("screenshot-completed", &path_str)
         .map_err(|e| command_error("SCREENSHOT_EVENT_FAIL", &e.to_string()))?;
 
-    tracing::info!(action = "screenshot_saved", path = %path_str);
+    tracing::info!(action = "app_screenshot_saved", path = %path_str);
 
     // 5. 清理临时截图文件（best-effort）
     let _ = std::fs::remove_dir_all(app_data.join("temp-screenshots"));
@@ -152,7 +152,7 @@ pub async fn finish_screenshot(app: AppHandle, data: Vec<u8>) -> CommandResult<S
 /// 取消截图：关闭遮罩 → 显示主窗口。
 #[tauri::command]
 pub async fn cancel_screenshot(app: AppHandle) -> CommandResult<()> {
-    tracing::info!(action = "screenshot_cancel");
+    tracing::info!(action = "app_screenshot_cancel");
 
     if let Some(overlay) = app.get_webview_window("screenshot-overlay") {
         let _ = overlay.close();

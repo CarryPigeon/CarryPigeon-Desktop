@@ -158,7 +158,7 @@ if (!isSubWindow && hasTauriRuntime) {
       resolveStartup('ready');
       if (isPerformanceMonitoringEnabled()) {
         const durationMs = Math.round(performance.now() - performance.timeOrigin);
-        logger.info("Action: app_startup_ready", { duration_ms: durationMs });
+        logger.info("Action: api_app_startup_ready", { duration_ms: durationMs });
       }
       // 启动后 5 秒静默检查更新
       window.setTimeout(() => {

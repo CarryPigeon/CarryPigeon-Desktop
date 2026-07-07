@@ -178,26 +178,18 @@ mod tests {
         let path = dir.join("sample.bin");
         std::fs::write(&path, b"hello world").unwrap();
 
-        let res = read_file_base64_chunk(
-            path.to_string_lossy().into_owned(),
-            0,
-            4,
-        )
-        .await
-        .unwrap();
+        let res = read_file_base64_chunk(path.to_string_lossy().into_owned(), 0, 4)
+            .await
+            .unwrap();
 
         assert_eq!(res.read_bytes, 4);
         assert_eq!(res.total_bytes, 11);
         assert!(!res.eof);
         assert_eq!(res.chunk, base64_encode(b"hell"));
 
-        let res2 = read_file_base64_chunk(
-            path.to_string_lossy().into_owned(),
-            6,
-            1024,
-        )
-        .await
-        .unwrap();
+        let res2 = read_file_base64_chunk(path.to_string_lossy().into_owned(), 6, 1024)
+            .await
+            .unwrap();
 
         assert_eq!(res2.read_bytes, 5);
         assert!(res2.eof);
@@ -212,13 +204,9 @@ mod tests {
         let path = dir.join("empty.bin");
         std::fs::write(&path, b"x").unwrap();
 
-        let res = read_file_base64_chunk(
-            path.to_string_lossy().into_owned(),
-            100,
-            4,
-        )
-        .await
-        .unwrap();
+        let res = read_file_base64_chunk(path.to_string_lossy().into_owned(), 100, 4)
+            .await
+            .unwrap();
 
         assert_eq!(res.read_bytes, 0);
         assert!(res.eof);

@@ -19,7 +19,7 @@ pub fn read_app_log_lines(limit: u32) -> CommandResult<Vec<String>> {
     let log_path = match get_app_data_dir() {
         Ok(dir) => dir.join("logs").join("app.log"),
         Err(e) => {
-            tracing::error!(action = "read_app_log_lines_failed", reason = "app_data_dir_unavailable", error = %e);
+            tracing::error!(action = "app_log_read_failed", reason = "app_data_dir_unavailable", error = %e);
             return Err(format!("[APP_DATA_DIR_UNAVAILABLE] {e}"));
         }
     };
@@ -31,7 +31,7 @@ pub fn read_app_log_lines(limit: u32) -> CommandResult<Vec<String>> {
     let file = match File::open(&log_path) {
         Ok(f) => f,
         Err(e) => {
-            tracing::error!(action = "read_app_log_lines_failed", path = ?log_path, error = %e);
+            tracing::error!(action = "app_log_read_failed", path = ?log_path, error = %e);
             return Err(format!("[LOG_OPEN_FAILED] {e}"));
         }
     };
@@ -49,7 +49,7 @@ pub fn read_app_log_lines(limit: u32) -> CommandResult<Vec<String>> {
                 }
             }
             Err(e) => {
-                tracing::error!(action = "read_app_log_lines_failed", error = %e);
+                tracing::error!(action = "app_log_read_failed", error = %e);
                 return Err(format!("[LOG_READ_FAILED] {e}"));
             }
         }
