@@ -87,6 +87,7 @@ export function createServerConnectionCapabilities(): ServerConnectionCapabiliti
     },
     scopeLifecycle: {
       registerCleanupHandler: scopeLifecycleCapabilities.registerCleanupHandler,
+      clearCurrentWorkspace: scopeLifecycleCapabilities.clearCurrentWorkspace,
     },
   };
 }

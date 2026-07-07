@@ -142,7 +142,7 @@ async function initOverlay(data: ScreenCapture[]) {
         resolve();
       };
       img.onerror = () => {
-        logger.error("Action: screenshot_image_load_failed", { index: idx });
+        logger.error("Action: api_screenshot_image_load_failed", { index: idx });
         failedCount++;
         resolve();
       };

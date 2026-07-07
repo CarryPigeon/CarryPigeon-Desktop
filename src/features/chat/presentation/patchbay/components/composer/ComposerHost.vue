@@ -9,7 +9,7 @@ import { useI18n } from "vue-i18n";
 import { safeListen } from "@/shared/tauri/events";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import DomainSelector from "./DomainSelector.vue";
-import ScreenshotButton from "@/features/screenshot/presentation/components/ScreenshotButton.vue";
+import { ScreenshotButton } from "@/features/screenshot/components";
 import StickerPickerButton from "@/features/chat/presentation/patchbay/components/composer/StickerPickerButton.vue";
 import FileUploadButton from "@/features/chat/message-flow/upload/presentation/components/FileUploadButton.vue";
 import VoiceMessageRecorder from "@/features/chat/message-flow/message/presentation/components/VoiceMessageRecorder.vue";
@@ -120,7 +120,7 @@ async function handleScreenshotCompleted(event: { payload: string }): Promise<vo
     const file = new File([blob], `screenshot-${Date.now()}.png`, { type: "image/png" });
     addFiles([file]);
   } catch (e) {
-    logger.error("Action: screenshot_insert_failed", { error: String(e) });
+    logger.error("Action: chat_composer_screenshot_insert_failed", { error: String(e) });
   }
 }
 

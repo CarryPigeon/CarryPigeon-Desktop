@@ -164,6 +164,12 @@ export type ServerConnectionScopeLifecycleCapabilities = {
    * @returns 取消注册函数。
    */
   registerCleanupHandler(handler: CurrentServerWorkspaceCleanupHandler): () => void;
+  /**
+   * 清理指定 server 的当前工作区（登出 / 切服时使用）。
+   *
+   * @param serverSocket - 目标 server socket。
+   */
+  clearCurrentWorkspace(serverSocket: string): Promise<void>;
 };
 
 /**

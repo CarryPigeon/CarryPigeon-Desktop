@@ -60,7 +60,7 @@ export function useVideoCall(initialSessionId: string) {
       localStream.value = stream;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.error(`[VOICE_CALL] Failed to start video call: ${msg}`);
+      logger.error("Action: chat_voice_call_start_failed", { error: msg });
       return;
     }
     const p = await ensurePC();
@@ -90,7 +90,7 @@ export function useVideoCall(initialSessionId: string) {
       localStream.value = stream;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.error(`[VOICE_CALL] Failed to accept video call: ${msg}`);
+      logger.error("Action: chat_voice_call_accept_failed", { error: msg });
       return;
     }
     const p = await ensurePC();

@@ -18,7 +18,7 @@ onMounted(async () => {
     appInfo.value = await caps.getAppInfo();
   } catch (e) {
     error.value = t("load_failed");
-    logger.error("Failed to load app info", { error: String(e) });
+    logger.error("Action: api_about_load_failed", { error: String(e) });
   } finally {
     loading.value = false;
   }

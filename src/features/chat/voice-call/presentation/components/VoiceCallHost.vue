@@ -174,7 +174,7 @@ function handleToggleScreenShare() {
       screenShare.setPeerConnection(pc);
       screenShare.startScreenShare();
     } else {
-      logger.warn("[VOICE_CALL] Cannot start screen share: no RTCPeerConnection available");
+      logger.warn("Action: chat_voice_call_screen_share_blocked", { reason: "no_peer_connection" });
     }
   }
 }

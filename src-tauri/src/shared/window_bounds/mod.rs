@@ -40,7 +40,7 @@ pub fn load() -> Option<WindowBounds> {
     match serde_json::from_str::<WindowBounds>(&raw) {
         Ok(b) => {
             tracing::info!(
-                action = "window_bounds_loaded",
+                action = "windows_bounds_loaded",
                 path = %path.display(),
                 width = b.width,
                 height = b.height,
@@ -51,7 +51,7 @@ pub fn load() -> Option<WindowBounds> {
         }
         Err(error) => {
             tracing::warn!(
-                action = "window_bounds_parse_failed",
+                action = "windows_bounds_parse_failed",
                 path = %path.display(),
                 error = %error
             );
@@ -63,7 +63,7 @@ pub fn load() -> Option<WindowBounds> {
 /// 同步写窗口 bounds 到磁盘（直接写，失败仅记录日志）。
 pub fn save(bounds: WindowBounds) {
     let Some(path) = bounds_file_path() else {
-        tracing::warn!(action = "window_bounds_save_no_data_dir");
+        tracing::warn!(action = "windows_bounds_save_no_data_dir");
         return;
     };
     if let Some(parent) = path.parent() {
@@ -73,14 +73,14 @@ pub fn save(bounds: WindowBounds) {
         Ok(raw) => {
             if let Err(error) = write_atomic(&path, raw.as_bytes()) {
                 tracing::warn!(
-                    action = "window_bounds_save_failed",
+                    action = "windows_bounds_save_failed",
                     path = %path.display(),
                     error = %error
                 );
                 return;
             }
             tracing::debug!(
-                action = "window_bounds_saved",
+                action = "windows_bounds_saved",
                 path = %path.display(),
                 width = bounds.width,
                 height = bounds.height,
@@ -90,7 +90,7 @@ pub fn save(bounds: WindowBounds) {
         }
         Err(error) => {
             tracing::warn!(
-                action = "window_bounds_serialize_failed",
+                action = "windows_bounds_serialize_failed",
                 error = %error
             );
         }
@@ -108,20 +108,20 @@ pub fn save_async(bounds: WindowBounds) {
     let raw = match serde_json::to_string(&bounds) {
         Ok(s) => s,
         Err(error) => {
-            tracing::warn!(action = "window_bounds_serialize_failed", error = %error);
+            tracing::warn!(action = "windows_bounds_serialize_failed", error = %error);
             return;
         }
     };
     tauri::async_runtime::spawn(async move {
         if let Err(error) = tokio::fs::write(&path, raw.as_bytes()).await {
             tracing::warn!(
-                action = "window_bounds_save_failed",
+                action = "windows_bounds_save_failed",
                 path = %path.display(),
                 error = %error
             );
         } else {
             tracing::debug!(
-                action = "window_bounds_saved_async",
+                action = "windows_bounds_saved_async",
                 path = %path.display()
             );
         }

@@ -23,7 +23,7 @@ export function useScreenShare(sessionId: string) {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.error(`[VOICE_CALL] Screen share failed: ${msg}`);
+      logger.error("Action: chat_voice_call_screen_share_failed", { error: msg });
       return;
     }
     const [displayTrack] = displayStream.getVideoTracks();
