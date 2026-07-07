@@ -28,6 +28,7 @@ import type {
   ChatPinRecord,
   ChatReactionRecord,
   ChatReadStateInput,
+  ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
 } from "@/features/chat/domain/types/chatApiModels";
@@ -174,7 +175,7 @@ export class ChatCoreApplicationService {
     accessToken: string,
     channelId: string,
     readState: ChatReadStateInput,
-  ): Promise<void> {
+  ): Promise<ChatReadStateResponse> {
     return this.deps.api.updateReadState(serverSocket, accessToken, channelId, readState);
   }
 
@@ -383,7 +384,7 @@ export class ChatGovernanceApplicationService {
     uid: string,
     until: number,
     reason: string,
-  ): Promise<void> {
+  ): Promise<ChatChannelBanRecord> {
     return this.deps.api.putChannelBan(serverSocket, accessToken, channelId, uid, until, reason);
   }
 

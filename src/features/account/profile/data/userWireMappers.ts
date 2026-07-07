@@ -20,8 +20,8 @@ export function mapUserMeWire(wire: ApiUserMe): UserMe {
     uid: asTrimmedString(wire.uid),
     email: asOptionalString(wire.email),
     nickname: asOptionalString(wire.nickname),
-    avatar: asOptionalString(wire.avatar),
-    backgroundUrl: asOptionalString(wire.backgroundUrl),
+    avatar: asOptionalString(wire.avatar_url),
+    backgroundUrl: asOptionalString(wire.background_url),
   };
 }
 
@@ -38,9 +38,9 @@ export function mapUserPublicWire(wire: ApiUserPublic): UserPublic {
   return {
     uid: asTrimmedString(wire.uid),
     nickname: asTrimmedString(wire.nickname),
-    avatar: asOptionalString(wire.avatar),
+    avatar: asOptionalString(wire.avatar_url),
     email: asOptionalString(wire.email),
     bio: asOptionalString(wire.bio),
-    backgroundUrl: asOptionalString(wire.backgroundUrl),
+    backgroundUrl: asOptionalString(wire.background_url),
   };
 }

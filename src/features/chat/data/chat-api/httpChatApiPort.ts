@@ -17,6 +17,7 @@ import type {
   ChatPinRecord,
   ChatReactionRecord,
   ChatReadStateInput,
+  ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
 } from "../../domain/types/chatApiModels";
@@ -48,7 +49,6 @@ import {
   httpPinMessage,
   httpPutChannelBan,
   httpReactToMessage,
-  httpRecallMessage,
   httpRemoveChannelAdmin,
   httpRemoveReaction,
   httpSearchChannelMessages,
@@ -70,6 +70,7 @@ import {
   mapChatPinWire,
   mapChatReactionWire,
   mapChatReadStateInput,
+  mapChatReadStateResponseWire,
   mapChatSendMessageInput,
   mapChatUnreadStateWire,
 } from "../protocol/chatWireMappers";
@@ -115,15 +116,16 @@ export const httpChatApiPort: ChatApiPort = {
     return httpDeleteMessage(serverSocket, accessToken, mid);
   },
   async recallMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
-    return httpRecallMessage(serverSocket, accessToken, mid);
+    return httpDeleteMessage(serverSocket, accessToken, mid);
   },
   async updateReadState(
     serverSocket: string,
     accessToken: string,
     cid: string,
     req: ChatReadStateInput,
-  ): Promise<void> {
-    return httpUpdateReadState(serverSocket, accessToken, cid, mapChatReadStateInput(req));
+  ): Promise<ChatReadStateResponse> {
+    const wire = await httpUpdateReadState(serverSocket, accessToken, cid, mapChatReadStateInput(req));
+    return mapChatReadStateResponseWire(wire);
   },
   async applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void> {
     return httpApplyJoinChannel(serverSocket, accessToken, cid, reason);
@@ -174,8 +176,9 @@ export const httpChatApiPort: ChatApiPort = {
     uid: string,
     until: number,
     reason: string,
-  ): Promise<void> {
-    return httpPutChannelBan(serverSocket, accessToken, cid, uid, until, reason);
+  ): Promise<ChatChannelBanRecord> {
+    const wire = await httpPutChannelBan(serverSocket, accessToken, cid, uid, until, reason);
+    return mapChatChannelBanWire(wire);
   },
   async deleteChannelBan(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void> {
     return httpDeleteChannelBan(serverSocket, accessToken, cid, uid);

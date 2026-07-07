@@ -28,11 +28,10 @@ export type UserPublic = {
 
 /**
  * 用户资料更新输入对象。
+ * 与服务端 `PATCH /api/users/me` 协议对齐。
  */
 export type UpdateUserProfileInput = {
   username: string;
-  avatar: number;
-  sex: number;
+  avatar?: string;
   brief: string;
-  birthday: number;
 };

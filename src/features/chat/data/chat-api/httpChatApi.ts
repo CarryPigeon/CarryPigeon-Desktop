@@ -21,6 +21,7 @@ import type {
   ChatPinListWire,
   ChatReactionRequestWire,
   ChatReactionResponseWire,
+  ChatReadStateResponseWire,
   ChatReadStateWire,
   ChatSendMessageWire,
   ChatUnreadStateWire,
@@ -114,27 +115,16 @@ export async function httpDeleteMessage(serverSocket: string, accessToken: strin
   await client.requestJson<void>("DELETE", `/messages/${encodeURIComponent(messageId)}`);
 }
 
-export async function httpRecallMessage(
-  serverSocket: string,
-  accessToken: string,
-  mid: string,
-): Promise<void> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const messageId = String(mid).trim();
-  if (!messageId) throw new Error("Missing mid");
-  await client.requestJson<void>("DELETE", `/messages/${encodeURIComponent(messageId)}/recall`);
-}
-
 export async function httpUpdateReadState(
   serverSocket: string,
   accessToken: string,
   cid: string,
   req: ChatReadStateWire,
-): Promise<void> {
+): Promise<ChatReadStateResponseWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  await client.requestJson<void>("PUT", `/channels/${encodeURIComponent(channelId)}/read_state`, req);
+  return client.requestJson<ChatReadStateResponseWire>("PUT", `/channels/${encodeURIComponent(channelId)}/read_state`, req);
 }
 
 export async function httpPatchChannel(
@@ -276,7 +266,7 @@ export async function httpPutChannelBan(
   uid: string,
   untilMs: number,
   reason: string,
-): Promise<void> {
+): Promise<ChatChannelBanWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const userId = String(uid).trim();
@@ -284,7 +274,7 @@ export async function httpPutChannelBan(
   if (!userId) throw new Error("Missing uid");
   const until = Number.isFinite(untilMs) ? Math.trunc(untilMs) : 0;
   const body: ApiPutBanRequest = { until, reason: String(reason ?? "") };
-  await client.requestJson<void>("PUT", `/channels/${encodeURIComponent(channelId)}/bans/${encodeURIComponent(userId)}`, body);
+  return client.requestJson<ChatChannelBanWire>("PUT", `/channels/${encodeURIComponent(channelId)}/bans/${encodeURIComponent(userId)}`, body);
 }
 
 export async function httpDeleteChannelBan(

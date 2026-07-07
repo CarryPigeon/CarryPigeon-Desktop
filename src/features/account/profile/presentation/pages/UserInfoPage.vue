@@ -294,13 +294,10 @@ async function handleSaveEdit(): Promise<void> {
       }
     }
 
-    const profileOutcome = await server.updateUserProfile({
-      username: draft.username.trim(),
-      avatar: 0,
-      sex: 0,
-      brief: draft.brief.trim(),
-      birthday: 0,
-    });
+	    const profileOutcome = await server.updateUserProfile({
+	      username: draft.username.trim(),
+	      brief: draft.brief.trim(),
+	    });
     if (!profileOutcome.ok) {
       formError.value = profileOutcome.error.message;
       return;

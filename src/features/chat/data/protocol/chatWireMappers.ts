@@ -21,6 +21,7 @@ import type {
   ChatQuoteReplyRecord,
   ChatReactionRecord,
   ChatReadStateInput,
+  ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
   ChatUserRecord,
@@ -55,6 +56,7 @@ import type {
   ChatMessageWire,
   ChatPinWire,
   ChatQuoteReplyWire,
+  ChatReadStateResponseWire,
   ChatReadStateWire,
   ChatSendMessageWire,
   ChatUnreadStateWire,
@@ -342,6 +344,18 @@ export function mapChatReadStateInput(input: ChatReadStateInput): ChatReadStateW
   return {
     last_read_mid: asTrimmedString(input.lastReadMessageId),
     last_read_time: asSafeNumber(input.lastReadTime),
+  };
+}
+
+/**
+ * 将已读状态响应 wire 映射为领域模型。
+ */
+export function mapChatReadStateResponseWire(wire: ChatReadStateResponseWire): ChatReadStateResponse {
+  return {
+    channelId: asTrimmedString(wire.cid),
+    userId: asTrimmedString(wire.uid),
+    lastReadMid: asTrimmedString(wire.last_read_mid),
+    lastReadTime: asSafeNumber(wire.last_read_time),
   };
 }
 

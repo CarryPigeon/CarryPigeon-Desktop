@@ -21,6 +21,7 @@ import type {
   ChatPinRecord,
   ChatReactionRecord,
   ChatReadStateInput,
+  ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
 } from "../types/chatApiModels";
@@ -51,7 +52,7 @@ export type ChatApiPort = {
   ): Promise<ChatMessageRecord>;
   deleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void>;
   recallMessage(serverSocket: string, accessToken: string, mid: string): Promise<void>;
-  updateReadState(serverSocket: string, accessToken: string, cid: string, req: ChatReadStateInput): Promise<void>;
+  updateReadState(serverSocket: string, accessToken: string, cid: string, req: ChatReadStateInput): Promise<ChatReadStateResponse>;
   applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void>;
   patchChannel(
     serverSocket: string,
@@ -79,7 +80,7 @@ export type ChatApiPort = {
     uid: string,
     until: number,
     reason: string,
-  ): Promise<void>;
+  ): Promise<ChatChannelBanRecord>;
   deleteChannelBan(serverSocket: string, accessToken: string, cid: string, uid: string): Promise<void>;
   createChannel(serverSocket: string, accessToken: string, req: ChatChannelCreateInput): Promise<ChatChannelRecord>;
   deleteChannel(serverSocket: string, accessToken: string, cid: string): Promise<void>;

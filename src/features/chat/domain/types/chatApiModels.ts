@@ -191,6 +191,16 @@ export type ChatReadStateInput = {
 };
 
 /**
+ * 已读状态上报响应。
+ */
+export type ChatReadStateResponse = {
+  channelId: string;
+  userId: string;
+  lastReadMid: string;
+  lastReadTime: number;
+};
+
+/**
  * 更新频道元信息的输入。
  */
 export type ChatChannelPatchInput = {
