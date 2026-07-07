@@ -54,4 +54,6 @@ ignore = [
     { id = "RUSTSEC-2025-0100", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
     { id = "RUSTSEC-2026-0173", reason = "Transitive dependency from sea-orm → sea-orm-macros → sea-bae → proc-macro-error2; no safe upgrade is available." },
     { id = "RUSTSEC-2025-0057", reason = "Transitive dependency from Tauri (selectors → kuchikiki → tauri-utils → tauri); no safe upgrade is available." },
+    { id = "RUSTSEC-2026-0194", reason = "Transitive dependency (xcb 0.30, tauri-winrt-notif 0.37, plist 0.38, wayland-scanner 0.39); quick-xml >=0.41.0 requires upstream crate updates." },
+    { id = "RUSTSEC-2026-0195", reason = "Transitive dependency (xcb 0.30, tauri-winrt-notif 0.37, plist 0.38, wayland-scanner 0.39); quick-xml >=0.41.0 requires upstream crate updates." },
 ]
