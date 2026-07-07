@@ -21,6 +21,7 @@ import type {
   ChatPinRecord,
   ChatReactionRecord,
   ChatReadStateInput,
+  ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
 } from "@/features/chat/domain/types/chatApiModels";
@@ -74,7 +75,7 @@ export type ChatCoreApiPort = {
     accessToken: string,
     channelId: string,
     readState: ChatReadStateInput,
-  ): Promise<void>;
+  ): Promise<ChatReadStateResponse>;
   applyJoinChannel(serverSocket: string, accessToken: string, channelId: string, reason: string): Promise<void>;
   patchChannel(
     serverSocket: string,
@@ -181,7 +182,7 @@ export type ChatGovernanceApiPort = {
     uid: string,
     until: number,
     reason: string,
-  ): Promise<void>;
+  ): Promise<ChatChannelBanRecord>;
   /**
    * 删除封禁。
    */

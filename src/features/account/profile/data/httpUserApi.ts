@@ -12,25 +12,27 @@ import { ProfileError } from "../domain/errors/ProfileErrors";
 
 /**
  * `/users/me` 响应：当前用户资料。
+ * 字段名与服务端 snake_case 响应对齐。
  */
 export type ApiUserMe = {
   uid: string;
   email?: string;
   nickname?: string;
-  avatar?: string;
-  backgroundUrl?: string;
+  avatar_url?: string;
+  background_url?: string;
 };
 
 /**
  * 用户公开资料（对外展示）。
+ * 字段名与服务端 snake_case 响应对齐。
  */
 export type ApiUserPublic = {
   uid: string;
   nickname: string;
-  avatar?: string;
+  avatar_url?: string;
   email?: string;
   bio?: string;
-  backgroundUrl?: string;
+  background_url?: string;
 };
 
 /**
@@ -55,10 +57,8 @@ type ApiUpdateUserEmailRequest = {
 
 type ApiUpdateUserProfileRequest = {
   username: string;
-  avatar: number;
-  sex: number;
+  avatar?: string;
   brief: string;
-  birthday: number;
 };
 
 /**
@@ -190,13 +190,13 @@ export async function httpUpdateUserProfile(
   input: ApiUpdateUserProfileRequest,
 ): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const body: ApiUpdateUserProfileRequest = {
+  const body: { username: string; brief: string; avatar?: string } = {
     username: String(input.username ?? "").trim(),
-    avatar: Number.isFinite(input.avatar) ? Math.trunc(input.avatar) : 0,
-    sex: Number.isFinite(input.sex) ? Math.trunc(input.sex) : 0,
     brief: String(input.brief ?? ""),
-    birthday: Number.isFinite(input.birthday) ? Math.trunc(input.birthday) : 0,
   };
+  if (input.avatar != null && input.avatar.trim()) {
+    body.avatar = input.avatar.trim();
+  }
   if (!body.username) {
     throw new ProfileError({ code: "update_profile_failed", message: "Missing username." });
   }

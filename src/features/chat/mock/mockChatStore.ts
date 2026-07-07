@@ -486,6 +486,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
 
   /**
    * 撤回指定的消息（mock）。
+   * 注意：服务端使用硬删除，本地也直接移除消息。
    *
    * @param messageId - 目标消息 id。
    * @returns 撤回结果。
@@ -507,12 +508,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         error,
       };
     }
-    const original = list[idx];
-    if (original.kind === "core_text") {
-      list[idx] = { ...original, recalledAt: Date.now(), text: "[该消息已被撤回]" };
-    } else {
-      list[idx] = { ...original, recalledAt: Date.now(), preview: "[该消息已被撤回]" };
-    }
+    state.messagesByChannel[currentChannelId.value] = list.filter((m) => m.id !== messageId);
     messageActionError.value = null;
     return {
       ok: true,

@@ -127,10 +127,8 @@ async function dispatchBridgeRequest(payload: UserProfileRequest, router: Router
       }
       const profileOutcome = await accountCapabilities.forServer(socket).updateUserProfile({
         username: payload.profile.username,
-        avatar: payload.profile.avatar,
-        sex: payload.profile.sex,
+        avatar: payload.profile.avatar != null ? String(payload.profile.avatar).trim() || undefined : undefined,
         brief: payload.profile.brief,
-        birthday: payload.profile.birthday,
       });
       if (!profileOutcome.ok) {
         await emitUserProfileResponse({

@@ -166,8 +166,17 @@ export class RoomGovernanceApplicationService {
       return rejectGovernanceCommand("channel_announcement_updated_rejected", "stale_runtime_scope", "Governance runtime scope changed.", undefined, { channelId: cid });
     }
 
+    const currentChannel = this.deps.channelCatalog.getChannel(cid);
+    if (!currentChannel) {
+      return rejectGovernanceCommand("channel_announcement_updated_rejected", "governance_action_failed", "Channel not found in local catalog.", undefined, { channelId: cid });
+    }
+    const patch: { name?: string; brief?: string; announcement?: string } = {
+      name: currentChannel.name,
+      brief: currentChannel.brief,
+      announcement: nextContent,
+    };
     try {
-      const next: ChatChannelRecord = await this.deps.api.patchChannel(socket, token, cid, { announcement: nextContent });
+      const next: ChatChannelRecord = await this.deps.api.patchChannel(socket, token, cid, patch);
       if (isStale()) {
         return rejectGovernanceCommand("channel_announcement_updated_rejected", "stale_runtime_scope", "Governance runtime scope changed.", undefined, { channelId: cid });
       }
@@ -461,7 +470,7 @@ export class RoomGovernanceApplicationService {
     }
 
     try {
-      await this.deps.api.putChannelBan(socket, token, cid, userId, until, reason);
+      const banRecord = await this.deps.api.putChannelBan(socket, token, cid, userId, until, reason);
       if (isStale()) {
         return rejectGovernanceCommand("channel_ban_upserted_rejected", "stale_runtime_scope", "Governance runtime scope changed.", undefined, {
           channelId: cid,
@@ -473,7 +482,7 @@ export class RoomGovernanceApplicationService {
         kind: "channel_ban_upserted",
         channelId: cid,
         uid: userId,
-        until,
+        until: banRecord.until,
       };
     } catch (error) {
       return rejectGovernanceCommand("channel_ban_upserted_rejected", "governance_action_failed", "Failed to set channel ban.", error, {

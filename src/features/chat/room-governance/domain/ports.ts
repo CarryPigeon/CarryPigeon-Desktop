@@ -37,4 +37,6 @@ export type GovernanceChannelCatalogPort = {
   setJoinRequested(channelId: string, joinRequested: boolean): void;
   applyChannelPatch(channelId: string, patch: Partial<Pick<GovernanceChannelSummary, "name" | "brief" | "announcement">>): void;
   reconcileSelectionAfterDeletion(deletedChannelId: string): void;
+  /** 按频道 ID 获取当前频道摘要，用于补充 PATCH 请求中的必填字段。 */
+  getChannel(channelId: string): GovernanceChannelSummary | undefined;
 };

@@ -172,6 +172,16 @@ export type ChatReadStateWire = {
   last_read_time: number;
 };
 
+/**
+ * 已读状态上报响应 wire 表示。
+ */
+export type ChatReadStateResponseWire = {
+  cid: string;
+  uid: string;
+  last_read_mid: string;
+  last_read_time: number;
+};
+
 export type ChatMessageSearchQueryWire = {
   q: string;
   cursor?: string;

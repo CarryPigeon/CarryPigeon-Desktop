@@ -26,6 +26,19 @@ export function createGovernanceChannelCatalogPort(
   deps: CreateGovernanceChannelCatalogPortDeps,
 ): GovernanceChannelCatalogPort {
   return {
+    getChannel(channelId: string) {
+      const channel = deps.channelsRef.value.find((item) => item.id === channelId);
+      if (!channel) return undefined;
+      return {
+        id: channel.id,
+        name: channel.name,
+        brief: channel.brief ?? "",
+        unread: 0,
+        joined: channel.joined,
+        joinRequested: channel.joinRequested,
+        announcement: channel.announcement,
+      };
+    },
     setJoinRequested(channelId: string, joinRequested: boolean): void {
       const channel = deps.channelsRef.value.find((item) => item.id === channelId);
       if (channel) channel.joinRequested = joinRequested;

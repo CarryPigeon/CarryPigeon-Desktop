@@ -11,6 +11,7 @@ import type {
   SessionReadStateApiPort,
   SessionScopePort,
 } from "../ports";
+import type { ChatReadStateResponse } from "@/features/chat/domain/types/chatApiModels";
 
 const logger = createLogger("roomSessionReadStateReporter");
 
@@ -105,10 +106,10 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
 
     const req = { lastReadMessageId: mid, lastReadTime: Math.trunc(Number(lastReadTimeMs) || 0) };
     try {
-      await deps.api.updateReadState(socket, token, channelId, req);
+      const res: ChatReadStateResponse = await deps.api.updateReadState(socket, token, channelId, req);
       if (deps.scope.getActiveServerSocket() !== requestSocket) return false;
       if (deps.scope.getActiveScopeVersion() !== requestScopeVersion) return false;
-      syncLocalReadMarker(channelId, mid, req.lastReadTime);
+      syncLocalReadMarker(channelId, res.lastReadMid, res.lastReadTime);
       deps.state.writeLastReportAtMs(channelId, now);
       return true;
     } catch (error) {
