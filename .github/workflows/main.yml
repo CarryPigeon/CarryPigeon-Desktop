@@ -32,7 +32,8 @@ jobs:
                     libayatana-appindicator3-dev \
                     librsvg2-dev \
                     libasound2-dev \
-                    libpipewire-0.3-dev
+                    libpipewire-0.3-dev \
+                    libgbm-dev
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
@@ -102,7 +103,8 @@ jobs:
                     libayatana-appindicator3-dev \
                     librsvg2-dev \
                     libasound2-dev \
-                    libpipewire-0.3-dev
+                    libpipewire-0.3-dev \
+                    libgbm-dev
 
             # 修复：在Action中指定pnpm版本
             - name: Setup pnpm
