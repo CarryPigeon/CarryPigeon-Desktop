@@ -51,9 +51,9 @@ const emit = defineEmits<{
    */
   (e: "switch", serverSocket: string): void;
   /**
-   * 打开服务器管理页。
+   * 打开服务器管理器。
    */
-  (e: "open-servers"): void;
+  (e: "open-server-manager"): void;
   /**
    * 打开插件中心页。
    */
@@ -62,8 +62,6 @@ const emit = defineEmits<{
    * 打开设置页。
    */
   (e: "open-settings"): void;
-  (e: "open-files"): void;
-  (e: "open-contacts"): void;
   (e: "toggle-server-mute"): [];
   (e: "mute-server-for-duration", durationMs: number | undefined): void;
   (e: "unmute-server"): void;
@@ -143,6 +141,11 @@ function formatTime(epoch: number): string {
         <span class="cp-dndBtn__icon" aria-hidden="true">{{ props.serverMuted ? "🔕" : "🔔" }}</span>
       </button>
     </div>
+    <div class="cp-rail__top-actions">
+      <button class="cp-rail__btn" type="button" @click="emit('open-server-manager')">
+        {{ t("manage") }}
+      </button>
+    </div>
     <div v-if="props.racks.length === 0" class="cp-rail__empty">{{ t("no_servers") }}</div>
     <div v-else class="cp-rackList" role="listbox" aria-label="servers">
       <button
@@ -158,11 +161,8 @@ function formatTime(epoch: number): string {
       </button>
     </div>
     <div class="cp-rail__foot">
-      <button class="cp-rail__btn" type="button" @click="emit('open-servers')">{{ t("manage") }}</button>
-      <button class="cp-rail__btn" type="button" @click="emit('open-contacts')">{{ t("contacts_title") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
-      <button class="cp-rail__btn" type="button" @click="emit('open-files')">{{ t("file_manager") }}</button>
     </div>
     <Teleport to="body">
       <div
@@ -288,5 +288,13 @@ function formatTime(epoch: number): string {
   position: fixed;
   inset: 0;
   z-index: 9998;
+}
+
+.cp-rail__top-actions {
+  padding: 12px;
+  border-bottom: 1px solid var(--cp-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 </style>

@@ -4,10 +4,10 @@
  * @description Patchbay 左侧频道栏：服务器上下文、必需插件 gate、频道筛选与列表。
  */
 
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import LabelBadge from "@/shared/ui/LabelBadge.vue";
+import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import CategoryGroupHeader from "@/features/chat/presentation/patchbay/components/rails/CategoryGroupHeader.vue";
 import type { ChannelRailModel } from "@/features/chat/presentation/patchbay/view-models/useChannelRailModel";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
@@ -21,6 +21,33 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const serverMenuOpen = ref(false);
+const serverMenuAnchor = ref<HTMLElement | null>(null);
+
+const MENU_WIDTH = 200;
+const MENU_HEIGHT_ESTIMATE = 220;
+
+const serverMenuStyle = computed(() => {
+  const el = serverMenuAnchor.value;
+  if (!el) return { position: "fixed" as const, left: "0px", top: "0px", zIndex: 9999 };
+  const rect = el.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rightSpace = vw - rect.right;
+  const left = rightSpace >= MENU_WIDTH ? rect.right : Math.max(8, rect.left - MENU_WIDTH);
+  const top = Math.min(rect.bottom + 4, Math.max(8, vh - MENU_HEIGHT_ESTIMATE - 8));
+  return { position: "fixed" as const, left: `${left}px`, top: `${top}px`, zIndex: 9999 };
+});
+
+function openServerMenu(): void {
+  serverMenuOpen.value = true;
+}
+
+function handleMenu(action: () => void): void {
+  serverMenuOpen.value = false;
+  action();
+}
 
 /**
  * 频道分类分组。
@@ -89,29 +116,63 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
   <!-- 组件：ChannelRail｜职责：频道栏（Patch Panel + 频道筛选 + 列表） -->
   <!-- 区块：<aside> .cp-rail--channels -->
   <aside class="cp-rail cp-rail--channels">
-    <!-- 区块：Patch Panel 头（服务器上下文 + gate 状态） -->
-    <div class="cp-panelHead">
-      <!-- 区块：标题 + 状态徽章 -->
-      <div class="cp-panelHead__top">
-        <div class="cp-panelHead__name">{{ t("channels") }}</div>
-        <div class="cp-panelHead__badges">
-          <LabelBadge v-if="props.model.missingRequiredCount > 0" variant="required" :label="t('setup_required_label')" />
-          <LabelBadge v-else variant="info" :label="t('ready_label')" />
+    <!-- 区块：服务器信息卡 -->
+    <div class="cp-serverCard" @click="props.model.openServerInfo">
+      <AvatarBadge
+        class="cp-serverCard__avatar"
+        :name="props.model.serverInfo?.name ?? '—'"
+        :avatar-url="props.model.serverInfo?.avatar"
+        :size="40"
+      />
+      <div class="cp-serverCard__meta">
+        <div class="cp-serverCard__name">{{ props.model.serverInfo?.name ?? '—' }}</div>
+        <div class="cp-serverCard__brief">{{ props.model.serverInfo?.brief || t('server_info_no_brief') }}</div>
+        <div class="cp-serverCard__socket">
+          <MonoTag :value="props.model.socket || 'no-server'" title="server socket" :copyable="true" />
         </div>
       </div>
-      <!-- 区块：服务器标识信息 -->
-      <div class="cp-panelHead__socket">
-        <MonoTag :value="props.model.socket || 'no-server'" title="server socket" :copyable="true" />
-        <MonoTag :value="props.model.serverId || 'missing-server_id'" title="server_id" :copyable="true" />
-      </div>
-      <!-- 区块：主要动作按钮 -->
-      <div class="cp-panelHead__actions">
-        <button class="cp-panelHead__btn" type="button" @click="props.model.openPlugins()">{{ t("plugins") }}</button>
-        <button v-if="props.model.missingRequiredCount > 0" class="cp-panelHead__btn danger" type="button" @click="props.model.openRequiredSetup()">
-          {{ t("required_setup") }}
+      <button
+        ref="serverMenuAnchor"
+        class="cp-serverCard__menuBtn"
+        type="button"
+        :aria-label="t('more_actions')"
+        @click.stop="openServerMenu"
+      >
+        <t-icon name="more" />
+      </button>
+    </div>
+
+    <!-- 服务器菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="serverMenuOpen"
+        class="cp-contextMenu cp-serverMenu"
+        :style="serverMenuStyle"
+        @click.stop
+      >
+        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openPlugins)">
+          {{ t('server_info_menu_plugins') }}
+        </button>
+        <button
+          v-if="props.model.missingRequiredCount > 0"
+          class="cp-contextMenu__item danger"
+          type="button"
+          @click="handleMenu(props.model.openRequiredSetup)"
+        >
+          {{ t('server_info_menu_required_setup') }}
+        </button>
+        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openServerManager)">
+          {{ t('server_info_menu_server_manager') }}
+        </button>
+        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openFileManager)">
+          {{ t('server_info_menu_file_manager') }}
+        </button>
+        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openSettings)">
+          {{ t('server_info_menu_settings') }}
         </button>
       </div>
-    </div>
+      <div v-if="serverMenuOpen" class="cp-contextMenu__backdrop" @click="serverMenuOpen = false" />
+    </Teleport>
 
     <!-- 区块：频道搜索 + 已加入/发现 Tab -->
     <div class="cp-channelSearch">
@@ -198,4 +259,63 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
     </div>
   </aside>
 </template>
+
+<style scoped lang="scss">
+.cp-serverCard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid var(--cp-border-light);
+  cursor: pointer;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+.cp-serverCard:hover {
+  background: var(--cp-hover-bg);
+}
+.cp-serverCard__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cp-serverCard__name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-serverCard__brief {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-serverCard__socket {
+  margin-top: 2px;
+}
+.cp-serverCard__menuBtn {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel);
+  color: var(--cp-text-muted);
+  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color var(--cp-fast) var(--cp-ease), color var(--cp-fast) var(--cp-ease);
+}
+.cp-serverCard__menuBtn:hover {
+  background: var(--cp-hover-bg);
+  color: var(--cp-text);
+}
+.cp-serverMenu {
+  min-width: 180px;
+}
+</style>
 

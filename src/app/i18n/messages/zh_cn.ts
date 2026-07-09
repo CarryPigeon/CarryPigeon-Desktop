@@ -828,4 +828,13 @@ export const zh_cn = {
   annotation_tool_undo: "撤销",
   annotation_width: "线宽 {width}px",
   annotation_color: "颜色 {color}",
+  // /chat 页面布局重设计
+  server_info_menu_plugins: "插件中心",
+  server_info_menu_required_setup: "必需设置",
+  server_info_menu_server_manager: "服务器管理",
+  server_info_menu_file_manager: "文件管理",
+  server_info_menu_settings: "设置",
+  pin_members_rail: "固定成员栏",
+  unpin_members_rail: "收起成员栏",
+  server_info_no_brief: "暂无服务器简介",
 };

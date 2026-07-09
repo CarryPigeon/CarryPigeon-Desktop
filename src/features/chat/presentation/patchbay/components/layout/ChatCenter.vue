@@ -10,7 +10,6 @@ import { useRouter } from "vue-router";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
 import type { CallState } from "@/features/chat/voice-call/domain/contracts";
-import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import { NotificationBell } from "@/features/notifications/components";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
@@ -121,11 +120,34 @@ const props = defineProps<{
    * 关闭快捷键帮助面板。
    */
   onCloseShortcutHelp?: () => void;
+  /**
+   * 成员栏是否已固定打开。
+   */
+  membersRailOpen: boolean;
+  /**
+   * 切换成员栏固定状态。
+   */
+  onToggleMembersRail: () => void;
 }>();
 
 const { t } = useI18n();
 const router = useRouter();
 const logger = createLogger("ChatCenter");
+
+/** 窗口宽度，用于判断成员栏固定按钮是否可用。 */
+const windowWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200);
+const canToggleMembersRail = computed(() => windowWidth.value >= 1100);
+
+function updateWindowWidth(): void {
+  windowWidth.value = window.innerWidth;
+}
+
+onMounted(() => {
+  window.addEventListener("resize", updateWindowWidth);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateWindowWidth);
+});
 
 /** 频道公告已被用户关闭。 */
 const dismissedAnnouncement = ref(false);
@@ -195,21 +217,6 @@ const virtualizerOptions = computed(() => ({
 }));
 
 const virtualizer = useVirtualizer(virtualizerOptions);
-
-const connectionLabel = computed(() => {
-  switch (props.model.connectionPillState) {
-    case "connected":
-      return t("connected");
-    case "reconnecting":
-      return t("reconnecting");
-    case "offline":
-    default:
-      return t("offline");
-  }
-});
-const connectionActionLabel = computed(() =>
-  props.model.connectionPillState === "offline" ? t("retry") : "",
-);
 
 const voiceHostRef = ref<{
   callState: { value: CallState };
@@ -487,6 +494,17 @@ function getReplyText(m: VirtualMessageItem): string {
         />
         <button
           v-if="props.model.currentChannelId"
+          class="cp-topConsole__pinMembers"
+          type="button"
+          :title="props.membersRailOpen ? t('unpin_members_rail') : t('pin_members_rail')"
+          :aria-pressed="props.membersRailOpen"
+          :disabled="!canToggleMembersRail"
+          @click="props.onToggleMembersRail"
+        >
+          <t-icon :name="props.membersRailOpen ? 'pin-filled' : 'pin'" />
+        </button>
+        <button
+          v-if="props.model.currentChannelId"
           class="cp-topConsole__search"
           type="button"
           @click="props.model.openSearchPanel"
@@ -505,14 +523,6 @@ function getReplyText(m: VirtualMessageItem): string {
           <t-icon name="setting" />
         </button>
         <NotificationBell />
-        <ConnectionPill
-          :state="props.model.connectionPillState"
-          :label="connectionLabel"
-          :detail="props.model.connectionDetail"
-          :action-label="connectionActionLabel"
-          aria-live="polite"
-          @action="props.model.retryConnection"
-        />
       </div>
     </header>
 

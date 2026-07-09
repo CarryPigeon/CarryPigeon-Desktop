@@ -4,7 +4,7 @@
  * @description chat｜组件：ComposerHost。
  */
 
-import { computed, ref, type Component, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref, type Component, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { safeListen } from "@/shared/tauri/events";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -99,6 +99,65 @@ const isUploadingVoice = ref(false);
 /** 附件列表快照（响应式）。 */
 const attachments = computed(() => Array.from(getAttachments().values()));
 
+const collapsed = ref(true);
+const composerEl = ref<HTMLElement | null>(null);
+
+const shouldBeExpanded = computed(() => {
+  if (props.draft.trim().length > 0) return true;
+  if (attachments.value.length > 0) return true;
+  if (props.replyTitle || props.replySnippet) return true;
+  if (props.quoteReplyDraft) return true;
+  if (props.error) return true;
+  return false;
+});
+
+let collapseTimer: ReturnType<typeof setTimeout> | null = null;
+
+function expand(): void {
+  if (collapseTimer) {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+  }
+  collapsed.value = false;
+}
+
+function scheduleCollapse(): void {
+  if (shouldBeExpanded.value) return;
+  if (collapseTimer) clearTimeout(collapseTimer);
+  collapseTimer = setTimeout(() => {
+    collapsed.value = true;
+  }, 150);
+}
+
+function handleFocus(): void {
+  expand();
+}
+
+function handleBlur(event?: FocusEvent): void {
+  const related = event?.relatedTarget as Node | null;
+  if (composerEl.value && related && composerEl.value.contains(related)) {
+    // 焦点仍在 ComposerHost 内部移动，不触发折叠
+    return;
+  }
+  scheduleCollapse();
+}
+
+function handleCollapsedClick(): void {
+  expand();
+  nextTick(() => {
+    const textarea = composerEl.value?.querySelector("textarea");
+    textarea?.focus();
+  });
+}
+
+watch(
+  shouldBeExpanded,
+  (expanded) => {
+    if (expanded) expand();
+  },
+  { immediate: true },
+);
+
 async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
   isUploadingVoice.value = true;
   try {
@@ -135,6 +194,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   mounted = false;
   unlistenScreenshot?.();
+  if (collapseTimer) clearTimeout(collapseTimer);
 });
 
 function handleStickerSelected(r: { fileId: string; shareKey: string }): void {
@@ -210,11 +270,27 @@ function handleKeydown(_: string | number, event: { e: KeyboardEvent }): void {
     return;
   }
 
-  // 处理 Escape：关闭提及菜单
+  // 处理 Escape：优先关闭提及菜单；若输入为空则取消焦点并折叠
   if (e.key === "Escape") {
-    e.preventDefault();
-    e.stopPropagation();
-    emit("closeMentionMenu");
+    if (props.mentionMenuOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      emit("closeMentionMenu");
+      return;
+    }
+    if (
+      props.draft.trim().length === 0 &&
+      attachments.value.length === 0 &&
+      !props.replyTitle &&
+      !props.replySnippet &&
+      !props.quoteReplyDraft &&
+      !props.error
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLElement | null)?.blur();
+      scheduleCollapse();
+    }
     return;
   }
 
@@ -302,25 +378,41 @@ function selectSystemMention(type: "everyone" | "here"): void {
 
 <template>
   <!-- 组件：ComposerHost｜职责：统一发送区（工具栏 + 输入 + 发送） -->
-  <section class="cp-composer">
-    <div v-if="props.replyTitle || props.replySnippet" class="cp-reply">
-      <div class="cp-reply__left">
-        <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
-        <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
-      </div>
-      <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><t-icon name="close" /></button>
+  <section ref="composerEl" class="cp-composer" :class="{ 'cp-composer--collapsed': collapsed }">
+    <!-- 折叠态：只显示占位输入条 -->
+    <div
+      v-if="collapsed"
+      class="cp-composer__collapsed"
+      role="button"
+      tabindex="0"
+      :aria-label="t('message_input_placeholder')"
+      @click="handleCollapsedClick"
+      @focus="handleCollapsedClick"
+    >
+      <span class="cp-composer__collapsedPlaceholder">{{ t('message_input_placeholder') }}</span>
+      <button class="cp-composer__send" type="button" disabled>{{ t('send') }}</button>
     </div>
 
-    <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
-      <div class="cp-quoteBar__bar"></div>
-      <div class="cp-quoteBar__content">
-        <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
-        <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
+    <!-- 展开态：完整编辑器 -->
+    <div v-else class="cp-composer__expanded" @focusin="expand" @focusout="handleBlur">
+      <div v-if="props.replyTitle || props.replySnippet" class="cp-reply">
+        <div class="cp-reply__left">
+          <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
+          <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
+        </div>
+        <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><t-icon name="close" /></button>
       </div>
-      <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')">&times;</button>
-    </div>
 
-    <div v-if="props.error" class="cp-composer__error" role="alert">
+      <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
+        <div class="cp-quoteBar__bar"></div>
+        <div class="cp-quoteBar__content">
+          <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
+          <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
+        </div>
+        <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')">&times;</button>
+      </div>
+
+      <div v-if="props.error" class="cp-composer__error" role="alert">
       {{ props.error }}
     </div>
 
@@ -381,6 +473,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
           :disabled="props.domainId.trim() !== 'Core:Text' || Boolean(props.disabled) || Boolean(props.sending)"
           :placeholder="props.domainId.trim() === 'Core:Text' ? t('message_input_placeholder') : t('plugin_composer_placeholder')"
           :autosize="{ minRows: 2, maxRows: 6 }"
+          @focus="handleFocus"
           @keydown="handleKeydown"
           @update:modelValue="handleUpdateDraft"
           @paste="handlePaste"
@@ -429,6 +522,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
       >
         {{ sys.label }}
       </button>
+    </div>
     </div>
   </section>
 </template>
@@ -709,5 +803,33 @@ function selectSystemMention(type: "everyone" | "here"): void {
   height: 1px;
   margin: 6px 8px;
   background: var(--cp-border-light, var(--cp-border));
+}
+
+.cp-composer__collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: text;
+}
+
+.cp-composer__collapsedPlaceholder {
+  font-size: 14px;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-composer__collapsed .cp-composer__send {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cp-composer__expanded {
+  display: flex;
+  flex-direction: column;
 }
 </style>
