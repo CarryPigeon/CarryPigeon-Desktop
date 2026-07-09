@@ -18,7 +18,6 @@ import {
   chatConnectionDetail,
   chatConnectionPillState,
   retryChatConnection,
-  useChatServerWorkspace,
 } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import type { ChatMessage, DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
@@ -116,6 +115,14 @@ type PatchbayPageRawModel = {
   dismissLinkPreview(): void;
   threadPanel: ReturnType<typeof useThreadPanelModel>;
   domainRegistryStore: unknown;
+  /** 右侧成员栏是否打开。 */
+  rightRailOpen: Ref<boolean>;
+  /** 切换右侧成员栏。 */
+  toggleRightRail(): void;
+  /** 连接状态悬浮窗标签。 */
+  connectionToastLabel: ComputedRef<string>;
+  /** 连接状态悬浮窗操作按钮标签。 */
+  connectionToastActionLabel: ComputedRef<string>;
   /** 快捷键帮助面板可见性。 */
   shortcutHelpOpen: Ref<boolean>;
   /** 关闭快捷键帮助面板。 */
@@ -197,6 +204,27 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const flashMessage = ref<string>("");
   const editingMessageId = ref<string>("");
   const linkPreview = ref<ChatLinkPreview | null>(null);
+  const rightRailOpen = ref(false);
+  const RIGHT_RAIL_MIN_WIDTH = 1100;
+
+  function toggleRightRail(): void {
+    if (typeof window !== "undefined" && window.innerWidth < RIGHT_RAIL_MIN_WIDTH) return;
+    rightRailOpen.value = !rightRailOpen.value;
+  }
+
+  function closeRightRailIfNarrow(): void {
+    if (typeof window !== "undefined" && window.innerWidth < RIGHT_RAIL_MIN_WIDTH) {
+      rightRailOpen.value = false;
+    }
+  }
+
+  onMounted(() => {
+    window.addEventListener("resize", closeRightRailIfNarrow);
+    closeRightRailIfNarrow();
+  });
+  onBeforeUnmount(() => {
+    window.removeEventListener("resize", closeRightRailIfNarrow);
+  });
 
   const LINK_PREVIEW_DEBOUNCE_MS = 400;
 
@@ -231,6 +259,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const {
     socket,
     serverId,
+    serverInfo,
     serverRacks,
     missingRequiredCount,
     quickSwitcherPlugins,
@@ -243,9 +272,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     sendComposerMessage: messageComposer.sendMessage,
     ensureChatReady: currentSession.ensureReady,
   });
-
-  const chatServerWorkspace = useChatServerWorkspace();
-  const serverInfo = computed(() => chatServerWorkspace.serverInfoStore.value.info.value);
 
   const { goPlugins, handleInstallHint } = usePluginNavigation(router, missingRequiredCount);
 
@@ -433,6 +459,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openRequiredSetup: handleOpenRequiredSetup,
     openCreateMenu: openCreateChatMenu,
     openChannelInfo,
+    openServerInfo: handleOpenServers,
     openServerManager: handleOpenServerManager,
     openFileManager: handleOpenFileManager,
     openSettings: handleOpenSettings,
@@ -774,6 +801,20 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     chatCenter.handleSingleForward(messageId);
   };
 
+  const connectionToastLabel = computed(() => {
+    switch (chatCenter.connectionPillState) {
+      case "connected":
+        return t("connected");
+      case "reconnecting":
+        return t("reconnecting");
+      default:
+        return t("offline");
+    }
+  });
+  const connectionToastActionLabel = computed(() =>
+    chatCenter.connectionPillState === "offline" ? t("retry") : "",
+  );
+
   const {
     quickSwitcherOpen,
     quickSwitcherQuery,
@@ -889,6 +930,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     serverMutedUntil: serverRailModel.serverMutedUntil,
     handleSwitchServer: runServerSwitch,
     handleOpenServers,
+    openServerManager: handleOpenServerManager,
     handleOpenSettings,
     goPlugins,
     handleOpenFiles: () => {
@@ -991,6 +1033,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     dismissLinkPreview,
     threadPanel,
     domainRegistryStore: domainRegistryView,
+    rightRailOpen,
+    toggleRightRail,
+    connectionToastLabel,
+    connectionToastActionLabel,
     shortcutHelpOpen,
     closeShortcutHelp,
     bindings,
