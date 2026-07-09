@@ -6,6 +6,7 @@
 import { onBeforeUnmount, ref, type Ref } from "vue";
 import type { Router } from "vue-router";
 import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
+import type { AuthSignInOutcome } from "@/features/account/auth-flow/application/authFlowOutcome";
 import { AuthError, toAuthErrorMessage } from "@/features/account/auth-flow/domain/errors/AuthErrors";
 import { authServerSocket } from "@/features/account/auth-flow/integration/serverWorkspace";
 
@@ -14,6 +15,7 @@ const authFlowCapabilities = getAuthFlowCapabilities();
 export type UseLoginEmailAuthDeps = {
   router: Router;
   mode?: "login" | "register";
+  onRequiredSetup?: (outcome: Extract<AuthSignInOutcome, { kind: "required_setup" }>) => void;
 };
 
 export type LoginEmailAuthModel = {
@@ -136,7 +138,11 @@ export function useLoginEmailAuth(deps: UseLoginEmailAuthDeps): LoginEmailAuthMo
       }
       if (outcome.ok && outcome.kind === "required_setup") {
         authFlowCapabilities.updateMissingRequiredPlugins([...outcome.missingPluginIds]);
-        void router.replace("/required-setup");
+        if (deps.onRequiredSetup) {
+          deps.onRequiredSetup(outcome);
+        } else {
+          void router.replace("/required-setup");
+        }
         return;
       }
       banner.value = outcome.error.message;

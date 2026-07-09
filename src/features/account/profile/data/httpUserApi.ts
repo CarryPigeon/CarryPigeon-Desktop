@@ -18,7 +18,7 @@ export type ApiUserMe = {
   uid: string;
   email?: string;
   nickname?: string;
-  avatar_url?: string;
+  avatar?: string;
   background_url?: string;
 };
 
@@ -29,7 +29,7 @@ export type ApiUserMe = {
 export type ApiUserPublic = {
   uid: string;
   nickname: string;
-  avatar_url?: string;
+  avatar?: string;
   email?: string;
   bio?: string;
   background_url?: string;

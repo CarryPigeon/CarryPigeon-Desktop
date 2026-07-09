@@ -59,23 +59,23 @@ export async function httpListFiles(serverSocket: string, accessToken: string, q
   if (query.uploaderId) q.push(`uploader_id=${encodeURIComponent(query.uploaderId)}`);
   if (query.dateFrom) q.push(`date_from=${encodeURIComponent(query.dateFrom)}`);
   if (query.dateTo) q.push(`date_to=${encodeURIComponent(query.dateTo)}`);
-  const path = `/api/files/list${q.length ? `?${q.join("&")}` : ""}`;
+  const path = `/files/list${q.length ? `?${q.join("&")}` : ""}`;
   const res = await client.requestJson<ApiListFilesResponse>("GET", path);
   return Array.isArray(res?.items) ? res.items.map(mapFileRecordWire) : [];
 }
 
 export async function httpDeleteFile(serverSocket: string, accessToken: string, request: FileDeleteRequest): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  await client.requestJson("POST", "/api/files/delete", { file_id: request.fileId, share_key: request.shareKey });
+  await client.requestJson("POST", "/files/delete", { file_id: request.fileId, share_key: request.shareKey });
 }
 
 export async function httpBatchDeleteFiles(serverSocket: string, accessToken: string, request: BatchFileRequest): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  await client.requestJson("POST", "/api/files/batch-delete", { file_ids: request.fileIds });
+  await client.requestJson("POST", "/files/batch-delete", { file_ids: request.fileIds });
 }
 
 export async function httpListUploaders(serverSocket: string, accessToken: string): Promise<UploaderInfo[]> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const res = await client.requestJson<ApiUploadersResponse>("GET", "/api/files/uploaders");
+  const res = await client.requestJson<ApiUploadersResponse>("GET", "/files/uploaders");
   return Array.isArray(res?.items) ? res.items : [];
 }
