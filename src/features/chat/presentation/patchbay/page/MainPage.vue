@@ -16,6 +16,7 @@ import ChannelContextMenu from "@/features/chat/presentation/patchbay/components
 import MessageContextMenu from "@/features/chat/presentation/patchbay/components/menus/MessageContextMenu.vue";
 import CreateChatMenu from "@/features/chat/presentation/patchbay/components/menus/CreateChatMenu.vue";
 import QuickSwitcher from "@/features/chat/presentation/patchbay/components/overlay/QuickSwitcher.vue";
+import ConnectionToast from "@/features/chat/presentation/patchbay/components/overlay/ConnectionToast.vue";
 import CreateChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateChannelDialog.vue";
 import CreateFriendPrivateChatDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateFriendPrivateChatDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
@@ -23,11 +24,6 @@ import "@/features/chat/public/styles";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const page = usePatchbayPageModel();
-
-const membersRailOpen = ref(true);
-function onToggleMembersRail(): void {
-  membersRailOpen.value = !membersRailOpen.value;
-}
 
 const mainEl = ref<HTMLElement | null>(null);
 const activeResizer = ref<"server-channel" | "channel-message" | "message-members" | null>(null);
@@ -274,6 +270,8 @@ onBeforeUnmount(() => {
       <ChatCenter
         :model="page.chatCenter"
         :channels="page.channels"
+        :members-rail-open="page.rightRailOpen"
+        :on-toggle-members-rail="page.toggleRightRail"
         :show-jump-to-bottom="page.chatViewport.showJumpToBottom"
         :on-jump-to-bottom="page.chatViewport.handleJumpToBottom"
         :on-signal-scroll="page.chatViewport.handleSignalScroll"
@@ -289,26 +287,25 @@ onBeforeUnmount(() => {
         :shortcut-help-visible="page.shortcutHelpOpen"
         :shortcut-bindings="page.bindings"
         :on-close-shortcut-help="page.closeShortcutHelp"
-        :members-rail-open="membersRailOpen"
-        :on-toggle-members-rail="onToggleMembersRail"
       />
 
-      <button
-        v-if="membersRailOpen"
-        class="cp-resizer"
-        :data-active="activeResizer === 'message-members'"
-        type="button"
-        role="separator"
-        aria-label="Resize messages and members"
-        aria-orientation="vertical"
-        :aria-valuemin="railBounds.members.min"
-        :aria-valuemax="railBounds.members.max"
-        :aria-valuenow="membersWidth"
-        @pointerdown="startResize('message-members', $event)"
-        @keydown="handleResizeKeydown('message-members', $event)"
-      ></button>
+      <template v-if="page.rightRailOpen">
+        <button
+          class="cp-resizer"
+          :data-active="activeResizer === 'message-members'"
+          type="button"
+          role="separator"
+          aria-label="Resize messages and members"
+          aria-orientation="vertical"
+          :aria-valuemin="railBounds.members.min"
+          :aria-valuemax="railBounds.members.max"
+          :aria-valuenow="membersWidth"
+          @pointerdown="startResize('message-members', $event)"
+          @keydown="handleResizeKeydown('message-members', $event)"
+        ></button>
 
-      <RightRailHost v-if="membersRailOpen" :model="page.membersRail" />
+        <RightRailHost :model="page.membersRail" />
+      </template>
 
       <QuickSwitcher
         :open="page.quickSwitcher.open"
@@ -385,6 +382,15 @@ onBeforeUnmount(() => {
         :channel-name="page.channelDialogs.deleteChannelName"
         @update:visible="page.channelDialogs.setShowDeleteChannel($event)"
         @deleted="page.channelDialogs.handleChannelDeleted"
+      />
+
+      <ConnectionToast
+        v-if="page.chatCenter.connectionPillState !== 'connected'"
+        :state="page.chatCenter.connectionPillState"
+        :label="page.connectionToastLabel"
+        :detail="page.chatCenter.connectionDetail"
+        :action-label="page.connectionToastActionLabel"
+        @action="page.chatCenter.retryConnection"
       />
 
       <ThreadPanel
