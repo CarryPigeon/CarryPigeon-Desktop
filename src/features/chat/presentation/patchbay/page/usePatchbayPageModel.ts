@@ -18,6 +18,7 @@ import {
   chatConnectionDetail,
   chatConnectionPillState,
   retryChatConnection,
+  useChatServerWorkspace,
 } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import type { ChatMessage, DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
@@ -242,6 +243,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     sendComposerMessage: messageComposer.sendMessage,
     ensureChatReady: currentSession.ensureReady,
   });
+
+  const chatServerWorkspace = useChatServerWorkspace();
+  const serverInfo = computed(() => chatServerWorkspace.serverInfoStore.value.info.value);
+
   const { goPlugins, handleInstallHint } = usePluginNavigation(router, missingRequiredCount);
 
   function runServerSwitch(serverSocket: string): void {
@@ -273,6 +278,14 @@ export function usePatchbayPageModel(): PatchbayPageModel {
 
   function handleOpenSettings(): void {
     void router.push("/settings");
+  }
+
+  function handleOpenServerManager(): void {
+    void router.push("/servers");
+  }
+
+  function handleOpenFileManager(): void {
+    void router.push("/files");
   }
 
   function handleOpenRequiredSetup(): void {
@@ -414,11 +427,15 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     currentSession,
     socket,
     serverId,
+    serverInfo,
     missingRequiredCount,
     openPlugins: goPlugins,
     openRequiredSetup: handleOpenRequiredSetup,
     openCreateMenu: openCreateChatMenu,
     openChannelInfo,
+    openServerManager: handleOpenServerManager,
+    openFileManager: handleOpenFileManager,
+    openSettings: handleOpenSettings,
     applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
     onAsyncError: logAsyncError,
     isChannelMuted: (channelId) => channelMuteStore.isMuted(channelId),
