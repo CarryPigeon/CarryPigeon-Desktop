@@ -141,6 +141,11 @@
   max-width: 380px;
 }
 
+/* 右侧边栏宿主：让内部 MembersRail 直接参与 .cp-main flex 布局 */
+.cp-rightRailHost {
+  display: contents;
+}
+
 /* 栏（Rail）：基础布局（标题 / 可滚动主体 / 底部） */
 .cp-rail {
   display: grid;
