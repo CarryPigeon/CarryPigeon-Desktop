@@ -51,10 +51,6 @@ const emit = defineEmits<{
    */
   (e: "switch", serverSocket: string): void;
   /**
-   * 打开服务器管理页。
-   */
-  (e: "open-servers"): void;
-  /**
    * 打开服务器管理器。
    */
   (e: "open-server-manager"): void;
@@ -66,8 +62,6 @@ const emit = defineEmits<{
    * 打开设置页。
    */
   (e: "open-settings"): void;
-  (e: "open-files"): void;
-  (e: "open-contacts"): void;
   (e: "toggle-server-mute"): [];
   (e: "mute-server-for-duration", durationMs: number | undefined): void;
   (e: "unmute-server"): void;

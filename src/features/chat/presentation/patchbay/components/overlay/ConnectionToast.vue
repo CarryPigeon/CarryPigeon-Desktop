@@ -29,7 +29,7 @@ function handleAction(): void {
 </script>
 
 <template>
-  <div class="cp-connection-toast" :data-state="props.state">
+  <div class="cp-connection-toast" role="status" aria-live="polite" aria-atomic="true" :data-state="props.state">
     <span class="cp-connection-toast__led" aria-hidden="true"></span>
     <div class="cp-connection-toast__text">
       <div class="cp-connection-toast__label">{{ props.label }}</div>

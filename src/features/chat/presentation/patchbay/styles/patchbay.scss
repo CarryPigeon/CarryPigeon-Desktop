@@ -152,6 +152,11 @@
   grid-template-rows: auto 1fr auto;
 }
 
+/* 栏（Rail）：服务器栏在标题与机架列表之间多了一个顶部操作区 */
+.cp-rail--servers {
+  grid-template-rows: auto auto 1fr auto;
+}
+
 /* 栏（Rail）：频道栏额外包含搜索区 */
 .cp-rail--channels {
   grid-template-rows: auto auto 1fr;
@@ -977,6 +982,12 @@
 .cp-topConsole__pinMembers[aria-pressed="true"] {
   border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+}
+
+.cp-topConsole__pinMembers:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* 顶部控制台”设置”按钮 */

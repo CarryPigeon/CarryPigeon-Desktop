@@ -133,7 +133,12 @@ function handleFocus(): void {
   expand();
 }
 
-function handleBlur(): void {
+function handleBlur(event?: FocusEvent): void {
+  const related = event?.relatedTarget as Node | null;
+  if (composerEl.value && related && composerEl.value.contains(related)) {
+    // 焦点仍在 ComposerHost 内部移动，不触发折叠
+    return;
+  }
   scheduleCollapse();
 }
 
@@ -145,10 +150,13 @@ function handleCollapsedClick(): void {
   });
 }
 
-watch(shouldBeExpanded, (expanded) => {
-  if (expanded) expand();
-  else scheduleCollapse();
-});
+watch(
+  shouldBeExpanded,
+  (expanded) => {
+    if (expanded) expand();
+  },
+  { immediate: true },
+);
 
 async function handleVoiceRecorded(payload: { filePath: string; durationMs: number; sizeBytes: number }): Promise<void> {
   isUploadingVoice.value = true;
@@ -262,11 +270,27 @@ function handleKeydown(_: string | number, event: { e: KeyboardEvent }): void {
     return;
   }
 
-  // 处理 Escape：关闭提及菜单
+  // 处理 Escape：优先关闭提及菜单；若输入为空则取消焦点并折叠
   if (e.key === "Escape") {
-    e.preventDefault();
-    e.stopPropagation();
-    emit("closeMentionMenu");
+    if (props.mentionMenuOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      emit("closeMentionMenu");
+      return;
+    }
+    if (
+      props.draft.trim().length === 0 &&
+      attachments.value.length === 0 &&
+      !props.replyTitle &&
+      !props.replySnippet &&
+      !props.quoteReplyDraft &&
+      !props.error
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLElement | null)?.blur();
+      scheduleCollapse();
+    }
     return;
   }
 
@@ -356,7 +380,15 @@ function selectSystemMention(type: "everyone" | "here"): void {
   <!-- 组件：ComposerHost｜职责：统一发送区（工具栏 + 输入 + 发送） -->
   <section ref="composerEl" class="cp-composer" :class="{ 'cp-composer--collapsed': collapsed }">
     <!-- 折叠态：只显示占位输入条 -->
-    <div v-if="collapsed" class="cp-composer__collapsed" @click="handleCollapsedClick">
+    <div
+      v-if="collapsed"
+      class="cp-composer__collapsed"
+      role="button"
+      tabindex="0"
+      :aria-label="t('message_input_placeholder')"
+      @click="handleCollapsedClick"
+      @focus="handleCollapsedClick"
+    >
       <span class="cp-composer__collapsedPlaceholder">{{ t('message_input_placeholder') }}</span>
       <button class="cp-composer__send" type="button" disabled>{{ t('send') }}</button>
     </div>
@@ -364,23 +396,23 @@ function selectSystemMention(type: "everyone" | "here"): void {
     <!-- 展开态：完整编辑器 -->
     <div v-else class="cp-composer__expanded" @focusin="expand" @focusout="handleBlur">
       <div v-if="props.replyTitle || props.replySnippet" class="cp-reply">
-      <div class="cp-reply__left">
-        <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
-        <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
+        <div class="cp-reply__left">
+          <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
+          <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
+        </div>
+        <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><t-icon name="close" /></button>
       </div>
-      <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><t-icon name="close" /></button>
-    </div>
 
-    <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
-      <div class="cp-quoteBar__bar"></div>
-      <div class="cp-quoteBar__content">
-        <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
-        <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
+      <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
+        <div class="cp-quoteBar__bar"></div>
+        <div class="cp-quoteBar__content">
+          <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
+          <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
+        </div>
+        <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')">&times;</button>
       </div>
-      <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')">&times;</button>
-    </div>
 
-    <div v-if="props.error" class="cp-composer__error" role="alert">
+      <div v-if="props.error" class="cp-composer__error" role="alert">
       {{ props.error }}
     </div>
 

@@ -134,6 +134,21 @@ const { t } = useI18n();
 const router = useRouter();
 const logger = createLogger("ChatCenter");
 
+/** 窗口宽度，用于判断成员栏固定按钮是否可用。 */
+const windowWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200);
+const canToggleMembersRail = computed(() => windowWidth.value >= 1100);
+
+function updateWindowWidth(): void {
+  windowWidth.value = window.innerWidth;
+}
+
+onMounted(() => {
+  window.addEventListener("resize", updateWindowWidth);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateWindowWidth);
+});
+
 /** 频道公告已被用户关闭。 */
 const dismissedAnnouncement = ref(false);
 
@@ -483,6 +498,7 @@ function getReplyText(m: VirtualMessageItem): string {
           type="button"
           :title="props.membersRailOpen ? t('unpin_members_rail') : t('pin_members_rail')"
           :aria-pressed="props.membersRailOpen"
+          :disabled="!canToggleMembersRail"
           @click="props.onToggleMembersRail"
         >
           <t-icon :name="props.membersRailOpen ? 'pin-filled' : 'pin'" />

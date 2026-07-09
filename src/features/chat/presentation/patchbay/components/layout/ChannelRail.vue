@@ -25,15 +25,19 @@ const { t } = useI18n();
 const serverMenuOpen = ref(false);
 const serverMenuAnchor = ref<HTMLElement | null>(null);
 
-const serverMenuX = computed(() => {
+const MENU_WIDTH = 200;
+const MENU_HEIGHT_ESTIMATE = 220;
+
+const serverMenuStyle = computed(() => {
   const el = serverMenuAnchor.value;
-  if (!el) return 0;
-  return el.getBoundingClientRect().right;
-});
-const serverMenuY = computed(() => {
-  const el = serverMenuAnchor.value;
-  if (!el) return 0;
-  return el.getBoundingClientRect().bottom + 4;
+  if (!el) return { position: "fixed" as const, left: "0px", top: "0px", zIndex: 9999 };
+  const rect = el.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rightSpace = vw - rect.right;
+  const left = rightSpace >= MENU_WIDTH ? rect.right : Math.max(8, rect.left - MENU_WIDTH);
+  const top = Math.min(rect.bottom + 4, Math.max(8, vh - MENU_HEIGHT_ESTIMATE - 8));
+  return { position: "fixed" as const, left: `${left}px`, top: `${top}px`, zIndex: 9999 };
 });
 
 function openServerMenu(): void {
@@ -143,7 +147,7 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
       <div
         v-if="serverMenuOpen"
         class="cp-contextMenu cp-serverMenu"
-        :style="{ position: 'fixed', left: `${serverMenuX}px`, top: `${serverMenuY}px`, zIndex: 9999 }"
+        :style="serverMenuStyle"
         @click.stop
       >
         <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openPlugins)">
