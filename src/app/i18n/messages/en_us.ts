@@ -826,4 +826,13 @@ export const en_us = {
   annotation_tool_undo: "Undo",
   annotation_width: "Stroke width {width}px",
   annotation_color: "Color {color}",
+  // /chat page layout redesign
+  server_info_menu_plugins: "Plugin Center",
+  server_info_menu_required_setup: "Required Setup",
+  server_info_menu_server_manager: "Server Manager",
+  server_info_menu_file_manager: "File Manager",
+  server_info_menu_settings: "Settings",
+  pin_members_rail: "Pin Members",
+  unpin_members_rail: "Unpin Members",
+  server_info_no_brief: "No server brief",
 };

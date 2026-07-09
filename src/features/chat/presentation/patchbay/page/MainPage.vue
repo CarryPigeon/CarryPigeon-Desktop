@@ -6,7 +6,7 @@
 
 import ServerRail from "@/features/chat/presentation/patchbay/components/layout/ServerRail.vue";
 import ChannelRail from "@/features/chat/presentation/patchbay/components/layout/ChannelRail.vue";
-import MembersRail from "@/features/chat/presentation/patchbay/components/layout/MembersRail.vue";
+import RightRailHost from "@/features/chat/presentation/patchbay/components/layout/RightRailHost.vue";
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 import ChannelSettingsMenu from "@/features/chat/presentation/patchbay/components/menus/ChannelSettingsMenu.vue";
 import ChatCenter from "@/features/chat/presentation/patchbay/components/layout/ChatCenter.vue";
@@ -16,6 +16,7 @@ import ChannelContextMenu from "@/features/chat/presentation/patchbay/components
 import MessageContextMenu from "@/features/chat/presentation/patchbay/components/menus/MessageContextMenu.vue";
 import CreateChatMenu from "@/features/chat/presentation/patchbay/components/menus/CreateChatMenu.vue";
 import QuickSwitcher from "@/features/chat/presentation/patchbay/components/overlay/QuickSwitcher.vue";
+import ConnectionToast from "@/features/chat/presentation/patchbay/components/overlay/ConnectionToast.vue";
 import CreateChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateChannelDialog.vue";
 import CreateFriendPrivateChatDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateFriendPrivateChatDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
@@ -114,29 +115,34 @@ function applyResizeDelta(
 }
 
 function sideRailBudget(containerWidth: number): number {
+  const membersMin = page.rightRailOpen ? railBounds.members.min : 0;
   return Math.max(
-    railBounds.server.min + railBounds.channel.min + railBounds.members.min,
+    railBounds.server.min + railBounds.channel.min + membersMin,
     containerWidth - layoutMetrics.horizontalPadding - layoutMetrics.resizers - layoutMetrics.gaps - layoutMetrics.messageMin,
   );
 }
 
 function fitSideRailsToContainer(containerWidth: number): void {
   const budget = sideRailBudget(containerWidth);
-  const totalWidth = serverWidth.value + channelWidth.value + membersWidth.value;
+  const totalWidth = serverWidth.value + channelWidth.value + (page.rightRailOpen ? membersWidth.value : 0);
   let overflow = totalWidth - budget;
 
   if (overflow <= 0) {
     let spareSpace = budget - totalWidth;
-    spareSpace = growWidthToPreferred(membersWidth, preferredMembersWidth, railBounds.members.max, spareSpace);
+    if (page.rightRailOpen) {
+      spareSpace = growWidthToPreferred(membersWidth, preferredMembersWidth, railBounds.members.max, spareSpace);
+    }
     spareSpace = growWidthToPreferred(channelWidth, preferredChannelWidth, railBounds.channel.max, spareSpace);
     growWidthToPreferred(serverWidth, preferredServerWidth, railBounds.server.max, spareSpace);
     return;
   }
 
-  const shrinkMembers = Math.min(overflow, membersWidth.value - railBounds.members.min);
-  membersWidth.value -= shrinkMembers;
-  overflow -= shrinkMembers;
-  if (overflow <= 0) return;
+  if (page.rightRailOpen) {
+    const shrinkMembers = Math.min(overflow, membersWidth.value - railBounds.members.min);
+    membersWidth.value -= shrinkMembers;
+    overflow -= shrinkMembers;
+    if (overflow <= 0) return;
+  }
 
   const shrinkChannel = Math.min(overflow, channelWidth.value - railBounds.channel.min);
   channelWidth.value -= shrinkChannel;
@@ -227,10 +233,9 @@ onBeforeUnmount(() => {
         :server-muted="page.serverRail.serverMuted"
         :server-muted-until="page.serverRail.serverMutedUntil"
         @switch="page.serverRail.handleSwitchServer"
-        @open-servers="page.serverRail.handleOpenServers"
+        @open-server-manager="page.serverRail.openServerManager"
         @open-plugins="page.serverRail.goPlugins"
         @open-settings="page.serverRail.handleOpenSettings"
-        @open-files="page.serverRail.handleOpenFiles"
         @toggle-server-mute="page.serverRail.toggleServerMute"
         @mute-server-for-duration="(durationMs) => page.serverRail.muteServerForDuration(durationMs)"
         @unmute-server="page.serverRail.unmuteServer"
@@ -269,6 +274,8 @@ onBeforeUnmount(() => {
       <ChatCenter
         :model="page.chatCenter"
         :channels="page.channels"
+        :members-rail-open="page.rightRailOpen"
+        :on-toggle-members-rail="page.toggleRightRail"
         :show-jump-to-bottom="page.chatViewport.showJumpToBottom"
         :on-jump-to-bottom="page.chatViewport.handleJumpToBottom"
         :on-signal-scroll="page.chatViewport.handleSignalScroll"
@@ -286,21 +293,23 @@ onBeforeUnmount(() => {
         :on-close-shortcut-help="page.closeShortcutHelp"
       />
 
-      <button
-        class="cp-resizer"
-        :data-active="activeResizer === 'message-members'"
-        type="button"
-        role="separator"
-        aria-label="Resize messages and members"
-        aria-orientation="vertical"
-        :aria-valuemin="railBounds.members.min"
-        :aria-valuemax="railBounds.members.max"
-        :aria-valuenow="membersWidth"
-        @pointerdown="startResize('message-members', $event)"
-        @keydown="handleResizeKeydown('message-members', $event)"
-      ></button>
+      <template v-if="page.rightRailOpen">
+        <button
+          class="cp-resizer"
+          :data-active="activeResizer === 'message-members'"
+          type="button"
+          role="separator"
+          aria-label="Resize messages and members"
+          aria-orientation="vertical"
+          :aria-valuemin="railBounds.members.min"
+          :aria-valuemax="railBounds.members.max"
+          :aria-valuenow="membersWidth"
+          @pointerdown="startResize('message-members', $event)"
+          @keydown="handleResizeKeydown('message-members', $event)"
+        ></button>
 
-      <MembersRail :model="page.membersRail" />
+        <RightRailHost :model="page.membersRail" />
+      </template>
 
       <QuickSwitcher
         :open="page.quickSwitcher.open"
@@ -377,6 +386,15 @@ onBeforeUnmount(() => {
         :channel-name="page.channelDialogs.deleteChannelName"
         @update:visible="page.channelDialogs.setShowDeleteChannel($event)"
         @deleted="page.channelDialogs.handleChannelDeleted"
+      />
+
+      <ConnectionToast
+        v-if="page.chatCenter.connectionPillState !== 'connected'"
+        :state="page.chatCenter.connectionPillState"
+        :label="page.connectionToastLabel"
+        :detail="page.chatCenter.connectionDetail"
+        :action-label="page.connectionToastActionLabel"
+        @action="page.chatCenter.retryConnection"
       />
 
       <ThreadPanel

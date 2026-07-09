@@ -17,6 +17,7 @@ type PatchbayServerRailRawModel = {
   serverMutedUntil: RefLike<number | null>;
   handleSwitchServer(serverSocket: string): void;
   handleOpenServers(): void;
+  openServerManager(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
@@ -124,6 +125,7 @@ type CreatePatchbayServerRailSectionDeps = {
   serverMutedUntil: RefLike<number | null>;
   handleSwitchServer(serverSocket: string): void;
   handleOpenServers(): void;
+  openServerManager(): void;
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
@@ -141,6 +143,7 @@ export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSe
     serverMutedUntil: deps.serverMutedUntil,
     handleSwitchServer: deps.handleSwitchServer,
     handleOpenServers: deps.handleOpenServers,
+    openServerManager: deps.openServerManager,
     handleOpenSettings: deps.handleOpenSettings,
     goPlugins: deps.goPlugins,
     handleOpenFiles: deps.handleOpenFiles,

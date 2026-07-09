@@ -20,9 +20,13 @@ import { currentServerSocket } from "@/features/server-connection/api";
 import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
+
+type ServerInfoView = { name: string; brief: string; avatar?: string };
+
 type ChannelRailRawModel = {
   socket: ComputedRef<string>;
   serverId: ComputedRef<string>;
+  serverInfo: ComputedRef<ServerInfoView | null>;
   missingRequiredCount: ComputedRef<number>;
   channelSearch: WritableComputedRef<string>;
   channelTab: WritableComputedRef<"joined" | "discover">;
@@ -30,10 +34,14 @@ type ChannelRailRawModel = {
   currentChannelId: ComputedRef<CurrentChannelSessionSnapshot["currentChannelId"]>;
   setChannelSearch(value: string): void;
   setChannelTab(value: "joined" | "discover"): void;
-    openPlugins(): void;
-    openRequiredSetup(): void;
-    openCreateMenu(e: MouseEvent): void;
-    openChannelInfo(channelId: string): void;
+  openPlugins(): void;
+  openRequiredSetup(): void;
+  openCreateMenu(e: MouseEvent): void;
+  openChannelInfo(channelId: string): void;
+  openServerInfo(): void;
+  openServerManager(): void;
+  openFileManager(): void;
+  openSettings(): void;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   hasDraft(channelId: string): boolean;
@@ -52,11 +60,16 @@ export type UseChannelRailModelDeps = {
   currentSession: CurrentChannelSessionCapabilities;
   socket: RefLike<string>;
   serverId: RefLike<string>;
+  serverInfo: RefLike<ServerInfoView | null>;
   missingRequiredCount: RefLike<number>;
   openPlugins(): void;
   openRequiredSetup(): void;
   openCreateMenu(e: MouseEvent): void;
   openChannelInfo(channelId: string): void;
+  openServerInfo?(): void;
+  openServerManager(): void;
+  openFileManager(): void;
+  openSettings(): void;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   onAsyncError: AsyncErrorHandler;
   /** 频道静音状态查询 */
@@ -103,6 +116,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
   const rawModel: ChannelRailRawModel = {
     socket: computed(() => deps.socket.value),
     serverId: computed(() => deps.serverId.value),
+    serverInfo: computed(() => deps.serverInfo.value),
     missingRequiredCount: computed(() => deps.missingRequiredCount.value),
     channelSearch: computed({
       get: () => directorySnapshot.value.searchQuery,
@@ -124,6 +138,10 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     openRequiredSetup: deps.openRequiredSetup,
     openCreateMenu: deps.openCreateMenu,
     openChannelInfo: deps.openChannelInfo,
+    openServerInfo: deps.openServerInfo ?? deps.openServerManager,
+    openServerManager: deps.openServerManager,
+    openFileManager: deps.openFileManager,
+    openSettings: deps.openSettings,
     selectChannel,
     applyJoin: deps.applyJoin,
     hasDraft(channelId: string): boolean {

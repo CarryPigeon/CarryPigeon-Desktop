@@ -42,6 +42,11 @@ export type UsePatchbayWorkspaceDeps = {
 export type PatchbayWorkspaceModel = {
   socket: ComputedRef<string>;
   serverId: ComputedRef<string>;
+  serverInfo: ComputedRef<{
+    name: string;
+    brief: string;
+    avatar?: string;
+  } | null>;
   serverRacks: typeof chatServerRacks;
   missingRequiredCount: ComputedRef<number>;
   quickSwitcherPlugins: ComputedRef<readonly { pluginId: string; name: string }[]>;
@@ -65,6 +70,15 @@ export type PatchbayWorkspaceModel = {
  */
 export function usePatchbayWorkspace(deps: UsePatchbayWorkspaceDeps): PatchbayWorkspaceModel {
   const { socket, serverInfoStore, serverId } = useChatServerWorkspace();
+  const serverInfo = computed(() => {
+    const info = serverInfoStore.value.info.value;
+    if (!info) return null;
+    return {
+      name: info.name,
+      brief: info.brief,
+      avatar: info.avatar,
+    };
+  });
   const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
   const pluginAccess = createChatPluginAccess({ socket, requiredPluginsDeclared });
   const domainRegistryView = computed(() => getChatDomainRegistryView(socket.value));
@@ -115,6 +129,7 @@ export function usePatchbayWorkspace(deps: UsePatchbayWorkspaceDeps): PatchbayWo
   return {
     socket,
     serverId,
+    serverInfo,
     serverRacks: chatServerRacks,
     missingRequiredCount: pluginAccess.missingRequiredCount,
     quickSwitcherPlugins: computed(() => pluginAccess.quickSwitcherModules.value),
