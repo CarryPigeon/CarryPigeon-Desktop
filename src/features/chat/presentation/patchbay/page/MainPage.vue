@@ -6,7 +6,7 @@
 
 import ServerRail from "@/features/chat/presentation/patchbay/components/layout/ServerRail.vue";
 import ChannelRail from "@/features/chat/presentation/patchbay/components/layout/ChannelRail.vue";
-import MembersRail from "@/features/chat/presentation/patchbay/components/layout/MembersRail.vue";
+import RightRailHost from "@/features/chat/presentation/patchbay/components/layout/RightRailHost.vue";
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 import ChannelSettingsMenu from "@/features/chat/presentation/patchbay/components/menus/ChannelSettingsMenu.vue";
 import ChatCenter from "@/features/chat/presentation/patchbay/components/layout/ChatCenter.vue";
@@ -23,6 +23,11 @@ import "@/features/chat/public/styles";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
 const page = usePatchbayPageModel();
+
+const membersRailOpen = ref(true);
+function onToggleMembersRail(): void {
+  membersRailOpen.value = !membersRailOpen.value;
+}
 
 const mainEl = ref<HTMLElement | null>(null);
 const activeResizer = ref<"server-channel" | "channel-message" | "message-members" | null>(null);
@@ -284,9 +289,12 @@ onBeforeUnmount(() => {
         :shortcut-help-visible="page.shortcutHelpOpen"
         :shortcut-bindings="page.bindings"
         :on-close-shortcut-help="page.closeShortcutHelp"
+        :members-rail-open="membersRailOpen"
+        :on-toggle-members-rail="onToggleMembersRail"
       />
 
       <button
+        v-if="membersRailOpen"
         class="cp-resizer"
         :data-active="activeResizer === 'message-members'"
         type="button"
@@ -300,7 +308,7 @@ onBeforeUnmount(() => {
         @keydown="handleResizeKeydown('message-members', $event)"
       ></button>
 
-      <MembersRail :model="page.membersRail" />
+      <RightRailHost v-if="membersRailOpen" :model="page.membersRail" />
 
       <QuickSwitcher
         :open="page.quickSwitcher.open"
