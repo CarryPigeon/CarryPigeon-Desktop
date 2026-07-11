@@ -4,7 +4,7 @@
  * @description Patchbay 左侧频道栏：服务器上下文、必需插件 gate、频道筛选与列表。
  */
 
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
@@ -48,6 +48,19 @@ function handleMenu(action: () => void): void {
   serverMenuOpen.value = false;
   action();
 }
+
+/**
+ * 全局快捷关闭：Esc 关闭服务器菜单。
+ */
+function onGlobalKeydown(e: KeyboardEvent): void {
+  if (!serverMenuOpen.value) return;
+  if (e.key !== "Escape") return;
+  e.preventDefault();
+  serverMenuOpen.value = false;
+}
+
+onMounted(() => window.addEventListener("keydown", onGlobalKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown));
 
 /**
  * 频道分类分组。
@@ -146,32 +159,35 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
     <Teleport to="body">
       <div
         v-if="serverMenuOpen"
-        class="cp-contextMenu cp-serverMenu"
+        class="cp-serverMenu"
         :style="serverMenuStyle"
+        role="menu"
+        :aria-label="t('more_actions')"
         @click.stop
       >
-        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openPlugins)">
+        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openPlugins)">
           {{ t('server_info_menu_plugins') }}
         </button>
         <button
           v-if="props.model.missingRequiredCount > 0"
-          class="cp-contextMenu__item danger"
+          class="cp-serverMenu__item danger"
           type="button"
+          role="menuitem"
           @click="handleMenu(props.model.openRequiredSetup)"
         >
           {{ t('server_info_menu_required_setup') }}
         </button>
-        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openServerManager)">
+        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openServerManager)">
           {{ t('server_info_menu_server_manager') }}
         </button>
-        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openFileManager)">
+        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openFileManager)">
           {{ t('server_info_menu_file_manager') }}
         </button>
-        <button class="cp-contextMenu__item" type="button" @click="handleMenu(props.model.openSettings)">
+        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openSettings)">
           {{ t('server_info_menu_settings') }}
         </button>
       </div>
-      <div v-if="serverMenuOpen" class="cp-contextMenu__backdrop" @click="serverMenuOpen = false" />
+      <div v-if="serverMenuOpen" class="cp-serverMenu__backdrop" @click="serverMenuOpen = false" />
     </Teleport>
 
     <!-- 区块：频道搜索 + 已加入/发现 Tab -->
@@ -316,6 +332,64 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
 }
 .cp-serverMenu {
   min-width: 180px;
+  border: 1px solid color-mix(in oklab, var(--cp-info) 18%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-panel) 92%, rgba(0, 0, 0, 0.05));
+  border-radius: 16px;
+  box-shadow: var(--cp-shadow);
+  padding: 8px;
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cp-serverMenu__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+
+.cp-serverMenu__item {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-serverMenu__item:hover {
+  transform: translateY(-1px);
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
+}
+
+.cp-serverMenu__item:active {
+  transform: translateY(0);
+}
+
+.cp-serverMenu__item.danger {
+  color: color-mix(in oklab, var(--cp-danger) 72%, var(--cp-text));
+}
+
+.cp-serverMenu__item.danger:hover {
+  border-color: color-mix(in oklab, var(--cp-danger) 26%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
+}
+
+.cp-serverMenu__item:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cp-info) 40%, var(--cp-border));
+  outline-offset: 2px;
 }
 </style>
 

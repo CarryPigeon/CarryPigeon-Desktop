@@ -48,7 +48,7 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
 </script>
 
 <template>
-  <!-- 页面：ChannelInfoPage｜职责：频道信息展示/编辑（mock）｜交互：编辑保存、申请加入、跳转回插线板 -->
+  <!-- 页面：ChannelInfoPage｜职责：频道信息展示/编辑（mock）｜交互：编辑保存、申请加入、跳转回枢纽 -->
   <!-- 区块：<main> .cp-info -->
   <main class="cp-info">
     <ErrorBoundary>

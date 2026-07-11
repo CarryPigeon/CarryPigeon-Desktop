@@ -28,7 +28,7 @@
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' app: data: blob: https:",
         "font-src": "'self' data:",
-        "connect-src": "'self' https: wss: app:",
+        "connect-src": "'self' http: https: ws: wss: app:",
         "object-src": "'none'",
         "base-uri": "'none'",
         "frame-ancestors": "'none'"

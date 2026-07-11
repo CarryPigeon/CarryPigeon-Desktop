@@ -4,7 +4,9 @@
  * @description Patchbay 连接状态展示（LED + 文案 + 可选动作）。
  */
 
-export type ConnectionState = "connected" | "reconnecting" | "offline";
+import { computed } from "vue";
+
+export type ConnectionState = "connected" | "reconnecting" | "offline" | "idle";
 
 const props = withDefaults(
   defineProps<{
@@ -31,12 +33,21 @@ const emit = defineEmits<{
 function handleAction(): void {
   emit("action");
 }
+
+/**
+ * 派生显示状态：首屏未尝试连接（offline 且无详情）时呈现中性 idle，避免红色闪烁误导用户。
+ *
+ * @returns 实际渲染用的状态。
+ */
+const displayState = computed<ConnectionState>(() =>
+  props.state === "offline" && !props.detail ? "idle" : props.state,
+);
 </script>
 
 <template>
   <!-- 组件：ConnectionPill｜职责：连接状态（LED + 文案 + 可选按钮） -->
   <!-- 区块：<div> .cp-connection-pill -->
-  <div class="cp-connection-pill" :data-state="props.state">
+  <div class="cp-connection-pill" :data-state="displayState">
     <span class="cp-led" aria-hidden="true"></span>
     <div class="cp-connection-text">
       <div class="cp-connection-label">{{ props.label }}</div>
@@ -97,6 +108,12 @@ function handleAction(): void {
   background: var(--cp-danger);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
   animation: cp-led-blink 1.4s var(--cp-ease) infinite;
+}
+
+/* 选择器：`.cp-connection-pill[data-state="idle"] .cp-led`｜用途：未尝试连接（中性灰，无动画） */
+.cp-connection-pill[data-state="idle"] .cp-led {
+  background: var(--cp-domain-unknown);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
 }
 
 /* 选择器：`.cp-connection-text`｜用途：文案容器（label/detail 垂直堆叠 + 截断） */

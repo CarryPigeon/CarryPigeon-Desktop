@@ -28,7 +28,7 @@ const { email, code, sending, loggingIn, banner, countdown, clearBanner, handleS
   mode: "register",
 });
 
-const { transport, socketDraft, stage, serverInfo, handleConnect } = useLoginConnection({
+const { socketDraft, stage, serverInfo, handleConnect } = useLoginConnection({
   onSocketDraftChanged: clearBanner,
 });
 
@@ -46,64 +46,46 @@ useLoginHotkeys(router);
             <div class="cp-login__brandMark" aria-hidden="true"></div>
             <div class="cp-login__brandText">
               <div class="cp-login__brandName">CarryPigeon</div>
-              <div class="cp-login__brandSub">Modular Patchbay</div>
+              <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
             </div>
           </div>
           <div class="cp-login__stageWrap">
             <div class="cp-login__stage">
-              <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">Handshake</span>
+              <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">{{ t("stage_handshake") }}</span>
               <span class="cp-login__stageSep">→</span>
-              <span class="cp-login__stageItem" :data-active="stage === 'Auth'">Auth</span>
+              <span class="cp-login__stageItem" :data-active="stage === 'Auth'">{{ t("stage_auth") }}</span>
             </div>
-            <div class="cp-login__kbdHint">Ctrl/Cmd+P: Plugins · Ctrl/Cmd+,: Settings</div>
+            <div class="cp-login__kbdHint">{{ t("hotkey_hint") }}</div>
           </div>
         </header>
 
         <div class="cp-login__rack">
-          <div class="cp-login__label">Rack Overview</div>
+          <div class="cp-login__label">{{ t("rack_overview") }}</div>
 
           <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">server_socket</div>
-            <t-input v-model="socketDraft" placeholder="tls://host:port or mock://handshake" clearable />
+            <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
+            <t-input v-model="socketDraft" :placeholder="t('server_socket_placeholder')" clearable />
             <div class="cp-login__fieldHint">
-              <MonoTag :value="currentServerSocket || '—'" title="current socket" :copyable="true" />
-              <button class="cp-login__miniBtn" type="button" @click="handleConnect">Connect</button>
+              <MonoTag :value="currentServerSocket || '—'" :title="t('current_server_socket')" :copyable="true" />
+              <button class="cp-login__miniBtn" type="button" @click="handleConnect">{{ t("login_connect") }}</button>
             </div>
           </div>
 
           <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">transport</div>
-            <div class="cp-login__seg">
-              <button class="cp-login__segBtn" :data-active="transport === 'tls_strict'" type="button" @click="transport = 'tls_strict'">
-                TLS Strict
-              </button>
-              <button class="cp-login__segBtn" :data-active="transport === 'tls_insecure'" type="button" @click="transport = 'tls_insecure'">
-                TLS Insecure
-              </button>
-              <button class="cp-login__segBtn" :data-active="transport === 'tcp_legacy'" type="button" @click="transport = 'tcp_legacy'">
-                TCP Legacy
-              </button>
-            </div>
-            <div class="cp-login__transportHint">
-              (Mock preview ignores transport; real mode should enforce TLS policies.)
-            </div>
-          </div>
-
-          <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">connection</div>
+            <div class="cp-login__fieldLabel">{{ t("login_field_connection") }}</div>
             <ConnectionPill
               :state="connectionPillState"
-              label="Server link"
+              :label="t('conn_server_link')"
               :detail="connectionDetail"
-              :action-label="connectionPhase === 'failed' ? 'Retry' : ''"
+              :action-label="connectionPhase === 'failed' ? t('conn_retry') : ''"
               @action="retryLast"
             />
           </div>
 
           <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">server_id</div>
+            <div class="cp-login__fieldLabel">{{ t("server_id_label") }}</div>
             <div class="cp-login__fieldHint">
-              <MonoTag :value="serverInfo?.serverId || '—'" title="server_id" :copyable="true" />
+              <MonoTag :value="serverInfo?.serverId || '—'" :title="t('server_id_label')" :copyable="true" />
             </div>
             <div class="cp-login__transportHint">
               {{ t("login_server_id_hint") }}
@@ -113,56 +95,56 @@ useLoginHotkeys(router);
 
         <div class="cp-login__leftFoot">
           <div class="cp-login__monoBlock">
-            <div class="cp-login__monoTitle">Tip</div>
+            <div class="cp-login__monoTitle">{{ t("tip_title") }}</div>
             <div class="cp-login__monoText">
               {{ t("login_tip_power_latch") }}
             </div>
           </div>
-          <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">Open Server Manager</button>
-          <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
+          <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">{{ t("login_open_server_manager") }}</button>
+          <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
         </div>
       </section>
 
       <section class="cp-login__right">
         <div class="cp-login__panel">
-          <div class="cp-login__panelTitle">Create Account</div>
-          <div class="cp-login__panelSub">Create a new account on this server</div>
+          <div class="cp-login__panelTitle">{{ t("register_create_account") }}</div>
+          <div class="cp-login__panelSub">{{ t("register_create_account_desc") }}</div>
 
           <div v-if="banner" class="cp-login__banner">{{ banner }}</div>
 
           <div class="cp-login__form">
             <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">email</div>
-              <t-input v-model="email" placeholder="you@domain.com" clearable />
+              <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
+              <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
             </div>
 
             <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">code</div>
+              <div class="cp-login__fieldLabel">{{ t("login_code") }}</div>
               <div class="cp-login__codeRow">
-                <t-input v-model="code" placeholder="123456" clearable />
+                <t-input v-model="code" :placeholder="t('login_code_placeholder')" clearable />
                 <button
                   class="cp-login__sendBtn"
                   type="button"
                   :disabled="sending || countdown > 0"
                   @click="handleSendCode"
                 >
-                  {{ countdown > 0 ? `Resend (${countdown})` : sending ? "Sending…" : "Send Code" }}
+                  {{ countdown > 0 ? t("resend_in", { n: countdown }) : sending ? t("sending") : t("send_code") }}
                 </button>
               </div>
             </div>
 
             <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
-              {{ loggingIn ? "Creating account…" : "Create Account" }}
+              {{ loggingIn ? t("register_creating") : t("register_create_account") }}
             </button>
 
             <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
-              <span style="font-size: 12px; color: var(--cp-text-muted);">Already have an account?</span>
+              <span style="font-size: 12px; color: var(--cp-text-muted);">{{ t("register_already_have") }}</span>
               <button class="cp-login__ghost" type="button" @click="$router.push('/login')" style="margin-top: 6px;">
-                Sign in
+                {{ t("register_sign_in") }}
               </button>
             </div>
 
-            <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">Open Plugin Center</button>
+            <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
           </div>
         </div>
       </section>
