@@ -50,7 +50,8 @@ function handleAction(): void {
 .cp-connection-toast {
   position: fixed;
   left: 16px;
-  bottom: 92px;
+  /* 抬到底部服务器栏页脚（插件/设置两个按钮）之上，避免遮挡 */
+  bottom: calc(12px + 36px + 10px + 36px + 12px + 8px);
   z-index: 80;
   display: inline-flex;
   align-items: center;

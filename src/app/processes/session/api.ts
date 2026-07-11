@@ -122,7 +122,11 @@ export function ensureInitialServerSelection(): void {
 
 export async function restoreStartupSession(router: Router): Promise<void> {
   const socket = serverConnectionCapabilities.workspace.readSocket();
-  if (!socket) return;
+  if (!socket) {
+    // 初次启动且未配置任何服务器：跳转登录页让用户配置服务器
+    void router.replace("/login");
+    return;
+  }
 
   setStartupPhaseLabel("startup_phase_connect");
   if (!(await ensureServerConnectivity(socket))) return;

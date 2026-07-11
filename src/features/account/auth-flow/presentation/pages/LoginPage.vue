@@ -59,13 +59,13 @@ useLoginHotkeys(router);
             <div class="cp-login__brandMark" aria-hidden="true"></div>
             <div class="cp-login__brandText">
               <div class="cp-login__brandName">CarryPigeon</div>
-              <div class="cp-login__brandSub">Modular Patchbay</div>
+              <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
             </div>
           </div>
-          <div class="cp-login__kbdHint">Ctrl/Cmd+P: Plugins · Ctrl/Cmd+,: Settings</div>
+          <div class="cp-login__kbdHint">{{ t("hotkey_hint") }}</div>
         </header>
 
-        <nav class="cp-wizard" aria-label="login steps">
+          <nav class="cp-wizard" :aria-label="t('login_steps_aria')">
           <div class="cp-wizard__step" :data-active="wizard.step.value === 'server'">
             <span class="cp-wizard__num">1</span>
             <span class="cp-wizard__label">{{ t("login_step_server") }}</span>
@@ -89,38 +89,24 @@ useLoginHotkeys(router);
 
           <div class="cp-login__form">
             <div class="cp-login__field">
-              <div class="cp-login__fieldLabel">server_socket</div>
-              <t-input v-model="wizard.socketDraft.value" placeholder="tls://host:port or mock://handshake" clearable />
+              <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
+              <t-input v-model="wizard.socketDraft.value" :placeholder="t('server_socket_placeholder')" clearable />
               <div class="cp-login__fieldHint">
-                <MonoTag :value="wizard.currentServerSocket.value || '-'" title="current socket" :copyable="true" />
+                <MonoTag :value="wizard.currentServerSocket.value || '-'" :title="t('current_server_socket')" :copyable="true" />
                 <button class="cp-login__miniBtn" type="button" :disabled="connecting" @click="onConnect">
                   {{ connecting ? t("login_connecting") : t("login_connect") }}
                 </button>
               </div>
+              <p class="cp-login__fieldNote">{{ t("login_socket_hint") }}</p>
             </div>
 
             <div class="cp-login__field">
-              <div class="cp-login__fieldLabel">{{ t("login_transport_label") }}</div>
-              <div class="cp-login__seg">
-                <button class="cp-login__segBtn" :data-active="wizard.transport.value === 'tls_strict'" type="button" @click="wizard.transport.value = 'tls_strict'">
-                  TLS Strict
-                </button>
-                <button class="cp-login__segBtn" :data-active="wizard.transport.value === 'tls_insecure'" type="button" @click="wizard.transport.value = 'tls_insecure'">
-                  TLS Insecure
-                </button>
-                <button class="cp-login__segBtn" :data-active="wizard.transport.value === 'tcp_legacy'" type="button" @click="wizard.transport.value = 'tcp_legacy'">
-                  TCP Legacy
-                </button>
-              </div>
-            </div>
-
-            <div class="cp-login__field">
-              <div class="cp-login__fieldLabel">connection</div>
+              <div class="cp-login__fieldLabel">{{ t("login_field_connection") }}</div>
               <ConnectionPill
                 :state="wizard.connectionPillState.value"
-                label="Server link"
+                :label="t('conn_server_link')"
                 :detail="wizard.connectionDetail.value"
-                :action-label="wizard.serverConnectFailed.value ? 'Retry' : ''"
+                :action-label="wizard.serverConnectFailed.value ? t('conn_retry') : ''"
                 @action="() => wizard.retryConnect()"
               />
             </div>
@@ -264,22 +250,22 @@ useLoginHotkeys(router);
 
           <div class="cp-login__form">
             <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">email</div>
-              <t-input v-model="email" placeholder="you@domain.com" clearable />
+              <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
+              <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
             </div>
 
             <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">code</div>
+              <div class="cp-login__fieldLabel">{{ t("login_code") }}</div>
               <div class="cp-login__codeRow">
-                <t-input v-model="code" placeholder="123456" clearable />
+                <t-input v-model="code" :placeholder="t('login_code_placeholder')" clearable />
                 <button class="cp-login__sendBtn" type="button" :disabled="sending || countdown > 0" @click="handleSendCode">
-                  {{ countdown > 0 ? `Resend (${countdown})` : sending ? "Sending…" : "Send Code" }}
+                  {{ countdown > 0 ? t("resend_in", { n: countdown }) : sending ? t("sending") : t("send_code") }}
                 </button>
               </div>
             </div>
 
             <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
-              {{ loggingIn ? "Signing in…" : "Sign In / Register" }}
+              {{ loggingIn ? t("signing_in") : t("sign_in_register") }}
             </button>
 
             <div class="cp-login__formRow cp-login__registerRow">
@@ -610,6 +596,14 @@ useLoginHotkeys(router);
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Field note (socket format help) */
+.cp-login__fieldNote {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--cp-text-muted);
 }
 
 /* Mini connect button */

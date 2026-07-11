@@ -80,7 +80,7 @@ const {
           </div>
         </div>
 
-        <div v-if="plugins.catalogLoading.value" class="cp-required__state">Loading…</div>
+        <div v-if="plugins.catalogLoading.value" class="cp-required__state">{{ t("loading") }}</div>
         <div v-else-if="plugins.catalogError.value" class="cp-required__state err">{{ plugins.catalogError.value }}</div>
         <div v-else class="cp-required__list">
           <article v-for="p in requiredEntries" :key="p.pluginId" class="cp-required__item" :data-ok="Boolean(plugins.installedById.value[p.pluginId]?.enabled && plugins.installedById.value[p.pluginId]?.status === 'ok')">
