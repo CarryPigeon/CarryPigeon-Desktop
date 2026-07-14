@@ -12,6 +12,7 @@ import {
   setServerSocket,
   startServerRackRuntime,
   stopServerRackRuntime,
+  updateServerNameBySocket as updateServerNameBySocketInternal,
   type ServerRack,
   type ServerTlsConfig,
 } from "../presentation/store";
@@ -44,4 +45,8 @@ export function selectRackSocket(serverSocket: string): void {
 
 export function addRackServer(serverSocket: string, name: string): void {
   addServerInternal(serverSocket, name);
+}
+
+export function updateRackServerName(serverSocket: string, name: string): boolean {
+  return updateServerNameBySocketInternal(serverSocket, name);
 }

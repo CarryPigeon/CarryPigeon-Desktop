@@ -11,6 +11,7 @@ import {
   authServerSocket,
   connectAuthServerWorkspace,
   selectAuthServerWorkspace,
+  updateAuthServerRackName,
   useAuthServerWorkspace,
 } from "@/features/account/auth-flow/integration/serverWorkspace";
 import type { ServerInfo } from "@/features/server-connection/api-types";
@@ -65,7 +66,34 @@ export function useLoginConnection(deps: UseLoginConnectionDeps = {}): LoginConn
     await connectAuthServerWorkspace({ maxAttempts: 6 });
     if (authConnectionPhase.value === "connected") {
       await refreshServerInfo();
-      logger.info("Action: servers_info_refreshed", { socket, serverId: serverInfo.value?.serverId ?? "" });
+      // 检查 refresh 是否成功获取到 server info
+      if (serverInfo.value) {
+        syncRackNameFromServerInfo(socket);
+        logger.info("Action: servers_info_refreshed", { socket, serverId: serverInfo.value.serverId ?? "" });
+      } else {
+        logger.warn("Action: servers_info_refresh_failed_after_connect", { socket });
+      }
+    }
+  }
+
+  /**
+   * 将当前 rack 的展示名同步为拉取到的真实服务器名。
+   *
+   * 说明：
+   * - 若该 socket 尚无 rack，则新增一个以服务器名为名的 rack。
+   * - 若已有 rack 且名称为占位名（"Default"/"Unnamed Rack"/空），则重命名为真实服务器名。
+   * - 其他情况保留用户自定义名称，避免覆盖。
+   */
+  function syncRackNameFromServerInfo(socket: string): void {
+    const serverName = serverInfo.value?.name?.trim();
+    if (!socket || !serverName) return;
+
+    const placeholderNames = new Set(["Default", "Unnamed Rack", ""]);
+    const existing = authServerDirectory.value.find((r) => r.serverSocket === socket);
+    if (existing && placeholderNames.has(existing.name)) {
+      updateAuthServerRackName(socket, serverName);
+    } else if (!existing) {
+      addAuthServerRack(socket, serverName);
     }
   }
 
@@ -93,9 +121,6 @@ export function useLoginConnection(deps: UseLoginConnectionDeps = {}): LoginConn
   );
 
   onMounted(() => {
-    if (authServerDirectory.value.length === 0 && authServerSocket.value.trim()) {
-      addAuthServerRack(authServerSocket.value, "Default");
-    }
     void handleInitialConnect();
   });
 

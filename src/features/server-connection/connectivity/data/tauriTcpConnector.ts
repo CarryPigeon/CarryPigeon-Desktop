@@ -4,6 +4,7 @@
  */
 import { createServerTcpService } from "./tcp";
 import type { TcpConnectorPort } from "../domain/ports/TcpConnectorPort";
+import { IS_MOCK_ENABLED } from "@/shared/config/runtime";
 import { createLogger } from "@/shared/utils/logger";
 import { ensureServerDb } from "@/shared/db";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
@@ -201,6 +202,10 @@ export const tauriTcpConnector: TcpConnectorPort = {
   async connect(serverSocket: string): Promise<void> {
     const serverSocketKey = serverSocket.trim();
     if (!serverSocketKey) throw new Error("Missing server socket");
+    // 非 mock 模式下拒绝 mock socket 连接，防止 localStorage 残留的 mock 数据导致虚假连接
+    if (!IS_MOCK_ENABLED && serverSocketKey.startsWith("mock://")) {
+      throw new Error(`Mock socket rejected in non-mock mode: ${serverSocketKey}`);
+    }
     logger.info("Action: network_connect_server_started", { serverSocket: serverSocketKey });
     try {
       // 任何“非显式 native transport”的输入（包括纯 `host:port`、`127.0.0.1:8080`、

@@ -14,6 +14,7 @@ export {
   startServerRackRuntime,
   stopServerRackRuntime,
   togglePinServerById,
+  updateServerNameBySocket,
   updateServerRack,
   type ServerRack,
   type ServerTlsConfig,

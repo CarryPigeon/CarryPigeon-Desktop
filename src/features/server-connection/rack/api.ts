@@ -16,6 +16,7 @@ import {
   selectRackSocket,
   startRackRuntime,
   stopRackRuntime,
+  updateRackServerName,
   type ServerRack,
   type ServerTlsConfig,
 } from "./application/rackDirectoryService";
@@ -28,6 +29,7 @@ export type RackCapabilities = {
   getTlsConfig(serverSocket: string): ServerTlsConfig;
   selectSocket(serverSocket: string): void;
   addServer(serverSocket: string, name: string): void;
+  updateServerNameBySocket(serverSocket: string, name: string): boolean;
 };
 
 /**
@@ -42,6 +44,7 @@ export function createRackCapabilities(): RackCapabilities {
     getTlsConfig: getRackTlsConfig,
     selectSocket: selectRackSocket,
     addServer: addRackServer,
+    updateServerNameBySocket: updateRackServerName,
   };
 }
 

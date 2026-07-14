@@ -29,7 +29,7 @@ export function createHttpEmailServicePort(serverSocket: string): EmailServicePo
         if (isApiRequestError(e)) {
           throw new AuthError({
             code: "send_code_failed",
-            message: `Send code failed: ${e.reason} (HTTP ${e.status})`,
+            message: `Send code failed: ${e.message} (HTTP ${e.status})`,
             status: e.status,
             reason: e.reason,
             details: e.details,

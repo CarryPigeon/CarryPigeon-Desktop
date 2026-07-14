@@ -84,6 +84,7 @@ export function createServerConnectionCapabilities(): ServerConnectionCapabiliti
     },
     rack: {
       addServer: rackCapabilities.addServer,
+      updateServerNameBySocket: rackCapabilities.updateServerNameBySocket,
     },
     scopeLifecycle: {
       registerCleanupHandler: scopeLifecycleCapabilities.registerCleanupHandler,

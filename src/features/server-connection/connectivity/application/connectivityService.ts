@@ -12,6 +12,7 @@ import {
   connectionPhase,
   connectionPillState,
   connectionReason,
+  forceSetFailed,
   retryLast as retryLastInternal,
   startConnectionRuntime as startConnectionRuntimeInternal,
   stopConnectionRuntime as stopConnectionRuntimeInternal,
@@ -64,3 +65,6 @@ export function connectWithRetry(serverSocket: string, options?: ConnectivityRet
 export function retryLastConnection(): Promise<void> {
   return retryLastInternal();
 }
+
+/** 强制将连接状态设为失败（用于 workspace 层回滚连接阶段）。 */
+export const forceSetConnectionFailed = forceSetFailed;

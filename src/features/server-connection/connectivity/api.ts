@@ -11,6 +11,7 @@
 import {
   connectNow,
   connectWithRetry,
+  forceSetConnectionFailed,
   getConnectivitySnapshot,
   retryLastConnection,
   startConnectivityRuntime,
@@ -34,6 +35,8 @@ export type ConnectivityCapabilities = {
     },
   ): Promise<void>;
   retry(): Promise<void>;
+  /** 强制将连接状态设为失败（用于 workspace 层回滚）。 */
+  forceSetConnectionFailed(detail: string): void;
 };
 
 /**
@@ -47,6 +50,7 @@ export function createConnectivityCapabilities(): ConnectivityCapabilities {
     connectNow,
     connectWithRetry,
     retry: retryLastConnection,
+    forceSetConnectionFailed,
   };
 }
 

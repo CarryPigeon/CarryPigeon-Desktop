@@ -67,7 +67,7 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
     if (isApiRequestError(error)) {
       throw new AuthError({
         code,
-        message: `${fallback}: ${error.reason} (HTTP ${error.status})`,
+        message: `${fallback}: ${error.message} (HTTP ${error.status})`,
         status: error.status,
         reason: error.reason,
         details: error.details,

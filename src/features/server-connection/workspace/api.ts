@@ -274,7 +274,18 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
             kind: "server_workspace_activated",
             serverSocket: socket,
             connected: shouldConnect,
-            infoRefreshed: true,
+            infoRefreshed: false,
+          };
+        }
+        // refresh 失败时回滚连接状态，防止 UI 显示 "connected" 但实际无 server info
+        if (serverInfoCapabilities.getError(socket)) {
+          connectivityCapabilities.forceSetConnectionFailed(
+            `Server info refresh failed: ${serverInfoCapabilities.getError(socket)}`,
+          );
+          return {
+            ok: false,
+            kind: "server_workspace_activation_rejected",
+            error: toServerWorkspaceCommandErrorInfo("refresh_info_failed", "Server info refresh failed."),
           };
         }
       }

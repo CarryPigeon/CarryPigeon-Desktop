@@ -11,7 +11,6 @@ import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { useLoginWizard } from "../composables/useLoginWizard";
 import { useLoginEmailAuth } from "../composables/useLoginEmailAuth";
 import { useLoginHotkeys } from "../composables/useLoginHotkeys";
-import ConnectionPill from "@/shared/ui/ConnectionPill.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
@@ -62,53 +61,21 @@ useLoginHotkeys(router);
               <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
             </div>
           </div>
-          <div class="cp-login__kbdHint">{{ t("hotkey_hint") }}</div>
         </header>
-
-          <nav class="cp-wizard" :aria-label="t('login_steps_aria')">
-          <div class="cp-wizard__step" :data-active="wizard.step.value === 'server'">
-            <span class="cp-wizard__num">1</span>
-            <span class="cp-wizard__label">{{ t("login_step_server") }}</span>
-          </div>
-          <span class="cp-wizard__sep" aria-hidden="true">→</span>
-          <div class="cp-wizard__step" :data-active="wizard.step.value === 'prepare'">
-            <span class="cp-wizard__num">2</span>
-            <span class="cp-wizard__label">{{ t("login_step_prepare") }}</span>
-          </div>
-          <span class="cp-wizard__sep" aria-hidden="true">→</span>
-          <div class="cp-wizard__step" :data-active="wizard.step.value === 'account'">
-            <span class="cp-wizard__num">3</span>
-            <span class="cp-wizard__label">{{ t("login_step_account") }}</span>
-          </div>
-        </nav>
 
         <!-- Step 1: server -->
         <section v-if="wizard.step.value === 'server'" class="cp-login__panel">
           <h1 class="cp-login__panelTitle">{{ t("login_server_title") }}</h1>
-          <p class="cp-login__panelSub">{{ t("login_server_desc") }}</p>
 
           <div class="cp-login__form">
             <div class="cp-login__field">
               <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
               <t-input v-model="wizard.socketDraft.value" :placeholder="t('server_socket_placeholder')" clearable />
               <div class="cp-login__fieldHint">
-                <MonoTag :value="wizard.currentServerSocket.value || '-'" :title="t('current_server_socket')" :copyable="true" />
                 <button class="cp-login__miniBtn" type="button" :disabled="connecting" @click="onConnect">
                   {{ connecting ? t("login_connecting") : t("login_connect") }}
                 </button>
               </div>
-              <p class="cp-login__fieldNote">{{ t("login_socket_hint") }}</p>
-            </div>
-
-            <div class="cp-login__field">
-              <div class="cp-login__fieldLabel">{{ t("login_field_connection") }}</div>
-              <ConnectionPill
-                :state="wizard.connectionPillState.value"
-                :label="t('conn_server_link')"
-                :detail="wizard.connectionDetail.value"
-                :action-label="wizard.serverConnectFailed.value ? t('conn_retry') : ''"
-                @action="() => wizard.retryConnect()"
-              />
             </div>
 
             <div class="cp-login__footRow">
@@ -353,73 +320,6 @@ useLoginHotkeys(router);
   color: var(--cp-text-muted);
 }
 
-/* Hotkey hint */
-.cp-login__kbdHint {
-  font-size: 11px;
-  color: var(--cp-text-muted);
-}
-
-/* Stepper */
-.cp-wizard {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  border-radius: 999px;
-  padding: 8px 12px;
-  flex-wrap: wrap;
-}
-
-/* Stepper step */
-.cp-wizard__step {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--cp-text-muted);
-  transition: color var(--cp-fast) var(--cp-ease);
-}
-
-/* Stepper active step */
-.cp-wizard__step[data-active="true"] {
-  color: var(--cp-text);
-}
-
-/* Stepper number badge */
-.cp-wizard__num {
-  font-family: var(--cp-font-display);
-  font-weight: 800;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  font-size: 12px;
-}
-
-/* Stepper active number badge */
-.cp-wizard__step[data-active="true"] .cp-wizard__num {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
-}
-
-/* Stepper label */
-.cp-wizard__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-}
-
-/* Stepper separator */
-.cp-wizard__sep {
-  opacity: 0.55;
-}
-
 /* Panel (step body) */
 .cp-login__panel {
   border: 1px solid var(--cp-border);
@@ -436,14 +336,6 @@ useLoginHotkeys(router);
   letter-spacing: 0.04em;
   font-size: 18px;
   color: var(--cp-text);
-}
-
-/* Panel subtitle */
-.cp-login__panelSub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.5;
 }
 
 /* Section title */
@@ -596,14 +488,6 @@ useLoginHotkeys(router);
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-/* Field note (socket format help) */
-.cp-login__fieldNote {
-  margin: 10px 0 0;
-  font-size: 11px;
-  line-height: 1.6;
-  color: var(--cp-text-muted);
 }
 
 /* Mini connect button */
