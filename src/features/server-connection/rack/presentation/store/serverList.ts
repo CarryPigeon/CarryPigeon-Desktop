@@ -261,6 +261,24 @@ export function addServer(serverSocket: string, name: string): void {
 }
 
 /**
+ * 按 server socket 更新 rack 名称。
+ *
+ * 说明：
+ * - 若找不到对应 socket 的 rack，返回 `false`。
+ * - 主要用于连接成功后把自动创建的占位名称（如 "Default"）替换为真实服务器名。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @param name - 新的展示名称。
+ * @returns 更新成功返回 `true`；否则返回 `false`。
+ */
+export function updateServerNameBySocket(serverSocket: string, name: string): boolean {
+  const socket = serverSocket.trim();
+  const rack = findRackBySocket(socket);
+  if (!rack) return false;
+  return updateServerRack(rack.id, { name });
+}
+
+/**
  * 按 id 原地更新 rack。
  *
  * 注意：

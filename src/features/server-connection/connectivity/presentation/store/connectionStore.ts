@@ -425,6 +425,18 @@ export async function connectNow(serverSocket: string): Promise<void> {
 }
 
 /**
+ * 强制将连接状态设为失败（用于 workspace 层在 refresh 失败后回滚）。
+ */
+export function forceSetFailed(detail: string): void {
+  state.value = {
+    phase: "failed",
+    reason: "handshake_failed",
+    detail,
+    lastServerSocket: state.value.lastServerSocket,
+  };
+}
+
+/**
  * 重试上一次尝试的连接。
  *
  * 若此前从未尝试过连接（lastServerSocket 为空）：

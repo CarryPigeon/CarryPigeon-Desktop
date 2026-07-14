@@ -14,8 +14,8 @@
       {
         "title": "carrypigeon-desktop",
         "resizable": true,
-        "width": 1200,
-        "height": 800,
+        "width": 960,
+        "height": 640,
         "minHeight": 400,
         "minWidth": 600,
         "visible": false

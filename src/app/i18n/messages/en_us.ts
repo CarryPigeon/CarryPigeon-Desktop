@@ -224,7 +224,7 @@ export const en_us = {
     "Formats: tls:// and tcp:// are native transports (decided by the scheme you type); https:// or wss:// use the HTTP/WS API (native handshake skipped automatically); mock://<host> is mock mode (dev builds only). A bare host:port connects over HTTPS.",
   login_field_connection: "Connection Status",
   login_field_email: "Email",
-  login_email_placeholder: "you@domain.com",
+  login_email_placeholder: "you{'@'}domain.com",
   login_code_placeholder: "123456",
   login_steps_aria: "Login steps",
   login_prepare_title: "Confirm server & prepare plugins",

@@ -85,6 +85,10 @@ export function addAuthServerRack(serverSocket: string, name: string): void {
   serverConnectionCapabilities.rack.addServer(serverSocket, name);
 }
 
+export function updateAuthServerRackName(serverSocket: string, name: string): boolean {
+  return serverConnectionCapabilities.rack.updateServerNameBySocket(serverSocket, name);
+}
+
 export function connectAuthServerWorkspace(options?: ServerWorkspaceConnectOptions): Promise<ServerWorkspaceConnectionOutcome> {
   return serverConnectionCapabilities.workspace.connect(options);
 }

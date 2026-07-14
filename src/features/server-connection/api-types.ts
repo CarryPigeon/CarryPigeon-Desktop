@@ -65,6 +65,15 @@ export type ServerConnectionRackCapabilities = {
    * @returns 无返回值。
    */
   addServer(serverSocket: string, name: string): void;
+
+  /**
+   * 按 server socket 更新已有 rack 的展示名称。
+   *
+   * @param serverSocket - 目标 server 的 socket 地址。
+   * @param name - 新的展示名称。
+   * @returns 找到并更新成功返回 `true`；否则返回 `false`。
+   */
+  updateServerNameBySocket(serverSocket: string, name: string): boolean;
 };
 
 /**

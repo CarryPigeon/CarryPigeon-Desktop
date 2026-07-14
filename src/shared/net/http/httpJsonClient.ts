@@ -102,6 +102,7 @@ function logAndBuildApiRequestError(args: {
   method: string;
   url: string;
   envelope: ApiErrorEnvelope;
+  raw?: unknown;
 }): ApiRequestError {
   const err = new ApiRequestError(args.envelope);
   logger.warn("Action: http_client_request_failed", {
@@ -110,6 +111,7 @@ function logAndBuildApiRequestError(args: {
     url: args.url,
     status: err.status,
     reason: err.reason,
+    rawError: args.raw,
   });
   return err;
 }
@@ -180,17 +182,40 @@ async function readJsonSafe(res: Response): Promise<unknown | null> {
  * @param res - fetch Response。
  * @returns ApiRequestError。
  */
-async function toApiError(res: Response): Promise<ApiRequestError> {
-  const raw = await readJsonSafe(res);
-  if (raw && typeof raw === "object" && "error" in raw) {
-    return new ApiRequestError(raw as ApiErrorEnvelope);
+async function toApiError(res: Response, url: string, method: string): Promise<ApiRequestError> {
+  const ct = res.headers.get("content-type") ?? "";
+  let rawText = "";
+  try {
+    rawText = await res.text();
+  } catch {
+    rawText = "";
+  }
+  const rawJson: unknown = (() => {
+    if (!ct.includes("application/json") && !ct.includes("application/vnd.carrypigeon+json")) return null;
+    try {
+      return JSON.parse(rawText);
+    } catch {
+      return null;
+    }
+  })();
+  logger.warn("Action: http_client_raw_error_response", {
+    transport: "fetch",
+    method,
+    url,
+    status: res.status,
+    statusText: res.statusText,
+    contentType: ct,
+    rawBody: rawText.slice(0, 2000),
+  });
+  if (rawJson && typeof rawJson === "object" && "error" in rawJson) {
+    return new ApiRequestError(rawJson as ApiErrorEnvelope);
   }
   return new ApiRequestError({
     error: {
       status: res.status,
       reason: "http_error",
       message: `HTTP ${res.status}`,
-      details: { status_text: res.statusText },
+      details: { status_text: res.statusText, raw_body: rawText.slice(0, 500) },
     },
   });
 }
@@ -297,6 +322,7 @@ export class HttpJsonClient {
           method,
           url,
           envelope: res.error as ApiErrorEnvelope,
+          raw: res.error,
         });
       }
       if (res.status === 204) return undefined as T;
@@ -312,6 +338,7 @@ export class HttpJsonClient {
             method,
             url,
             envelope: tauriRes.error as ApiErrorEnvelope,
+            raw: tauriRes.error,
           });
         }
         if (tauriRes.status === 204) return undefined as T;
@@ -331,7 +358,7 @@ export class HttpJsonClient {
     });
 
     if (!res.ok) {
-      const err = await toApiError(res);
+      const err = await toApiError(res, url, method);
       logger.warn("Action: http_client_request_failed", {
         transport: "fetch",
         method,
@@ -382,6 +409,7 @@ export class HttpJsonClient {
           method,
           url,
           envelope: res.error as ApiErrorEnvelope,
+          raw: res.error,
         });
       }
       if (res.status === 204) return undefined as T;
@@ -413,7 +441,7 @@ export class HttpJsonClient {
     });
 
     if (!res.ok) {
-      const err = await toApiError(res);
+      const err = await toApiError(res, url, method);
       logger.warn("Action: http_client_form_data_request_failed", {
         transport: "fetch",
         method,

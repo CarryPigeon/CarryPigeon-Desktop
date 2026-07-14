@@ -5,7 +5,6 @@
 defineOptions({ name: "App" });
 import StartupShell from '@/app/bootstrap/StartupShell.vue';
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
-import GlobalHotkeyHint from '@/shared/ui/GlobalHotkeyHint.vue';
 </script>
 
 <template>
@@ -13,7 +12,6 @@ import GlobalHotkeyHint from '@/shared/ui/GlobalHotkeyHint.vue';
     <StartupShell>
       <router-view></router-view>
     </StartupShell>
-    <GlobalHotkeyHint />
   </ErrorBoundary>
 </template>
 
