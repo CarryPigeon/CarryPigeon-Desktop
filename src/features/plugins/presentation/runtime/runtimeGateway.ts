@@ -11,6 +11,7 @@ import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginT
 import { IS_STORE_MOCK, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { normalizeServerKey } from "@/shared/serverKey";
+import { getLocalVoiceCallRuntimeEntry, USE_LOCAL_VOICE_CALL_PLUGIN } from "@/features/plugins/data/localPluginSource";
 
 function getMockRuntimeEntry(serverSocket: string, pluginId: string, version?: string): PluginRuntimeEntry {
   const id = String(pluginId ?? "").trim();
@@ -38,6 +39,9 @@ function getMockRuntimeEntry(serverSocket: string, pluginId: string, version?: s
 export function getRuntimeEntry(serverSocket: string, pluginId: string): Promise<PluginRuntimeEntry> {
   if (IS_STORE_MOCK || USE_MOCK_TRANSPORT) {
     return Promise.resolve(getMockRuntimeEntry(serverSocket, pluginId));
+  }
+  if (USE_LOCAL_VOICE_CALL_PLUGIN && pluginId === "voice-call") {
+    return Promise.resolve(getLocalVoiceCallRuntimeEntry(normalizeServerKey(serverSocket)));
   }
   return invokeTauri<RawPluginRuntimeEntry>(TAURI_COMMANDS.pluginsGetRuntimeEntry, {
     serverSocket,
