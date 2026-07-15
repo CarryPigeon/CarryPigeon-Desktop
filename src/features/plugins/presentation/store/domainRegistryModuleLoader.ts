@@ -36,7 +36,12 @@ export async function loadPluginRuntimeModule(runtime: PluginRuntimeEntry): Prom
   if ((IS_STORE_MOCK || USE_MOCK_TRANSPORT) && runtime.entry === "mock-runtime") {
     return createMockLoadedPluginModule(runtime);
   }
-  const entryUrl = toAppPluginEntryUrl(runtime);
+  // 根相对/绝对 entry（如开发期本地插件源 `/plugins/voice-call/index.js`）直接 import，
+  // 不走 app://plugins/... 分发；其余相对 entry 走标准 app:// 协议。
+  const entry = String(runtime.entry ?? "").trim();
+  const entryUrl = /^(https?:)?\/\//u.test(entry) || entry.startsWith("/")
+    ? entry
+    : toAppPluginEntryUrl(runtime);
   const moduleNamespace = await importPluginModule(entryUrl);
   return normalizePluginModule(runtime.pluginId, runtime.version, runtime, moduleNamespace);
 }

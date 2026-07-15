@@ -12,8 +12,9 @@
     "scripts": {
         "dev": "vite",
         "vendor:build": "vite build --config src/features/plugins/vite.vendor.config.ts",
-    "plugins:build:voice-call": "vite build --config plugins/voice-call/vite.config.ts",
-        "predev": "pnpm run vendor:build",
+        "plugins:build:voice-call": "vite build --config plugins/voice-call/vite.config.ts",
+        "plugins:dev:link": "node scripts/copy-plugin-dist.mjs",
+        "predev": "pnpm run vendor:build && pnpm run plugins:build:voice-call && pnpm run plugins:dev:link",
         "prebuild": "pnpm run vendor:build",
         "typecheck": "vue-tsc --noEmit",
         "build": "pnpm run -s typecheck && vite build",

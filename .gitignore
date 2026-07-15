@@ -18,6 +18,10 @@ dist-ssr
 .vscode
 .vscode/*
 !.vscode/extensions.json
+
+# Generated plugin/vendor assets (rebuilt by predev/prebuild)
+public/vendor/
+public/plugins/
 .idea
 .DS_Store
 *.suo
