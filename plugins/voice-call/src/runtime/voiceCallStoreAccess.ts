@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import type { VoiceCallState } from "../runtime/voiceCallState";
+import type { VoiceCallState } from "./voiceCallState";
 
 /**
  * 默认空状态，确保 resolveState() 在任何时候都可安全访问。
