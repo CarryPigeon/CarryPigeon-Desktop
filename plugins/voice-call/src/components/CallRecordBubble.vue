@@ -28,10 +28,8 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
-import type { CallSummary } from "../../domain/contracts";
-
-const { t } = useI18n();
+import type { CallSummary } from "../domain/contracts";
+import { t } from "../i18n";
 
 const props = defineProps<{
   summary: CallSummary;
