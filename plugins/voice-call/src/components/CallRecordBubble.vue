@@ -28,21 +28,49 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CallSummary } from "../domain/contracts";
+import type { CallKind, CallSummary } from "../domain/contracts";
 import { t } from "../i18n";
 
+/**
+ * 通用插件消息渲染契约（由宿主 MessageContentHost 的 plugin 分支传入）。
+ * 仅消费 `data` / `from`，其余字段保留以兼容未来扩展。
+ */
 const props = defineProps<{
-  summary: CallSummary;
-  initiatorName: string;
+  data?: unknown;
+  context?: unknown;
+  preview?: unknown;
+  domain?: string;
+  domainVersion?: string;
+  mid?: string;
+  from?: { id: string; name: string };
+  timeMs?: number;
+  replyToMid?: string;
 }>();
 
 defineEmits<{
   callback: [];
 }>();
 
+/** 从消息 data 提取通话摘要，缺失字段以安全默认值兜底。 */
+const summary = computed<CallSummary>(() => {
+  const d = (props.data ?? {}) as Partial<CallSummary> & Record<string, unknown>;
+  return {
+    sessionId: String(d.sessionId ?? ""),
+    kind: (d.kind as CallKind) ?? "direct",
+    duration: Number(d.duration ?? 0),
+    disconnectReason: String(d.disconnectReason ?? ""),
+  };
+});
+
+/** 发起方名称：优先取 data.initiatorName，其次回落到消息发送者。 */
+const initiatorName = computed<string>(() => {
+  const d = (props.data ?? {}) as Record<string, unknown>;
+  return String(d.initiatorName ?? props.from?.name ?? "");
+});
+
 const formattedDuration = computed(() => {
-  if (props.summary.duration <= 0) return "";
-  const totalSec = Math.floor(props.summary.duration / 1000);
+  if (summary.value.duration <= 0) return "";
+  const totalSec = Math.floor(summary.value.duration / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   if (min > 0) return t("voice_call_duration_format", { min, sec });
@@ -50,9 +78,9 @@ const formattedDuration = computed(() => {
 });
 
 const statusText = computed(() => {
-  if (props.summary.disconnectReason === "timeout") return t("voice_call_status_missed");
-  if (props.summary.disconnectReason === "declined") return t("voice_call_status_declined");
-  if (props.summary.disconnectReason === "cancelled") return t("voice_call_status_cancelled");
+  if (summary.value.disconnectReason === "timeout") return t("voice_call_status_missed");
+  if (summary.value.disconnectReason === "declined") return t("voice_call_status_declined");
+  if (summary.value.disconnectReason === "cancelled") return t("voice_call_status_cancelled");
   return t("voice_call_status_ended");
 });
 </script>

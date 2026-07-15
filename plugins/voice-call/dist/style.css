@@ -1,5 +1,409 @@
 @charset "UTF-8";
 /* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.voice-call-banner[data-v-cde189a0] {
+  height: 56px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  overflow: hidden;
+}
+.voice-call-banner__content[data-v-cde189a0] {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 16px;
+  gap: 12px;
+}
+.voice-call-banner__icon[data-v-cde189a0] {
+  font-size: 24px;
+  animation: pulse-ring-cde189a0 1.5s ease-in-out infinite;
+}
+.voice-call-banner__info[data-v-cde189a0] {
+  flex: 1;
+  min-width: 0;
+}
+.voice-call-banner__title[data-v-cde189a0] {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.voice-call-banner__countdown[data-v-cde189a0] {
+  display: block;
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.voice-call-banner__actions[data-v-cde189a0] {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.voice-call-banner__btn[data-v-cde189a0] {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.voice-call-banner__btn[data-v-cde189a0]:hover {
+  opacity: 0.9;
+}
+.voice-call-banner__btn--accept[data-v-cde189a0] {
+  background: #fff;
+  color: #667eea;
+}
+.voice-call-banner__btn--reject[data-v-cde189a0] {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.voice-banner-slide-enter-active[data-v-cde189a0],
+.voice-banner-slide-leave-active[data-v-cde189a0] {
+  transition: all 0.3s ease;
+}
+.voice-banner-slide-enter-from[data-v-cde189a0],
+.voice-banner-slide-leave-to[data-v-cde189a0] {
+  height: 0;
+  opacity: 0;
+}
+@keyframes pulse-ring-cde189a0 {
+0%, 100% {
+    transform: scale(1);
+}
+50% {
+    transform: scale(1.1);
+}
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.cp-avatar[data-v-93701517] {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--cp-border);
+  background: radial-gradient(12px 12px at 30% 30%, color-mix(in oklab, var(--cp-info) 22%, transparent), transparent 60%), radial-gradient(14px 14px at 70% 70%, color-mix(in oklab, var(--cp-accent) 16%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in oklab, hsl(var(--cp-avatar-hue), 60%, 55%) 16%, var(--cp-panel)), color-mix(in oklab, hsl(calc(var(--cp-avatar-hue) + 40), 70%, 50%) 12%, var(--cp-panel-muted)));
+  box-shadow: 0 10px 18px rgba(20, 32, 29, 0.1);
+  user-select: none;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+.cp-avatar--image[data-v-93701517] {
+  background: var(--cp-panel);
+}
+.cp-avatar__img[data-v-93701517] {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+}
+.cp-avatar__inner[data-v-93701517] {
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  font-size: clamp(10px, var(--cp-avatar-size) / 2.65, 12px);
+  color: color-mix(in oklab, var(--cp-text) 86%, transparent);
+  text-transform: uppercase;
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.cp-self-preview[data-v-24e87e4b] {
+  position: relative;
+  width: 160px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1a1a2e;
+}
+.cp-self-preview video[data-v-24e87e4b] {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cp-self-preview__placeholder[data-v-24e87e4b] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.cp-remote-tile[data-v-342ebbaa] {
+  flex: 1;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1a1a2e;
+  min-height: 200px;
+}
+.cp-remote-tile video[data-v-342ebbaa] {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.cp-remote-tile__placeholder[data-v-342ebbaa] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.cp-video-grid[data-v-92301184] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: #0f0f1a;
+  border-radius: 8px;
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.voice-call-panel[data-v-3857b46f] {
+  border-top: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  overflow: hidden;
+}
+.voice-call-panel__bar[data-v-3857b46f] {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 16px;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.voice-call-panel__bar[data-v-3857b46f]:hover {
+  background: var(--cp-hover-bg);
+}
+.voice-call-panel__status[data-v-3857b46f] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--cp-text);
+  flex: 1;
+  min-width: 0;
+}
+.voice-call-panel__dot[data-v-3857b46f] {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cp-border);
+  flex-shrink: 0;
+}
+.voice-call-panel__dot.is-active[data-v-3857b46f] {
+  background: var(--cp-success);
+  animation: blink-3857b46f 1.5s ease-in-out infinite;
+}
+.voice-call-panel__dot.is-connecting[data-v-3857b46f] {
+  background: var(--cp-warn);
+  animation: blink-3857b46f 0.8s ease-in-out infinite;
+}
+.voice-call-panel__participant-count[data-v-3857b46f] {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+}
+.voice-call-panel__bar-hangup[data-v-3857b46f] {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--cp-danger);
+  border-radius: 50%;
+  background: var(--cp-panel);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-danger);
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.voice-call-panel__bar-hangup[data-v-3857b46f]:hover {
+  background: var(--cp-danger);
+  color: #fff;
+}
+.voice-call-panel__toggle[data-v-3857b46f] {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--cp-text-light);
+}
+.voice-call-panel__video[data-v-3857b46f] {
+  border-top: 1px solid var(--cp-border);
+}
+.voice-call-panel__controls[data-v-3857b46f] {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 8px;
+  border-top: 1px solid var(--cp-border);
+}
+.voice-call-panel__ctrl-btn[data-v-3857b46f] {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--cp-border);
+  border-radius: 50%;
+  background: var(--cp-panel);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.voice-call-panel__ctrl-btn[data-v-3857b46f]:hover {
+  background: var(--cp-hover-bg);
+}
+.voice-call-panel__ctrl-btn.is-muted[data-v-3857b46f] {
+  background: var(--cp-warn);
+  border-color: var(--cp-warn);
+}
+.voice-call-panel__ctrl-btn.is-off[data-v-3857b46f] {
+  background: var(--cp-danger);
+  border-color: var(--cp-danger);
+  color: #fff;
+}
+.voice-call-panel__ctrl-btn.is-active[data-v-3857b46f] {
+  background: var(--cp-success);
+  border-color: var(--cp-success);
+  color: #fff;
+}
+.voice-call-panel__ctrl-btn--hangup[data-v-3857b46f] {
+  margin-left: auto;
+  border-color: var(--cp-danger);
+  color: var(--cp-danger);
+}
+.voice-call-panel__ctrl-btn--hangup[data-v-3857b46f]:hover {
+  background: var(--cp-danger);
+  color: #fff;
+}
+.voice-call-panel__device-select[data-v-3857b46f] {
+  padding: 4px 8px;
+  border: 1px solid var(--cp-border);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  max-width: 120px;
+}
+.voice-call-panel__roster[data-v-3857b46f] {
+  padding: 8px 16px;
+  border-top: 1px solid var(--cp-border);
+}
+.voice-call-panel__roster-title[data-v-3857b46f] {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  margin-bottom: 6px;
+}
+.voice-call-panel__participant[data-v-3857b46f] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+.voice-call-panel__participant-avatar[data-v-3857b46f] {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.voice-call-panel__participant-name[data-v-3857b46f] {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cp-text);
+}
+.voice-call-panel__participant-icon[data-v-3857b46f] {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.voice-call-panel__participant-level[data-v-3857b46f] {
+  width: 40px;
+  height: 4px;
+  background: var(--cp-border-light);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.voice-call-panel__level-bar[data-v-3857b46f] {
+  display: block;
+  height: 100%;
+  background: var(--cp-success);
+  border-radius: 2px;
+  transition: width 0.2s;
+}
+.voice-panel-slide-enter-active[data-v-3857b46f],
+.voice-panel-slide-leave-active[data-v-3857b46f] {
+  transition: all 0.3s ease;
+}
+.voice-panel-slide-enter-from[data-v-3857b46f],
+.voice-panel-slide-leave-to[data-v-3857b46f] {
+  transform: translateY(100%);
+}
+@keyframes blink-3857b46f {
+0%, 100% {
+    opacity: 1;
+}
+50% {
+    opacity: 0.3;
+}
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
+.call-record-bubble[data-v-4db1606a] {
+  max-width: 240px;
+  border: 1px solid var(--cp-border);
+  border-radius: 8px;
+  background: var(--cp-surface);
+  padding: 12px;
+  font-size: 13px;
+}
+.call-record-bubble__header[data-v-4db1606a] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--cp-text);
+}
+.call-record-bubble__body[data-v-4db1606a] {
+  margin-bottom: 8px;
+}
+.call-record-bubble__row[data-v-4db1606a] {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.call-record-bubble__label[data-v-4db1606a] {
+  color: var(--cp-text-muted);
+}
+.call-record-bubble__value[data-v-4db1606a] {
+  color: var(--cp-text);
+}
+.call-record-bubble__value--status[data-v-4db1606a] {
+  color: var(--cp-text-light);
+}
+.call-record-bubble__footer[data-v-4db1606a] {
+  text-align: right;
+}
+.call-record-bubble__btn[data-v-4db1606a] {
+  padding: 4px 12px;
+  border: 1px solid var(--cp-accent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cp-accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+.call-record-bubble__btn[data-v-4db1606a]:hover {
+  background: var(--cp-accent-soft);
+}
+/* 样式：button-size mixin｜职责：四档尺寸 token，组件跨页统一按钮规格 */
 .voice-call-plugin {
   display: contents;
 }/*$vite$:1*/
