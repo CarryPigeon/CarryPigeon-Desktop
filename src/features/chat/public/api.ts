@@ -96,3 +96,14 @@ export function getChatCapabilities(): ChatCapabilities {
   }
   return cachedChatCapabilities;
 }
+
+/**
+ * 通用插件 UI 挂载点（Task 4）。
+ *
+ * 说明：
+ * - `chatPluginUiBridge` 实现 `PluginUiBridge`，供插件运行时注入；
+ * - `toolbarActions` 为工具栏动作响应式列表，`PluginToolbarSlot` 渲染它；
+ * - `bindOverlayMount` 由 `PluginOverlayHost` 的 expose.mount 注入。
+ * 这些符号经 chat 公共 API 透出，供 plugins 等跨 feature 消费。
+ */
+export { chatPluginUiBridge, toolbarActions, bindOverlayMount } from "@/features/chat/presentation/plugins/chatPluginUiBridge";
