@@ -1,5 +1,5 @@
 import { ref, watch, readonly, computed, onUnmounted } from "vue";
-import type { CallState, CallSession, AudioDeviceInfo, CallParticipant, CallSummary } from "../../domain/contracts";
+import type { CallState, CallSession, AudioDeviceInfo, CallParticipant, CallSummary } from "../domain/contracts";
 import { useRingtone } from "./useRingtone";
 
 export interface UseVoiceCallOptions {

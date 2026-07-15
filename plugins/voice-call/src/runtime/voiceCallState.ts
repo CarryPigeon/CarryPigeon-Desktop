@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { CallState, CallSession, CallSummary, AudioDeviceInfo, CallParticipant } from "../../domain/contracts";
+import type { CallState, CallSession, CallSummary, AudioDeviceInfo, CallParticipant } from "../domain/contracts";
 
 export function createVoiceCallState() {
   const currentState = ref<CallState>("idle");

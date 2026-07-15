@@ -1,9 +1,6 @@
 import { ref, onUnmounted } from "vue";
-import { type UnlistenFn } from "@tauri-apps/api/event";
-import { safeListen } from "@/shared/tauri/events";
-import { invokeTauri } from "@/shared/tauri/invokeClient";
-import { TAURI_COMMANDS } from "@/shared/tauri/commands";
-import { createLogger } from "@/shared/utils/logger";
+import { invokeVoiceCall, onVoiceCallEvent } from "../host/bridge";
+import { createLogger } from "../shared/logger";
 
 const STUN_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -19,7 +16,7 @@ export function useVideoCall(initialSessionId: string) {
   const connected = ref(false);
 
   let pc: RTCPeerConnection | null = null;
-  let unlisten: UnlistenFn | null = null;
+  let unlisten: (() => void) | null = null;
 
   function setSessionId(sid: string) {
     sessionId.value = sid;
@@ -31,7 +28,7 @@ export function useVideoCall(initialSessionId: string) {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        void invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
+        void invokeVoiceCall("voice_call:send_video_signaling", {
           sessionId: sessionId.value,
           signalType: "ice_candidate",
           payload: e.candidate.toJSON(),
@@ -69,7 +66,7 @@ export function useVideoCall(initialSessionId: string) {
     const offer = await p.createOffer();
     await p.setLocalDescription(offer);
 
-    await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
+    await invokeVoiceCall("voice_call:send_video_signaling", {
       sessionId: sessionId.value,
       signalType: "offer",
       payload: {
@@ -103,7 +100,7 @@ export function useVideoCall(initialSessionId: string) {
     const answer = await p.createAnswer();
     await p.setLocalDescription(answer);
 
-    await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
+    await invokeVoiceCall("voice_call:send_video_signaling", {
       sessionId: sessionId.value,
       signalType: "answer",
       payload: {
@@ -121,7 +118,7 @@ export function useVideoCall(initialSessionId: string) {
       t.enabled = !t.enabled;
     });
     cameraEnabled.value = tracks.some((t) => t.enabled);
-    await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
+    await invokeVoiceCall("voice_call:send_video_signaling", {
       sessionId: sessionId.value,
       signalType: "video_mute",
       payload: { muted: !cameraEnabled.value },
@@ -130,23 +127,23 @@ export function useVideoCall(initialSessionId: string) {
 
   function setupListener() {
     if (unlisten) return;
-    safeListen<{
+    unlisten = onVoiceCallEvent<{
       sessionId: string;
       signalType: string;
       payload: any;
     }>("voice_call:video_signaling", async (event) => {
-      if (event.payload.sessionId !== sessionId.value) return;
+      if (event.sessionId !== sessionId.value) return;
       if (!pc) return;
 
-      switch (event.payload.signalType) {
+      switch (event.signalType) {
         case "offer": {
           if (pc.signalingState !== "stable") break;
           await pc.setRemoteDescription(
-            new RTCSessionDescription(event.payload.payload)
+            new RTCSessionDescription(event.payload)
           );
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          await invokeTauri(TAURI_COMMANDS.sendVideoSignaling, {
+          await invokeVoiceCall("voice_call:send_video_signaling", {
             sessionId: sessionId.value,
             signalType: "answer",
             payload: { sdp: answer.sdp, type: answer.type, candidates: [] },
@@ -156,17 +153,15 @@ export function useVideoCall(initialSessionId: string) {
         case "answer": {
           if (pc.currentRemoteDescription) break;
           await pc.setRemoteDescription(
-            new RTCSessionDescription(event.payload.payload)
+            new RTCSessionDescription(event.payload)
           );
           break;
         }
         case "ice_candidate": {
-          await pc.addIceCandidate(event.payload.payload);
+          await pc.addIceCandidate(event.payload);
           break;
         }
       }
-    }).then((fn) => {
-      unlisten = fn;
     });
   }
 
