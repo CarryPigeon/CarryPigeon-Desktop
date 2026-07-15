@@ -125,6 +125,9 @@ export const renderers = {
 
 // composers 可选；发起通话走工具栏入口，不依赖 composer。
 
+// 模块级清理句柄（deactivate 无 ctx 入参，故在模块作用域保存）
+let cleanup: (() => void) | null = null;
+
 export function activate(ctx: PluginContext) {
   const detachToolbar = ctx.host.registerToolbarAction({
     id: "voice-call.start",
@@ -135,11 +138,18 @@ export function activate(ctx: PluginContext) {
   const offIncoming = ctx.host.onEvent("voice_call:incoming", onIncoming);
   const offState = ctx.host.onEvent("voice_call:state_change", onStateChange);
   const offVideo = ctx.host.onEvent("voice_call:video_signaling", onVideoSignaling);
-  ctx.__cleanup = () => { detachToolbar(); unmountOverlay(); offIncoming(); offState(); offVideo(); };
+  cleanup = () => {
+    detachToolbar();
+    unmountOverlay();
+    offIncoming();
+    offState();
+    offVideo();
+  };
 }
 
 export function deactivate() {
-  ctx.__cleanup?.();
+  cleanup?.();
+  cleanup = null;
 }
 ```
 
