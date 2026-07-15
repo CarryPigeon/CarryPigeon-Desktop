@@ -9,7 +9,6 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
-import type { CallState } from "@/features/chat/voice-call/domain/contracts";
 import { NotificationBell } from "@/features/notifications/components";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
@@ -18,8 +17,8 @@ import MessageContentHost from "@/features/chat/message-flow/message/presentatio
 import { reactToMessage } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
 import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components/menus/MultiSelectToolbar.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
-import VoiceCallHost from "@/features/chat/voice-call/presentation/components/VoiceCallHost.vue";
-import VoiceCallTrigger from "@/features/chat/voice-call/presentation/components/VoiceCallTrigger.vue";
+import { PluginOverlayHost, PluginToolbarSlot } from "@/features/plugins/api";
+import { toolbarActions, bindOverlayMount } from "@/features/chat/presentation/plugins/chatPluginUiBridge";
 import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
 import ForwardDetailDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardDetailDialog.vue";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
@@ -218,18 +217,11 @@ const virtualizerOptions = computed(() => ({
 
 const virtualizer = useVirtualizer(virtualizerOptions);
 
-const voiceHostRef = ref<{
-  callState: { value: CallState };
-  startDirectCall: (targetUserId: string) => Promise<unknown>;
-  startVideoCall: (targetUserId?: string) => Promise<void>;
-  startConference: () => Promise<unknown>;
-} | null>(null);
-
-const currentCallState = ref<CallState>("idle");
-
-function onVoiceCallStateChange(state: CallState): void {
-  currentCallState.value = state;
-}
+/** 通用浮层宿主：把 expose.mount 注入 chat UI 桥，供插件经 host.mountOverlay 注册全局浮层。 */
+const overlayHostRef = ref<InstanceType<typeof PluginOverlayHost> | null>(null);
+onMounted(() => {
+  if (overlayHostRef.value) bindOverlayMount(overlayHostRef.value.mount);
+});
 
 /** 图片灯箱状态。 */
 const lightboxOpen = ref(false);
@@ -351,18 +343,6 @@ function closeLightbox(): void {
   lightboxImages.value = [];
 }
 
-function handleDirectCallStart(targetUserId: string): void {
-  voiceHostRef.value?.startDirectCall(targetUserId || props.targetUserId || "");
-}
-
-function handleVideoCallStart(targetUserId: string): void {
-  voiceHostRef.value?.startVideoCall(targetUserId || props.targetUserId || "");
-}
-
-function handleConferenceStart(): void {
-  voiceHostRef.value?.startConference();
-}
-
 function handleStickerSelected(r: { fileId: string; shareKey: string }): void {
   props.model.handleFileUploaded(r);
   props.model.handleSend();
@@ -482,16 +462,7 @@ function getReplyText(m: VirtualMessageItem): string {
         <div class="cp-topConsole__title">{{ t("messages_title") }}</div>
       </div>
       <div class="cp-topConsole__right">
-        <VoiceCallTrigger
-          v-if="props.model.currentChannelId"
-          :room-id="props.model.currentChannelId"
-          :room-name="props.model.currentChannelName"
-          :call-state="currentCallState"
-          :target-user-id="props.targetUserId"
-          @start-direct="handleDirectCallStart"
-          @start-video="handleVideoCallStart"
-          @start-conference="handleConferenceStart"
-        />
+        <PluginToolbarSlot :actions="toolbarActions" />
         <button
           v-if="props.model.currentChannelId"
           class="cp-topConsole__pinMembers"
@@ -526,13 +497,7 @@ function getReplyText(m: VirtualMessageItem): string {
       </div>
     </header>
 
-    <VoiceCallHost
-      ref="voiceHostRef"
-      :room-id="props.model.currentChannelId"
-      :room-name="props.model.currentChannelName"
-      :target-user-id="props.targetUserId"
-      @stateChange="onVoiceCallStateChange"
-    />
+    <PluginOverlayHost ref="overlayHostRef" />
 
     <AnnouncementBanner
       v-if="channelAnnouncement"

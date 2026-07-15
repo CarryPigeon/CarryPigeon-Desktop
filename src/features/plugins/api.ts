@@ -90,3 +90,14 @@ export function getPluginsCapabilities(): PluginsCapabilities {
   pluginsCapabilitiesSingleton = createPluginsCapabilities();
   return pluginsCapabilitiesSingleton;
 }
+
+/**
+ * 通用插件 UI 挂载点（Task 4）。
+ *
+ * 说明：
+ * - 这两个组件原本位于 `plugins/presentation/*`（feature 内部实现）；
+ * - 此处经公共 API 透出，供 chat 等宿主 feature 跨 feature 渲染，
+ *   避免宿主直接 deep import 到 `plugins/presentation/*`。
+ */
+export { default as PluginOverlayHost } from "./presentation/components/PluginOverlayHost.vue";
+export { default as PluginToolbarSlot } from "./presentation/components/PluginToolbarSlot.vue";

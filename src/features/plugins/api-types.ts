@@ -4,6 +4,7 @@
  * 仅导出 plugins 对外稳定可见的公共类型，避免把内部 store / runtime 实现细节暴露为公共 API。
  */
 
+import type { Component } from "vue";
 import type { DomainBinding, DomainRegistryHostBridge } from "./contracts/domainRegistry";
 import type { PluginComposerPayload, PluginContext } from "./domain/types/pluginRuntimeTypes";
 import type {
@@ -22,6 +23,30 @@ import type {
 } from "./application/pluginCommandOutcome";
 
 export type { DomainRegistryHostBridge, PluginComposerPayload, PluginContext };
+
+/**
+ * 宿主 chat UI 桥（Task 4 实现 mountOverlay / registerToolbarAction）。
+ * 插件运行时只通过该桥挂载全局 UI，不直接接触宿主组件树。
+ *
+ * 说明：此处从 runtime 内部实现透出为 plugins 公共类型，供 chat 等宿主 feature 消费。
+ */
+export type { PluginUiBridge } from "./presentation/runtime/pluginUiApi";
+
+/**
+ * 插件在 chat 工具栏注册的动作。
+ *
+ * 说明：
+ * - `id` 用于去重与反注册；
+ * - `order` 越小越靠前；缺省按 0 处理；
+ * - `onClick` 为点击回调。
+ */
+export type ToolbarAction = {
+  id: string;
+  label: string;
+  icon?: Component;
+  order?: number;
+  onClick: () => void;
+};
 export type {
   PluginCatalogEntryLike,
 };
