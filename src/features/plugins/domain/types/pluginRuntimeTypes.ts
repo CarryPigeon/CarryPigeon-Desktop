@@ -8,6 +8,8 @@
  * - 该文件不依赖 Vue/Tauri 等平台库，便于跨层复用与测试。
  */
 
+import type { Component } from "vue";
+
 /**
  * 插件编辑器（composer）提交给宿主的载荷格式。
  *
@@ -65,5 +67,19 @@ export type PluginContext = {
         bodyText: string;
       }>;
     };
+    /** 泛型命令调用（权限 + 命令白名单，建议前缀 voice_call:*） */
+    invoke?: <T = unknown>(command: string, args?: Record<string, unknown>) => Promise<T>;
+    /** 订阅宿主 Tauri 事件（权限 + 事件白名单），返回取消函数 */
+    onEvent?: <T = unknown>(event: string, handler: (payload: T) => void) => () => void;
+    /** 挂载全局浮层组件，返回卸载函数 */
+    mountOverlay?: (component: Component, opts?: { zIndex?: number }) => () => void;
+    /** 注册聊天头部/工具栏入口，返回注销函数 */
+    registerToolbarAction?: (action: {
+      id: string;
+      label: string;
+      icon?: Component;
+      order?: number;
+      onClick: () => void;
+    }) => () => void;
   };
 };
