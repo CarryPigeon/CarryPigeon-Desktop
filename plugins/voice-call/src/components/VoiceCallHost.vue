@@ -36,27 +36,27 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import { listen } from "@tauri-apps/api/event";
-import { createLogger } from "@/shared/utils/logger";
+import { onVoiceCallEvent, getContext } from "../host/bridge";
+import { createLogger } from "../shared/logger";
 import { useVoiceCall } from "../composables/useVoiceCall";
-import { useVideoCall } from "../../composition/useVideoCall";
-import { useScreenShare } from "../../composition/useScreenShare";
+import { useVideoCall } from "../composables/useVideoCall";
+import { useScreenShare } from "../composables/useScreenShare";
 import VoiceCallBanner from "./VoiceCallBanner.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
-import { createMockVoiceCallStatePort } from "../../mock";
-import { createTauriVoiceCallApi } from "../../data/tauri/tauriVoiceCallApi";
-import { currentChatUserId } from "../../../composition/chatAccountSession";
-import { getRoomGovernanceCapabilities } from "../../../room-governance/api";
-import { IS_STORE_MOCK } from "@/shared/config/runtime";
-import {
-  currentState as globalCallState,
-  activeSession as globalActiveSession,
-} from "../../presentation/store-access/voiceCallStoreAccess";
-import type { CallParticipant, CallSession, CallState } from "../../domain/contracts";
+import { createVoiceCallStatePort } from "../composables/createVoiceCallStatePort";
+import { getRoomGovernanceCapabilities } from "../runtime/governance";
+import type { CallParticipant, CallSession, CallState } from "../domain/contracts";
+import { t } from "../i18n";
 
-const { t } = useI18n();
 const logger = createLogger("VoiceCallHost");
+
+function getCurrentUserId(): string {
+  try {
+    return getContext().uid ?? "";
+  } catch {
+    return "";
+  }
+}
 
 const props = defineProps<{
   roomId: string;
@@ -68,10 +68,7 @@ const emit = defineEmits<{
   (e: "stateChange", state: CallState): void;
 }>();
 
-const isMock = IS_STORE_MOCK;
-const statePort = isMock
-  ? createMockVoiceCallStatePort()
-  : createTauriVoiceCallApi();
+const statePort = createVoiceCallStatePort();
 
 const {
   callState,
@@ -103,7 +100,7 @@ const {
 } = useVoiceCall({
   statePort,
   roomId: () => props.roomId,
-  userId: () => currentChatUserId.value,
+  userId: () => getCurrentUserId(),
 });
 
 const videoCall = useVideoCall("");
@@ -123,7 +120,7 @@ const isConference = computed(() => activeSession.value?.kind === "conference");
 const callerName = computed(() => {
   const session = activeSession.value;
   if (!session) return "";
-  const selfId = currentChatUserId.value;
+  const selfId = getCurrentUserId();
   return session.participants.find((p: CallParticipant) => p.userId !== selfId)?.displayName ?? t("voice_call_unknown_user");
 });
 
@@ -152,7 +149,9 @@ function handleReject() {
 }
 
 function handleHangup() {
-  if (callState.value === "dialing") {
+  // 未拨通（dialing/connecting）时取消通话，断开原因记为 cancelled；
+  // 已拨通则挂断。会议在连接中也走离开会议逻辑。
+  if (callState.value === "dialing" || callState.value === "connecting") {
     cancelCall();
   } else if (isConference.value) {
     void leaveConference();
@@ -248,18 +247,16 @@ onMounted(() => {
 let unlistenIncoming: (() => void) | null = null;
 let unlistenStateChange: (() => void) | null = null;
 
-onMounted(async () => {
-  if (isMock) return;
+onMounted(() => {
   try {
-    unlistenIncoming = await listen<{
+    unlistenIncoming = onVoiceCallEvent<{
       session_id: string;
       call_kind: string;
       from_user_id: string;
       from_display_name: string;
       room_id: string;
       timestamp: number;
-    }>("voice_call:incoming", (event) => {
-      const w = event.payload;
+    }>("voice_call:incoming", (w) => {
       const session: CallSession = {
         sessionId: w.session_id,
         kind: (w.call_kind as CallSession["kind"]) || "direct",
@@ -279,16 +276,15 @@ onMounted(async () => {
       onIncomingCall(session);
     });
   } catch {
-    // Tauri event listen 在非 Tauri 环境会失败，忽略。
+    // 事件订阅在非 Tauri 环境会失败，忽略。
   }
 
   try {
-    unlistenStateChange = await listen<{
+    unlistenStateChange = onVoiceCallEvent<{
       session_id: string;
       new_state: string;
       reason?: string;
-    }>("voice_call:state_change", (event) => {
-      const s = event.payload;
+    }>("voice_call:state_change", (s) => {
       const session = activeSession.value;
       if (session && session.sessionId === s.session_id) {
         syncState(s.new_state as CallState, {
@@ -301,19 +297,6 @@ onMounted(async () => {
     // 同上，非 Tauri 环境忽略。
   }
 });
-
-// 监听全局 voiceCallStoreAccess 状态（WS 事件路由更新此状态）
-// 使用 getter 形式而非数组 ref 形式，避免对 CallSession 对象进行深度比较
-watch(
-  () => globalCallState.value,
-  (gState) => {
-    if (!gState || gState === "idle") return;
-    const gSession = globalActiveSession.value;
-    if (gState !== callState.value && gSession) {
-      syncState(gState, gSession);
-    }
-  },
-);
 
 onUnmounted(() => {
   unlistenIncoming?.();

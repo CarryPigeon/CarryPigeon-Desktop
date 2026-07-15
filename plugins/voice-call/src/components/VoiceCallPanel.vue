@@ -12,8 +12,8 @@
         <button
           type="button"
           class="voice-call-panel__bar-hangup"
-          :title="t('voice_call_hangup')"
-          :aria-label="t('voice_call_hangup')"
+          :title="hangupLabel"
+          :aria-label="hangupLabel"
           @click.stop="$emit('hangup')"
         >
           <t-icon name="close" />
@@ -118,8 +118,8 @@
         <button
           type="button"
           class="voice-call-panel__ctrl-btn voice-call-panel__ctrl-btn--hangup"
-          :title="t('voice_call_hangup')"
-          :aria-label="t('voice_call_hangup')"
+          :title="hangupLabel"
+          :aria-label="hangupLabel"
           @click="$emit('hangup')"
         >
           <t-icon name="close" />
@@ -131,12 +131,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
-import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
-import type { CallState, AudioDeviceInfo, CallParticipant } from "../../domain/contracts";
+import AvatarBadge from "./AvatarBadge.vue";
+import type { CallState, AudioDeviceInfo, CallParticipant } from "../domain/contracts";
 import VideoGrid from "./VideoGrid.vue";
-
-const { t } = useI18n();
+import { t } from "../i18n";
 
 const props = defineProps<{
   state: CallState;
@@ -169,6 +167,13 @@ defineEmits<{
 const minimized = ref(false);
 
 const visible = computed(() => props.state === "dialing" || props.state === "connecting" || props.state === "active");
+
+// 未拨通（dialing/connecting）时按钮语义为“取消”，已拨通后为“挂断”。
+const hangupLabel = computed(() =>
+  props.state === "dialing" || props.state === "connecting"
+    ? t("voice_call_cancel")
+    : t("voice_call_hangup")
+);
 
 const formattedDuration = computed(() => {
   const totalSec = Math.floor(props.duration / 1000);

@@ -2,21 +2,20 @@
   <button
     class="voice-call-button"
     :disabled="callState !== 'idle' && callState !== 'ended'"
-    :title="t('video_call')"
+    :title="conference ? t('voice_call_conference') : t('voice_call_start')"
     @click="$emit('start')"
   >
-    <t-icon name="camera" class="voice-call-icon" />
+    <t-icon :name="conference ? 'usergroup' : 'call'" class="voice-call-icon" />
   </button>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
-import type { CallState } from "../../domain/contracts";
-
-const { t } = useI18n();
+import type { CallState } from "../domain/contracts";
+import { t } from "../i18n";
 
 defineProps<{
   callState: CallState;
+  conference?: boolean;
 }>();
 
 defineEmits<{

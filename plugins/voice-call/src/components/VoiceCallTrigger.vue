@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import type { CallState } from "../../domain/contracts";
+import type { CallState } from "../domain/contracts";
 import VoiceCallButton from "./VoiceCallButton.vue";
 import VideoCallButton from "./VideoCallButton.vue";
 
