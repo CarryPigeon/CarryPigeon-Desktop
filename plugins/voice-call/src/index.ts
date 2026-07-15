@@ -1,26 +1,64 @@
-import { defineComponent } from "vue";
 import type { Component } from "vue";
+import type { PluginContext } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 import { voiceCallManifest } from "./manifest";
+import { bindContext, onVoiceCallEvent } from "./host/bridge";
+import { voiceCallMessages } from "./i18n/messages";
+import VoiceCallHost from "./components/VoiceCallHost.vue";
+import CallRecordBubble from "./components/CallRecordBubble.vue";
 import "./styles/voice-call.scss";
 
 export const manifest = voiceCallManifest;
 
-// P0 占位渲染器；后续任务迁入真实组件（如 CallRecordBubble）后替换。
-// 此处通过 defineComponent 引入 vue 运行期依赖，验证 vue 经 /vendor/vendor.mjs 共享且被 external。
-const Placeholder = defineComponent({
-  name: "VoiceCallPlaceholder",
-  render: () => null,
-});
-
 export const renderers: Record<string, Component> = {
-  call_record: Placeholder,
+  call_record: CallRecordBubble,
 };
 
-// 后续任务填充：注册工具栏入口、挂载浮层、订阅 voice_call:* 事件。
-export function activate(_ctx: unknown): void {
-  // no-op in P0
+let cleanup: (() => void) | null = null;
+
+function t(lang: string, key: string): string {
+  const dict =
+    (voiceCallMessages as Record<string, Record<string, string>>)[lang] ?? voiceCallMessages.zh_cn;
+  return dict[key] ?? key;
+}
+
+export function activate(ctx: PluginContext): void {
+  bindContext(ctx);
+  const lang = ctx.lang || "zh_cn";
+
+  const detach =
+    ctx.host.registerToolbarAction?.({
+      id: "voice-call.start",
+      label: t(lang, "voiceCall.start"),
+      order: 50,
+      onClick: () => {
+        // 发起通话流程：实际参数（target/room）由 chat 上下文提供；此处走 bridge 调后端。
+        void ctx.host.invoke?.("voice_call:start_direct_call", {
+          sessionId: `local-${Date.now()}`,
+          targetUserId: "",
+          roomId: "",
+        });
+      },
+    }) ?? (() => {});
+
+  const unmount = ctx.host.mountOverlay?.(VoiceCallHost) ?? (() => {});
+
+  const offIncoming = onVoiceCallEvent("voice_call:incoming", (p) => {
+    // 由 VoiceCallHost 内部状态机消费；此处仅确保订阅建立
+    void p;
+  });
+  const offState = onVoiceCallEvent("voice_call:state_change", () => {});
+  const offVideo = onVoiceCallEvent("voice_call:video_signaling", () => {});
+
+  cleanup = () => {
+    detach();
+    unmount();
+    offIncoming();
+    offState();
+    offVideo();
+  };
 }
 
 export function deactivate(): void {
-  // no-op in P0
+  cleanup?.();
+  cleanup = null;
 }

@@ -25,7 +25,6 @@ import type {
   RoomGovernanceCapabilities,
   RoomGovernanceMembersSnapshot,
 } from "../room-governance/api-types";
-import type { VoiceCallCapabilities } from "../voice-call/api-types";
 
 /**
  * 未读消息预览项。
@@ -165,11 +164,6 @@ export type ChatCapabilities = {
    * chat 治理能力分组。
    */
   governance: ChatGovernanceCapabilities;
-
-  /**
-   * chat 语音通话能力分组。
-   */
-  voiceCall: VoiceCallCapabilities;
 
   /**
    * 获取未读消息预览列表（按时间降序，跨频道）。
