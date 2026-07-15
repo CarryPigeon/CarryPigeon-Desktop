@@ -1,0 +1,7 @@
+// 插件级样式入口（P0 占位）。
+// 由 vite.config.ts 的 scss.additionalData 自动注入 @/styles/button-size（仅变量/mixin，不输出运行时值）。
+// 后续任务迁入组件样式时在此追加。
+.voice-call-plugin {
+  // placeholder rule; kept minimal for early scaffolding.
+  display: contents;
+}
