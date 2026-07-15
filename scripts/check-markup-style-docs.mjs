@@ -103,6 +103,9 @@ async function* walk(dir) {
     const full = path.join(dir, ent.name);
     if (ent.isDirectory()) {
       if (IGNORED_DIRS.has(ent.name)) continue;
+      // 跳过生成产物目录（vendor:build / 插件构建输出），它们不是源码。
+      const relDir = path.relative(ROOT, full).replace(/\\/gu, "/");
+      if (relDir === "public/vendor" || relDir === "public/plugins") continue;
       yield* walk(full);
     } else if (ent.isFile()) {
       const ext = path.extname(ent.name).toLowerCase();
