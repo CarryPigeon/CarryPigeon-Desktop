@@ -21,8 +21,6 @@ import type { RoomSessionStatePort } from "@/features/chat/room-session/domain/p
 import { createMessageEventRouter } from "@/features/chat/message-flow/internal";
 import { createReadStateEventRouter } from "@/features/chat/room-session/internal";
 import { createChatGovernanceEventRouter } from "./createChatGovernanceEventRouter";
-import { createVoiceCallEventRouter } from "@/features/chat/voice-call/domain/event-handlers/voiceCallEventRouter";
-import { resolveState } from "@/features/chat/voice-call/presentation/store-access/voiceCallStoreAccess";
 import { createNotificationOnNewMessageHandler } from "@/app/bootstrap/trayIntegration";
 import { invokeTauri } from "@/shared/tauri/invokeClient";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
@@ -98,50 +96,6 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     state: deps.readStateProjection,
   });
 
-  const routeVoiceCallEvent = createVoiceCallEventRouter({
-    setIncomingCall: (session) => {
-      const state = resolveState();
-      state.currentState.value = "ringing";
-      state.activeSession.value = session;
-    },
-    updateCallState: (sessionId, callState) => {
-      const s = resolveState();
-      s.currentState.value = callState;
-      if (callState === "ended") {
-        const session = s.activeSession.value;
-        if (session) {
-          const duration = session.startedAt ? Date.now() / 1000 - session.startedAt : 0;
-          s.activeSummary.value = {
-            sessionId,
-            kind: session.kind,
-            duration,
-            disconnectReason: "ended",
-          };
-        }
-        setTimeout(() => {
-          const fresh = resolveState();
-          fresh.currentState.value = "idle";
-          fresh.activeSession.value = null;
-        }, 3000);
-      }
-    },
-    updateParticipants: (_sessionId, p) => {
-      resolveState().participants.value = p;
-    },
-    setCallSummary: (sessionId, duration, reason) => {
-      const s = resolveState();
-      const session = s.activeSession.value;
-      if (session) {
-        s.activeSummary.value = {
-          sessionId,
-          kind: session.kind,
-          duration,
-          disconnectReason: reason,
-        };
-      }
-    },
-  });
-
   return function handleWsEvent(env: ChatEventEnvelope): void {
     const eventType = String(env.eventType ?? "").trim();
     const payload = env.payload && typeof env.payload === "object" ? (env.payload as Record<string, unknown>) : null;
@@ -149,8 +103,6 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     if (routeGovernanceEvent(eventType, payload)) return;
     if (routeMessageEvent(eventType, payload)) return;
     if (routeReadStateEvent(eventType, payload)) return;
-
-    if (routeVoiceCallEvent(eventType, payload)) return;
 
     deps.logger.debug("Action: chat_ws_event_ignored", { eventType });
   };

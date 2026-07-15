@@ -18,10 +18,6 @@ import { createChatMessageFlowRuntime } from "@/features/chat/message-flow/prese
 import { createChatGovernanceRuntime } from "@/features/chat/room-governance/presentation/runtime/governanceRuntime";
 import { createChatSessionRuntime } from "@/features/chat/room-session/presentation/runtime/sessionRuntime";
 import { createChatSessionSharedContext } from "@/features/chat/room-session/presentation/runtime/sessionSharedContext";
-import { createVoiceCallState, setVoiceCallState } from "@/features/chat/voice-call/internal";
-import { getVoiceCallCapabilities } from "@/features/chat/voice-call/api";
-import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
-import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { dedupeAsyncByKey } from "@/shared/utils/asyncDedupe";
 
 type LoggerLike = {
@@ -56,10 +52,6 @@ export type ChatStoreAssemblyDeps = {
  * - `chatRuntimeStore.ts` 只消费最终装配结果，不再关心中间细节。
  */
 export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
-  // Initialize voice call store singleton before any component tries to access it
-  const voiceCallState = createVoiceCallState();
-  setVoiceCallState(voiceCallState);
-
   /**
    * 第一步：创建 chat 聚合响应式状态。
    *
@@ -104,20 +96,8 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     lastReadReportAtMsByChannel,
   });
 
-  // Defer signaling connection until server socket is available
-  setTimeout(async () => {
-    const socket = getActiveChatServerSocket();
-    if (!socket) return;
-    const token = (await ensureValidAccessToken(socket)).trim();
-    if (!token) return;
-    const voiceCall = getVoiceCallCapabilities();
-    const wsUrl = `wss://${socket}/signaling`;
-    await voiceCall.connectSignaling(wsUrl, token);
-    // 开始监听 Rust 后端发射的 voice_call:incoming Tauri 事件
-    voiceCall.listenForIncomingCalls().catch(() => {
-      // 非 Tauri 环境下 listen 会失败，忽略。
-    });
-  }, 2000);
+  // voice-call 信令连接与来电监听已迁移至 voice-call 插件（plugins/voice-call），
+  // 由插件经 host/bridge 自行管理，此处不再装配。
 
   /**
    * 第三步：装配 governance runtime。

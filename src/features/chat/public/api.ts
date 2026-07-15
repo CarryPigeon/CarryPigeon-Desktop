@@ -11,7 +11,6 @@
 import { createMessageFlowCapabilities } from "../message-flow/api";
 import { createRoomGovernanceCapabilities } from "../room-governance/api";
 import { createRoomSessionCapabilities } from "../room-session/api";
-import { getVoiceCallCapabilities } from "../voice-call/api";
 import { getActiveChatServerSocket } from "../composition/serverWorkspaceAdapter";
 import type { ChatCapabilities, UnreadMessagePreview } from "./api-types";
 
@@ -52,7 +51,6 @@ export function createChatCapabilities(): ChatCapabilities {
       createChannel: roomGovernanceCapabilities.createChannel,
       forChannel: roomGovernanceCapabilities.forChannel,
     },
-    voiceCall: getVoiceCallCapabilities(),
 
     getUnreadMessagePreviews(maxCount: number) {
       const snapshot = roomSessionCapabilities.directory.getSnapshot();
