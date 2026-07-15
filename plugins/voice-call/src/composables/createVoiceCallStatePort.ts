@@ -68,8 +68,8 @@ export function createVoiceCallStatePort(): VoiceCallStatePort {
         }>;
       } catch {
         // Fallback: use individual commands (backward compatible)
-        const input = await invokeVoiceCall("voice_call:enumerate_input_devices") as Promise<AudioDeviceInfo[]>;
-        const output = await invokeVoiceCall("voice_call:enumerate_output_devices") as Promise<AudioDeviceInfo[]>;
+        const input = await (invokeVoiceCall("voice_call:enumerate_input_devices") as Promise<AudioDeviceInfo[]>);
+        const output = await (invokeVoiceCall("voice_call:enumerate_output_devices") as Promise<AudioDeviceInfo[]>);
         return { input, output };
       }
     },
