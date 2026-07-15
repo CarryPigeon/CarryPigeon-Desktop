@@ -25,5 +25,6 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "auto-imports.d.ts", "components.d.ts"],
+  "exclude": ["src/features/plugins/vite.*.config.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
