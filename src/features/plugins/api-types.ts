@@ -6,7 +6,7 @@
 
 import type { Component } from "vue";
 import type { DomainBinding, DomainRegistryHostBridge } from "./contracts/domainRegistry";
-import type { PluginChatContext, PluginComposerPayload, PluginContext } from "./domain/types/pluginRuntimeTypes";
+import type { PluginChatContext, PluginComposerPayload, PluginContext, PluginOverlayMountHandle } from "./domain/types/pluginRuntimeTypes";
 import type {
   InstalledPluginState,
   PluginCatalogEntryLike,
@@ -22,7 +22,7 @@ import type {
   UpdatePluginToLatestOutcome,
 } from "./application/pluginCommandOutcome";
 
-export type { DomainRegistryHostBridge, PluginChatContext, PluginComposerPayload, PluginContext };
+export type { DomainRegistryHostBridge, PluginChatContext, PluginComposerPayload, PluginContext, PluginOverlayMountHandle };
 
 /**
  * 宿主 chat UI 桥（Task 4 实现 mountOverlay / registerToolbarAction）。
