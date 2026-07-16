@@ -12,6 +12,7 @@ use super::super::domain::model::*;
 use crate::shared::error::CommandResult;
 use tauri::{Emitter, State};
 
+#[derive(Clone)]
 pub struct VoiceCallService {
     inner: Arc<VoiceCallInner>,
 }
@@ -84,6 +85,41 @@ impl VoiceCallService {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(VoiceCallInner::new()),
+        }
+    }
+
+    /// 是否存在尚未拨通（dialing/ringing/connecting）的通话会话。
+    /// 使用 try_lock 以避免在同步的窗口关闭事件中阻塞等待。
+    pub fn has_not_connected_call(&self) -> bool {
+        match self.inner.sessions.try_lock() {
+            Ok(sessions) => sessions.values().any(|s| {
+                matches!(
+                    s.state,
+                    CallState::Dialing | CallState::Ringing | CallState::Connecting
+                )
+            }),
+            Err(_) => false,
+        }
+    }
+
+    /// 取消所有尚未拨通（dialing/ringing/connecting）的通话会话，
+    /// 向对端发送挂断/离开信令并清理资源。用于窗口关闭时静默取消。
+    pub(crate) async fn cancel_not_connected_calls(&self) {
+        let ids: Vec<String> = {
+            let sessions = self.inner.sessions.lock().await;
+            sessions
+                .iter()
+                .filter(|(_, s)| {
+                    matches!(
+                        s.state,
+                        CallState::Dialing | CallState::Ringing | CallState::Connecting
+                    )
+                })
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        for id in ids {
+            end_session(&self.inner, &id).await;
         }
     }
 }
@@ -642,17 +678,14 @@ pub async fn reject_call(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn hangup_call(
-    service: State<'_, VoiceCallService>,
-    session_id: String,
-) -> CommandResult<()> {
-    let inner = service.inner.clone();
-
+/// 结束指定会话：向对端发送挂断/离开信令、清理资源并置为 Ended。
+/// 对任意状态均安全（会话不存在时静默忽略），供 `hangup_call` 命令与
+/// 窗口关闭时取消未拨通通话复用。
+pub(crate) async fn end_session(inner: &Arc<VoiceCallInner>, session_id: &str) {
     let is_conference = {
         let sessions = inner.sessions.lock().await;
         sessions
-            .get(&session_id)
+            .get(session_id)
             .map(|s| s.call_kind == CallKind::Conference)
             .unwrap_or(false)
     };
@@ -664,7 +697,7 @@ pub async fn hangup_call(
         if let Some(ref client) = *sig_guard {
             let _ = client
                 .send(&SignalingMessage::ConferenceLeave {
-                    session_id: session_id.clone(),
+                    session_id: session_id.to_string(),
                     user_id,
                 })
                 .await;
@@ -674,7 +707,7 @@ pub async fn hangup_call(
         // Clean up conference-specific resources
         let webrtc_guard = inner.webrtc.lock().await;
         if let Some(ref wm) = *webrtc_guard {
-            wm.close_all_for_session(&session_id).await;
+            wm.close_all_for_session(session_id).await;
         }
         drop(webrtc_guard);
 
@@ -690,22 +723,29 @@ pub async fn hangup_call(
         if let Some(ref client) = *sig_guard {
             let _ = client
                 .send(&SignalingMessage::CallHangup {
-                    session_id: session_id.clone(),
+                    session_id: session_id.to_string(),
                 })
                 .await;
         }
         drop(sig_guard);
-        inner.cleanup_session(&session_id).await;
+        inner.cleanup_session(session_id).await;
     }
 
     {
         let mut sessions = inner.sessions.lock().await;
-        let session = sessions
-            .get_mut(&session_id)
-            .ok_or_else(|| format!("[VOICE_CALL_FAILED] Session not found: {}", session_id))?;
-        session.state = CallState::Ended;
-        session.ended_at = Some(now_secs());
+        if let Some(session) = sessions.get_mut(session_id) {
+            session.state = CallState::Ended;
+            session.ended_at = Some(now_secs());
+        }
     }
+}
+
+#[tauri::command]
+pub async fn hangup_call(
+    service: State<'_, VoiceCallService>,
+    session_id: String,
+) -> CommandResult<()> {
+    end_session(&service.inner, &session_id).await;
     Ok(())
 }
 

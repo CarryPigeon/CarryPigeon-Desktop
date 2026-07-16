@@ -27,6 +27,7 @@ use crate::features::settings::data::config_store_port_adapter::ConfigStorePortA
 use crate::features::settings::domain::settings_schema::SettingsImportEnvelopeV1;
 use crate::features::tray::di::commands::{TrayUnreadState, start_hover_timer};
 use crate::features::tray::domain::tray_i18n::tray_labels;
+use crate::features::voice_call::di::commands::VoiceCallService;
 use crate::shared::close_to_tray_state::CloseToTrayState;
 use crate::shared::temp_file::TempFileManager;
 use crate::shared::window_bounds::{self, WindowBounds};
@@ -294,19 +295,55 @@ pub fn run() -> anyhow::Result<()> {
                     _ => {}
                 }
             }
-            // 主窗口关闭时，若 close_to_tray 为 true，则阻止关闭并隐藏到托盘。
-            if label == "main"
-                && let tauri::WindowEvent::CloseRequested { api, .. } = event
-                    && let Some(state) = window.app_handle().try_state::<CloseToTrayState>()
-                        && state.0.load(Ordering::SeqCst) {
-                            // 关闭到托盘前最后一次持久化当前 bounds。
+            // 主窗口关闭时：
+            // 1) 若仍有未拨通（dialing/ringing/connecting）的通话，先静默取消
+            //    （向对端发送挂断/离开信令）再关闭/隐藏窗口，不弹确认框；
+            // 2) 否则若 close_to_tray 为 true，则阻止关闭并隐藏到托盘。
+            if label == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    // 优先处理未拨通的通话：关闭窗口前取消。
+                    if let Some(service) = window.app_handle().try_state::<VoiceCallService>() {
+                        if service.has_not_connected_call() {
+                            api.prevent_close();
                             if let Some(bounds) = current_main_bounds(window) {
                                 window_bounds::save(bounds);
                             }
-                            api.prevent_close();
-                            let _ = window.hide();
-                            tracing::info!(action = "app_main_window_hide_to_tray");
+                            let app_handle = window.app_handle().clone();
+                            let svc = (*service).clone();
+                            let close_to_tray = window
+                                .app_handle()
+                                .try_state::<CloseToTrayState>()
+                                .map(|s| s.0.load(Ordering::SeqCst))
+                                .unwrap_or(false);
+                            tauri::async_runtime::spawn(async move {
+                                svc.cancel_not_connected_calls().await;
+                                if let Some(w) = app_handle.get_webview_window("main") {
+                                    if close_to_tray {
+                                        let _ = w.hide();
+                                        tracing::info!(action = "app_main_window_hide_to_tray");
+                                    } else {
+                                        let _ = w.close();
+                                    }
+                                }
+                            });
+                            // 已处理取消逻辑，跳过下方 close_to_tray 分支。
+                            return;
                         }
+                    }
+                    // 无未拨通通话时，按 close_to_tray 设置决定是否隐藏到托盘。
+                    if let Some(state) = window.app_handle().try_state::<CloseToTrayState>()
+                        && state.0.load(Ordering::SeqCst)
+                    {
+                        // 关闭到托盘前最后一次持久化当前 bounds。
+                        if let Some(bounds) = current_main_bounds(window) {
+                            window_bounds::save(bounds);
+                        }
+                        api.prevent_close();
+                        let _ = window.hide();
+                        tracing::info!(action = "app_main_window_hide_to_tray");
+                    }
+                }
+            }
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
