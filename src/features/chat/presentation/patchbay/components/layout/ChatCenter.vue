@@ -18,6 +18,7 @@ import { reactToMessage } from "@/features/chat/message-flow/presentation/store-
 import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components/menus/MultiSelectToolbar.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import { PluginOverlayHost, PluginToolbarSlot } from "@/features/plugins/api";
+import type { PluginChatContext } from "@/features/plugins/api";
 import { toolbarActions, bindOverlayMount } from "@/features/chat/presentation/plugins/chatPluginUiBridge";
 import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
 import ForwardDetailDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardDetailDialog.vue";
@@ -222,6 +223,13 @@ const overlayHostRef = ref<InstanceType<typeof PluginOverlayHost> | null>(null);
 onMounted(() => {
   if (overlayHostRef.value) bindOverlayMount(overlayHostRef.value.mount);
 });
+
+/** 实时频道上下文：注入给插件工具栏动作（如语音通话插件的 3 个通话入口）。 */
+const chatContext = computed<PluginChatContext>(() => ({
+  channelId: props.model.currentChannelId,
+  channelName: props.model.currentChannelName,
+  targetUserId: props.targetUserId,
+}));
 
 /** 图片灯箱状态。 */
 const lightboxOpen = ref(false);
@@ -462,7 +470,7 @@ function getReplyText(m: VirtualMessageItem): string {
         <div class="cp-topConsole__title">{{ t("messages_title") }}</div>
       </div>
       <div class="cp-topConsole__right">
-        <PluginToolbarSlot :actions="toolbarActions" />
+        <PluginToolbarSlot :actions="toolbarActions" :chat-context="chatContext" />
         <button
           v-if="props.model.currentChannelId"
           class="cp-topConsole__pinMembers"
