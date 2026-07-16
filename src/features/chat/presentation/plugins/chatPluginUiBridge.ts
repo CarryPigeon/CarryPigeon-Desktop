@@ -1,7 +1,10 @@
 import { reactive } from "vue";
 import type { Component } from "vue";
-import type { PluginOverlayMountHandle } from "@/features/plugins/domain/types/pluginRuntimeTypes";
+import type { PluginOverlayMountHandle } from "@/features/plugins/api-types";
 import type { PluginUiBridge, ToolbarAction } from "@/features/plugins/api-types";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("chatPluginUiBridge");
 
 // 工具栏动作响应式列表：PluginToolbarSlot 渲染它。
 export const toolbarActions = reactive<ToolbarAction[]>([]);
@@ -15,7 +18,7 @@ export function bindOverlayMount(fn: (c: Component, opts?: { zIndex?: number; pr
 export const chatPluginUiBridge: PluginUiBridge = {
   mountOverlay(component, opts) {
     if (!overlayMount) {
-      console.warn("[chatPluginUiBridge] overlay host not ready");
+      logger.warn("Action: chat_plugin_ui_overlay_host_not_ready");
       return { unmount: () => {}, instance: null };
     }
     return overlayMount(component, opts);
