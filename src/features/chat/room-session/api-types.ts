@@ -37,6 +37,11 @@ export type RoomSessionDirectoryCapabilities = ReadableCapability<RoomSessionDir
   setActiveTab(value: "joined" | "discover"): void;
   focusDiscoverChannel(channelName: string): void;
   findChannelById(channelId: string): ChatChannel | null;
+  /**
+   * 本地将某频道未读角标归零（不依赖服务端接受标记已读）。
+   * 用于弥补服务端两套未读体系不联动的缺陷：标记提及已读后红点仍残留。
+   */
+  zeroChannelUnreadLocally(channelId: string): void;
 };
 
 /**

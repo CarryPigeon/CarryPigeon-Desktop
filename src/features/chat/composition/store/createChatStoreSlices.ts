@@ -27,6 +27,7 @@ export function createRoomSessionSlice(store: ChatRuntimeAggregateStore): RoomSe
     ensureChatReady: store.ensureChatReady,
     selectChannel: store.selectChannel,
     reportCurrentReadState: store.reportCurrentReadState,
+    markChannelReadLocally: store.markChannelReadLocally,
   };
 }
 

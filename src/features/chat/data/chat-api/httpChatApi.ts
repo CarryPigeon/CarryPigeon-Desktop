@@ -423,7 +423,12 @@ export async function httpListMentions(serverSocket: string, accessToken: string
   return client.requestJson<ChatMentionPageWire>("GET", path);
 }
 
-export async function httpMarkMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void> {
+export async function httpMarkMentionRead(
+  serverSocket: string,
+  accessToken: string,
+  mentionId: string,
+  _cid?: string,
+): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const id = String(mentionId).trim();
   if (!id) throw new Error("Missing mention_id");

@@ -295,8 +295,8 @@ export const httpChatApiPort: ChatApiPort = {
       hasMore: Boolean(wire.has_more),
     };
   },
-  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void> {
-    return httpMarkMentionRead(serverSocket, accessToken, mentionId);
+  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void> {
+    return httpMarkMentionRead(serverSocket, accessToken, mentionId, cid);
   },
   async batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
     return httpBatchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);

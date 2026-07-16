@@ -33,6 +33,7 @@ import type {
   ChatUnreadState,
 } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
+import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
 
 /**
  * `ChatCoreApplicationService` 的依赖集合。
@@ -232,12 +233,16 @@ export class ChatCoreApplicationService {
     return this.deps.api.listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
   }
 
-  markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void> {
-    return this.deps.api.markMentionRead(serverSocket, accessToken, mentionId);
+  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void> {
+    await this.deps.api.markMentionRead(serverSocket, accessToken, mentionId, cid);
+    // 服务端两套未读体系不联动：标记提及已读后频道红点仍残留，本地补偿归零。
+    if (cid) getRoomSessionCapabilities().directory.zeroChannelUnreadLocally(cid);
   }
 
-  batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
-    return this.deps.api.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
+  async batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
+    await this.deps.api.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
+    // 服务端两套未读体系不联动：标记提及已读后频道红点仍残留，本地补偿归零。
+    if (cid) getRoomSessionCapabilities().directory.zeroChannelUnreadLocally(cid);
   }
 
   searchChannelMessages(

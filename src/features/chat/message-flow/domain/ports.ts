@@ -121,4 +121,9 @@ export type MessageComposerStatePort = {
  */
 export type ChannelUnreadProjectionPort = {
   incrementChannelUnread(channelId: string, delta?: number): void;
+  /**
+   * 本地时间线发生变化（删除/撤回消息）后，以可见消息重算并写回角标。
+   * 仅对已加载本地时间线的频道生效；未加载频道保持原值。
+   */
+  recomputeChannelUnreadLocally(channelId: string): void;
 };

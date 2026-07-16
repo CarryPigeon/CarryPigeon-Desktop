@@ -160,5 +160,6 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     getMessageById: (channelId, messageId) => viewApplicationService.getMessageById(channelId, messageId),
     selectChannel: (channelId) => viewApplicationService.selectChannel(channelId),
     reportCurrentReadState: () => viewApplicationService.reportCurrentReadState(),
+    markChannelReadLocally: (channelId) => sessionState.markChannelReadLocally(channelId),
   };
 }

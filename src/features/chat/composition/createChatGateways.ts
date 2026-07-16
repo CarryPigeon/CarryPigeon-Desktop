@@ -98,8 +98,8 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid) {
       return deps.core.listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
     },
-    markMentionRead(serverSocket, accessToken, mentionId) {
-      return deps.core.markMentionRead(serverSocket, accessToken, mentionId);
+    markMentionRead(serverSocket, accessToken, mentionId, cid) {
+      return deps.core.markMentionRead(serverSocket, accessToken, mentionId, cid);
     },
     batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid) {
       return deps.core.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);

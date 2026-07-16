@@ -5,8 +5,10 @@
 
 import type { ChatReadStateReporterPort } from "@/features/chat/domain/ports/runtimePorts";
 import { shouldAdvanceReadMarker } from "@/features/chat/domain/utils/readMarker";
+import { pickReportableLastMid } from "../utils/unreadRecompute";
 import { createLogger } from "@/shared/utils/logger";
 import type {
+  SessionMessageCachePort,
   SessionReadMarkerStatePort,
   SessionReadStateApiPort,
   SessionScopePort,
@@ -28,6 +30,7 @@ export type ReadStateReporterDeps = {
   api: SessionReadStateApiPort;
   scope: SessionScopePort;
   state: SessionReadMarkerStatePort;
+  messageCache: Pick<SessionMessageCachePort, "listMessages">;
 };
 
 /**
@@ -95,7 +98,9 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
     const channelId = String(cid).trim();
     const mid = String(lastMid).trim();
     if (!channelId || !mid) return false;
-    syncLocalReadMarker(channelId, mid, lastReadTimeMs);
+    // 跳过已撤回/删除的尾部消息，避免服务端因消息不存在而拒绝标记已读、导致游标卡死。
+    const reportableMid = pickReportableLastMid(deps.messageCache.listMessages(channelId), mid);
+    syncLocalReadMarker(channelId, reportableMid, lastReadTimeMs);
     const now = Number.isFinite(nowMs) ? Math.trunc(nowMs) : Date.now();
     if (!canReportNow(channelId, now, minIntervalMs)) return false;
 
@@ -104,7 +109,7 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
     const requestSocket = socket;
     const requestScopeVersion = deps.scope.getActiveScopeVersion();
 
-    const req = { lastReadMessageId: mid, lastReadTime: Math.trunc(Number(lastReadTimeMs) || 0) };
+    const req = { lastReadMessageId: reportableMid, lastReadTime: Math.trunc(Number(lastReadTimeMs) || 0) };
     try {
       const res: ChatReadStateResponse = await deps.api.updateReadState(socket, token, channelId, req);
       if (deps.scope.getActiveServerSocket() !== requestSocket) return false;

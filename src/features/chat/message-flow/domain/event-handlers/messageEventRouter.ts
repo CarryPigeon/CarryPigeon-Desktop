@@ -62,6 +62,8 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
       if (!cid || !mid) return true;
 
       deps.timelineState.removeMessage(cid, mid);
+      // 本地时间线移除后，以可见消息重算角标（服务端仍会把已删消息计入未读）。
+      deps.unreadProjection.recomputeChannelUnreadLocally(cid);
       return true;
     }
 
@@ -93,6 +95,8 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
       if (!cid || !mid) return true;
 
       deps.timelineState.markMessageRecalled(cid, mid, recalledAt, recalledBy);
+      // 撤回消息仍留在时间线，但应被排除在未读之外，需重算角标。
+      deps.unreadProjection.recomputeChannelUnreadLocally(cid);
       return true;
     }
 

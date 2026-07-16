@@ -72,6 +72,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     lastReadReportAtMsByChannel,
     lastReadTimeMsByChannel,
     members,
+    messagesByChannel,
     messageActionError,
     replyDraft,
     replyToMessageId,
@@ -91,6 +92,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     api: deps.api,
     channelsRef,
     scopeVersion,
+    messagesByChannel,
     lastReadTimeMsByChannel,
     lastReadMidByChannel,
     lastReadReportAtMsByChannel,
@@ -156,6 +158,9 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
   });
   const unreadProjection = createSessionUnreadProjectionPort({
     channelsRef,
+    messagesByChannel,
+    lastReadTimeMsByChannel,
+    lastReadMidByChannel,
   });
   const readStateProjection = createSessionReadStateEventProjectionPort({
     channelsRef,

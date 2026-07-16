@@ -84,3 +84,12 @@ export function reportCurrentReadState(): Promise<void> {
 export function selectChannel(id: string): Promise<ChannelSelectionOutcome> {
   return resolveRoomSessionStore().selectChannel(id);
 }
+
+/**
+ * 本地将某频道未读角标归零。
+ *
+ * 仅影响本地显示，不向上同步服务端；用于弥补服务端提及已读与频道未读不联动的缺陷。
+ */
+export function zeroChannelUnreadLocally(channelId: string): void {
+  resolveRoomSessionStore().markChannelReadLocally(channelId);
+}
