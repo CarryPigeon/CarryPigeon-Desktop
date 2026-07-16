@@ -141,9 +141,9 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     }
   }
 
-  async function startDirectCall(targetUserId: string): Promise<CallSession> {
+  async function startDirectCall(targetUserId: string, roomIdOverride?: string): Promise<CallSession> {
     callState.value = "dialing";
-    const session = await statePort.startCall("direct", roomId(), targetUserId);
+    const session = await statePort.startCall("direct", roomIdOverride ?? roomId(), targetUserId);
     activeSession.value = session;
     startPoll();
     ringtone.play();
@@ -151,9 +151,9 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     return session;
   }
 
-  async function startConference(): Promise<CallSession> {
+  async function startConference(roomIdOverride?: string): Promise<CallSession> {
     callState.value = "dialing";
-    const session = await statePort.startCall("conference", roomId());
+    const session = await statePort.startCall("conference", roomIdOverride ?? roomId());
     activeSession.value = session;
     startPoll();
     ringtone.play();

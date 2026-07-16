@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ToolbarAction } from "@/features/plugins/api-types";
+import type { PluginChatContext, ToolbarAction } from "@/features/plugins/api-types";
 
-const props = defineProps<{ actions: ToolbarAction[] }>();
+const props = defineProps<{ actions: ToolbarAction[]; chatContext?: PluginChatContext }>();
 const sorted = computed(() =>
   [...props.actions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
 );
@@ -15,7 +15,7 @@ const sorted = computed(() =>
       :key="a.id"
       size="small"
       variant="outline"
-      @click="a.onClick"
+      @click="a.onClick(props.chatContext ?? { channelId: '' })"
     >
       <template v-if="a.icon" #icon><component :is="a.icon" /></template>
       {{ a.label }}

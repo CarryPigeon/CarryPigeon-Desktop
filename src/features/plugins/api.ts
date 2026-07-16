@@ -101,3 +101,6 @@ export function getPluginsCapabilities(): PluginsCapabilities {
  */
 export { default as PluginOverlayHost } from "./presentation/components/PluginOverlayHost.vue";
 export { default as PluginToolbarSlot } from "./presentation/components/PluginToolbarSlot.vue";
+
+// 跨 feature 类型约束（如插件工具栏实时频道上下文）经公共 API 透出。
+export type { PluginChatContext } from "./api-types";

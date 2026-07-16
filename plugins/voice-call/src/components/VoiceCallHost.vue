@@ -188,7 +188,7 @@ watch(callState, async (s) => {
   if (s === "active" || s === "connecting") {
     try {
       const governance = getRoomGovernanceCapabilities();
-      const channelGov = governance.forChannel(props.roomId);
+      const channelGov = governance.forChannel(activeSession.value?.roomId ?? props.roomId);
       const members = await channelGov.listMembers();
       const map = new Map<string, string>();
       for (const m of members) {
@@ -308,24 +308,28 @@ onUnmounted(() => {
   videoCall.hangup();
 });
 
-function startCall(targetUserId?: string) {
+function startCall(targetUserId?: string, roomId?: string) {
   const uid = targetUserId || props.targetUserId || "";
-  return startDirectCall(uid);
+  return startDirectCall(uid, roomId);
 }
 
-async function startVideoCall(targetUserId?: string) {
+async function startVideoCall(targetUserId?: string, roomId?: string) {
   const uid = targetUserId || props.targetUserId || "";
-  await startDirectCall(uid);
+  await startDirectCall(uid, roomId);
   setTimeout(() => {
     videoCall.startCall();
   }, 1000);
+}
+
+function startConferenceCall(roomId?: string) {
+  return startConference(roomId);
 }
 
 defineExpose({
   callState,
   startDirectCall: startCall,
   startVideoCall,
-  startConference,
+  startConference: startConferenceCall,
   joinConference,
   leaveConference,
 });

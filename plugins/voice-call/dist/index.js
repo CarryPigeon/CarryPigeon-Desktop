@@ -1,4 +1,4 @@
-import { Fragment, Icon, Transition, computed, createBlock, createCommentVNode, createElementBlock, createElementVNode, createTextVNode, createVNode, defineComponent, normalizeClass, normalizeStyle, onMounted, onScopeDispose, onUnmounted, openBlock, readonly, ref, renderList, toDisplayString, unref, watch, withCtx, withModifiers } from "/vendor/vendor.mjs";
+import { Fragment, Icon, Transition, computed, createBlock, createCommentVNode, createElementBlock, createElementVNode, createTextVNode, createVNode, defineComponent, h, normalizeClass, normalizeStyle, onMounted, onScopeDispose, onUnmounted, openBlock, readonly, ref, renderList, toDisplayString, unref, watch, withCtx, withModifiers } from "/vendor/vendor.mjs";
 var manifest_default = {
 	pluginId: "voice-call",
 	version: "0.1.0",
@@ -36,90 +36,6 @@ function onVoiceCallEvent(event, handler) {
 	if (!ctx?.host.onEvent) throw new Error("host.onEvent not available");
 	return ctx.host.onEvent(event, handler);
 }
-//#endregion
-//#region plugins/voice-call/src/i18n/messages.ts
-var voiceCallMessages = {
-	zh_cn: {
-		"voice_call": "语音通话",
-		"voice_call_start": "发起语音通话",
-		"voice_call_conference": "发起多人会议",
-		"voice_call_dialing": "正在拨号...",
-		"voice_call_connecting": "正在连接...",
-		"voice_call_in_call": "通话中",
-		"voice_call_participants": "{count} 人",
-		"voice_call_participants_title": "参与者",
-		"voice_call_hangup": "挂断",
-		"voice_call_cancel": "取消",
-		"voice_call_mute": "静音",
-		"voice_call_unmute": "取消静音",
-		"voice_call_noise_off": "关闭降噪",
-		"voice_call_noise_on": "开启降噪",
-		"voice_call_answer": "接听",
-		"voice_call_reject": "拒接",
-		"voice_call_caller_invite": "{name} 邀请你语音通话",
-		"voice_call_ring_countdown": "响铃中 · 剩余 {secs} 秒",
-		"voice_call_initiator": "发起人",
-		"voice_call_duration": "时长",
-		"voice_call_status": "状态",
-		"voice_call_callback": "回拨",
-		"voice_call_duration_format": "{min} 分 {sec} 秒",
-		"voice_call_duration_seconds": "{sec} 秒",
-		"voice_call_status_missed": "未接听",
-		"voice_call_status_declined": "已拒绝",
-		"voice_call_status_cancelled": "已取消",
-		"voice_call_status_ended": "已结束",
-		"voice_call_unknown_user": "未知用户",
-		"voice_call_default_device": "默认设备",
-		"voice_call_input_device": "输入设备",
-		"voice_call_output_device": "输出设备",
-		"video_call": "视频通话",
-		"voice_call_camera_on": "开启摄像头",
-		"voice_call_camera_off": "关闭摄像头",
-		"voice_call_screen_share_start": "共享屏幕",
-		"voice_call_screen_share_stop": "停止共享",
-		"voiceCall.start": "发起通话"
-	},
-	en_us: {
-		"voice_call": "Voice Call",
-		"voice_call_start": "Start Voice Call",
-		"voice_call_conference": "Start Conference",
-		"voice_call_dialing": "Dialing...",
-		"voice_call_connecting": "Connecting...",
-		"voice_call_in_call": "In Call",
-		"voice_call_participants": "{count} participants",
-		"voice_call_participants_title": "Participants",
-		"voice_call_hangup": "Hang Up",
-		"voice_call_cancel": "Cancel",
-		"voice_call_mute": "Mute",
-		"voice_call_unmute": "Unmute",
-		"voice_call_noise_off": "Disable Noise Suppression",
-		"voice_call_noise_on": "Enable Noise Suppression",
-		"voice_call_answer": "Accept",
-		"voice_call_reject": "Reject",
-		"voice_call_caller_invite": "{name} invites you to a voice call",
-		"voice_call_ring_countdown": "Ringing · {secs}s",
-		"voice_call_initiator": "Initiator",
-		"voice_call_duration": "Duration",
-		"voice_call_status": "Status",
-		"voice_call_callback": "Call Back",
-		"voice_call_duration_format": "{min}m {sec}s",
-		"voice_call_duration_seconds": "{sec}s",
-		"voice_call_status_missed": "Missed",
-		"voice_call_status_declined": "Declined",
-		"voice_call_status_cancelled": "Cancelled",
-		"voice_call_status_ended": "Ended",
-		"voice_call_unknown_user": "Unknown User",
-		"voice_call_default_device": "Default Device",
-		"voice_call_input_device": "Input device",
-		"voice_call_output_device": "Output device",
-		"video_call": "Video Call",
-		"voice_call_camera_on": "Camera On",
-		"voice_call_camera_off": "Camera Off",
-		"voice_call_screen_share_start": "Share Screen",
-		"voice_call_screen_share_stop": "Stop Sharing",
-		"voiceCall.start": "Start Call"
-	}
-};
 //#endregion
 //#region plugins/voice-call/src/shared/logger.ts
 function createLogger(name) {
@@ -377,18 +293,18 @@ function useVoiceCall(options) {
 			}
 		}
 	}
-	async function startDirectCall(targetUserId) {
+	async function startDirectCall(targetUserId, roomIdOverride) {
 		callState.value = "dialing";
-		const session = await statePort.startCall("direct", roomId(), targetUserId);
+		const session = await statePort.startCall("direct", roomIdOverride ?? roomId(), targetUserId);
 		activeSession.value = session;
 		startPoll();
 		ringtone.play();
 		startRingCountdown();
 		return session;
 	}
-	async function startConference() {
+	async function startConference(roomIdOverride) {
 		callState.value = "dialing";
-		const session = await statePort.startCall("conference", roomId());
+		const session = await statePort.startCall("conference", roomIdOverride ?? roomId());
 		activeSession.value = session;
 		startPoll();
 		ringtone.play();
@@ -616,7 +532,7 @@ function useVoiceCall(options) {
 //#endregion
 //#region plugins/voice-call/src/composables/useVideoCall.ts
 var STUN_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
-var logger$1 = createLogger("VideoCall");
+var logger$2 = createLogger("VideoCall");
 function useVideoCall(initialSessionId) {
 	const sessionId = ref(initialSessionId);
 	const localStream = ref();
@@ -656,7 +572,7 @@ function useVideoCall(initialSessionId) {
 			localStream.value = stream;
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
-			logger$1.error("Action: chat_voice_call_start_failed", { error: msg });
+			logger$2.error("Action: chat_voice_call_start_failed", { error: msg });
 			return;
 		}
 		const p = await ensurePC();
@@ -683,7 +599,7 @@ function useVideoCall(initialSessionId) {
 			localStream.value = stream;
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
-			logger$1.error("Action: chat_voice_call_accept_failed", { error: msg });
+			logger$2.error("Action: chat_voice_call_accept_failed", { error: msg });
 			return;
 		}
 		const p = await ensurePC();
@@ -781,7 +697,7 @@ function useVideoCall(initialSessionId) {
 }
 //#endregion
 //#region plugins/voice-call/src/composables/useScreenShare.ts
-var logger = createLogger("ScreenShare");
+var logger$1 = createLogger("ScreenShare");
 function useScreenShare(sessionId) {
 	const isSharing = ref(false);
 	let originalVideoTrack = null;
@@ -796,7 +712,7 @@ function useScreenShare(sessionId) {
 			displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
-			logger.error("Action: chat_voice_call_screen_share_failed", { error: msg });
+			logger$1.error("Action: chat_voice_call_screen_share_failed", { error: msg });
 			return;
 		}
 		const [displayTrack] = displayStream.getVideoTracks();
@@ -837,12 +753,96 @@ function useScreenShare(sessionId) {
 	};
 }
 //#endregion
+//#region plugins/voice-call/src/i18n/messages.ts
+var voiceCallMessages = {
+	zh_cn: {
+		"voice_call": "语音通话",
+		"voice_call_start": "发起语音通话",
+		"voice_call_conference": "发起多人会议",
+		"voice_call_dialing": "正在拨号...",
+		"voice_call_connecting": "正在连接...",
+		"voice_call_in_call": "通话中",
+		"voice_call_participants": "{count} 人",
+		"voice_call_participants_title": "参与者",
+		"voice_call_hangup": "挂断",
+		"voice_call_cancel": "取消",
+		"voice_call_mute": "静音",
+		"voice_call_unmute": "取消静音",
+		"voice_call_noise_off": "关闭降噪",
+		"voice_call_noise_on": "开启降噪",
+		"voice_call_answer": "接听",
+		"voice_call_reject": "拒接",
+		"voice_call_caller_invite": "{name} 邀请你语音通话",
+		"voice_call_ring_countdown": "响铃中 · 剩余 {secs} 秒",
+		"voice_call_initiator": "发起人",
+		"voice_call_duration": "时长",
+		"voice_call_status": "状态",
+		"voice_call_callback": "回拨",
+		"voice_call_duration_format": "{min} 分 {sec} 秒",
+		"voice_call_duration_seconds": "{sec} 秒",
+		"voice_call_status_missed": "未接听",
+		"voice_call_status_declined": "已拒绝",
+		"voice_call_status_cancelled": "已取消",
+		"voice_call_status_ended": "已结束",
+		"voice_call_unknown_user": "未知用户",
+		"voice_call_default_device": "默认设备",
+		"voice_call_input_device": "输入设备",
+		"voice_call_output_device": "输出设备",
+		"video_call": "视频通话",
+		"voice_call_camera_on": "开启摄像头",
+		"voice_call_camera_off": "关闭摄像头",
+		"voice_call_screen_share_start": "共享屏幕",
+		"voice_call_screen_share_stop": "停止共享",
+		"voiceCall.start": "发起通话"
+	},
+	en_us: {
+		"voice_call": "Voice Call",
+		"voice_call_start": "Start Voice Call",
+		"voice_call_conference": "Start Conference",
+		"voice_call_dialing": "Dialing...",
+		"voice_call_connecting": "Connecting...",
+		"voice_call_in_call": "In Call",
+		"voice_call_participants": "{count} participants",
+		"voice_call_participants_title": "Participants",
+		"voice_call_hangup": "Hang Up",
+		"voice_call_cancel": "Cancel",
+		"voice_call_mute": "Mute",
+		"voice_call_unmute": "Unmute",
+		"voice_call_noise_off": "Disable Noise Suppression",
+		"voice_call_noise_on": "Enable Noise Suppression",
+		"voice_call_answer": "Accept",
+		"voice_call_reject": "Reject",
+		"voice_call_caller_invite": "{name} invites you to a voice call",
+		"voice_call_ring_countdown": "Ringing · {secs}s",
+		"voice_call_initiator": "Initiator",
+		"voice_call_duration": "Duration",
+		"voice_call_status": "Status",
+		"voice_call_callback": "Call Back",
+		"voice_call_duration_format": "{min}m {sec}s",
+		"voice_call_duration_seconds": "{sec}s",
+		"voice_call_status_missed": "Missed",
+		"voice_call_status_declined": "Declined",
+		"voice_call_status_cancelled": "Cancelled",
+		"voice_call_status_ended": "Ended",
+		"voice_call_unknown_user": "Unknown User",
+		"voice_call_default_device": "Default Device",
+		"voice_call_input_device": "Input device",
+		"voice_call_output_device": "Output device",
+		"video_call": "Video Call",
+		"voice_call_camera_on": "Camera On",
+		"voice_call_camera_off": "Camera Off",
+		"voice_call_screen_share_start": "Share Screen",
+		"voice_call_screen_share_stop": "Stop Sharing",
+		"voiceCall.start": "Start Call"
+	}
+};
+//#endregion
 //#region plugins/voice-call/src/i18n/index.ts
 /**
 * 轻量 i18n 读取：根据已绑定宿主上下文的 lang 取对应字典。
 * 支持 {name} 形式的具名插值（与 vue-i18n 调用方式保持一致）。
 */
-function t$1(key, params) {
+function t(key, params) {
 	let lang = "zh_cn";
 	try {
 		lang = getContext().lang || "zh_cn";
@@ -883,14 +883,14 @@ var VoiceCallBanner_vue_vue_type_script_setup_true_lang_default = /*@__PURE__*/ 
 						name: "call",
 						class: "voice-call-banner__icon"
 					}),
-					createElementVNode("div", _hoisted_3$5, [createElementVNode("span", _hoisted_4$2, toDisplayString(unref(t$1)("voice_call_caller_invite", { name: __props.callerName })), 1), __props.ringRemainingSecs > 0 ? (openBlock(), createElementBlock("span", _hoisted_5$2, toDisplayString(unref(t$1)("voice_call_ring_countdown", { secs: __props.ringRemainingSecs })), 1)) : createCommentVNode("", true)]),
+					createElementVNode("div", _hoisted_3$5, [createElementVNode("span", _hoisted_4$2, toDisplayString(unref(t)("voice_call_caller_invite", { name: __props.callerName })), 1), __props.ringRemainingSecs > 0 ? (openBlock(), createElementBlock("span", _hoisted_5$2, toDisplayString(unref(t)("voice_call_ring_countdown", { secs: __props.ringRemainingSecs })), 1)) : createCommentVNode("", true)]),
 					createElementVNode("div", _hoisted_6$2, [createElementVNode("button", {
 						class: "voice-call-banner__btn voice-call-banner__btn--accept",
 						onClick: _cache[0] || (_cache[0] = ($event) => _ctx.$emit("accept"))
-					}, toDisplayString(unref(t$1)("voice_call_answer")), 1), createElementVNode("button", {
+					}, toDisplayString(unref(t)("voice_call_answer")), 1), createElementVNode("button", {
 						class: "voice-call-banner__btn voice-call-banner__btn--reject",
 						onClick: _cache[1] || (_cache[1] = ($event) => _ctx.$emit("reject"))
-					}, toDisplayString(unref(t$1)("voice_call_reject")), 1)])
+					}, toDisplayString(unref(t)("voice_call_reject")), 1)])
 				])])) : createCommentVNode("", true)]),
 				_: 1
 			});
@@ -1126,7 +1126,7 @@ var VoiceCallPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 		const props = __props;
 		const minimized = ref(false);
 		const visible = computed(() => props.state === "dialing" || props.state === "connecting" || props.state === "active");
-		const hangupLabel = computed(() => props.state === "dialing" || props.state === "connecting" ? t$1("voice_call_cancel") : t$1("voice_call_hangup"));
+		const hangupLabel = computed(() => props.state === "dialing" || props.state === "connecting" ? t("voice_call_cancel") : t("voice_call_hangup"));
 		const formattedDuration = computed(() => {
 			const totalSec = Math.floor(props.duration / 1e3);
 			const min = Math.floor(totalSec / 60);
@@ -1147,8 +1147,8 @@ var VoiceCallPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 						createElementVNode("span", _hoisted_1$2, [createElementVNode("span", { class: normalizeClass(["voice-call-panel__dot", {
 							"is-active": __props.state === "active",
 							"is-connecting": __props.state === "connecting" || __props.state === "dialing"
-						}]) }, null, 2), createTextVNode(" " + toDisplayString(__props.state === "dialing" ? unref(t$1)("voice_call_dialing") : __props.state === "connecting" ? unref(t$1)("voice_call_connecting") : __props.state === "active" ? `${unref(t$1)("voice_call_in_call")} · ${formattedDuration.value}` : __props.state), 1)]),
-						__props.state === "active" ? (openBlock(), createElementBlock("span", _hoisted_2$1, toDisplayString(unref(t$1)("voice_call_participants", { count: __props.participants.length })), 1)) : createCommentVNode("", true),
+						}]) }, null, 2), createTextVNode(" " + toDisplayString(__props.state === "dialing" ? unref(t)("voice_call_dialing") : __props.state === "connecting" ? unref(t)("voice_call_connecting") : __props.state === "active" ? `${unref(t)("voice_call_in_call")} · ${formattedDuration.value}` : __props.state), 1)]),
+						__props.state === "active" ? (openBlock(), createElementBlock("span", _hoisted_2$1, toDisplayString(unref(t)("voice_call_participants", { count: __props.participants.length })), 1)) : createCommentVNode("", true),
 						createElementVNode("button", {
 							type: "button",
 							class: "voice-call-panel__bar-hangup",
@@ -1158,7 +1158,7 @@ var VoiceCallPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 						}, [createVNode(_component_t_icon, { name: "close" })], 8, _hoisted_3$1),
 						createElementVNode("span", _hoisted_4$1, [createVNode(_component_t_icon, { name: minimized.value ? "chevron-up" : "chevron-down" }, null, 8, ["name"])])
 					]),
-					!minimized.value && __props.isConference && __props.participants.length > 0 ? (openBlock(), createElementBlock("div", _hoisted_5$1, [createElementVNode("div", _hoisted_6$1, toDisplayString(unref(t$1)("voice_call_participants_title")) + " (" + toDisplayString(__props.participants.length) + ")", 1), (openBlock(true), createElementBlock(Fragment, null, renderList(__props.participants, (p) => {
+					!minimized.value && __props.isConference && __props.participants.length > 0 ? (openBlock(), createElementBlock("div", _hoisted_5$1, [createElementVNode("div", _hoisted_6$1, toDisplayString(unref(t)("voice_call_participants_title")) + " (" + toDisplayString(__props.participants.length) + ")", 1), (openBlock(true), createElementBlock(Fragment, null, renderList(__props.participants, (p) => {
 						return openBlock(), createElementBlock("div", {
 							key: p.userId,
 							class: "voice-call-panel__participant"
@@ -1190,37 +1190,37 @@ var VoiceCallPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 						createElementVNode("button", {
 							type: "button",
 							class: normalizeClass(["voice-call-panel__ctrl-btn", { "is-muted": __props.isMuted }]),
-							title: __props.isMuted ? unref(t$1)("voice_call_unmute") : unref(t$1)("voice_call_mute"),
-							"aria-label": __props.isMuted ? unref(t$1)("voice_call_unmute") : unref(t$1)("voice_call_mute"),
+							title: __props.isMuted ? unref(t)("voice_call_unmute") : unref(t)("voice_call_mute"),
+							"aria-label": __props.isMuted ? unref(t)("voice_call_unmute") : unref(t)("voice_call_mute"),
 							onClick: _cache[2] || (_cache[2] = ($event) => _ctx.$emit("toggleMute"))
 						}, [createVNode(_component_t_icon, { name: "microphone" })], 10, _hoisted_14$1),
 						createElementVNode("button", {
 							type: "button",
 							class: normalizeClass(["voice-call-panel__ctrl-btn", { "is-off": !__props.isNoiseSuppressionOn }]),
-							title: __props.isNoiseSuppressionOn ? unref(t$1)("voice_call_noise_off") : unref(t$1)("voice_call_noise_on"),
-							"aria-label": __props.isNoiseSuppressionOn ? unref(t$1)("voice_call_noise_off") : unref(t$1)("voice_call_noise_on"),
+							title: __props.isNoiseSuppressionOn ? unref(t)("voice_call_noise_off") : unref(t)("voice_call_noise_on"),
+							"aria-label": __props.isNoiseSuppressionOn ? unref(t)("voice_call_noise_off") : unref(t)("voice_call_noise_on"),
 							onClick: _cache[3] || (_cache[3] = ($event) => _ctx.$emit("toggleNoiseSuppression"))
 						}, [createVNode(_component_t_icon, { name: "sound-mute" })], 10, _hoisted_15),
 						createElementVNode("button", {
 							type: "button",
 							class: normalizeClass(["voice-call-panel__ctrl-btn", { "is-muted": !__props.cameraEnabled }]),
-							title: __props.cameraEnabled ? unref(t$1)("voice_call_camera_off") : unref(t$1)("voice_call_camera_on"),
-							"aria-label": __props.cameraEnabled ? unref(t$1)("voice_call_camera_off") : unref(t$1)("voice_call_camera_on"),
+							title: __props.cameraEnabled ? unref(t)("voice_call_camera_off") : unref(t)("voice_call_camera_on"),
+							"aria-label": __props.cameraEnabled ? unref(t)("voice_call_camera_off") : unref(t)("voice_call_camera_on"),
 							onClick: _cache[4] || (_cache[4] = ($event) => _ctx.$emit("toggleCamera"))
 						}, [createVNode(_component_t_icon, { name: "camera" })], 10, _hoisted_16),
 						createElementVNode("button", {
 							type: "button",
 							class: normalizeClass(["voice-call-panel__ctrl-btn", { "is-active": __props.isSharing }]),
-							title: __props.isSharing ? unref(t$1)("voice_call_screen_share_stop") : unref(t$1)("voice_call_screen_share_start"),
-							"aria-label": __props.isSharing ? unref(t$1)("voice_call_screen_share_stop") : unref(t$1)("voice_call_screen_share_start"),
+							title: __props.isSharing ? unref(t)("voice_call_screen_share_stop") : unref(t)("voice_call_screen_share_start"),
+							"aria-label": __props.isSharing ? unref(t)("voice_call_screen_share_stop") : unref(t)("voice_call_screen_share_start"),
 							onClick: _cache[5] || (_cache[5] = ($event) => _ctx.$emit("toggleScreenShare"))
 						}, [createVNode(_component_t_icon, { name: "share" })], 10, _hoisted_17),
 						createElementVNode("select", {
 							class: "voice-call-panel__device-select",
-							"aria-label": unref(t$1)("voice_call_input_device"),
+							"aria-label": unref(t)("voice_call_input_device"),
 							value: __props.currentInputDeviceId ?? "",
 							onChange: _cache[6] || (_cache[6] = ($event) => _ctx.$emit("selectInputDevice", $event.target.value))
-						}, [createElementVNode("option", _hoisted_19, toDisplayString(unref(t$1)("voice_call_default_device")), 1), (openBlock(true), createElementBlock(Fragment, null, renderList(__props.inputDevices, (device) => {
+						}, [createElementVNode("option", _hoisted_19, toDisplayString(unref(t)("voice_call_default_device")), 1), (openBlock(true), createElementBlock(Fragment, null, renderList(__props.inputDevices, (device) => {
 							return openBlock(), createElementBlock("option", {
 								key: device.deviceId,
 								value: device.deviceId
@@ -1228,10 +1228,10 @@ var VoiceCallPanel_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/* 
 						}), 128))], 40, _hoisted_18),
 						createElementVNode("select", {
 							class: "voice-call-panel__device-select",
-							"aria-label": unref(t$1)("voice_call_output_device"),
+							"aria-label": unref(t)("voice_call_output_device"),
 							value: __props.currentOutputDeviceId ?? "",
 							onChange: _cache[7] || (_cache[7] = ($event) => _ctx.$emit("selectOutputDevice", $event.target.value))
-						}, [createElementVNode("option", _hoisted_22, toDisplayString(unref(t$1)("voice_call_default_device")), 1), (openBlock(true), createElementBlock(Fragment, null, renderList(__props.outputDevices, (device) => {
+						}, [createElementVNode("option", _hoisted_22, toDisplayString(unref(t)("voice_call_default_device")), 1), (openBlock(true), createElementBlock(Fragment, null, renderList(__props.outputDevices, (device) => {
 							return openBlock(), createElementBlock("option", {
 								key: device.deviceId,
 								value: device.deviceId
@@ -1404,7 +1404,7 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 			const session = activeSession.value;
 			if (!session) return "";
 			const selfId = getCurrentUserId();
-			return session.participants.find((p) => p.userId !== selfId)?.displayName ?? t$1("voice_call_unknown_user");
+			return session.participants.find((p) => p.userId !== selfId)?.displayName ?? t("voice_call_unknown_user");
 		});
 		const currentInputDeviceId = computed(() => {
 			const sessionDevice = activeSession.value?.mediaSettings.inputDeviceId;
@@ -1446,7 +1446,7 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 		});
 		watch(callState, async (s) => {
 			if (s === "active" || s === "connecting") try {
-				const members = await getRoomGovernanceCapabilities().forChannel(props.roomId).listMembers();
+				const members = await getRoomGovernanceCapabilities().forChannel(activeSession.value?.roomId ?? props.roomId).listMembers();
 				const map = /* @__PURE__ */ new Map();
 				for (const m of members) if (m.avatar) map.set(m.uid, m.avatar);
 				memberAvatarMap.value = map;
@@ -1524,20 +1524,23 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 			if (screenShare.isSharing.value) screenShare.stopScreenShare();
 			videoCall.hangup();
 		});
-		function startCall(targetUserId) {
-			return startDirectCall(targetUserId || props.targetUserId || "");
+		function startCall(targetUserId, roomId) {
+			return startDirectCall(targetUserId || props.targetUserId || "", roomId);
 		}
-		async function startVideoCall(targetUserId) {
-			await startDirectCall(targetUserId || props.targetUserId || "");
+		async function startVideoCall(targetUserId, roomId) {
+			await startDirectCall(targetUserId || props.targetUserId || "", roomId);
 			setTimeout(() => {
 				videoCall.startCall();
 			}, 1e3);
+		}
+		function startConferenceCall(roomId) {
+			return startConference(roomId);
 		}
 		__expose({
 			callState,
 			startDirectCall: startCall,
 			startVideoCall,
-			startConference,
+			startConference: startConferenceCall,
 			joinConference,
 			leaveConference
 		});
@@ -1656,17 +1659,17 @@ var CallRecordBubble_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/
 			const totalSec = Math.floor(summary.value.duration / 1e3);
 			const min = Math.floor(totalSec / 60);
 			const sec = totalSec % 60;
-			if (min > 0) return t$1("voice_call_duration_format", {
+			if (min > 0) return t("voice_call_duration_format", {
 				min,
 				sec
 			});
-			return t$1("voice_call_duration_seconds", { sec });
+			return t("voice_call_duration_seconds", { sec });
 		});
 		const statusText = computed(() => {
-			if (summary.value.disconnectReason === "timeout") return t$1("voice_call_status_missed");
-			if (summary.value.disconnectReason === "declined") return t$1("voice_call_status_declined");
-			if (summary.value.disconnectReason === "cancelled") return t$1("voice_call_status_cancelled");
-			return t$1("voice_call_status_ended");
+			if (summary.value.disconnectReason === "timeout") return t("voice_call_status_missed");
+			if (summary.value.disconnectReason === "declined") return t("voice_call_status_declined");
+			if (summary.value.disconnectReason === "cancelled") return t("voice_call_status_cancelled");
+			return t("voice_call_status_ended");
 		});
 		return (_ctx, _cache) => {
 			const _component_t_icon = Icon;
@@ -1674,49 +1677,93 @@ var CallRecordBubble_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/
 				createElementVNode("div", _hoisted_2, [createVNode(_component_t_icon, {
 					name: "call",
 					class: "call-record-bubble__icon"
-				}), createElementVNode("span", _hoisted_3, toDisplayString(unref(t$1)("voice_call")), 1)]),
+				}), createElementVNode("span", _hoisted_3, toDisplayString(unref(t)("voice_call")), 1)]),
 				createElementVNode("div", _hoisted_4, [
-					createElementVNode("div", _hoisted_5, [createElementVNode("span", _hoisted_6, toDisplayString(unref(t$1)("voice_call_initiator")), 1), createElementVNode("span", _hoisted_7, toDisplayString(initiatorName.value), 1)]),
-					summary.value.duration > 0 ? (openBlock(), createElementBlock("div", _hoisted_8, [createElementVNode("span", _hoisted_9, toDisplayString(unref(t$1)("voice_call_duration")), 1), createElementVNode("span", _hoisted_10, toDisplayString(formattedDuration.value), 1)])) : createCommentVNode("", true),
-					createElementVNode("div", _hoisted_11, [createElementVNode("span", _hoisted_12, toDisplayString(unref(t$1)("voice_call_status")), 1), createElementVNode("span", _hoisted_13, toDisplayString(statusText.value), 1)])
+					createElementVNode("div", _hoisted_5, [createElementVNode("span", _hoisted_6, toDisplayString(unref(t)("voice_call_initiator")), 1), createElementVNode("span", _hoisted_7, toDisplayString(initiatorName.value), 1)]),
+					summary.value.duration > 0 ? (openBlock(), createElementBlock("div", _hoisted_8, [createElementVNode("span", _hoisted_9, toDisplayString(unref(t)("voice_call_duration")), 1), createElementVNode("span", _hoisted_10, toDisplayString(formattedDuration.value), 1)])) : createCommentVNode("", true),
+					createElementVNode("div", _hoisted_11, [createElementVNode("span", _hoisted_12, toDisplayString(unref(t)("voice_call_status")), 1), createElementVNode("span", _hoisted_13, toDisplayString(statusText.value), 1)])
 				]),
 				createElementVNode("div", _hoisted_14, [createElementVNode("button", {
 					class: "call-record-bubble__btn",
 					onClick: _cache[0] || (_cache[0] = ($event) => _ctx.$emit("callback"))
-				}, [createVNode(_component_t_icon, { name: "call" }), createTextVNode(" " + toDisplayString(unref(t$1)("voice_call_callback")), 1)])])
+				}, [createVNode(_component_t_icon, { name: "call" }), createTextVNode(" " + toDisplayString(unref(t)("voice_call_callback")), 1)])])
 			]);
 		};
 	}
 }), [["__scopeId", "data-v-4db1606a"]]);
 //#endregion
 //#region plugins/voice-call/src/index.ts
+var logger = createLogger("voice-call:plugin");
 var manifest = voiceCallManifest;
 var renderers = { call_record: CallRecordBubble_default };
 var cleanup = null;
-function t(lang, key) {
-	return (voiceCallMessages[lang] ?? voiceCallMessages.zh_cn)[key] ?? key;
+function makeIcon(name) {
+	return defineComponent({
+		name: `VoiceCallToolbarIcon-${name}`,
+		render: () => h(Icon, { name })
+	});
 }
+var VideoCallIcon = makeIcon("video");
+var AudioCallIcon = makeIcon("call");
+var ConferenceIcon = makeIcon("usergroup");
 function activate(ctx) {
 	bindContext(ctx);
-	const lang = ctx.lang || "zh_cn";
-	const detach = ctx.host.registerToolbarAction?.({
-		id: "voice-call.start",
-		label: t(lang, "voiceCall.start"),
-		order: 50,
-		onClick: () => {
-			ctx.host.invoke?.("voice_call:start_direct_call", {
-				sessionId: `local-${Date.now()}`,
-				targetUserId: "",
-				roomId: ""
-			});
+	const overlayHandle = ctx.host.mountOverlay?.(VoiceCallHost_default, { props: {
+		roomId: "",
+		roomName: "",
+		targetUserId: void 0
+	} }) ?? {
+		unmount: () => {},
+		instance: null
+	};
+	const unmount = overlayHandle.unmount;
+	function voiceHost() {
+		return overlayHandle.instance;
+	}
+	function startCall(kind, chatCtx) {
+		const host = voiceHost();
+		if (!host) {
+			logger.warn("voice_call_toolbar_host_missing", { kind });
+			return;
 		}
-	}) ?? (() => {});
-	const unmount = ctx.host.mountOverlay?.(VoiceCallHost_default) ?? (() => {});
-	const offIncoming = onVoiceCallEvent("voice_call:incoming", (p) => {});
+		const roomId = chatCtx?.channelId ?? "";
+		if (!roomId) {
+			logger.warn("voice_call_toolbar_no_channel", { kind });
+			return;
+		}
+		const targetUserId = chatCtx?.targetUserId;
+		if (kind === "video") host.startVideoCall?.(targetUserId, roomId);
+		else if (kind === "audio") host.startDirectCall?.(targetUserId, roomId);
+		else host.startConference?.(roomId);
+	}
+	const detachers = [
+		{
+			id: "voice-call.video",
+			label: "",
+			icon: VideoCallIcon,
+			order: 48,
+			onClick: (c) => startCall("video", c)
+		},
+		{
+			id: "voice-call.audio",
+			label: "",
+			icon: AudioCallIcon,
+			order: 49,
+			onClick: (c) => startCall("audio", c)
+		},
+		{
+			id: "voice-call.conference",
+			label: "",
+			icon: ConferenceIcon,
+			order: 50,
+			onClick: (c) => startCall("conference", c)
+		}
+	].map((a) => ctx.host.registerToolbarAction?.(a) ?? (() => {}));
+	const offIncoming = onVoiceCallEvent("voice_call:incoming", (p) => void 0);
 	const offState = onVoiceCallEvent("voice_call:state_change", () => {});
 	const offVideo = onVoiceCallEvent("voice_call:video_signaling", () => {});
 	cleanup = () => {
-		detach();
+		detachers.forEach((d) => d());
 		unmount();
 		offIncoming();
 		offState();

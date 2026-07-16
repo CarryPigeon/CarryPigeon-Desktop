@@ -4,19 +4,20 @@
  */
 
 import type { Component } from "vue";
+import type { PluginChatContext, PluginOverlayMountHandle } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 
 /**
  * 宿主提供的 chat UI 桥（Task 4 实现 mountOverlay / registerToolbarAction）。
  * 插件运行时只通过该桥挂载全局 UI，不直接接触宿主组件树。
  */
 export type PluginUiBridge = {
-  mountOverlay(component: Component, opts?: { zIndex?: number }): () => void;
+  mountOverlay(component: Component, opts?: { zIndex?: number; props?: Record<string, unknown> }): PluginOverlayMountHandle;
   registerToolbarAction(action: {
     id: string;
     label: string;
     icon?: Component;
     order?: number;
-    onClick: () => void;
+    onClick: (ctx: PluginChatContext) => void;
   }): () => void;
 };
 

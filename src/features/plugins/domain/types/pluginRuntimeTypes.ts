@@ -8,7 +8,34 @@
  * - 该文件不依赖 Vue/Tauri 等平台库，便于跨层复用与测试。
  */
 
-import type { Component } from "vue";
+import type { Component, ComponentPublicInstance } from "vue";
+
+/**
+ * 插件在 chat 工具栏点击时接收到的实时聊天上下文。
+ *
+ * 说明：
+ * - `channelId` 即当前频道 id（用于语音/视频通话的 roomId）；
+ * - `targetUserId` 为一对一通话对象（群聊/会议场景通常为空）；
+ * - 该上下文由宿主在调用 `ToolbarAction.onClick` 时实时注入，插件无需自行维护。
+ */
+export type PluginChatContext = {
+  channelId: string;
+  channelName?: string;
+  targetUserId?: string;
+};
+
+/**
+ * `host.mountOverlay` 的返回值句柄。
+ *
+ * 说明：
+ * - `unmount` 用于卸载浮层；
+ * - `instance` 为挂载浮层组件的公开实例（含插件 `defineExpose` 暴露的方法），
+ *   组件尚未完成挂载时为 `null`，调用方应在点击等异步时机读取。
+ */
+export type PluginOverlayMountHandle = {
+  unmount: () => void;
+  instance: ComponentPublicInstance | null;
+};
 
 /**
  * 插件编辑器（composer）提交给宿主的载荷格式。
@@ -71,15 +98,15 @@ export type PluginContext = {
     invoke?: <T = unknown>(command: string, args?: Record<string, unknown>) => Promise<T>;
     /** 订阅宿主 Tauri 事件（权限 + 事件白名单），返回取消函数 */
     onEvent?: <T = unknown>(event: string, handler: (payload: T) => void) => () => void;
-    /** 挂载全局浮层组件，返回卸载函数 */
-    mountOverlay?: (component: Component, opts?: { zIndex?: number }) => () => void;
+    /** 挂载全局浮层组件，返回卸载函数与组件实例句柄 */
+    mountOverlay?: (component: Component, opts?: { zIndex?: number; props?: Record<string, unknown> }) => PluginOverlayMountHandle;
     /** 注册聊天头部/工具栏入口，返回注销函数 */
     registerToolbarAction?: (action: {
       id: string;
       label: string;
       icon?: Component;
       order?: number;
-      onClick: () => void;
+      onClick: (ctx: PluginChatContext) => void;
     }) => () => void;
   };
 };
