@@ -23,6 +23,7 @@ import {
   reportCurrentReadState,
   selectChannel,
   totalUnreadCount,
+  zeroChannelUnreadLocally,
 } from "./presentation/store-access/sessionStoreAccess";
 import type {
   ChatChannel,
@@ -106,6 +107,7 @@ export function createRoomSessionCapabilitySource(): RoomSessionCapabilities {
         channelSearch.value = channelName;
       },
       findChannelById,
+      zeroChannelUnreadLocally,
     },
     currentChannel: {
       getSnapshot: getCurrentChannelSnapshot,

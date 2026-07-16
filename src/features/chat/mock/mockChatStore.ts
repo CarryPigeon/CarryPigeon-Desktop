@@ -1365,6 +1365,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     getMessageById,
     selectChannel,
     reportCurrentReadState,
+    markChannelReadLocally() {},
     loadMoreMessages,
     applyJoin,
     updateChannelMeta,

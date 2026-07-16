@@ -22,8 +22,8 @@ import {
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import type { ChatMessage, DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
-import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
+import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import type { RoomSessionCapabilities } from "@/features/chat/room-session/api-types";
 import { useChannelNavigation } from "../navigation/useChannelNavigation";
 import { useSignalViewport } from "../interactions/useSignalViewport";
@@ -422,6 +422,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     },
     openChannelInfo: (channelId) => {
       router.push(`/channel-info?cid=${encodeURIComponent(channelId)}`);
+    },
+    markChannelRead: (channelId) => {
+      // 本地将频道未读角标归零，不依赖服务端接受标记已读（避免已读游标卡死时红点残留）。
+      getRoomSessionCapabilities().directory.zeroChannelUnreadLocally(channelId);
     },
   });
 

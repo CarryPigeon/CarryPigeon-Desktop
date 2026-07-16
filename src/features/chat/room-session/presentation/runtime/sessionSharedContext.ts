@@ -17,6 +17,7 @@ import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { createReadStateReporter, RoomSessionCatalogApplicationService } from "@/features/chat/room-session/internal";
 import type { ChatApiGateway } from "@/features/chat/composition/contracts/chatGateway";
+import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import type { ChatSessionStateSlice } from "./sessionRuntimePorts";
 import {
@@ -31,6 +32,7 @@ export type ChatSessionSharedContextDeps = {
   api: ChatApiGateway;
   channelsRef: ChatSessionStateSlice["channelsRef"];
   scopeVersion: ChatSessionStateSlice["scopeVersion"];
+  messagesByChannel: ChatSessionStateSlice["messagesByChannel"];
   lastReadTimeMsByChannel: ChatSessionStateSlice["lastReadTimeMsByChannel"];
   lastReadMidByChannel: ChatSessionStateSlice["lastReadMidByChannel"];
   lastReadReportAtMsByChannel: ChatSessionStateSlice["lastReadReportAtMsByChannel"];
@@ -100,10 +102,24 @@ export function createChatSessionSharedContext(
     lastReadReportAtMsByChannel: deps.lastReadReportAtMsByChannel,
   });
 
+  const messageCache = {
+    listMessages(channelId: string): readonly ChatMessage[] {
+      return deps.messagesByChannel[channelId] ?? [];
+    },
+    findMessageById(channelId: string, messageId: string): ChatMessage | null {
+      const list = deps.messagesByChannel[channelId] ?? [];
+      return list.find((entry) => entry.id === messageId) ?? null;
+    },
+    clearAllMessageCaches(): void {
+      for (const key of Object.keys(deps.messagesByChannel)) delete deps.messagesByChannel[key];
+    },
+  };
+
   const readStateReporter = createReadStateReporter({
     api: deps.api,
     scope,
     state: readMarkerState,
+    messageCache,
   });
 
   /**
@@ -115,6 +131,7 @@ export function createChatSessionSharedContext(
     scope,
     directoryState,
     readMarkerState,
+    messageCache,
   });
 
   return {

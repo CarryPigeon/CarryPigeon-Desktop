@@ -12,9 +12,11 @@ import type { ChatChannel } from "@/features/chat/room-session/domain/contracts"
 import type {
   SessionChannelCatalogApiPort,
   SessionDirectoryStatePort,
+  SessionMessageCachePort,
   SessionReadMarkerStatePort,
   SessionScopePort,
 } from "../ports";
+import { recomputeChannelUnread } from "../utils/unreadRecompute";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("room-session-catalog");
@@ -27,6 +29,7 @@ export type RoomSessionCatalogApplicationServiceDeps = {
   scope: SessionScopePort;
   directoryState: SessionDirectoryStatePort;
   readMarkerState: SessionReadMarkerStatePort;
+  messageCache: SessionMessageCachePort;
 };
 
 /**
@@ -72,11 +75,21 @@ export class RoomSessionCatalogApplicationService {
       if (unread && Number.isFinite(unread.lastReadTime)) {
         this.deps.readMarkerState.writeLastReadTimeMs(cid, unread.lastReadTime);
       }
+      const serverUnread = unread ? Math.max(0, Math.trunc(unread.unread)) : 0;
+      // 本地已加载时间线的频道，以可见消息重算覆盖服务端值（已删除/撤回消息不再计入）。
+      const localTimeline = this.deps.messageCache.listMessages(cid);
+      const recomputed = recomputeChannelUnread({
+        serverUnread,
+        messages: localTimeline,
+        lastReadTimeMs: this.deps.readMarkerState.readLastReadTimeMs(cid),
+        lastReadMessageId: this.deps.readMarkerState.readLastReadMessageId(cid),
+      });
+      const displayUnread = recomputed == null ? serverUnread : recomputed;
       next.push({
         id: cid,
         name: String(channel.name ?? cid).trim() || cid,
         brief: String(channel.brief ?? "").trim(),
-        unread: unread ? Math.max(0, Math.trunc(unread.unread)) : 0,
+        unread: displayUnread,
         joined: true,
         joinRequested: false,
         categoryId: channel.categoryId ? String(channel.categoryId).trim() : undefined,

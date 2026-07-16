@@ -113,6 +113,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     getMessageById: session.getMessageById,
     selectChannel: session.selectChannel,
     reportCurrentReadState: session.reportCurrentReadState,
+    markChannelReadLocally: session.markChannelReadLocally,
     loadMoreMessages: messageFlow.loadMoreMessages,
     applyJoin: governance.applyJoin,
     updateChannelMeta: governance.updateChannelMeta,

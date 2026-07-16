@@ -50,4 +50,8 @@ export type ChatSessionRuntimePort = {
   getMessageById(channelId: string, messageId: string): ChatMessage | null;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   reportCurrentReadState(): Promise<void>;
+  /**
+   * 本地将某频道未读角标归零（不向上同步服务端）。
+   */
+  markChannelReadLocally(channelId: string): void;
 };

@@ -63,6 +63,7 @@ export type RoomSessionRuntimeStore = {
   ensureChatReady(): Promise<void>;
   selectChannel(id: string): Promise<ChannelSelectionOutcome>;
   reportCurrentReadState(): Promise<void>;
+  markChannelReadLocally(channelId: string): void;
 };
 
 /**
