@@ -40,10 +40,12 @@ export const mockFileServicePort: FileServicePort = {
 
   async performUpload(
     serverSocket: string,
+    accessToken: string,
     upload: UploadDescriptor,
     body: Blob | ArrayBuffer | Uint8Array,
   ): Promise<void> {
     void serverSocket;
+    void accessToken;
     void upload;
     void body;
     await sleep(MOCK_LATENCY_MS);

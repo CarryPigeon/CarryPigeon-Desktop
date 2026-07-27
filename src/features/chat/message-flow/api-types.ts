@@ -12,8 +12,6 @@ import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
-  EditChatMessageOutcome,
   MentionCandidate,
   MessageDomain,
   MessageMention,
@@ -23,19 +21,15 @@ import type {
   RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
-  ServerMessageSearchResult,
 } from "./domain/contracts";
 
 export type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
-  EditChatMessageOutcome,
   MessageDomain,
   MessageSearchResult,
   MessageSearchState,
-  ServerMessageSearchResult,
   SendChatMessageOutcome,
 } from "./domain/contracts";
 
@@ -51,8 +45,6 @@ export type MessageTimelineSnapshot = {
   hasMoreHistory: boolean;
   isLoadingHistory: boolean;
   search: MessageSearchState;
-  searchScope: "channel" | "server";
-  serverResults: ServerMessageSearchResult[];
   highlightedMessageId: string;
 };
 
@@ -66,13 +58,10 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
   findMessageById(messageId: string): ChatMessage | null;
   loadMoreHistory(): Promise<void>;
   beginReply(messageId: string): void;
-  deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
-  editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome>;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   searchCurrentChannel(query: string): Promise<void>;
-  searchServerMessages(query: string, channelIds?: string[]): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
   clearSearch(): void;
 };
@@ -113,6 +102,7 @@ export type MessageComposerCapabilities = ReadableCapability<MessageComposerSnap
   appendAttachmentShareKey(shareKey: string): void;
   cancelReply(): void;
   sendMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
+  sendVoiceMessage(input: { file: File; durationMs: number }): Promise<SendChatMessageOutcome>;
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   addMention(mention: MessageMention): void;
 

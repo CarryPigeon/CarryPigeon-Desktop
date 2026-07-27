@@ -17,8 +17,6 @@ import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
-  EditChatMessageOutcome,
   MentionCandidate,
   MessageDomain,
   MessageMention,
@@ -70,6 +68,7 @@ export type RoomSessionRuntimeStore = {
  * message-flow 内部 runtime store。
  */
 export type MessageFlowRuntimeStore = {
+  currentChannelId: Ref<string>;
   composerDraft: Ref<string>;
   selectedDomainId: Ref<string>;
   replyDraft: Ref<MessageReplySummary | null>;
@@ -89,15 +88,12 @@ export type MessageFlowRuntimeStore = {
   loadMoreMessages(): Promise<void>;
   startReply(message: ChatMessage): void;
   cancelReply(): void;
-  deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
-  editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome>;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
   reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
   removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   searchCurrentChannel(query: string): Promise<void>;
-  searchServerMessages(query: string, channelIds?: string[]): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
   clearSearch(): void;
 };

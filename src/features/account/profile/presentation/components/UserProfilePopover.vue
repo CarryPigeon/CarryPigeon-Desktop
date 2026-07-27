@@ -149,6 +149,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { getUserUsecase, getUserMutationPort } from "@/features/account/profile/di/user.di";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { currentUser } from "@/features/account/current-user/presentation/store/userData";
+import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 
 import type { UserPublic } from "@/features/account/profile/domain/types/UserTypes";
@@ -167,6 +168,7 @@ const router = useRouter();
 const { t } = useI18n();
 const logger = createLogger("userProfilePopover");
 const serverConnectionCapabilities = getServerConnectionCapabilities();
+const currentUserCapabilities = getCurrentUserCapabilities();
 
 // Refs
 const triggerRef = ref<HTMLElement | null>(null);
@@ -539,6 +541,10 @@ async function handleFileChange(e: Event) {
         bio: resolvedBio.value,
         backgroundUrl,
       };
+    }
+    // GET /users/me 不含 background_url：上传成功后写入本地快照供 UI 使用
+    if (isCurrentUser.value) {
+      currentUserCapabilities.applyLocalProfilePatch({ backgroundUrl });
     }
     toast.success(t("profile_background_uploaded"));
   } catch (err) {

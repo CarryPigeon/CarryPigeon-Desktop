@@ -38,9 +38,7 @@ const router = useRouter();
 const isEditing = ref(false);
 const isSaving = ref(false);
 const isSendingEmailCode = ref(false);
-const avatarFileInputRef = ref<HTMLInputElement | null>(null);
 const backgroundFileInputRef = ref<HTMLInputElement | null>(null);
-const isUploadingAvatar = ref(false);
 const isUploadingBackground = ref(false);
 const { t } = useI18n();
 const logger = createLogger("UserInfoPage");
@@ -179,10 +177,6 @@ async function handleSendEmailCode(): Promise<void> {
   }
 }
 
-function handleUploadAvatar() {
-  avatarFileInputRef.value?.click();
-}
-
 function handleUploadBackground() {
   backgroundFileInputRef.value?.click();
 }
@@ -198,43 +192,6 @@ function validateImageFile(file: File): string | null {
     return t("profile_image_size_error");
   }
   return null;
-}
-
-async function handleAvatarFileChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  const error = validateImageFile(file);
-  if (error) {
-    toast.error(error);
-    if (avatarFileInputRef.value) avatarFileInputRef.value.value = "";
-    return;
-  }
-  isUploadingAvatar.value = true;
-  try {
-    const serverSocket = serverConnectionCapabilities.workspace.readSocket();
-    const accessToken = await ensureValidAccessToken(serverSocket);
-    if (!serverSocket || !accessToken) {
-      toast.error(t("profile_not_connected"));
-      return;
-    }
-    const mutationPort = getUserMutationPort(serverSocket);
-    const avatarUrl = await mutationPort.updateUserAvatarImage(accessToken, file);
-    draft.avatarUrl = avatarUrl;
-    currentUserCapabilities.applyLocalProfilePatch({
-      username: draft.username.trim(),
-      email: draft.email.trim(),
-      description: draft.brief.trim(),
-      avatarUrl,
-      backgroundUrl: draft.backgroundUrl.trim(),
-    });
-    toast.success(t("profile_avatar_uploaded"));
-  } catch (err) {
-    logger.error("Action: auth_profile_avatar_upload_failed", { error: String(err) });
-    toast.error(t("upload_failed"));
-  } finally {
-    isUploadingAvatar.value = false;
-    if (avatarFileInputRef.value) avatarFileInputRef.value.value = "";
-  }
 }
 
 async function handleBackgroundFileChange(e: Event) {
@@ -296,6 +253,7 @@ async function handleSaveEdit(): Promise<void> {
 
 	    const profileOutcome = await server.updateUserProfile({
 	      username: draft.username.trim(),
+	      avatar: draft.avatarUrl.trim(),
 	      brief: draft.brief.trim(),
 	    });
     if (!profileOutcome.ok) {
@@ -351,14 +309,9 @@ async function handleSaveEdit(): Promise<void> {
             </span>
           </label>
           <label class="cp-info__field">
+            <!-- 服务端无独立头像上传端点；头像 URL 经 PATCH /users/me 的 avatar 字段保存 -->
             <span class="cp-info__fieldLabel">{{ t("upload_avatar") }}</span>
-            <input ref="avatarFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleAvatarFileChange" />
-            <span class="cp-info__inline">
-              <input v-model="draft.avatarUrl" class="cp-info__input" type="url" :placeholder="t('profile_avatar_url_hint')" />
-              <button class="cp-info__smallBtn" :disabled="isUploadingAvatar" type="button" @click="handleUploadAvatar">
-                {{ isUploadingAvatar ? t("uploading") : t("upload_avatar") }}
-              </button>
-            </span>
+            <input v-model="draft.avatarUrl" class="cp-info__input" type="url" :placeholder="t('profile_avatar_url_hint')" />
           </label>
           <label class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("profile_background") }}</span>

@@ -9,6 +9,9 @@ import { asTrimmedString, asOptionalString } from "@/shared/data/wireMapperUtils
 
 /**
  * 将用户 wire 模型（当前用户）映射为领域模型。
+ *
+ * 说明：`GET /users/me` 仅保证 `uid/email/nickname/avatar`；
+ * 背景图由本地上传快照维护，不在此映射。
  */
 export function mapUserMeWire(wire: ApiUserMe): UserMe {
   if (!wire) {
@@ -21,12 +24,14 @@ export function mapUserMeWire(wire: ApiUserMe): UserMe {
     email: asOptionalString(wire.email),
     nickname: asOptionalString(wire.nickname),
     avatar: asOptionalString(wire.avatar),
-    backgroundUrl: asOptionalString(wire.background_url),
   };
 }
 
 /**
  * 将用户 wire 模型（公开用户）映射为领域模型。
+ *
+ * 说明：`GET /users/{uid}` / batch 仅保证 `uid/nickname/avatar`；
+ * `bio` / `background_url` 服务端不返回，缺失时 UI 显示为空。
  */
 export function mapUserPublicWire(wire: ApiUserPublic): UserPublic {
   if (!wire) {

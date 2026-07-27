@@ -21,6 +21,7 @@
 3. `docs/api/12-ws-events-v1.md`
 4. `docs/api/13-error-model-and-reasons-v1.md`
 5. `docs/api/14-pagination-and-cursor-v1.md`
+6. `docs/api/15-quote-reply-forward-v1.md`
 
 ## 协议口径（必须）
 
@@ -37,3 +38,4 @@
 - `docs/api/12-ws-events-v1.md`：事件与恢复机制
 - `docs/api/13-error-model-and-reasons-v1.md`：错误语义与映射
 - `docs/api/14-pagination-and-cursor-v1.md`：游标与补拉策略
+- `docs/api/15-quote-reply-forward-v1.md`：Core:ReplyText / Core:Forward 包装域契约（引用回复、内联引用、多消息转发）

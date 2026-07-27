@@ -120,8 +120,6 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     updateAnnouncement: governance.updateAnnouncement,
     startReply: messageFlow.startReply,
     cancelReply: messageFlow.cancelReply,
-    deleteMessage: messageFlow.deleteMessage,
-    editMessage: messageFlow.editMessage,
     recallMessage: messageFlow.recallMessage,
     sendComposerMessage: messageFlow.sendComposerMessage,
     forwardMessage: async () => {
@@ -131,7 +129,6 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     removeReaction: messageFlow.removeReaction,
     listMentionCandidates: messageFlow.listMentionCandidates,
     searchCurrentChannel: messageFlow.searchCurrentChannel,
-    searchServerMessages: messageFlow.searchServerMessages,
     loadContextAroundMessage: messageFlow.loadContextAroundMessage,
     clearSearch: messageFlow.clearSearch,
     // 频道管理

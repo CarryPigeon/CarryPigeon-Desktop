@@ -16,6 +16,8 @@ import { createMockAuthServicePort } from "../mock/mockAuthServicePort";
 import { createMockEmailServicePort } from "../mock/mockEmailServicePort";
 import { createMockRequiredGatePort } from "../mock/mockRequiredGatePort";
 import { LoginWithEmailCode } from "../domain/usecases/LoginWithEmailCode";
+import { LoginWithPassword } from "../domain/usecases/LoginWithPassword";
+import { RegisterWithPassword } from "../domain/usecases/RegisterWithPassword";
 import { SendVerificationCode } from "../domain/usecases/SendVerificationCode";
 import { RefreshToken } from "../domain/usecases/RefreshToken";
 import { TokenLogin } from "../domain/usecases/TokenLogin";
@@ -60,6 +62,26 @@ export function getAuthServicePort(serverSocket: string): AuthServicePort {
  */
 export function getLoginWithEmailCodeUsecase(serverSocket: string): LoginWithEmailCode {
   return new LoginWithEmailCode(getAuthServicePort(serverSocket));
+}
+
+/**
+ * 获取 `LoginWithPassword` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns LoginWithPassword 用例实例。
+ */
+export function getLoginWithPasswordUsecase(serverSocket: string): LoginWithPassword {
+  return new LoginWithPassword(getAuthServicePort(serverSocket));
+}
+
+/**
+ * 获取 `RegisterWithPassword` 用例实例。
+ *
+ * @param serverSocket - 服务器 Socket 地址。
+ * @returns RegisterWithPassword 用例实例。
+ */
+export function getRegisterWithPasswordUsecase(serverSocket: string): RegisterWithPassword {
+  return new RegisterWithPassword(getAuthServicePort(serverSocket));
 }
 
 /**

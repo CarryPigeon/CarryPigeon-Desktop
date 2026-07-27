@@ -30,6 +30,14 @@ export type AuthLoginResult = {
 };
 
 /**
+ * Password registration result（`POST /auth/register`；不签发 token）。
+ */
+export type AuthRegisterResult = {
+  uid: string;
+  username: string;
+};
+
+/**
  * Token login result (minimal).
  */
 export type TokenLoginResult = {

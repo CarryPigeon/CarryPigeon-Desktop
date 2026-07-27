@@ -10,7 +10,7 @@ import type {
   MessageComposerStatePort,
   MessageTimelineStatePort,
 } from "@/features/chat/message-flow/domain/ports";
-import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState, ServerMessageSearchResult } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
 import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 
 /**
@@ -39,8 +39,6 @@ export type CreateMessageTimelineStatePortDeps = {
   loadingMoreByChannel: Record<string, boolean>;
   searchState: Ref<MessageSearchState>;
   highlightedMessageId: Ref<string>;
-  serverSearchResults: Ref<ServerMessageSearchResult[]>;
-  searchScope: Ref<"channel" | "server">;
 };
 
 /**
@@ -124,14 +122,6 @@ export function createMessageTimelineStatePort(
     },
     readSearchState(): MessageSearchState {
       return deps.searchState.value;
-    },
-    writeServerSearchState(state: { query: string; loading: boolean; error: string; results: ServerMessageSearchResult[] }): void {
-      deps.serverSearchResults.value = state.results;
-      deps.searchState.value = { ...deps.searchState.value, query: state.query, loading: state.loading, error: state.error, serverResults: state.results };
-    },
-    writeSearchScope(scope: "channel" | "server"): void {
-      deps.searchScope.value = scope;
-      deps.searchState.value = { ...deps.searchState.value, searchScope: scope };
     },
     setHighlightedMessageId(messageId: string): void {
       deps.highlightedMessageId.value = messageId.trim();

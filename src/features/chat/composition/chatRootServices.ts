@@ -49,14 +49,12 @@ export type ChatCoreApplicationServiceDeps = {
     | "getUnreads"
     | "listChannelMessages"
     | "sendChannelMessage"
-    | "deleteMessage"
     | "recallMessage"
     | "reactToMessage"
     | "removeReaction"
     | "updateReadState"
     | "applyJoinChannel"
     | "patchChannel"
-    | "editMessage"
     | "pinMessage"
     | "unpinMessage"
     | "listPins"
@@ -65,10 +63,8 @@ export type ChatCoreApplicationServiceDeps = {
     | "markMentionRead"
     | "batchMarkMentionsRead"
     | "searchChannelMessages"
-    | "searchMessages"
     | "listChannelMessagesAround"
     | "getChannel"
-    | "getThreadReplies"
   >;
 };
 
@@ -129,17 +125,10 @@ export class ChatCoreApplicationService {
   }
 
   /**
-   * 删除一条消息。
-   */
-  deleteMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void> {
-    return this.deps.api.deleteMessage(serverSocket, accessToken, messageId);
-  }
-
-  /**
    * 撤回一条消息。
    */
-  recallMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void> {
-    return this.deps.api.recallMessage(serverSocket, accessToken, messageId);
+  recallMessage(serverSocket: string, accessToken: string, channelId: string, messageId: string): Promise<ChatMessageRecord> {
+    return this.deps.api.recallMessage(serverSocket, accessToken, channelId, messageId);
   }
 
   /**
@@ -199,15 +188,6 @@ export class ChatCoreApplicationService {
     return this.deps.api.patchChannel(serverSocket, accessToken, channelId, patch);
   }
 
-  editMessage(
-    serverSocket: string,
-    accessToken: string,
-    mid: string,
-    req: { domain: string; domainVersion: string; data: unknown; mentions?: Array<{ type: string; uid: string }>; expectedEditVersion?: number },
-  ): Promise<ChatMessageRecord> {
-    return this.deps.api.editMessage(serverSocket, accessToken, mid, req);
-  }
-
   pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void> {
     return this.deps.api.pinMessage(serverSocket, accessToken, cid, mid, note);
   }
@@ -254,14 +234,6 @@ export class ChatCoreApplicationService {
     return this.deps.api.searchChannelMessages(serverSocket, accessToken, cid, query);
   }
 
-  searchMessages(
-    serverSocket: string,
-    accessToken: string,
-    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
-  ): Promise<ChatMessagePage> {
-    return this.deps.api.searchMessages(serverSocket, accessToken, query);
-  }
-
   listChannelMessagesAround(
     serverSocket: string,
     accessToken: string,
@@ -275,16 +247,6 @@ export class ChatCoreApplicationService {
 
   getChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelRecord> {
     return this.deps.api.getChannel(serverSocket, accessToken, cid);
-  }
-
-  getThreadReplies(
-    serverSocket: string,
-    accessToken: string,
-    rootMessageId: string,
-    cursor?: string,
-    limit?: number,
-  ): Promise<ChatMessagePage> {
-    return this.deps.api.getThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit);
   }
 }
 

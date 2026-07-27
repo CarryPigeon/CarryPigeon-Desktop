@@ -12,7 +12,7 @@ import { sleep } from "@/shared/mock/sleep";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
 import type { AuthServicePort } from "../domain/ports/AuthServicePort";
-import type { AuthLoginResult, TokenLoginResult } from "../domain/types/AuthTypes";
+import type { AuthLoginResult, AuthRegisterResult, TokenLoginResult } from "../domain/types/AuthTypes";
 import { AuthError, AuthRequiredPluginMissingError } from "../domain/errors/AuthErrors";
 
 /**
@@ -42,6 +42,28 @@ export function createMockAuthServicePort(serverSocket: string): AuthServicePort
       return {
         accessToken: `mock-access:${email.trim().toLowerCase()}:${Date.now()}`,
         refreshToken: `mock-refresh:${email.trim().toLowerCase()}:${Date.now()}`,
+        expiresInSec: 1800,
+        uid: "1",
+        isNewUser: false,
+      };
+    },
+    async registerWithPassword(username: string, password: string): Promise<AuthRegisterResult> {
+      await sleep(MOCK_LATENCY_MS);
+      const u = username.trim();
+      if (!u || !password) {
+        throw new AuthError({ code: "missing_username_or_password", message: "Missing username or password." });
+      }
+      return { uid: "1", username: u };
+    },
+    async loginWithPassword(username: string, password: string): Promise<AuthLoginResult> {
+      await sleep(MOCK_LATENCY_MS);
+      const u = username.trim();
+      if (!u || !password) {
+        throw new AuthError({ code: "missing_username_or_password", message: "Missing username or password." });
+      }
+      return {
+        accessToken: `mock-access:password:${u}:${Date.now()}`,
+        refreshToken: `mock-refresh:password:${u}:${Date.now()}`,
         expiresInSec: 1800,
         uid: "1",
         isNewUser: false,

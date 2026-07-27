@@ -38,11 +38,13 @@ export const httpFileServicePort: FileServicePort = {
 
   async performUpload(
     serverSocket: string,
+    accessToken: string,
     upload: UploadDescriptor,
     body: Blob | ArrayBuffer | Uint8Array,
   ): Promise<void> {
     await httpPerformFileUpload(
       serverSocket,
+      accessToken,
       {
         method: upload.method,
         url: upload.url,

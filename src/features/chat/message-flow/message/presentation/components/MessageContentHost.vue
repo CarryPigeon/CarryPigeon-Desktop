@@ -23,6 +23,7 @@ import {
 import type { RenderableChatMessage } from "@/features/chat/message-flow/message/domain/messageModels";
 import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
 import MergedForwardBubble from "./MergedForwardBubble.vue";
+import FileRefMessageBubble from "./FileRefMessageBubble.vue";
 import ReactionBar from "./ReactionBar.vue";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import { getAccountCapabilities } from "@/features/account/api";
@@ -44,10 +45,6 @@ const props = defineProps<{
    * domain registry（来自父级 store）。
    */
   domainRegistryStore: unknown;
-  /**
-   * 外部触发的正在编辑的消息 ID。
-   */
-  editingMessageId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -60,21 +57,9 @@ const emit = defineEmits<{
    */
   (event: "react", messageId: string, emoji: string): void;
   /**
-   * 编辑确认。
-   */
-  (event: "edit", payload: { messageId: string; text: string }): void;
-  /**
-   * 编辑取消。
-   */
-  (event: "edit-cancel", messageId: string): void;
-  /**
    * 打开图片灯箱。
    */
   (event: "openLightbox", payload: { url: string; fileName: string; isVideo?: boolean }): void;
-  /**
-   * 打开线程面板。
-   */
-  (event: "viewThread", messageId: string): void;
   /**
    * 查看合并转发消息详情。
    */
@@ -83,10 +68,6 @@ const emit = defineEmits<{
    * 发送失败后重试。
    */
   (event: "retry", messageId: string): void;
-  /**
-   * 移除发送失败的消息。
-   */
-  (event: "remove", messageId: string): void;
 }>();
 
 const { t } = useI18n();
@@ -163,32 +144,54 @@ const mergedForwardData = computed(() => {
 });
 
 /**
- * 线程回复计数。
- */
-const threadReplyCount = computed(() => {
-  return "threadReplyCount" in props.message
-    ? Number(props.message.threadReplyCount) || 0
-    : 0;
-});
-
-/**
- * 判断当前消息是否为 Voice:Message 语音消息。
+ * 判断当前消息是否为语音消息（Core:Voice 或旧 Voice:Message）。
  */
 const isVoiceMessage = computed(() => {
-  return props.message.domain.id === "Voice:Message";
+  const id = props.message.domain.id;
+  return id === "Core:Voice" || id === "Voice:Message";
 });
 
 /**
- * 语音消息数据（从 message.data 中提取）。
+ * 语音消息数据（从 message.data 中提取；兼容 snake_case / camelCase）。
  */
 const voiceMessageData = computed<{ shareKey?: string; durationMs?: number } | null>(() => {
   if (!isVoiceMessage.value) return null;
   if (!("data" in props.message) || !props.message.data) return null;
   const data = props.message.data as Record<string, unknown>;
-  if (!data || typeof data !== 'object') return null;
+  if (!data || typeof data !== "object") return null;
+  const shareKey = String(data.share_key ?? data.shareKey ?? "").trim();
+  const durationMs = Number(data.duration_millis ?? data.durationMs ?? 0);
   return {
-    shareKey: String(data.shareKey ?? ""),
-    durationMs: Number(data.durationMs ?? 0),
+    shareKey,
+    durationMs: Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0,
+  };
+});
+
+/**
+ * 判断当前消息是否为 Core:File。
+ */
+const isCoreFileMessage = computed(() => props.message.domain.id === "Core:File");
+
+/**
+ * Core:File 消息数据。
+ */
+const coreFileData = computed<{
+  shareKey: string;
+  filename: string;
+  mimeType?: string;
+  sizeBytes?: number;
+} | null>(() => {
+  if (!isCoreFileMessage.value) return null;
+  if (!("data" in props.message) || !props.message.data) return null;
+  const data = props.message.data as Record<string, unknown>;
+  if (!data || typeof data !== "object") return null;
+  const shareKey = String(data.share_key ?? data.shareKey ?? "").trim();
+  if (!shareKey) return null;
+  return {
+    shareKey,
+    filename: String(data.filename ?? data.text ?? shareKey).trim() || shareKey,
+    mimeType: String(data.mime_type ?? data.mimeType ?? "").trim() || undefined,
+    sizeBytes: Number(data.size ?? data.sizeBytes ?? 0) || undefined,
   };
 });
 
@@ -222,11 +225,19 @@ function handleInstall(): void {
     <div class="cp-messageContent">
       <!-- 置顶标记 -->
       <span v-if="isPinned" class="cp-pinBadge" :title="t('pinned_message')"><AppIcon name="pin" :size="12" :stroke-width="1.75" /></span>
-      <!-- 语音消息（Voice:Message） -->
+      <!-- 语音消息（Core:Voice / Voice:Message） -->
       <VoiceMessageBubble
       v-if="isVoiceMessage && voiceMessageData && voiceMessageData.shareKey"
       :share-key="voiceMessageData.shareKey"
       :duration-ms="voiceMessageData.durationMs ?? 0"
+    />
+    <FileRefMessageBubble
+      v-else-if="isCoreFileMessage && coreFileData"
+      :filename="coreFileData.filename"
+      :share-key="coreFileData.shareKey"
+      :mime-type="coreFileData.mimeType"
+      :size-bytes="coreFileData.sizeBytes"
+      @openLightbox="(payload) => emit('openLightbox', payload)"
     />
     <MergedForwardBubble
       v-else-if="isMergedForward && mergedForwardData"
@@ -271,12 +282,9 @@ function handleInstall(): void {
       :forwarded-from="props.message.kind === 'core_text' ? props.message.forwardedFrom : undefined"
       :is-edited="isEdited"
       :is-own="isOwn"
-      :editing-message-id="props.editingMessageId"
       :link-preview="messageLinkPreview"
       :current-user-id="currentChatUserId"
       :current-user-name="currentUserName"
-      @edit="(payload) => emit('edit', payload)"
-      @edit-cancel="(messageId) => emit('edit-cancel', messageId)"
       @openLightbox="(payload) => emit('openLightbox', payload)"
     />
     <div v-else-if="renderModel.kind === 'plugin'" class="cp-pluginBubble">
@@ -307,20 +315,12 @@ function handleInstall(): void {
       :message-id="props.message.id"
       :error="sendFailedError"
       @retry="(mid: string) => emit('retry', mid)"
-      @remove="(mid: string) => emit('remove', mid)"
     />
     <ReactionBar
       :message-id="props.message.id"
       :reactions="props.message.reactions ?? []"
       @react="(messageId, emoji) => emit('react', messageId, emoji)"
     />
-    <button
-      v-if="threadReplyCount > 0"
-      class="cp-threadLink"
-      @click="emit('viewThread', props.message.id)"
-    >
-      {{ threadReplyCount }} {{ threadReplyCount === 1 ? t('reply') : t('replies') }} &mdash; {{ t('view_thread') }}
-    </button>
     </div>
   </template>
 </template>
@@ -335,25 +335,6 @@ function handleInstall(): void {
   font-style: italic;
   font-size: 12px;
   user-select: none;
-}
-
-.cp-threadLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  padding: 2px 8px;
-  border: none;
-  background: transparent;
-  color: var(--cp-accent, #5865f2);
-  font-size: 11px;
-  cursor: pointer;
-  border-radius: 6px;
-  transition: background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-threadLink:hover {
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 10%, transparent);
 }
 
 /* 消息内容包装容器，为置顶标记提供定位上下文 */

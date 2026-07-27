@@ -90,7 +90,6 @@ type ChatCenterRawModel = {
   currentUserRole: ComputedRef<string>;
   searchPanelOpen: Ref<boolean>;
   searchState: ComputedRef<MessageSearchState>;
-  searchScope: ComputedRef<"channel" | "server">;
   highlightedMessageId: ComputedRef<string>;
   /** 置顶消息摘要列表。 */
   pins: Ref<PinSummary[]>;
@@ -130,7 +129,6 @@ type ChatCenterRawModel = {
   openSearchPanel(): void;
   closeSearchPanel(): void;
   searchMessages(query?: string): Promise<void>;
-  setSearchScope(scope: "channel" | "server"): void;
   openSearchResult(messageId: string, channelId?: string): Promise<void>;
   multiSelectMode: ComputedRef<boolean>;
   selectedCount: ComputedRef<number>;
@@ -145,7 +143,6 @@ type ChatCenterRawModel = {
   isForwarding: Ref<boolean>;
   closeForwardDialog(): void;
   handleForwardConfirm(payload: { targetCid: string; comment: string }): Promise<void>;
-  handleBatchDelete(): Promise<void>;
   handleBatchBookmark(): void;
   toggleMessageSelection(id: string): void;
   isMessageSelected(id: string): boolean;
@@ -172,7 +169,6 @@ export type UseChatCenterModelDeps = {
   domainRegistryView: RefLike<unknown>;
   onLoadMoreMessages(): void | Promise<void>;
   onReplyShortcut(messageId: string): void;
-  onDeleteShortcut(messageId: string): void;
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
   onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
   selectChannel(channelId: string): Promise<void>;
@@ -305,7 +301,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
    */
   const searchPanelOpen = ref(false);
   const searchState = computed(() => messageTimelineSnapshot.value.search);
-  const searchScope = computed(() => messageTimelineSnapshot.value.searchScope);
   const highlightedMessageId = computed(() => messageTimelineSnapshot.value.highlightedMessageId);
 
   /**
@@ -398,21 +393,10 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     deps.currentTimeline.clearSearch();
   }
 
-  function setSearchScope(scope: "channel" | "server"): void {
-    messageTimelineSnapshot.value.search.searchScope = scope;
-    if (scope === "server" && searchState.value.query) {
-      void deps.currentTimeline.searchServerMessages(searchState.value.query);
-    }
-  }
-
   async function searchMessages(query?: string): Promise<void> {
     const q = (query ?? searchState.value.query ?? "").trim();
     if (!q) return;
-    if (messageTimelineSnapshot.value.search.searchScope === "server") {
-      await deps.currentTimeline.searchServerMessages(q);
-    } else {
-      await deps.currentTimeline.searchCurrentChannel(q);
-    }
+    await deps.currentTimeline.searchCurrentChannel(q);
   }
 
   async function openSearchResult(messageId: string, channelId?: string): Promise<void> {
@@ -531,23 +515,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     }
   }
 
-  async function handleBatchDelete(): Promise<void> {
-    const ids = getSelectedIds();
-    if (ids.length === 0) return;
-    let failed = 0;
-    for (const mid of ids) {
-      try {
-        await deps.currentTimeline.deleteMessage(mid);
-      } catch {
-        failed++;
-      }
-    }
-    clearSelection();
-    if (failed > 0) {
-      logger.error("Action: chat_batch_delete_partial_failure", { failed, total: ids.length });
-    }
-  }
-
   function handleBatchBookmark(): void {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
@@ -651,12 +618,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }, { immediate: true });
 
   function handleMessageKeydown(e: KeyboardEvent, messageId: string): void {
-    if (e.key === "Delete") {
-      e.preventDefault();
-      deps.onDeleteShortcut(messageId);
-      return;
-    }
-
     const k = e.key.toLowerCase();
     if (!e.metaKey && !e.ctrlKey && !e.altKey && k === "r") {
       e.preventDefault();
@@ -699,7 +660,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     currentUserRole,
     searchPanelOpen,
     searchState,
-    searchScope,
     highlightedMessageId,
     pins,
     pinsLoading,
@@ -731,7 +691,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     openSearchPanel,
     closeSearchPanel,
     searchMessages,
-    setSearchScope,
     openSearchResult,
     multiSelectMode,
     selectedCount,
@@ -746,7 +705,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     isForwarding,
     closeForwardDialog,
     handleForwardConfirm,
-    handleBatchDelete,
     handleBatchBookmark,
     toggleMessageSelection: (id: string) => toggleMessageSelection(id),
     isMessageSelected: (id: string) => isMessageSelected(id),

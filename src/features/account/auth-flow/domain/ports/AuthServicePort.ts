@@ -7,7 +7,7 @@
  * - `http`：基于后端 API 的真实实现
  */
 
-import type { AuthLoginResult, TokenLoginResult } from "../types/AuthTypes";
+import type { AuthLoginResult, AuthRegisterResult, TokenLoginResult } from "../types/AuthTypes";
 
 /**
  * 认证服务端口（领域层）。
@@ -22,6 +22,26 @@ export interface AuthServicePort {
    * @throws AuthRequiredPluginMissingError 当 required gate 不满足（缺少必需插件）时抛出。
    */
   loginWithEmailCode(email: string, code: string): Promise<AuthLoginResult>;
+
+  /**
+   * 使用用户名 + 密码注册账号（不签发 token）。
+   *
+   * @param username - 用户名。
+   * @param password - 密码。
+   * @returns 注册结果（uid / username）。
+   */
+  registerWithPassword(username: string, password: string): Promise<AuthRegisterResult>;
+
+  /**
+   * 使用用户名 + 密码登录并获取 token。
+   *
+   * 说明：服务端该入口不跑 required plugin gate；可被配置关闭（`password_login_disabled`）。
+   *
+   * @param username - 用户名。
+   * @param password - 密码。
+   * @returns 登录结果（access/refresh token 等）。
+   */
+  loginWithPassword(username: string, password: string): Promise<AuthLoginResult>;
 
   /**
    * 校验并使用已有 access token 获取用户信息。

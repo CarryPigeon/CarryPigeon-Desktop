@@ -11,8 +11,6 @@ import type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
-  EditChatMessageOutcome,
   MentionCandidate,
   MessageMention,
   MessageReplySummary,
@@ -42,6 +40,10 @@ export const composerDraft = computed({
  * 当前频道是否还有可继续加载的历史消息。
  */
 export const currentChannelHasMore = computed(() => resolveMessageFlowStore().currentChannelHasMore.value);
+/**
+ * 当前频道 id。
+ */
+export const currentChannelId = computed(() => resolveMessageFlowStore().currentChannelId.value);
 /**
  * 当前频道时间线消息列表。
  */
@@ -128,27 +130,6 @@ export function cancelReply(): void {
 }
 
 /**
- * 删除指定消息。
- */
-export function deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome> {
-  return resolveMessageFlowStore().deleteMessage(messageId);
-}
-
-/**
- * 编辑指定消息。
- */
-export function editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome> {
-  return resolveMessageFlowStore().editMessage(messageId, request);
-}
-
-/**
- * 撤回指定消息。
- */
-export function recallMessage(messageId: string): Promise<RecallChatMessageOutcome> {
-  return resolveMessageFlowStore().recallMessage(messageId);
-}
-
-/**
  * 在指定频道中按 id 查询消息。
  */
 export function getMessageById(channelId: string, messageId: string): ChatMessage | null {
@@ -191,32 +172,23 @@ export function listMentionCandidates(channelId?: string): Promise<MentionCandid
   return resolveMessageFlowStore().listMentionCandidates(channelId);
 }
 
-/**
- * 在当前频道中搜索消息。
- */
 export function searchCurrentChannel(query: string): Promise<void> {
   return resolveMessageFlowStore().searchCurrentChannel(query);
 }
 
-/**
- * 加载某条消息周围的上下文并在 timeline 中高亮。
- */
 export function loadContextAroundMessage(messageId: string): Promise<void> {
   return resolveMessageFlowStore().loadContextAroundMessage(messageId);
 }
 
-/**
- * 清楚搜索状态。
- */
 export function clearSearch(): void {
   return resolveMessageFlowStore().clearSearch();
 }
 
 /**
- * 在服务器范围内搜索消息。
+ * 撤回指定消息。
  */
-export function searchServerMessages(query: string, channelIds?: string[]): Promise<void> {
-  return resolveMessageFlowStore().searchServerMessages(query, channelIds);
+export function recallMessage(messageId: string): Promise<RecallChatMessageOutcome> {
+  return resolveMessageFlowStore().recallMessage(messageId);
 }
 
 /**

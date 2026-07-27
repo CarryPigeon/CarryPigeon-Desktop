@@ -30,12 +30,17 @@ export interface FileServicePort {
   /**
    * 使用 upload descriptor 执行实际上传（两段式上传的第二段）。
    *
+   * 说明：
+   * - 上传端点受 Bearer 鉴权保护，必须携带 access token。
+   *
    * @param serverSocket - 服务器 Socket 地址，用于推导期望 origin。
+   * @param accessToken - 访问令牌（Bearer），附加到上传请求的 `Authorization` header。
    * @param upload - upload descriptor。
    * @param body - 二进制载荷（Blob/ArrayBuffer/Uint8Array）。
    */
   performUpload(
     serverSocket: string,
+    accessToken: string,
     upload: UploadDescriptor,
     body: Blob | ArrayBuffer | Uint8Array,
   ): Promise<void>;

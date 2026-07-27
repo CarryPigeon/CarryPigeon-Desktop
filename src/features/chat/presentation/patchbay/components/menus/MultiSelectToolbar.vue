@@ -14,7 +14,6 @@ const emit = defineEmits<{
   (e: "cancel"): void;
   (e: "forward-merged"): void;
   (e: "forward-separate"): void;
-  (e: "delete"): void;
   (e: "bookmark"): void;
 }>();
 
@@ -40,13 +39,6 @@ const { t } = useI18n();
         @click="emit('forward-separate')"
       >
         {{ t("forward_separate") }} ({{ props.selectedCount }})
-      </button>
-      <button
-        v-if="props.selectedCount > 0"
-        class="cp-multiSelectToolbar__btn cp-multiSelectToolbar__btn--danger"
-        @click="emit('delete')"
-      >
-        {{ t("delete") }} ({{ props.selectedCount }})
       </button>
       <button
         v-if="props.selectedCount > 0"
@@ -90,10 +82,6 @@ const { t } = useI18n();
   color: var(--cp-text, #cdd6f4);
   font-size: 12px;
   cursor: pointer;
-}
-.cp-multiSelectToolbar__btn--danger {
-  color: var(--cp-danger, #e34);
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
 }
 .cp-multiSelectToolbar__btn--cancel {
   color: var(--cp-text-secondary, #a6adc8);

@@ -59,11 +59,8 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     sendChannelMessage(serverSocket, accessToken, channelId, req, idempotencyKey) {
       return deps.core.sendMessage(serverSocket, accessToken, channelId, req, idempotencyKey);
     },
-    deleteMessage(serverSocket, accessToken, messageId) {
-      return deps.core.deleteMessage(serverSocket, accessToken, messageId);
-    },
-    recallMessage(serverSocket, accessToken, messageId) {
-      return deps.core.recallMessage(serverSocket, accessToken, messageId);
+    recallMessage(serverSocket, accessToken, channelId, messageId) {
+      return deps.core.recallMessage(serverSocket, accessToken, channelId, messageId);
     },
     reactToMessage(serverSocket, accessToken, channelId, messageId, emoji) {
       return deps.core.reactToMessage(serverSocket, accessToken, channelId, messageId, emoji);
@@ -77,11 +74,8 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     applyJoinChannel(serverSocket, accessToken, channelId, reason) {
       return deps.core.applyJoinChannel(serverSocket, accessToken, channelId, reason);
     },
-    patchChannel(serverSocket, accessToken, channelId, patch) {
+patchChannel(serverSocket, accessToken, channelId, patch) {
       return deps.core.patchChannel(serverSocket, accessToken, channelId, patch);
-    },
-    editMessage(serverSocket, accessToken, mid, req) {
-      return deps.core.editMessage(serverSocket, accessToken, mid, req);
     },
     pinMessage(serverSocket, accessToken, cid, mid, note) {
       return deps.core.pinMessage(serverSocket, accessToken, cid, mid, note);
@@ -107,17 +101,11 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     searchChannelMessages(serverSocket, accessToken, cid, query) {
       return deps.core.searchChannelMessages(serverSocket, accessToken, cid, query);
     },
-    searchMessages(serverSocket, accessToken, query) {
-      return deps.core.searchMessages(serverSocket, accessToken, query);
-    },
     listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after) {
       return deps.core.listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
     },
     getChannel(serverSocket, accessToken, cid) {
       return deps.core.getChannel(serverSocket, accessToken, cid);
-    },
-    getThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit) {
-      return deps.core.getThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit);
     },
   };
 }

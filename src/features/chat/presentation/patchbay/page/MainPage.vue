@@ -10,7 +10,6 @@ import RightRailHost from "@/features/chat/presentation/patchbay/components/layo
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 import ChannelSettingsMenu from "@/features/chat/presentation/patchbay/components/menus/ChannelSettingsMenu.vue";
 import ChatCenter from "@/features/chat/presentation/patchbay/components/layout/ChatCenter.vue";
-import ThreadPanel from "@/features/chat/presentation/patchbay/components/thread/ThreadPanel.vue";
 import { usePatchbayPageModel } from "@/features/chat/presentation/patchbay/page/usePatchbayPageModel";
 import ChannelContextMenu from "@/features/chat/presentation/patchbay/components/menus/ChannelContextMenu.vue";
 import MessageContextMenu from "@/features/chat/presentation/patchbay/components/menus/MessageContextMenu.vue";
@@ -284,10 +283,6 @@ onBeforeUnmount(() => {
         :on-message-context-menu="page.chatViewport.handleMessageContextMenu"
         :on-more-click="page.chatViewport.handleMoreClick"
         :on-install-hint="page.chatViewport.handleInstallHint"
-        :editing-message-id="page.editingMessageId"
-        :on-edit="page.handleEditMessage"
-        :on-edit-cancel="page.clearEditingMessageId"
-        :on-view-thread="(messageId: string) => page.threadPanel.openThread(messageId)"
         :shortcut-help-visible="page.shortcutHelpOpen"
         :shortcut-bindings="page.bindings"
         :on-close-shortcut-help="page.closeShortcutHelp"
@@ -335,9 +330,7 @@ onBeforeUnmount(() => {
         :open="page.messageContextMenu.open"
         :x="page.messageContextMenu.x"
         :y="page.messageContextMenu.y"
-        :show-edit="page.messageContextMenu.showEdit"
         :show-recall="page.messageContextMenu.showRecall"
-        :show-view-thread="page.messageContextMenu.showViewThread"
         :can-pin="page.messageContextMenu.canPin"
         :is-pinned="page.messageContextMenu.isPinned"
         :is-bookmarked="page.messageContextMenu.isBookmarked"
@@ -395,12 +388,6 @@ onBeforeUnmount(() => {
         :detail="page.chatCenter.connectionDetail"
         :action-label="page.connectionToastActionLabel"
         @action="page.chatCenter.retryConnection"
-      />
-
-      <ThreadPanel
-        :model="page.threadPanel"
-        :domain-registry-store="page.domainRegistryStore"
-        @close="page.threadPanel.closeThread()"
       />
     </ErrorBoundary>
   </main>

@@ -11,7 +11,7 @@ import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
 import { getDeviceId } from "@/shared/utils/deviceId";
 import type { AuthServicePort } from "../domain/ports/AuthServicePort";
-import type { AuthLoginResult, TokenLoginResult } from "../domain/types/AuthTypes";
+import type { AuthLoginResult, AuthRegisterResult, TokenLoginResult } from "../domain/types/AuthTypes";
 import { AuthError, AuthRequiredPluginMissingError } from "../domain/errors/AuthErrors";
 import { buildInstalledPluginsPayload } from "./installedPluginsPayload";
 
@@ -22,6 +22,11 @@ type ApiTokenResponse = {
   refresh_token: string;
   uid: string;
   is_new_user: boolean;
+};
+
+type ApiRegisterResponse = {
+  uid: string;
+  username: string;
 };
 
 type ApiUserMeResponse = {
@@ -77,6 +82,21 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
     throw new AuthError({ code, message: String(error) || fallback, cause: error });
   }
 
+  function mapTokenResponse(res: ApiTokenResponse, code: AuthError["code"]): AuthLoginResult {
+    const accessToken = String(res.access_token ?? "").trim();
+    const refreshToken = String(res.refresh_token ?? "").trim();
+    const expiresInSec = Number(res.expires_in ?? 0);
+    if (!accessToken) throw new AuthError({ code, message: "Missing access_token in auth response." });
+    if (!refreshToken) throw new AuthError({ code, message: "Missing refresh_token in auth response." });
+    return {
+      accessToken,
+      refreshToken,
+      expiresInSec: Number.isFinite(expiresInSec) ? Math.max(0, Math.trunc(expiresInSec)) : 0,
+      uid: String(res.uid ?? "").trim(),
+      isNewUser: Boolean(res.is_new_user),
+    };
+  }
+
   return {
     async loginWithEmailCode(email: string, code: string): Promise<AuthLoginResult> {
       const e = email.trim();
@@ -94,20 +114,44 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
             installed_plugins,
           },
         });
-        const accessToken = String(res.access_token ?? "").trim();
-        const refreshToken = String(res.refresh_token ?? "").trim();
-        const expiresInSec = Number(res.expires_in ?? 0);
-        if (!accessToken) throw new AuthError({ code: "login_failed", message: "Missing access_token in login response." });
-        if (!refreshToken) throw new AuthError({ code: "login_failed", message: "Missing refresh_token in login response." });
-        return {
-          accessToken,
-          refreshToken,
-          expiresInSec: Number.isFinite(expiresInSec) ? Math.max(0, Math.trunc(expiresInSec)) : 0,
-          uid: String(res.uid ?? "").trim(),
-          isNewUser: Boolean(res.is_new_user),
-        };
+        return mapTokenResponse(res, "login_failed");
       } catch (err) {
         throwIfRequiredGate(err);
+        rethrowAsAuthError("login_failed", "Login failed", err);
+      }
+    },
+    async registerWithPassword(username: string, password: string): Promise<AuthRegisterResult> {
+      const u = username.trim();
+      const p = password;
+      if (!u || !p) {
+        throw new AuthError({ code: "missing_username_or_password", message: "Missing username or password." });
+      }
+      try {
+        const res = await baseClient.requestJson<ApiRegisterResponse>("POST", "/auth/register", {
+          username: u,
+          password: p,
+        });
+        const uid = String(res.uid ?? "").trim();
+        const name = String(res.username ?? "").trim() || u;
+        if (!uid) throw new AuthError({ code: "register_failed", message: "Missing uid in register response." });
+        return { uid, username: name };
+      } catch (err) {
+        rethrowAsAuthError("register_failed", "Register failed", err);
+      }
+    },
+    async loginWithPassword(username: string, password: string): Promise<AuthLoginResult> {
+      const u = username.trim();
+      const p = password;
+      if (!u || !p) {
+        throw new AuthError({ code: "missing_username_or_password", message: "Missing username or password." });
+      }
+      try {
+        const res = await baseClient.requestJson<ApiTokenResponse>("POST", "/auth/login", {
+          username: u,
+          password: p,
+        });
+        return mapTokenResponse(res, "login_failed");
+      } catch (err) {
         rethrowAsAuthError("login_failed", "Login failed", err);
       }
     },

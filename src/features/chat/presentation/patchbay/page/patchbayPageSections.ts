@@ -50,14 +50,12 @@ type PatchbayMessageContextMenuRawModel = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
-  showEdit: RefLike<boolean>;
   showRecall: RefLike<boolean>;
-  showViewThread: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
   isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
+  handleMenuCommand(command: "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -185,14 +183,12 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
-  showEdit: RefLike<boolean>;
   showRecall: RefLike<boolean>;
-  showViewThread: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
   isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
+  handleMenuCommand(command: "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
 };
 
 /**
@@ -205,9 +201,7 @@ export function createPatchbayMessageContextMenuSection(
     open: deps.open,
     x: deps.x,
     y: deps.y,
-    showEdit: deps.showEdit,
     showRecall: deps.showRecall,
-    showViewThread: deps.showViewThread,
     canPin: deps.canPin,
     isPinned: deps.isPinned,
     isBookmarked: deps.isBookmarked,

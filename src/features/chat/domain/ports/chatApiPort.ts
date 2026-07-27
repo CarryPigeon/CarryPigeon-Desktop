@@ -24,6 +24,8 @@ import type {
   ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
+  ChatMessageAttachmentType,
+  ChatMessageAttachmentUploadResult,
 } from "../types/chatApiModels";
 
 /**
@@ -50,8 +52,19 @@ export type ChatApiPort = {
     req: ChatSendMessageInput,
     idempotencyKey?: string,
   ): Promise<ChatMessageRecord>;
-  deleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void>;
-  recallMessage(serverSocket: string, accessToken: string, mid: string): Promise<void>;
+  uploadMessageAttachment(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    file: File,
+    messageType?: ChatMessageAttachmentType,
+  ): Promise<ChatMessageAttachmentUploadResult>;
+  recallMessage(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    mid: string,
+  ): Promise<ChatMessageRecord>;
   updateReadState(serverSocket: string, accessToken: string, cid: string, req: ChatReadStateInput): Promise<ChatReadStateResponse>;
   applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void>;
   patchChannel(
@@ -91,11 +104,6 @@ export type ChatApiPort = {
     cid: string,
     query: { q: string; cursor?: string; limit?: number; senderUid?: string; domain?: string; beforeMid?: string; afterMid?: string },
   ): Promise<ChatMessagePage>;
-  searchMessages(
-    serverSocket: string,
-    accessToken: string,
-    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
-  ): Promise<ChatMessagePage>;
   listChannelMessagesAround(
     serverSocket: string,
     accessToken: string,
@@ -104,22 +112,9 @@ export type ChatApiPort = {
     before?: number,
     after?: number,
   ): Promise<ChatMessagePage>;
-  editMessage(
-    serverSocket: string,
-    accessToken: string,
-    mid: string,
-    req: { domain: string; domainVersion: string; data: unknown; mentions?: Array<{ type: string; uid: string }>; expectedEditVersion?: number },
-  ): Promise<ChatMessageRecord>;
   pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void>;
   unpinMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void>;
   listPins(serverSocket: string, accessToken: string, cid: string, cursor?: string, limit?: number): Promise<{ items: ChatPinRecord[]; nextCursor?: string; hasMore?: boolean }>;
-  getThreadReplies(
-    serverSocket: string,
-    accessToken: string,
-    rootMessageId: string,
-    cursor?: string,
-    limit?: number,
-  ): Promise<ChatMessagePage>;
   forwardMessage(
     serverSocket: string,
     accessToken: string,

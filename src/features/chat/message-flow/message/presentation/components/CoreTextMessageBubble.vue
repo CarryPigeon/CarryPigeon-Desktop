@@ -2,10 +2,10 @@
 /**
  * @fileoverview CoreTextMessageBubble.vue
  * @description
- * message-flow/message｜Core:Text 消息气泡（支持 `[file:share_key]` token 分段渲染和 inline 编辑）。
+ * message-flow/message｜Core:Text 消息气泡（支持 `[file:share_key]` token 分段渲染）。
  */
 
-import { computed, ref, nextTick, watch, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import FileRefMessageBubble from "./FileRefMessageBubble.vue";
@@ -118,11 +118,6 @@ const props = defineProps<{
    */
   isOwn?: boolean;
   /**
-   * 外部触发的正在编辑的消息 ID。
-   * 当该值与 messageId 相等时进入编辑模式。
-   */
-  editingMessageId?: string;
-  /**
    * 链接预览卡片数据。
    */
   linkPreview?: ChatLinkPreview | null;
@@ -143,97 +138,10 @@ const renderSegments = computed(() => {
 
 const emit = defineEmits<{
   /**
-   * 编辑确认：携带新文本内容。
-   */
-  (event: "edit", payload: { messageId: string; text: string }): void;
-  /**
-   * 编辑取消。
-   */
-  (event: "edit-cancel", messageId: string): void;
-  /**
    * 打开图片灯箱。
    */
   (event: "openLightbox", payload: { url: string; fileName: string }): void;
 }>();
-
-/**
- * 编辑状态 refs。
- */
-const isEditing = ref(false);
-const editText = ref("");
-const isSaving = ref(false);
-const editInputRef = ref<HTMLTextAreaElement | null>(null);
-
-/**
- * 监听外部编辑触发：当 editingMessageId 变为当前消息 id 时进入编辑模式。
- * 当 editingMessageId 变为其他值（或清空）且正在编辑时，退出编辑模式。
- */
-watch(() => props.editingMessageId, (newVal) => {
-  if (newVal === props.messageId && props.isOwn !== false) {
-    startEdit();
-  } else if (newVal !== undefined && newVal !== props.messageId && isEditing.value) {
-    isEditing.value = false;
-    editText.value = "";
-    isSaving.value = false;
-  }
-});
-
-/**
- * 进入编辑模式：填充当前文本，聚焦 textarea 并全选。
- */
-function startEdit(): void {
-  isEditing.value = true;
-  editText.value = props.text;
-  isSaving.value = false;
-  nextTick(() => {
-    editInputRef.value?.focus();
-    editInputRef.value?.select();
-  });
-}
-
-/**
- * 取消编辑：退出编辑模式，清除编辑状态，通知父级。
- */
-function cancelEdit(): void {
-  isEditing.value = false;
-  editText.value = "";
-  isSaving.value = false;
-  emit("edit-cancel", props.messageId);
-}
-
-/**
- * 确认编辑：校验内容变化后发出 edit 事件。
- */
-function confirmEdit(): void {
-  if (isSaving.value) return;
-  const text = editText.value.trim();
-  if (!text || text === props.text) {
-    cancelEdit();
-    return;
-  }
-  isSaving.value = true;
-  emit("edit", { messageId: props.messageId, text });
-}
-
-/**
- * 编辑输入框按键处理：
- * - Enter（无 Shift）→ 确认
- * - Esc → 取消
- */
-function onEditKeydown(e: KeyboardEvent): void {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    confirmEdit();
-  } else if (e.key === "Escape") {
-    e.preventDefault();
-    cancelEdit();
-  }
-}
-
-/**
- * 暴露 startEdit 给父组件，支持通过模板 ref 触发编辑。
- */
-defineExpose({ startEdit });
 
 /**
  * 根据提及类型返回对应的 CSS class 名。
@@ -250,7 +158,7 @@ function openLink(url: string): void {
 </script>
 
 <template>
-  <!-- 组件：CoreTextMessageBubble｜职责：渲染 core-text（文本 + 文件引用 token），支持 inline 编辑 -->
+  <!-- 组件：CoreTextMessageBubble｜职责：渲染 core-text（文本 + 文件引用 token） -->
   <div class="cp-bubble">
     <div v-if="props.forwardedFrom" class="cp-forwardedFrom">
       <span class="cp-forwardedFrom__icon">↩</span>
@@ -287,55 +195,38 @@ function openLink(url: string): void {
       </div>
     </div>
 
-    <!-- 编辑模式 -->
-    <template v-if="isEditing">
-      <textarea
-        ref="editInputRef"
-        v-model="editText"
-        class="cp-bubble__editInput"
-        :disabled="isSaving"
-        @keydown="onEditKeydown"
-      ></textarea>
-      <div class="cp-bubble__editHint">
-        <span v-if="isSaving" class="cp-bubble__editSpinner">...</span>
-        <span v-else>Enter 保存 · Esc 取消</span>
-      </div>
-    </template>
-    <!-- 普通渲染模式：支持文本、文件引用 token、自定义表情与可评论代码块 -->
-    <template v-else>
-      <template v-for="(segment, segIdx) in renderSegments" :key="`${props.messageId}-seg-${segIdx}`">
-        <template v-if="segment.kind === 'text'">
-          <template v-if="hasFileToken(segment.text)">
-            <template v-for="(p, idx) in parseCoreTextParts(segment.text)" :key="`${props.messageId}-${segIdx}-${idx}`">
-              <span v-if="p.kind === 'text'">
-                <template v-for="(seg, si) in parseCustomEmojis(p.text)" :key="`${props.messageId}-${segIdx}-${idx}-${si}`">
-                  <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="':' + seg.name + ':'" class="cp-customEmoji" :title="':' + seg.name + ':'" />
-                  <span v-else>{{ seg.value }}</span>
-                </template>
-              </span>
-              <FileRefMessageBubble v-else :filename="p.shareKey" :share-key="p.shareKey" @openLightbox="(payload) => emit('openLightbox', payload)" />
-            </template>
-          </template>
-          <template v-else>
-            <template v-for="(seg, si) in parseCustomEmojis(segment.text)" :key="`${props.messageId}-${segIdx}-text-${si}`">
-              <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="':' + seg.name + ':'" class="cp-customEmoji" :title="':' + seg.name + ':'" />
-              <span v-else>{{ seg.value }}</span>
-            </template>
+    <template v-for="(segment, segIdx) in renderSegments" :key="`${props.messageId}-seg-${segIdx}`">
+      <template v-if="segment.kind === 'text'">
+        <template v-if="hasFileToken(segment.text)">
+          <template v-for="(p, idx) in parseCoreTextParts(segment.text)" :key="`${props.messageId}-${segIdx}-${idx}`">
+            <span v-if="p.kind === 'text'">
+              <template v-for="(seg, si) in parseCustomEmojis(p.text)" :key="`${props.messageId}-${segIdx}-${idx}-${si}`">
+                <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="':' + seg.name + ':'" class="cp-customEmoji" :title="':' + seg.name + ':'" />
+                <span v-else>{{ seg.value }}</span>
+              </template>
+            </span>
+            <FileRefMessageBubble v-else :filename="p.shareKey" :share-key="p.shareKey" @openLightbox="(payload) => emit('openLightbox', payload)" />
           </template>
         </template>
-        <CodeBlockReviewable
-          v-else
-          :code="segment.code"
-          :language="segment.language"
-          :block-index="segment.blockIndex ?? 0"
-          :message-id="props.messageId"
-          :channel-id="props.channelId ?? ''"
-          :current-user-id="props.currentUserId ?? ''"
-          :current-user-name="props.currentUserName ?? ''"
-        />
+        <template v-else>
+          <template v-for="(seg, si) in parseCustomEmojis(segment.text)" :key="`${props.messageId}-${segIdx}-text-${si}`">
+            <img v-if="seg.type === 'emoji'" :src="seg.imagePath" :alt="':' + seg.name + ':'" class="cp-customEmoji" :title="':' + seg.name + ':'" />
+            <span v-else>{{ seg.value }}</span>
+          </template>
+        </template>
       </template>
-      <span v-if="props.isEdited" class="cp-bubble__edited">(已编辑)</span>
+      <CodeBlockReviewable
+        v-else
+        :code="segment.code"
+        :language="segment.language"
+        :block-index="segment.blockIndex ?? 0"
+        :message-id="props.messageId"
+        :channel-id="props.channelId ?? ''"
+        :current-user-id="props.currentUserId ?? ''"
+        :current-user-name="props.currentUserName ?? ''"
+      />
     </template>
+    <span v-if="props.isEdited" class="cp-bubble__edited">(已编辑)</span>
 
     <div v-if="props.mentions?.length" class="cp-mentionList">
       <span
@@ -438,29 +329,6 @@ function openLink(url: string): void {
   white-space: nowrap;
 }
 
-/* 编辑输入框 */
-.cp-bubble__editInput {
-  width: 100%;
-  min-height: 48px;
-  padding: 8px 12px;
-  border: 1px solid var(--cp-accent, #5865f2);
-  border-radius: 6px;
-  background: var(--cp-panel);
-  color: var(--cp-text);
-  font-size: 13px;
-  resize: vertical;
-  outline: none;
-}
-.cp-bubble__editHint {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--cp-text-muted, #888);
-  margin-top: 4px;
-}
-.cp-bubble__editSpinner {
-  color: var(--cp-accent, #5865f2);
-}
 .cp-bubble__edited {
   font-size: 11px;
   color: var(--cp-text-muted, #888);
@@ -527,4 +395,3 @@ function openLink(url: string): void {
   object-fit: contain;
 }
 </style>
-

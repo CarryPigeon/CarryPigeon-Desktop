@@ -36,10 +36,7 @@ function makeMockDeps(overrides: Record<string, unknown> = {}): MessageFlowAppli
         domain: "Core:Text", data: { text: "Hello" },
         send_time: Date.now(),
       }),
-      deleteChannelMessage: vi.fn().mockResolvedValue(undefined),
-      deleteMessage: vi.fn().mockResolvedValue(undefined),
-      editChannelMessage: vi.fn().mockResolvedValue({}),
-      recallChannelMessage: vi.fn().mockResolvedValue({}),
+      recallMessage: vi.fn().mockResolvedValue({}),
       listChannelMessages: vi.fn().mockResolvedValue({ items: [], nextCursor: null, hasMore: false }),
     },
     scope: {
@@ -50,7 +47,6 @@ function makeMockDeps(overrides: Record<string, unknown> = {}): MessageFlowAppli
     timelineState: {
       readCurrentChannelId: vi.fn().mockReturnValue("ch1"),
       appendMessageIfMissing: vi.fn(),
-      beginOptimisticMessageRemoval: vi.fn().mockReturnValue({ restore: vi.fn() }),
       listMessages: vi.fn().mockReturnValue([]),
       replaceMessage: vi.fn(),
     },
@@ -202,11 +198,75 @@ describe("MessageFlowApplicationService", () => {
         expect.any(String),
         "ch1",
         expect.objectContaining({
-          replyToMessageId: "reply-to-1",
-          replyTo: expect.objectContaining({ messageId: "reply-to-1" }),
+          domain: "Core:ReplyText",
+          data: expect.objectContaining({
+            content: expect.objectContaining({ text: "Hello" }),
+            replyToMessageId: "reply-to-1",
+            replyTo: expect.objectContaining({ messageId: "reply-to-1" }),
+          }),
         }),
         expect.any(String),
       );
+    });
+
+    it("should send Core:ReplyText with quote reply", async () => {
+      const deps = makeMockDeps();
+      deps.composerState.readQuoteReplyDraft = vi.fn().mockReturnValue({
+        messageId: "quote-1",
+        userId: "u2",
+        preview: "Quoted text",
+      });
+      const svc = new MessageFlowApplicationService(deps);
+
+      const result = await svc.sendComposerMessage();
+      expect(result.ok).toBe(true);
+      expect(deps.api.sendChannelMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        "ch1",
+        expect.objectContaining({
+          domain: "Core:ReplyText",
+          data: expect.objectContaining({
+            content: expect.objectContaining({ text: "Hello" }),
+            quoteReply: expect.objectContaining({ messageId: "quote-1" }),
+          }),
+        }),
+        expect.any(String),
+      );
+    });
+
+    it("should put linkPreview inside data and mentions at top level for Core:ReplyText", async () => {
+      const deps = makeMockDeps();
+      deps.composerState.listDraftMentions = vi.fn().mockReturnValue([
+        { userId: "u2", displayName: "Bob", type: "user" },
+      ]);
+      deps.composerState.readReplyDraft = vi.fn().mockReturnValue({
+        messageId: "reply-to-1",
+        senderName: "Bob",
+        preview: "Hi",
+        createdAt: 1000,
+      });
+      const svc = new MessageFlowApplicationService(deps);
+
+      const result = await svc.sendComposerMessage({
+        domain: "Core:Text",
+        domainVersion: "1.0.0",
+        data: { text: "Hello" },
+        linkPreview: { url: "https://example.com", title: "Example" },
+      });
+      expect(result.ok).toBe(true);
+      const call = (deps.api.sendChannelMessage as ReturnType<typeof vi.fn>).mock.calls[0];
+      const req = call[3] as {
+        domain: string;
+        data: { content: unknown; linkPreview?: unknown };
+        mentions?: unknown[];
+      };
+      expect(req.domain).toBe("Core:ReplyText");
+      expect(req.data.content).toEqual({ text: "Hello" });
+      // mentions 在信封顶层（domain ChatSendMessageInput.mentions），不放入 data；
+      // 由 wire mapper 在序列化时转为 string[] 写到 wire 顶层。
+      expect(req.mentions).toEqual([{ userId: "u2", displayName: "Bob", type: "user" }]);
+      expect(req.data.linkPreview).toEqual({ url: "https://example.com", title: "Example" });
     });
 
     it("should handle send failure gracefully", async () => {
@@ -229,54 +289,6 @@ describe("MessageFlowApplicationService", () => {
       const result = await svc.sendComposerMessage();
       expect(result.ok).toBe(false);
       expect((result as any).error?.code).toBe("plugin_composer_required");
-    });
-  });
-
-  describe("deleteMessage", () => {
-    it("should reject empty message id", async () => {
-      const deps = makeMockDeps();
-      const svc = new MessageFlowApplicationService(deps);
-
-      const result = await svc.deleteMessage("");
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.code).toBe("missing_message_id");
-      }
-    });
-
-    it("should reject when not signed in", async () => {
-      const deps = makeMockDeps();
-      deps.scope.getSocketAndValidToken = vi.fn().mockResolvedValue([null, null]);
-      const svc = new MessageFlowApplicationService(deps);
-
-      const result = await svc.deleteMessage("msg-1");
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.code).toBe("not_signed_in");
-      }
-    });
-
-    it("should optimistically remove then call API", async () => {
-      const deps = makeMockDeps();
-      const svc = new MessageFlowApplicationService(deps);
-
-      const result = await svc.deleteMessage("msg-1");
-      expect(result.ok).toBe(true);
-      expect(result.kind).toBe("chat_message_deleted");
-      expect(deps.api.deleteMessage).toHaveBeenCalled();
-    });
-
-    it("should rollback on delete failure", async () => {
-      const restoreMock = vi.fn();
-      const deps = makeMockDeps();
-      deps.timelineState.beginOptimisticMessageRemoval = vi.fn().mockReturnValue({ restore: restoreMock });
-      deps.api.deleteMessage = vi.fn().mockRejectedValue(new Error("Server error"));
-      const svc = new MessageFlowApplicationService(deps);
-
-      const result = await svc.deleteMessage("msg-1");
-      expect(result.ok).toBe(false);
-      expect(result.kind).toBe("chat_message_delete_rejected");
-      expect(restoreMock).toHaveBeenCalled();
     });
   });
 });

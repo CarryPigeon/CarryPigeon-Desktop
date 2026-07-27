@@ -110,6 +110,11 @@ const channelGroups = computed(() => {
   });
 });
 
+/** 服务端频道摘要不含 category_*；无真实分类时扁平展示。 */
+const hasServerCategories = computed(() =>
+  props.model.channels.some((c) => Boolean(c.categoryId)),
+);
+
 const collapsedGroups = reactive(new Set<string>());
 
 function toggleGroup(groupId: string): void {
@@ -123,6 +128,10 @@ function toggleGroup(groupId: string): void {
 function onChannelContextMenu(e: MouseEvent, channelId: string): void {
   emit("channel-context-menu", e, channelId);
 }
+
+onMounted(() => {
+  props.model.setChannelTab("joined");
+});
 </script>
 
 <template>
@@ -194,12 +203,7 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
     <div class="cp-channelSearch">
       <!-- 区块：Tabs（joined/discover） -->
       <div class="cp-channelTabs">
-        <button class="cp-channelTabs__btn" type="button" :data-active="props.model.channelTab === 'joined'" @click="props.model.setChannelTab('joined')">
-          {{ t("channels_joined") }}
-        </button>
-        <button class="cp-channelTabs__btn" type="button" :data-active="props.model.channelTab === 'discover'" @click="props.model.setChannelTab('discover')">
-          {{ t("channels_discover") }}
-        </button>
+        <!-- 服务端频道列表即成员频道；discover 需走 /channels/discover，暂不在此本地过滤 -->
         <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateMenu($event)" :title="t('create_chat')">+</button>
       </div>
       <!-- 区块：搜索输入框 -->
@@ -218,7 +222,7 @@ function onChannelContextMenu(e: MouseEvent, channelId: string): void {
         <template v-for="group in channelGroups" :key="group.id">
           <!-- 区块：分组标题（仅 joined 视图显示分组） -->
           <CategoryGroupHeader
-            v-if="group.id !== '__uncategorized__' || group.channels.length > 0"
+            v-if="hasServerCategories"
             :group-id="group.id"
             :name="group.name"
             :count="group.channels.length"

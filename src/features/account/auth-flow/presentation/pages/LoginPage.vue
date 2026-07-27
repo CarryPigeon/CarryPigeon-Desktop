@@ -10,6 +10,7 @@ import { useI18n } from "vue-i18n";
 import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { useLoginWizard } from "../composables/useLoginWizard";
 import { useLoginEmailAuth } from "../composables/useLoginEmailAuth";
+import { useLoginPasswordAuth } from "../composables/useLoginPasswordAuth";
 import { useLoginHotkeys } from "../composables/useLoginHotkeys";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
@@ -21,7 +22,9 @@ const authFlowCapabilities = getAuthFlowCapabilities();
 
 let wizard: ReturnType<typeof useLoginWizard>;
 
-const auth = useLoginEmailAuth({
+const authMethod = ref<"email" | "password">("email");
+
+const emailAuth = useLoginEmailAuth({
   router,
   onRequiredSetup: (outcome) => {
     authFlowCapabilities.updateMissingRequiredPlugins([...outcome.missingPluginIds]);
@@ -30,9 +33,43 @@ const auth = useLoginEmailAuth({
   },
 });
 
-const { email, code, sending, loggingIn, banner, countdown, clearBanner, handleSendCode, handleLogin } = auth;
+const passwordAuth = useLoginPasswordAuth({
+  router,
+  mode: "login",
+  onRequiredSetup: (outcome) => {
+    authFlowCapabilities.updateMissingRequiredPlugins([...outcome.missingPluginIds]);
+    void wizard.ensurePrepareData();
+    wizard.goToPrepare();
+  },
+});
 
-wizard = useLoginWizard({ onSocketDraftChanged: clearBanner });
+const {
+  email,
+  code,
+  sending,
+  loggingIn: emailLoggingIn,
+  banner: emailBanner,
+  countdown,
+  clearBanner: clearEmailBanner,
+  handleSendCode,
+  handleLogin,
+} = emailAuth;
+
+const {
+  username,
+  password,
+  loggingIn: passwordLoggingIn,
+  banner: passwordBanner,
+  clearBanner: clearPasswordBanner,
+  handlePasswordAuth,
+} = passwordAuth;
+
+wizard = useLoginWizard({
+  onSocketDraftChanged: () => {
+    clearEmailBanner();
+    clearPasswordBanner();
+  },
+});
 
 const connecting = ref(false);
 async function onConnect(): Promise<void> {
@@ -42,6 +79,12 @@ async function onConnect(): Promise<void> {
   } finally {
     connecting.value = false;
   }
+}
+
+function switchAuthMethod(method: "email" | "password"): void {
+  authMethod.value = method;
+  clearEmailBanner();
+  clearPasswordBanner();
 }
 
 useLoginHotkeys(router);
@@ -213,9 +256,34 @@ useLoginHotkeys(router);
           <h1 class="cp-login__panelTitle">{{ t("login_account_title") }}</h1>
           <p class="cp-login__panelSub">{{ t("login_account_desc") }}</p>
 
-          <div v-if="banner" class="cp-login__banner">{{ banner }}</div>
+          <div class="cp-login__methodTabs" role="tablist">
+            <button
+              class="cp-login__methodTab"
+              type="button"
+              role="tab"
+              :aria-selected="authMethod === 'email'"
+              :data-active="authMethod === 'email'"
+              @click="switchAuthMethod('email')"
+            >
+              {{ t("login_method_email") }}
+            </button>
+            <button
+              class="cp-login__methodTab"
+              type="button"
+              role="tab"
+              :aria-selected="authMethod === 'password'"
+              :data-active="authMethod === 'password'"
+              @click="switchAuthMethod('password')"
+            >
+              {{ t("login_method_password") }}
+            </button>
+          </div>
 
-          <div class="cp-login__form">
+          <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
+            {{ authMethod === "email" ? emailBanner : passwordBanner }}
+          </div>
+
+          <div v-if="authMethod === 'email'" class="cp-login__form">
             <div class="cp-login__formRow">
               <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
               <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
@@ -231,8 +299,31 @@ useLoginHotkeys(router);
               </div>
             </div>
 
-            <button class="cp-login__primary" type="button" :disabled="loggingIn" @click="handleLogin">
-              {{ loggingIn ? t("signing_in") : t("sign_in_register") }}
+            <button class="cp-login__primary" type="button" :disabled="emailLoggingIn" @click="handleLogin">
+              {{ emailLoggingIn ? t("signing_in") : t("sign_in_register") }}
+            </button>
+
+            <div class="cp-login__formRow cp-login__registerRow">
+              <span class="cp-login__muted">{{ t("login_no_account") }}</span>
+              <button class="cp-login__ghost" type="button" @click="router.push('/register')">{{ t("login_register") }}</button>
+            </div>
+
+            <button class="cp-login__ghost" type="button" @click="wizard.goToPrepare()">{{ t("login_back") }}</button>
+          </div>
+
+          <div v-else class="cp-login__form">
+            <div class="cp-login__formRow">
+              <div class="cp-login__fieldLabel">{{ t("login_field_username") }}</div>
+              <t-input v-model="username" :placeholder="t('login_username_placeholder')" clearable />
+            </div>
+
+            <div class="cp-login__formRow">
+              <div class="cp-login__fieldLabel">{{ t("login_field_password") }}</div>
+              <t-input v-model="password" type="password" :placeholder="t('login_password_placeholder')" clearable />
+            </div>
+
+            <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn" @click="handlePasswordAuth">
+              {{ passwordLoggingIn ? t("signing_in") : t("sign_in") }}
             </button>
 
             <div class="cp-login__formRow cp-login__registerRow">
@@ -575,6 +666,29 @@ useLoginHotkeys(router);
 .cp-login__registerRow {
   text-align: center;
   align-items: center;
+}
+
+.cp-login__methodTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+
+.cp-login__methodTab {
+  border: 1px solid var(--cp-border);
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cp-login__methodTab[data-active="true"] {
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
+  color: var(--cp-text);
 }
 
 /* Code row (input + send) */

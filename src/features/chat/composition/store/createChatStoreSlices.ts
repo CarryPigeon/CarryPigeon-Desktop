@@ -36,6 +36,7 @@ export function createRoomSessionSlice(store: ChatRuntimeAggregateStore): RoomSe
  */
 export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): MessageFlowRuntimeStore {
   return {
+    currentChannelId: store.currentChannelId,
     composerDraft: store.composerDraft,
     multiSelectMode: store.multiSelectMode,
     selectedMessageIds: store.selectedMessageIds,
@@ -55,15 +56,12 @@ export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): Messag
     loadMoreMessages: store.loadMoreMessages,
     startReply: store.startReply,
     cancelReply: store.cancelReply,
-    deleteMessage: store.deleteMessage,
-    editMessage: store.editMessage,
     recallMessage: store.recallMessage,
     sendComposerMessage: store.sendComposerMessage,
     reactToMessage: store.reactToMessage,
     removeReaction: store.removeReaction,
     listMentionCandidates: store.listMentionCandidates,
     searchCurrentChannel: store.searchCurrentChannel,
-    searchServerMessages: store.searchServerMessages,
     loadContextAroundMessage: store.loadContextAroundMessage,
     clearSearch: store.clearSearch,
   };

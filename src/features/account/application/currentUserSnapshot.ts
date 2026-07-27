@@ -89,9 +89,17 @@ export function applyCurrentUserProfilePatch(patch: CurrentUserProfilePatch): Cu
 
 /**
  * 从权威 `me` 资料同步当前用户快照。
+ *
+ * 说明：
+ * - `GET /users/me` 当前不返回 `background_url`；
+ * - 同步时若权威资料缺少背景，保留本地已有背景，避免上传后被空值清掉。
  */
 export async function syncCurrentUserSnapshot(serverSocket: string, accessToken: string): Promise<CurrentUser> {
+  const previous = getCurrentUserSnapshot();
   const profile = await getCurrentUserProfile(serverSocket, accessToken);
   const snapshot = toCurrentUserSnapshot(profile);
+  if (!snapshot.backgroundUrl && previous.backgroundUrl) {
+    snapshot.backgroundUrl = previous.backgroundUrl;
+  }
   return replaceCurrentUserSnapshot(snapshot);
 }

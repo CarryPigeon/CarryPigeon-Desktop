@@ -104,6 +104,12 @@ describe("mapChatUnreadStateWire", () => {
     const result = mapChatUnreadStateWire(wire as any);
     expect(result.unreadCount).toBe(0);
   });
+
+  it("should leave mentionUnreadCount undefined when server omits mention_unread_count", () => {
+    const wire = { cid: "ch3", unread_count: 2, last_read_time: 1699999999000 };
+    const result = mapChatUnreadStateWire(wire as any);
+    expect(result.mentionUnreadCount).toBeUndefined();
+  });
 });
 
 // ── mapChatMessageWire ──
@@ -112,42 +118,50 @@ describe("mapChatMessageWire", () => {
   it("should map core_text message wire", () => {
     const wire = {
       mid: "msg1", cid: "ch1", uid: "u1",
-      sender: { uid: "u1", nickname: "Alice" },
       domain: "Core:Text", data: { text: "Hello world" },
       send_time: 1700000000000,
     };
     const result = mapChatMessageWire(wire as any);
     expect(result.id).toBe("msg1");
     expect(result.channelId).toBe("ch1");
-    expect(result.sender?.nickname).toBe("Alice");
+    // 服务端 canonical 信封不携带 sender，作者信息由客户端通过 members 等接口解析；
+    // mapper 应将 sender 留空，而非从 wire 顶层读取。
+    expect(result.sender).toBeUndefined();
+    expect(result.userId).toBe("u1");
     expect(result.domain).toBe("Core:Text");
     expect(result.sentTime).toBe(1700000000000);
   });
 
-  it("should map reply_to when present", () => {
+  it("should extract reply_to from Core:ReplyText data", () => {
     const wire = {
       mid: "msg2", cid: "ch1", uid: "u2",
-      sender: { uid: "u2", nickname: "Bob" },
-      domain: "Core:Text", data: { text: "Reply" },
+      domain: "Core:ReplyText",
+      domain_version: "1.0.0",
+      data: {
+        content: { text: "Reply" },
+        reply_to_mid: "msg1",
+        reply_to: { mid: "msg1", sender_name: "Alice", preview: "Hello", created_at: 1699999999000 },
+      },
       send_time: 1700000000000,
-      reply_to: { mid: "msg1", sender_name: "Alice", preview: "Hello", created_at: 1699999999000 },
     };
     const result = mapChatMessageWire(wire as any);
     expect(result.replyTo?.messageId).toBe("msg1");
     expect(result.replyTo?.senderName).toBe("Alice");
+    expect(result.replyToMessageId).toBe("msg1");
   });
 
-  it("should parse mentions array", () => {
+  it("should parse mentions string array at top level", () => {
     const wire = {
       mid: "msg3", cid: "ch1", uid: "u1",
-      sender: { uid: "u1", nickname: "Alice" },
       domain: "Core:Text", data: { text: "Hey @Bob" },
       send_time: 1700000000000,
-      mentions: [{ uid: "u2", display_name: "Bob", type: "user" }],
+      mentions: ["u2"],
     };
     const result = mapChatMessageWire(wire as any);
     expect(result.mentions).toHaveLength(1);
     expect(result.mentions![0].userId).toBe("u2");
+    // wire 顶层为 string[]，服务端不回传 displayName/type，留空由渲染层回退。
+    expect(result.mentions![0].displayName).toBe("");
   });
 });
 
@@ -202,6 +216,18 @@ describe("mapChatChannelMemberWire", () => {
     const result = mapChatChannelMemberWire(wire as any);
     expect(result.role).toBe("member");
   });
+
+  it("should convert Instant epoch seconds join_time to milliseconds", () => {
+    const wire = { uid: "u3", nickname: "Carol", join_time: 1700000000 };
+    const result = mapChatChannelMemberWire(wire as any);
+    expect(result.joinTime).toBe(1700000000000);
+  });
+
+  it("should convert numeric-string Instant seconds join_time to milliseconds", () => {
+    const wire = { uid: "u4", nickname: "Dave", join_time: "1700000000.5" };
+    const result = mapChatChannelMemberWire(wire as any);
+    expect(result.joinTime).toBe(1700000000500);
+  });
 });
 
 // ── mapChatChannelApplicationWire ──
@@ -217,6 +243,7 @@ describe("mapChatChannelApplicationWire", () => {
     expect(result.userId).toBe("u2");
     expect(result.reason).toBe("Please let me in");
     expect(result.status).toBe("pending");
+    expect(result.applyTime).toBe(1700000000000);
   });
 });
 
@@ -281,15 +308,136 @@ describe("mapChatSendMessageInput", () => {
       replyTo: { messageId: "r1", senderName: "Bob", preview: "Hi", createdAt: 1 },
       quoteReply: { messageId: "q1", userId: "u2", preview: "Hey" },
       mentions: [{ userId: "u3", displayName: "Charlie", type: "user" as const }],
-      linkPreview: undefined,
+      linkPreview: { url: "https://example.com", title: "Example" },
     } as any;
     const result = mapChatSendMessageInput(input);
     expect(result.domain).toBe("Core:Text");
     expect(result.domain_version).toBe("1.0.0");
     expect(result.data).toEqual({ text: "Hello" });
-    expect(result.reply_to_mid).toBe("reply1");
-    expect(result.reply_to?.mid).toBe("r1");
-    expect(result.quote_reply?.mid).toBe("q1");
+    // Core:Text 顶层不承载 reply/quote/link_preview 关系元数据
+    expect((result as any).reply_to_mid).toBeUndefined();
+    expect((result as any).reply_to).toBeUndefined();
+    expect((result as any).quote_reply).toBeUndefined();
+    expect((result as any).link_preview).toBeUndefined();
+    // mentions 在信封顶层为 string[]（snowflake UID）
+    expect(result.mentions).toEqual(["u3"]);
+  });
+
+  it("should put reply metadata and linkPreview inside data for Core:ReplyText", () => {
+    const input = {
+      domain: "Core:ReplyText",
+      domainVersion: "1.0.0",
+      data: {
+        content: { text: "Reply text" },
+      },
+      replyToMessageId: "reply1",
+      replyTo: { messageId: "r1", senderName: "Bob", preview: "Hi", createdAt: 1 },
+      quoteReply: { messageId: "q1", userId: "u2", preview: "Hey" },
+      mentions: [{ userId: "u3", displayName: "Charlie", type: "user" }],
+      linkPreview: { url: "https://example.com", title: "Example" },
+    } as any;
+    const result = mapChatSendMessageInput(input);
+    expect(result.domain).toBe("Core:ReplyText");
+    // 关系元数据放在 data 内，顶层不出现
+    expect((result as any).reply_to_mid).toBeUndefined();
+    expect((result as any).reply_to).toBeUndefined();
+    expect((result as any).quote_reply).toBeUndefined();
+    expect((result as any).link_preview).toBeUndefined();
+    // mentions 仍在信封顶层为 string[]（snowflake UID），不放入 data
+    expect(result.mentions).toEqual(["u3"]);
+    expect(result.data).toEqual({
+      content: { text: "Reply text" },
+      reply_to_mid: "reply1",
+      reply_to: { mid: "r1", sender_name: "Bob", preview: "Hi", created_at: 1, unavailable: false },
+      quote_reply: { mid: "q1", uid: "u2", preview: "Hey" },
+      link_preview: input.linkPreview,
+    });
+  });
+});
+
+// ── Core:ReplyText / Core:Forward wrapper domains ──
+
+describe("mapChatMessageWire wrapper domains", () => {
+  it("should extract reply metadata, mentions and linkPreview from Core:ReplyText data", () => {
+    const wire = {
+      mid: "msg-reply",
+      cid: "ch1",
+      uid: "u1",
+      domain: "Core:ReplyText",
+      domain_version: "1.0.0",
+      data: {
+        content: { text: "Reply text" },
+        reply_to_mid: "msg1",
+        reply_to: { mid: "msg1", sender_name: "Bob", preview: "Hi", created_at: 1699999999000 },
+        quote_reply: { mid: "msg2", uid: "u2", preview: "Hey" },
+        link_preview: { url: "https://example.com", title: "Example" },
+      },
+      // mentions 在信封顶层为 string[]（snowflake UID），不放入 data。
+      mentions: ["u3"],
+      send_time: 1700000000000,
+    };
+    const result = mapChatMessageWire(wire as any);
+    expect(result.domain).toBe("Core:ReplyText");
+    expect(result.data).toEqual({
+      content: { text: "Reply text" },
+      replyToMessageId: "msg1",
+      replyTo: { messageId: "msg1", senderName: "Bob", preview: "Hi", createdAt: 1699999999000, unavailable: false },
+      quoteReply: { messageId: "msg2", userId: "u2", preview: "Hey" },
+      linkPreview: { url: "https://example.com", title: "Example" },
+    });
+    expect(result.replyToMessageId).toBe("msg1");
+    expect(result.replyTo?.messageId).toBe("msg1");
+    expect(result.replyTo?.senderName).toBe("Bob");
+    expect(result.quoteReply?.messageId).toBe("msg2");
+    // mentions 从顶层 string[] 解析为 ChatMessageMentionRecord[]，displayName 留空。
+    expect(result.mentions).toEqual([{ userId: "u3", displayName: "" }]);
+    expect(result.linkPreview).toEqual(wire.data.link_preview);
+  });
+
+  it("should extract forward metadata from Core:Forward data", () => {
+    const wire = {
+      mid: "msg-fwd",
+      cid: "ch1",
+      uid: "u1",
+      domain: "Core:Forward",
+      domain_version: "1.0.0",
+      data: {
+        domain: "Core:Text",
+        domain_version: "1.0.0",
+        content: { text: "See this" },
+        forwarded_from: { mid: "msg1", cid: "ch2", uid: "u2", preview: "Hello", send_time: 1699999999000 },
+      },
+      send_time: 1700000000000,
+    };
+    const result = mapChatMessageWire(wire as any);
+    expect(result.domain).toBe("Core:Forward");
+    expect(result.forwardedFrom?.messageId).toBe("msg1");
+    expect(result.forwardedFrom?.channelId).toBe("ch2");
+  });
+
+  it("should extract merged forward metadata from Core:Forward data", () => {
+    const wire = {
+      mid: "msg-fwd-merged",
+      cid: "ch1",
+      uid: "u1",
+      domain: "Core:Forward",
+      domain_version: "1.0.0",
+      data: {
+        domain: "Core:Text",
+        domain_version: "1.0.0",
+        content: { text: "" },
+        forwarded_messages: [
+          { mid: "msg1", cid: "ch2", uid: "u2", preview: "A", send_time: 1699999999000 },
+          { mid: "msg2", cid: "ch2", uid: "u2", preview: "B", send_time: 1699999999100 },
+        ],
+      },
+      send_time: 1700000000000,
+    };
+    const result = mapChatMessageWire(wire as any);
+    expect(result.domain).toBe("Core:Forward");
+    expect(result.forwardedMessages).toHaveLength(2);
+    expect(result.forwardedMessages?.[0].messageId).toBe("msg1");
+    expect(result.forwardedMessages?.[1].messageId).toBe("msg2");
   });
 });
 

@@ -22,9 +22,10 @@ import {
   markError,
   updateProgress,
 } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
-import { getFileServicePort } from "@/features/chat/message-flow/upload/composition/uploadServices";
+import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { readAuthToken } from "@/shared/utils/localState";
+import { IS_STORE_MOCK } from "@/shared/config/runtime";
 import {
   addMention,
   availableDomains,
@@ -32,10 +33,9 @@ import {
   clearSearch,
   composerDraft,
   currentChannelHasMore,
+  currentChannelId,
   currentMessages,
-  deleteMessage,
   draftMentions,
-  editMessage,
   getMessageById as findMessageByIdInChannel,
   highlightedMessageId,
   listMentionCandidates,
@@ -50,7 +50,6 @@ import {
   replyDraft,
   replyToMessageId,
   searchCurrentChannel,
-  searchServerMessages,
   searchState,
   selectedDomainId,
   sendComposerMessage,
@@ -64,6 +63,7 @@ import type {
   MessageFlowCapabilities,
   MessageTimelineSnapshot,
 } from "./api-types";
+import { createMessageActionError } from "./domain/outcomes/messageActionOutcome";
 
 /**
  * 在“当前频道”时间线里按消息 id 查询消息。
@@ -92,8 +92,6 @@ function getTimelineSnapshot(): MessageTimelineSnapshot {
     hasMoreHistory: currentChannelHasMore.value,
     isLoadingHistory: loadingMoreMessages.value,
     search: { ...searchState.value },
-    searchScope: searchState.value.searchScope,
-    serverResults: searchState.value.serverResults ?? [],
     highlightedMessageId: highlightedMessageId.value,
   };
 }
@@ -181,10 +179,12 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
   }
 
   /**
-   * 发送消息前先上传所有待上传的图片附件。
+   * 发送消息前先上传所有待上传附件，并按服务端契约发送 Core:File。
    *
-   * 对每个 pending 附件调用两段式上传（requestUpload + performUpload），
-   * 然后将 `[file:shareKey]` token 追加到 composer draft 末尾，再执行发送。
+   * 流程：
+   * 1. `POST /channels/{cid}/messages/attachments` 上传每个 pending 附件；
+   * 2. 对每个成功附件发送一条 `Core:File` 消息；
+   * 3. 若仍有文本 draft 或显式 payload，再走原有 Core:Text / ReplyText 发送。
    *
    * @param payload - 可选的发送 payload。
    * @returns 发送结果。
@@ -193,42 +193,145 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
     payload?: import("./api-types").ComposerSubmitPayload,
   ): Promise<import("./api-types").SendChatMessageOutcome> {
     const pending = getPendingAttachments();
+    let lastFileOutcome: import("./api-types").SendChatMessageOutcome | null = null;
+
     if (pending.length > 0) {
       const socket = getActiveChatServerSocket();
       const token = readAuthToken(socket) || "";
-      const fileService = getFileServicePort();
+      const cid = currentChannelId.value.trim();
+      if (!socket || !token || !cid) {
+        return sendComposerMessage(payload);
+      }
 
       for (const att of pending) {
         try {
           updateProgress(att.id, 10);
-          // 两段式上传：第一步，请求 upload descriptor
-          const result = await fileService.requestUpload(socket, token, {
-            filename: att.file.name,
-            mimeType: att.file.type || "application/octet-stream",
-            sizeBytes: att.file.size,
+          let uploaded: {
+            shareKey: string;
+            objectKey: string;
+            filename: string;
+            mimeType: string;
+            size: number;
+          };
+          if (IS_STORE_MOCK) {
+            uploaded = {
+              shareKey: `mock-shr-${att.id}`,
+              objectKey: `mock/object/${att.id}`,
+              filename: att.file.name || "file",
+              mimeType: att.file.type || "application/octet-stream",
+              size: att.file.size,
+            };
+          } else {
+            uploaded = await httpChatApiPort.uploadMessageAttachment(
+              socket,
+              token,
+              cid,
+              att.file,
+              "file",
+            );
+          }
+          updateProgress(att.id, 80);
+          markDone(att.id, uploaded.shareKey);
+
+          lastFileOutcome = await sendComposerMessage({
+            domain: "Core:File",
+            domainVersion: "1.0.0",
+            data: {
+              share_key: uploaded.shareKey,
+              object_key: uploaded.objectKey,
+              filename: uploaded.filename || att.file.name || "file",
+              mime_type: uploaded.mimeType || att.file.type || "application/octet-stream",
+              size: uploaded.size || att.file.size,
+            },
           });
-          updateProgress(att.id, 50);
-          // 第二步，执行实际上传（直接传递 File，让 fetch 流式读取）
-          await fileService.performUpload(socket, result.upload, att.file);
-          markDone(att.id, result.shareKey);
-          // 将 shareKey 追加到 draft
-          appendAttachmentShareKey(result.shareKey);
+          if (!lastFileOutcome.ok) {
+            markError(att.id, lastFileOutcome.error.message);
+          }
         } catch (e) {
           markError(att.id, String(e));
-          // 继续上传其余文件
         }
       }
     }
-    const outcome = await sendComposerMessage(payload);
-    if (outcome.ok) {
-      // 仅清理上传成功的附件，保留失败的以便用户查看错误状态并重试
-      for (const [id, att] of getAttachments()) {
-        if (att.status === "done") {
-          removeAttachment(id);
+
+    const draftText = composerDraft.value.trim();
+    const hasRealPayload = !!(payload && (String(payload.domain ?? "").trim() || payload.data !== undefined));
+    if (draftText || hasRealPayload) {
+      const outcome = await sendComposerMessage(payload);
+      if (outcome.ok) {
+        for (const [id, att] of getAttachments()) {
+          if (att.status === "done") removeAttachment(id);
         }
       }
+      return outcome;
     }
-    return outcome;
+
+    if (lastFileOutcome) {
+      if (lastFileOutcome.ok) {
+        for (const [id, att] of getAttachments()) {
+          if (att.status === "done") removeAttachment(id);
+        }
+      }
+      return lastFileOutcome;
+    }
+
+    return sendComposerMessage(payload);
+  }
+
+  /**
+   * 上传并发送一条 Core:Voice 语音消息。
+   */
+  async function sendVoiceMessage(input: {
+    file: File;
+    durationMs: number;
+  }): Promise<import("./api-types").SendChatMessageOutcome> {
+    const socket = getActiveChatServerSocket();
+    const token = readAuthToken(socket) || "";
+    const cid = currentChannelId.value.trim();
+    if (!socket || !token || !cid) {
+      const error = createMessageActionError("not_signed_in", "Not signed in or no channel selected.");
+      return { ok: false, kind: "chat_message_send_rejected", error };
+    }
+
+    // store-mock：退化为本地附件发送，保留时长字段到 Core:Voice data。
+    if (IS_STORE_MOCK) {
+      return sendComposerMessage({
+        domain: "Core:Voice",
+        domainVersion: "1.0.0",
+        data: {
+          share_key: `mock-voice-${Date.now().toString(16)}`,
+          filename: input.file.name || "voice.wav",
+          mime_type: input.file.type || "audio/wav",
+          size: input.file.size,
+          duration_millis: Math.max(1, Math.trunc(input.durationMs)),
+        },
+      });
+    }
+
+    try {
+      const uploaded = await httpChatApiPort.uploadMessageAttachment(
+        socket,
+        token,
+        cid,
+        input.file,
+        "voice",
+      );
+
+      return await sendComposerMessage({
+        domain: "Core:Voice",
+        domainVersion: "1.0.0",
+        data: {
+          share_key: uploaded.shareKey,
+          object_key: uploaded.objectKey,
+          filename: uploaded.filename || input.file.name || "voice.wav",
+          mime_type: uploaded.mimeType || input.file.type || "audio/wav",
+          size: uploaded.size || input.file.size,
+          duration_millis: Math.max(1, Math.trunc(input.durationMs)),
+        },
+      });
+    } catch (e) {
+      const error = createMessageActionError("send_failed", "Send voice message failed.", e);
+      return { ok: false, kind: "chat_message_send_rejected", error };
+    }
   }
 
   return {
@@ -241,13 +344,10 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
         const message = findCurrentChannelMessageById(messageId);
         if (message) startReply(message);
       },
-      deleteMessage,
-      editMessage,
       recallMessage,
       reactToMessage,
       removeReaction,
       searchCurrentChannel,
-      searchServerMessages,
       loadContextAroundMessage,
       clearSearch,
     },
@@ -260,6 +360,7 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       appendAttachmentShareKey,
       cancelReply,
       sendMessage: sendMessageWithAttachments,
+      sendVoiceMessage,
       listMentionCandidates: listMentionCandidates,
       addMention: addMention,
 

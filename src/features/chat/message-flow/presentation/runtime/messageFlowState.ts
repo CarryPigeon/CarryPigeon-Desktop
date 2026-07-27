@@ -6,7 +6,7 @@
  */
 
 import { computed, reactive, ref, type Ref } from "vue";
-import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState, ServerMessageSearchResult } from "@/features/chat/message-flow/api-types";
+import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
 import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 
 /**
@@ -37,9 +37,7 @@ export function createChatMessageFlowState(deps: CreateChatMessageFlowStateDeps)
   const nextCursorByChannel = reactive<Record<string, string>>({});
   const hasMoreByChannel = reactive<Record<string, boolean>>({});
   const loadingMoreByChannel = reactive<Record<string, boolean>>({});
-  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" });
-  const serverSearchResults = ref<ServerMessageSearchResult[]>([]);
-  const searchScope = ref<"channel" | "server">("channel");
+  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [] });
   const highlightedMessageId = ref<string>("");
 
   const currentMessages = computed(() => messagesByChannel[deps.currentChannelId.value] ?? []);
@@ -81,8 +79,6 @@ export function createChatMessageFlowState(deps: CreateChatMessageFlowStateDeps)
     hasMoreByChannel,
     loadingMoreByChannel,
     searchState,
-    serverSearchResults,
-    searchScope,
     highlightedMessageId,
     currentMessages,
     currentChannelHasMore,

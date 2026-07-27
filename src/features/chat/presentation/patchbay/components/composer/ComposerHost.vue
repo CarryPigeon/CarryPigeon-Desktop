@@ -18,6 +18,7 @@ import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels
 import type { ComposerSubmitPayload } from "@/features/chat/message-flow/api-types";
 import AttachmentPreviewBar from "@/features/chat/message-flow/upload/presentation/components/AttachmentPreviewBar.vue";
 import { addFiles, getAttachments, removeAttachment } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
+import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import { createLogger } from "@/shared/utils/logger";
 import { readLocalFileAsBlob } from "@/shared/utils/readLocalFileAsBlob";
 
@@ -163,7 +164,16 @@ async function handleVoiceRecorded(payload: { filePath: string; durationMs: numb
   try {
     const blob = await readLocalFileAsBlob(payload.filePath, "audio/wav");
     const file = new File([blob], `voice-message-${Date.now()}.wav`, { type: "audio/wav" });
-    addFiles([file]);
+    const outcome = await getMessageFlowCapabilities().composer.sendVoiceMessage({
+      file,
+      durationMs: payload.durationMs,
+    });
+    if (!outcome.ok) {
+      logger.error("Action: chat_voice_message_send_failed", {
+        error: outcome.error.message,
+        code: outcome.error.code,
+      });
+    }
   } catch (e) {
     logger.error("Action: chat_voice_message_upload_failed", { error: String(e) });
   } finally {

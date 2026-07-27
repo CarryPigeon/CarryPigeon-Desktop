@@ -15,10 +15,7 @@ import type {
   MentionCandidate,
   MessageDomain,
   MessageSearchState,
-  ServerMessageSearchResult,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
-  EditChatMessageOutcome,
   MessageMention,
   MessageReplySummary,
   ReactToMessageOutcome,
@@ -170,7 +167,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   const multiSelectMode = ref(false);
   const selectedMessageIds = ref<Set<string>>(new Set());
   const messageActionError = ref<ChatMessageActionErrorInfo | null>(null);
-  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" });
+  const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [] });
   const highlightedMessageId = ref<string>("");
   const currentChannelId = ref<string>("cid-prod");
   const sendAttempt = ref<number>(0);
@@ -413,80 +410,10 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   }
 
   /**
-   * 从当前频道删除消息（mock 硬删除）。
-   *
-   * @param messageId - 目标消息 id。
-   * @returns 删除结果。
-   */
-  async function deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome> {
-    const list = state.messagesByChannel[currentChannelId.value] ?? [];
-    const idx = list.findIndex((m) => m.id === messageId);
-    if (idx < 0) {
-      const error: ChatMessageActionErrorInfo = {
-        code: "delete_failed",
-        message: "Message not found.",
-        retryable: false,
-        details: { messageId },
-      };
-      messageActionError.value = error;
-      return {
-        ok: false,
-        kind: "chat_message_delete_rejected",
-        error,
-      };
-    }
-    // 释放媒体消息的 blob URL，避免 mock 长时间运行时内存泄漏。
-    const removed = list[idx];
-    if (removed.kind === "image" || removed.kind === "video") {
-      if ((removed as any).url?.startsWith("blob:")) URL.revokeObjectURL((removed as any).url);
-      if ((removed as any).thumbUrl?.startsWith("blob:")) URL.revokeObjectURL((removed as any).thumbUrl);
-    }
-    list.splice(idx, 1);
-    messageActionError.value = null;
-    return {
-      ok: true,
-      kind: "chat_message_deleted",
-      messageId,
-    };
-  }
-
-  /**
-   * 编辑指定的消息（mock）。
-   *
-   * @param messageId - 目标消息 id。
-   * @param request - 编辑请求。
-   * @returns 编辑结果。
-   */
-  async function editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome> {
-    const list = state.messagesByChannel[currentChannelId.value] ?? [];
-    const idx = list.findIndex((m) => m.id === messageId);
-    if (idx < 0) {
-      const error: ChatMessageActionErrorInfo = {
-        code: "edit_failed",
-        message: "Message not found.",
-        retryable: false,
-        details: { messageId },
-      };
-      messageActionError.value = error;
-      return {
-        ok: false,
-        kind: "chat_message_edit_rejected",
-        error,
-      };
-    }
-    const updated = { ...list[idx], text: request.text, updatedAt: Date.now() };
-    list[idx] = updated;
-    messageActionError.value = null;
-    return {
-      ok: true,
-      kind: "chat_message_edited",
-      message: updated,
-    };
-  }
-
-  /**
    * 撤回指定的消息（mock）。
-   * 注意：服务端使用硬删除，本地也直接移除消息。
+   *
+   * 没有"硬删除" mock —— 服务端使用 `POST .../recall` 将消息标记为 `status:"recalled"`，
+   * 本 mock 也把目标消息标记为后撤回态（保留在时间线、内容替换为占位符）。
    *
    * @param messageId - 目标消息 id。
    * @returns 撤回结果。
@@ -508,7 +435,13 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         error,
       };
     }
-    state.messagesByChannel[currentChannelId.value] = list.filter((m) => m.id !== messageId);
+    const recalledAt = Date.now();
+    const original = list[idx];
+    if (original.kind === "core_text") {
+      list[idx] = { ...original, recalledAt, text: "[该消息已被撤回]" };
+    } else {
+      list[idx] = { ...original, recalledAt, preview: "[该消息已被撤回]" };
+    }
     messageActionError.value = null;
     return {
       ok: true,
@@ -623,6 +556,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         replyToId,
         replyTo,
         quoteReply,
+        ...(replyToId || quoteReply ? { domain: { id: "Core:ReplyText", label: "Core:ReplyText", colorVar: "--cp-domain-core" } } : {}),
       } as ChatMessage;
       list.push(msg);
       createdMessages.push(msg);
@@ -664,12 +598,15 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         // 如果文本中除 [file:xxx] 外还有实质内容，同时创建文本消息
         const textWithoutFileRefs = text.replace(/\[file:[^\]]+\]/g, "").trim();
         if (textWithoutFileRefs) {
+          const isReply = Boolean(replyToId) || Boolean(quoteReply);
           const textMsg: ChatMessage = {
             id: `m-${Date.now()}`,
             kind: "core_text",
             from,
             timeMs: now,
-            domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+            domain: isReply
+              ? { id: "Core:ReplyText", label: "Core:ReplyText", colorVar: "--cp-domain-core" }
+              : { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
             text: textWithoutFileRefs,
             replyToId,
             replyTo,
@@ -682,12 +619,15 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         // 分离已处理的附件（保留 blob URL 给消息引用）
         detachAttachments();
       } else {
+        const isReply = Boolean(replyToId) || Boolean(quoteReply);
         const msg: ChatMessage = {
           id: `m-${now}`,
           kind: "core_text",
           from,
           timeMs: now,
-          domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+          domain: isReply
+            ? { id: "Core:ReplyText", label: "Core:ReplyText", colorVar: "--cp-domain-core" }
+            : { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
           text,
           replyToId,
           replyTo,
@@ -1116,12 +1056,12 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   async function searchCurrentChannel(query: string): Promise<void> {
     const q = String(query ?? "").trim();
     if (!q) {
-      searchState.value = { query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" };
+      searchState.value = { query: "", loading: false, error: "", results: [] };
       return;
     }
     const cid = currentChannelId.value.trim();
     if (!cid) return;
-    searchState.value = { query: q, loading: true, error: "", results: [], serverResults: [], searchScope: "channel" };
+    searchState.value = { query: q, loading: true, error: "", results: [] };
     // Simulate search delay
     await new Promise((resolve) => setTimeout(resolve, 300));
     const messages = state.messagesByChannel[cid] ?? [];
@@ -1135,37 +1075,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         message,
         preview: message.kind === "core_text" ? message.text : message.preview,
       }));
-    searchState.value = { query: q, loading: false, error: "", results, serverResults: [], searchScope: "channel" };
-  }
-
-  async function searchServerMessages(query: string, channelIds?: string[]): Promise<void> {
-    const q = String(query ?? "").trim();
-    if (!q) {
-      searchState.value = { ...searchState.value, searchScope: "server", serverResults: [], query: "", loading: false, error: "" };
-      return;
-    }
-    searchState.value = { ...searchState.value, searchScope: "server", loading: true, error: "", serverResults: [] };
-    // Simulate search delay
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const needle = q.toLowerCase();
-    const results: ServerMessageSearchResult[] = [];
-    const cids = channelIds?.length ? channelIds : Object.keys(state.messagesByChannel);
-    for (const cid of cids) {
-      const messages = state.messagesByChannel[cid] ?? [];
-      for (const msg of messages) {
-        const text = msg.kind === "core_text" ? msg.text : msg.preview;
-        if (text.toLowerCase().includes(needle)) {
-          const channel = state.channels.find((c) => c.id === cid);
-          results.push({
-            message: msg,
-            preview: msg.kind === "core_text" ? msg.text : msg.preview,
-            channelId: cid,
-            channelName: channel?.name ?? cid,
-          });
-        }
-      }
-    }
-    searchState.value = { query: q, loading: false, error: "", results: [], serverResults: results, searchScope: "server" };
+    searchState.value = { query: q, loading: false, error: "", results };
   }
 
   async function loadContextAroundMessage(messageId: string): Promise<void> {
@@ -1192,7 +1102,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   }
 
   function clearSearch(): void {
-    searchState.value = { query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" };
+    searchState.value = { query: "", loading: false, error: "", results: [] };
     highlightedMessageId.value = "";
   }
 
@@ -1259,7 +1169,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         kind: "core_text",
         from: f,
         timeMs: now,
-        domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+        domain: { id: "Core:Forward", label: "Core:Forward", colorVar: "--cp-domain-core" },
         text: req.comment ?? "",
         forwardedMessages: fwds,
       };
@@ -1287,7 +1197,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
       kind: "core_text",
       from: f,
       timeMs: now,
-      domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+      domain: { id: "Core:Forward", label: "Core:Forward", colorVar: "--cp-domain-core" },
       text: req.comment ?? "",
       forwardedFrom,
     };
@@ -1330,8 +1240,6 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
       loading: false,
       error: "",
       results: [],
-      serverResults: [],
-      searchScope: "channel",
     };
     highlightedMessageId.value = "";
   });
@@ -1372,8 +1280,6 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     updateAnnouncement,
     startReply,
     cancelReply,
-    deleteMessage,
-    editMessage,
     recallMessage,
     sendComposerMessage,
     forwardMessage,
@@ -1381,7 +1287,6 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     removeReaction,
     listMentionCandidates,
     searchCurrentChannel,
-    searchServerMessages,
     loadContextAroundMessage,
     clearSearch,
     // 频道管理

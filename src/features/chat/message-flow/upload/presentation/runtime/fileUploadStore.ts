@@ -88,7 +88,7 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
 
     // 第 2 步：执行实际上传（直接传递 File，让 fetch 以流式方式读取，避免整文件进内存）
     task.progress = 50;
-    await fileService.performUpload(socket, result.upload, file);
+    await fileService.performUpload(socket, token, result.upload, file);
 
     task.progress = 100;
     task.status = "success";
