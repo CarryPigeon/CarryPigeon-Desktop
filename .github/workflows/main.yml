@@ -35,10 +35,9 @@ jobs:
                     libpipewire-0.3-dev \
                     libgbm-dev
 
+            # 省略 version，使用 package.json 的 packageManager 字段
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
-              with:
-                  version: 10
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -106,11 +105,9 @@ jobs:
                     libpipewire-0.3-dev \
                     libgbm-dev
 
-            # 修复：在Action中指定pnpm版本
+            # 省略 version，使用 package.json 的 packageManager 字段
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
-              with:
-                  version: 10
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
