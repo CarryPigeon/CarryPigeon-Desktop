@@ -68,8 +68,6 @@ export type ChatMessageActionErrorCode =
   | "missing_message_id"
   | "stale_runtime_scope"
   | "send_failed"
-  | "delete_failed"
-  | "edit_failed"
   | "reaction_failed"
   | "recall_failed";
 
@@ -87,20 +85,6 @@ export type ChatMessageActionErrorInfo = SemanticErrorInfo<ChatMessageActionErro
 export type SendChatMessageOutcome =
   | SuccessOutcome<"chat_message_sent", { message: ChatMessage }>
   | FailureOutcome<"chat_message_send_rejected", ChatMessageActionErrorCode>;
-
-/**
- * 删除消息显式结果。
- */
-export type DeleteChatMessageOutcome =
-  | SuccessOutcome<"chat_message_deleted", { messageId: string }>
-  | FailureOutcome<"chat_message_delete_rejected", ChatMessageActionErrorCode>;
-
-/**
- * 编辑消息显式结果。
- */
-export type EditChatMessageOutcome =
-  | SuccessOutcome<"chat_message_edited", { message: ChatMessage }>
-  | FailureOutcome<"chat_message_edit_rejected", ChatMessageActionErrorCode>;
 
 /**
  * 添加回应显式结果。
@@ -132,23 +116,14 @@ export type MessageSearchResult = {
 };
 
 /**
- * 服务器级消息搜索结果（包含频道信息）。
- */
-export type ServerMessageSearchResult = {
-  message: ChatMessage;
-  preview: string;
-  channelId: string;
-  channelName: string;
-};
-
-/**
  * 消息搜索状态。
+ *
+ * 服务端目前只有 per-channel `GET /channels/{cid}/messages/search`，没有全局
+ * `GET /messages/search`，因此本状态只承载当前频道内的搜索结果。
  */
 export type MessageSearchState = {
   query: string;
   loading: boolean;
   error: string;
   results: MessageSearchResult[];
-  serverResults: ServerMessageSearchResult[];
-  searchScope: "channel" | "server";
 };

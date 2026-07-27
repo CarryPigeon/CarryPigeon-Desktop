@@ -6,7 +6,6 @@
 
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
 import { NotificationBell } from "@/features/notifications/components";
@@ -35,7 +34,6 @@ import { createLogger } from "@/shared/utils/logger";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import SkeletonMessageList from "@/shared/ui/SkeletonMessageList.vue";
 import SearchPanel from "@/features/chat/presentation/patchbay/components/search/SearchPanel.vue";
-import AnnouncementBanner from "@/features/chat/presentation/channel-info/AnnouncementBanner.vue";
 import PinListBar from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
 import ShortcutHelp from "@/features/chat/presentation/patchbay/components/help/ShortcutHelp.vue";
 import type { ShortcutBinding } from "@/features/chat/presentation/patchbay/interactions/usePatchbayHotkeys";
@@ -91,23 +89,7 @@ const props = defineProps<{
    * 安装提示：从未知 domain 卡片跳转到插件中心。
    */
   onInstallHint: (pluginId: string | undefined) => void;
-  /**
-   * 打开线程面板。
-   */
-  onViewThread?: (messageId: string) => void;
   channels: readonly ChannelSummary[];
-  /**
-   * 当前正在编辑的消息 ID。
-   */
-  editingMessageId?: string;
-  /**
-   * 编辑确认回调。
-   */
-  onEdit?: (messageId: string, text: string) => void;
-  /**
-   * 编辑取消回调。
-   */
-  onEditCancel?: () => void;
   /**
    * 快捷键帮助面板可见性。
    */
@@ -131,7 +113,6 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const router = useRouter();
 const logger = createLogger("ChatCenter");
 
 /** 窗口宽度，用于判断成员栏固定按钮是否可用。 */
@@ -149,34 +130,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", updateWindowWidth);
 });
 
-/** 频道公告已被用户关闭。 */
-const dismissedAnnouncement = ref(false);
-
-/** 当前频道 id，用于在切换时重置公告关闭状态。 */
-const previousChannelId = ref(props.model.currentChannelId);
-
-/** 频道切换时重置公告关闭状态。 */
-watch(() => props.model.currentChannelId, (newId, oldId) => {
-  if (newId !== oldId) {
-    dismissedAnnouncement.value = false;
-    previousChannelId.value = newId;
-  }
-});
-
-/**
- * 当前频道摘要（从 channels 列表中匹配 currentChannelId）。
- */
-const currentChannel = computed(() => {
-  const cid = props.model.currentChannelId;
-  if (!cid) return null;
-  return props.channels.find((c) => c.id === cid) ?? null;
-});
-
-/** 当前频道公告（如果存在且未被关闭）。 */
-const channelAnnouncement = computed(() => {
-  if (dismissedAnnouncement.value) return null;
-  return currentChannel.value?.announcement ?? null;
-});
 
 const signalPaneEl = ref<HTMLElement | null>(null);
 
@@ -210,7 +163,6 @@ const virtualizerOptions = computed(() => ({
     let base = item.isGroupStart ? 52 : 32;
     if (m.replyToId) base += 28;
     if (m.reactions && m.reactions.length > 0) base += 24;
-    if (m.threadReplyCount) base += 20;
     return base;
   },
   overscan: 10,
@@ -382,17 +334,9 @@ const searchActiveIndex = ref(0);
  * @param index - 搜索结果列表中的索引。
  */
 function handleSearchNavigate(index: number): void {
-  const isServer = props.model.searchScope === "server";
-  if (isServer) {
-    const result = props.model.searchState.serverResults[index];
-    if (result) {
-      props.model.openSearchResult(result.message.id, result.channelId);
-    }
-  } else {
-    const result = props.model.searchState.results[index];
-    if (result) {
-      props.model.openSearchResult(result.message.id);
-    }
+  const result = props.model.searchState.results[index];
+  if (result) {
+    props.model.openSearchResult(result.message.id);
   }
 }
 
@@ -433,20 +377,8 @@ function handleRetryMessage(messageId: string): void {
   logger.info("Action: chat_retry_send_message", { messageId });
 }
 
-/**
- * 移除发送失败的消息。
- *
- * @param messageId - 失败的消息 ID。
- */
-function handleRemoveFailedMessage(messageId: string): void {
-  props.model.toggleMessageSelection(messageId);
-  void props.model.handleBatchDelete();
-  logger.info("Action: chat_remove_failed_message", { messageId });
-}
-
-/** 将 retry/remove 方法代理到 model 上，供模板直接调用。 */
+/** 将 retry 方法代理到 model 上，供模板直接调用。 */
 const retryMessage = handleRetryMessage;
-const removeFailedMessage = handleRemoveFailedMessage;
 
 function getReplyText(m: VirtualMessageItem): string {
   return m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, m.replyToId) : '';
@@ -507,24 +439,15 @@ function getReplyText(m: VirtualMessageItem): string {
 
     <PluginOverlayHost ref="overlayHostRef" />
 
-    <AnnouncementBanner
-      v-if="channelAnnouncement"
-      :announcement="channelAnnouncement"
-      @view-detail="router.push('/channel-info')"
-      @dismiss="dismissedAnnouncement = true"
-    />
-
     <SearchPanel
       v-if="props.model.searchPanelOpen"
       :visible="props.model.searchPanelOpen"
       :loading="props.model.searchState.loading"
       :error="props.model.searchState.error || null"
-      :results="props.model.searchScope === 'server' ? props.model.searchState.serverResults : props.model.searchState.results"
+      :results="props.model.searchState.results"
       :active-index="searchActiveIndex"
       :query="props.model.searchState.query"
-      :scope="props.model.searchScope"
       @search="(q: string) => props.model.searchMessages(q)"
-      @update:scope="(s: 'channel' | 'server') => props.model.setSearchScope(s)"
       @navigate="handleSearchNavigate"
       @close="props.model.closeSearchPanel"
     />
@@ -545,7 +468,6 @@ function getReplyText(m: VirtualMessageItem): string {
       @cancel="props.model.handleCancelMultiSelect"
       @forward-merged="props.model.handleBatchForwardMerged"
       @forward-separate="props.model.handleBatchForwardSeparate"
-      @delete="props.model.handleBatchDelete"
       @bookmark="props.model.handleBatchBookmark"
     />
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
@@ -594,7 +516,6 @@ function getReplyText(m: VirtualMessageItem): string {
               class="cp-msg"
               :data-message-id="virtualListItems[vr.index].m.id"
               :data-highlighted="virtualListItems[vr.index].m.id === props.model.highlightedMessageId"
-              :data-editing="virtualListItems[vr.index].m.id === props.editingMessageId"
               :data-mine="virtualListItems[vr.index].m.from.id === props.model.currentUserId"
               :data-group-start="virtualListItems[vr.index].isGroupStart"
               :data-mentioned="props.model.isMentioned(virtualListItems[vr.index].m)"
@@ -644,16 +565,11 @@ function getReplyText(m: VirtualMessageItem): string {
                   :channel-id="props.model.currentChannelId"
                   :reply-text="getReplyText(virtualListItems[vr.index].m)"
                   :domain-registry-store="props.model.domainRegistryStore"
-                  :editing-message-id="props.editingMessageId"
                   @install="props.onInstallHint"
                   @react="(messageId, emoji) => emoji && reactToMessage(messageId, emoji)"
-                  @edit="(payload) => props.onEdit?.(payload.messageId, payload.text)"
-                  @edit-cancel="props.onEditCancel?.()"
                   @openLightbox="openLightbox"
-                  @viewThread="(messageId) => props.onViewThread?.(messageId)"
                   @viewForwardDetail="openForwardDetail"
                   @retry="(mid: string) => retryMessage(mid)"
-                  @remove="(mid: string) => removeFailedMessage(mid)"
                 />
               </div>
             </div>

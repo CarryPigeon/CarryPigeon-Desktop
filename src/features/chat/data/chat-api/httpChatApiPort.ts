@@ -20,6 +20,8 @@ import type {
   ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
+  ChatMessageAttachmentType,
+  ChatMessageAttachmentUploadResult,
 } from "../../domain/types/chatApiModels";
 import {
   httpAddChannelAdmin,
@@ -28,12 +30,9 @@ import {
   httpCreateChannel,
   httpDeleteChannel,
   httpDeleteChannelBan,
-  httpDeleteMessage,
   httpDecideChannelApplication,
-  httpEditMessage,
   httpForwardMessage,
   httpGetChannel,
-  httpGetThreadReplies,
   httpGetUnreads,
   httpKickChannelMember,
   httpListChannelApplications,
@@ -49,13 +48,14 @@ import {
   httpPinMessage,
   httpPutChannelBan,
   httpReactToMessage,
+  httpRecallMessage,
   httpRemoveChannelAdmin,
   httpRemoveReaction,
   httpSearchChannelMessages,
-  httpSearchMessages,
   httpSendChannelMessage,
   httpUnpinMessage,
   httpUpdateReadState,
+  httpUploadMessageAttachment,
 } from "./httpChatApi";
 import {
   mapChatChannelApplicationWire,
@@ -65,6 +65,7 @@ import {
   mapChatChannelPatchInput,
   mapChatChannelWire,
   mapChatMentionWire,
+  mapChatMessageAttachmentUploadWire,
   mapChatMessagePageWire,
   mapChatMessageWire,
   mapChatPinWire,
@@ -112,11 +113,24 @@ export const httpChatApiPort: ChatApiPort = {
     const created = await httpSendChannelMessage(serverSocket, accessToken, cid, mapChatSendMessageInput(req), idempotencyKey);
     return mapChatMessageWire(created);
   },
-  async deleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
-    return httpDeleteMessage(serverSocket, accessToken, mid);
+  async uploadMessageAttachment(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    file: File,
+    messageType?: ChatMessageAttachmentType,
+  ): Promise<ChatMessageAttachmentUploadResult> {
+    const wire = await httpUploadMessageAttachment(serverSocket, accessToken, cid, file, messageType ?? "file");
+    return mapChatMessageAttachmentUploadWire(wire);
   },
-  async recallMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
-    return httpDeleteMessage(serverSocket, accessToken, mid);
+  async recallMessage(
+    serverSocket: string,
+    accessToken: string,
+    cid: string,
+    mid: string,
+  ): Promise<ChatMessageRecord> {
+    const recalled = await httpRecallMessage(serverSocket, accessToken, cid, mid);
+    return mapChatMessageWire(recalled);
   },
   async updateReadState(
     serverSocket: string,
@@ -198,16 +212,6 @@ export const httpChatApiPort: ChatApiPort = {
     const wire = await httpGetChannel(serverSocket, accessToken, cid);
     return mapChatChannelWire(wire);
   },
-  async getThreadReplies(
-    serverSocket: string,
-    accessToken: string,
-    rootMessageId: string,
-    cursor?: string,
-    limit?: number,
-  ): Promise<ChatMessagePage> {
-    const page = await httpGetThreadReplies(serverSocket, accessToken, rootMessageId, cursor, limit);
-    return mapChatMessagePageWire(page);
-  },
   async searchChannelMessages(
     serverSocket: string,
     accessToken: string,
@@ -225,14 +229,6 @@ export const httpChatApiPort: ChatApiPort = {
     });
     return mapChatMessagePageWire(page);
   },
-  async searchMessages(
-    serverSocket: string,
-    accessToken: string,
-    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
-  ): Promise<ChatMessagePage> {
-    const page = await httpSearchMessages(serverSocket, accessToken, query);
-    return mapChatMessagePageWire(page);
-  },
   async listChannelMessagesAround(
     serverSocket: string,
     accessToken: string,
@@ -243,21 +239,6 @@ export const httpChatApiPort: ChatApiPort = {
   ): Promise<ChatMessagePage> {
     const page = await httpListChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
     return mapChatMessagePageWire(page);
-  },
-  async editMessage(
-    serverSocket: string,
-    accessToken: string,
-    mid: string,
-    req: { domain: string; domainVersion: string; data: unknown; mentions?: Array<{ type: string; uid: string }>; expectedEditVersion?: number },
-  ): Promise<ChatMessageRecord> {
-    const updated = await httpEditMessage(serverSocket, accessToken, mid, {
-      domain: req.domain,
-      domain_version: req.domainVersion,
-      data: req.data,
-      mentions: req.mentions,
-      expected_edit_version: req.expectedEditVersion,
-    });
-    return mapChatMessageWire(updated);
   },
   async pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void> {
     return httpPinMessage(serverSocket, accessToken, cid, mid, note);

@@ -27,6 +27,19 @@ export function asSafeNumber(value: unknown): number {
 }
 
 /**
+ * 将 wire 上的 Instant / epoch 时间统一为毫秒。
+ *
+ * Jackson `WRITE_DATES_AS_TIMESTAMPS` 对 Instant 常写出 epoch **秒**（可带小数）；
+ * 客户端领域层统一使用毫秒。阈值 `1e12`：小于该值视为秒并乘 1000。
+ */
+export function asEpochMillis(value: unknown): number {
+  const raw = Number(value ?? 0);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  const millis = raw < 1e12 ? raw * 1000 : raw;
+  return Math.trunc(millis);
+}
+
+/**
  * 将任意值转换为可选的安全数字。
  */
 export function asOptionalNumber(value: unknown): number | undefined {

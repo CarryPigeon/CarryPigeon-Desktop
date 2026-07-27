@@ -57,7 +57,6 @@ export type {
   ChatMessage,
   ChatMessageActionErrorInfo,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
   MessageDomain,
   SendChatMessageOutcome,
 } from "../message-flow/api-types";

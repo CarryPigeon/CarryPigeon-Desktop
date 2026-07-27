@@ -7,15 +7,13 @@
 import { onBeforeUnmount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
-type MessageMenuAction = "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark";
+type MessageMenuAction = "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark";
 
 const props = defineProps<{
   open: boolean;
   x: number;
   y: number;
-  showEdit?: boolean;
   showRecall?: boolean;
-  showViewThread?: boolean;
   canPin?: boolean;
   isPinned?: boolean;
   /** 当前消息是否已收藏。 */
@@ -115,25 +113,12 @@ onBeforeUnmount(handleBeforeUnmount);
         <button v-if="props.canPin" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isPinned ? 'unpin' : 'pin')">
           {{ props.isPinned ? t("unpin_message") : t("pin_message") }}
         </button>
-        <button v-if="props.showEdit" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('edit')">
-          {{ t("edit_message") }}
-        </button>
         <button v-if="props.showRecall" class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('recall')">
           {{ t("recall_message") }}
-        </button>
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('thread')">
-          {{ t("reply_in_thread") }}
-        </button>
-        <button v-if="props.showViewThread" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('viewThread')">
-          {{ t("view_thread") }}
         </button>
         <div class="cp-msgmenu__sep" aria-hidden="true"></div>
         <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('select')">
           {{ t("select_message") }}
-        </button>
-        <div class="cp-msgmenu__sep" aria-hidden="true"></div>
-        <button class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('delete')">
-          {{ t("delete_message") }}
         </button>
       </div>
     </template>

@@ -79,18 +79,23 @@ export async function httpRequestFileUpload(
  * 说明：
  * - 该函数不会推断 content-type；由上传端点自行决定。
  * - 若服务端要求，可在 `upload.headers` 中携带 `Content-Type`。
+ * - 上传端点 `/api/files/uploads/{shareKey}` 受 Bearer 鉴权保护，必须附加 `Authorization` header。
  *
+ * @param serverSocket - 服务端 socket，用于推导期望 origin。
+ * @param accessToken - Bearer access token，附加到 `Authorization` header。
  * @param upload - `httpRequestFileUpload` 返回的 upload descriptor。
  * @param body - 二进制载荷（Blob/ArrayBuffer/Uint8Array）。
  * @returns Promise<void>。
  */
 export async function httpPerformFileUpload(
   serverSocket: string,
+  accessToken: string,
   upload: ApiUploadDescriptor,
   body: Blob | ArrayBuffer | Uint8Array,
 ): Promise<void> {
   if (USE_MOCK_TRANSPORT) {
     void serverSocket;
+    void accessToken;
     void upload;
     void body;
     return;
@@ -101,6 +106,8 @@ export async function httpPerformFileUpload(
 
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(upload?.headers ?? {})) headers[k] = String(v);
+  const token = String(accessToken ?? "").trim();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   /**
    * 将支持的二进制输入转换为 `fetch` 可接受的 body。

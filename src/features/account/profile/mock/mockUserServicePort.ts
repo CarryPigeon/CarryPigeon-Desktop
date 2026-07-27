@@ -78,7 +78,8 @@ export function createMockUserServicePort(serverSocket: string): UserServicePort
       await sleep(MOCK_LATENCY_MS);
     },
     async updateUserProfile(input: UpdateUserProfileInput): Promise<void> {
-      void input;
+      // 服务端无独立头像上传端点；头像通过 PATCH /users/me 的 avatar 字段写入。
+      mockPersistedAvatarUrl = String(input.avatar ?? "").trim();
       await sleep(MOCK_LATENCY_MS);
     },
     async updateUserBackgroundImage(accessToken: string, file: File): Promise<string> {
@@ -88,15 +89,6 @@ export function createMockUserServicePort(serverSocket: string): UserServicePort
       // 使用 File 对象生成 object URL 并持久化，确保 getMe/getUser 返回新值
       const objectUrl = URL.createObjectURL(file);
       mockPersistedBackgroundUrl = objectUrl;
-      return objectUrl;
-    },
-    async updateUserAvatarImage(accessToken: string, file: File): Promise<string> {
-      void accessToken;
-      void file;
-      await sleep(MOCK_LATENCY_MS);
-      // 使用 File 对象生成 object URL 并持久化，确保 getMe/getUser 返回新值
-      const objectUrl = URL.createObjectURL(file);
-      mockPersistedAvatarUrl = objectUrl;
       return objectUrl;
     },
   };

@@ -149,44 +149,18 @@ export class RoomGovernanceApplicationService {
   /**
    * 更新频道公告。
    *
-   * 成功后只做局部目录投影同步，不主动重建整份目录。
+   * 服务端 Channel PATCH 不支持 announcement；此能力已下线，避免误改 name/brief。
    */
   async updateChannelAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome> {
+    void content;
     const cid = String(channelId).trim();
-    if (!cid) {
-      return rejectGovernanceCommand("channel_announcement_updated_rejected", "missing_channel_id", "Missing channel id.");
-    }
-    const nextContent = String(content ?? "").slice(0, 2000);
-    const [socket, token] = await this.deps.getSocketAndValidToken();
-    if (!socket || !token) {
-      return rejectGovernanceCommand("channel_announcement_updated_rejected", "not_signed_in", "Not signed in.", undefined, { channelId: cid });
-    }
-    const isStale = this.createScopeGuard(socket);
-    if (isStale()) {
-      return rejectGovernanceCommand("channel_announcement_updated_rejected", "stale_runtime_scope", "Governance runtime scope changed.", undefined, { channelId: cid });
-    }
-
-    const currentChannel = this.deps.channelCatalog.getChannel(cid);
-    if (!currentChannel) {
-      return rejectGovernanceCommand("channel_announcement_updated_rejected", "governance_action_failed", "Channel not found in local catalog.", undefined, { channelId: cid });
-    }
-    const patch: { name?: string; brief?: string; announcement?: string } = {
-      name: currentChannel.name,
-      brief: currentChannel.brief,
-      announcement: nextContent,
-    };
-    try {
-      const next: ChatChannelRecord = await this.deps.api.patchChannel(socket, token, cid, patch);
-      if (isStale()) {
-        return rejectGovernanceCommand("channel_announcement_updated_rejected", "stale_runtime_scope", "Governance runtime scope changed.", undefined, { channelId: cid });
-      }
-      this.deps.channelCatalog.applyChannelPatch(cid, {
-        announcement: next.announcement,
-      });
-      return { ok: true, kind: "channel_announcement_updated", channelId: cid };
-    } catch (error) {
-      return rejectGovernanceCommand("channel_announcement_updated_rejected", "governance_action_failed", "Failed to update channel announcement.", error, { channelId: cid });
-    }
+    return rejectGovernanceCommand(
+      "channel_announcement_updated_rejected",
+      "governance_action_failed",
+      "Channel announcement is not supported by the server.",
+      undefined,
+      { channelId: cid },
+    );
   }
 
   /**

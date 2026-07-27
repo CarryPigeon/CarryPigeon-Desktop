@@ -113,21 +113,24 @@
 }
 ```
 
-### 5.2 `message.deleted`
+### 5.2 `message.recalled`
 
-触发：消息被硬删除（删除=消失）
+触发：消息被撤回（soft recall，消息仍存在于历史但 `status` 变为 `recalled`）
 
 ```json
 {
   "cid": "12345",
   "mid": "1",
-  "delete_time": 1700000001000
+  "recall_time": 1700000001000
 }
 ```
 
 客户端要求（必须）：
-- 收到后必须从内存与本地缓存移除该消息。
-- 若当前在该频道且 `mid` 不在本地列表，也应视为“状态已同步”而非报错。
+- 收到后必须把本地缓存中对应消息标记为撤回态（填充 `recalledAt`），渲染层切换为「该消息已被撤回」。
+- 若当前在该频道且 `mid` 不在本地列表，也应视为「状态已同步」而非报错。
+- 服务端事件 payload 字段为 `recall_time`（Unix epoch ms），不携带 `recalled_by_uid`；客户端如需展示撤回者，由调用 recall 的客户端本地自行记录。
+
+> ⚠️ v1 不再推送 `message.deleted` 事件。原「硬删除=消失」语义已下线，由 `POST /api/channels/{cid}/messages/{mid}/recall` + `message.recalled` 取代（见 `docs/api/11-http-endpoints-v1.md` §7.3）。
 
 ### 5.3 `read_state.updated`
 
@@ -157,7 +160,7 @@
 - `members`：成员/管理员变更（踢人、设/撤管理员等）
 - `applications`：入群申请列表变更
 - `bans`：禁言列表变更
-- `messages`：消息相关（一般优先用 `message.created/deleted`，此处仅作为兜底提示）
+- `messages`：消息相关（一般优先用 `message.created/recalled`，此处仅作为兜底提示）
 
 ## 6. 心跳
 

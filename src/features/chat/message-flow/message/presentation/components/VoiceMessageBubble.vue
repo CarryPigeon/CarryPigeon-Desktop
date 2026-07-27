@@ -10,6 +10,7 @@
 
 import { computed, ref } from "vue";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
+import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 
 const props = defineProps<{
@@ -30,6 +31,12 @@ const audioUrl = computed(() => {
   if (!props.shareKey) return "";
   return buildFileDownloadUrl(getActiveChatServerSocket(), props.shareKey);
 });
+
+// 音频下载端点受 Bearer 鉴权保护，原生 <audio> 无法附加 Authorization，故用 objectURL。
+const { objectUrl: audioObjectUrl } = useAuthedObjectUrl(
+  () => audioUrl.value,
+  () => getActiveChatServerSocket(),
+);
 
 /**
  * 格式化时长（mm:ss）。
@@ -60,8 +67,8 @@ function onEnded(): void {
     :class="{ 'cp-voiceBubble--playing': isPlaying }"
   >
     <audio
-      v-if="audioUrl"
-      :src="audioUrl"
+      v-if="audioObjectUrl"
+      :src="audioObjectUrl"
       controls
       preload="metadata"
       class="cp-voiceBubble__audio"

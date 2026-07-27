@@ -39,10 +39,10 @@
 
 - 排序：必须以 `mid`（或 `send_time + mid`）作为稳定排序键
   - `mid` 为服务端雪花 ID（JSON 中为十进制字符串，详见 `docs/api/10-http-ws-protocol-v1.md`）
-- 删除语义：硬删除后不得出现在任何分页结果中
+- 撤回语义：撤回（`status: "recalled"`）的消息仍出现在分页结果中，客户端据此渲染撤回态；v1 不再提供硬删除。
 - 客户端要求：
   - 必须按 `mid` 去重（WS 推送与 HTTP 补拉可能重叠）
-  - 必须能处理“收到 message.deleted 但本地没有该 mid”的情况
+  - 必须能处理「收到 `message.recalled` 但本地没有该 mid」的情况（视为状态已同步，非报错）
 
 ## 5. 与 WS resume 的配合
 

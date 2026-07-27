@@ -13,7 +13,6 @@ import type {
   ChatChannelMemberWire,
   ChatChannelWire,
   ChatMentionPageWire,
-  ChatMessageEditWire,
   ChatMessageForwardWire,
   ChatMessagePageWire,
   ChatMessageSearchQueryWire,
@@ -25,6 +24,7 @@ import type {
   ChatReadStateWire,
   ChatSendMessageWire,
   ChatUnreadStateWire,
+  ChatMessageAttachmentUploadWire,
 } from "../protocol/chatWireModels";
 
 type ApiListChannelsResponse = {
@@ -108,11 +108,26 @@ export async function httpSendChannelMessage(
   return client.requestJsonWithHeaders<ChatMessageWire>("POST", path, req, headers);
 }
 
-export async function httpDeleteMessage(serverSocket: string, accessToken: string, mid: string): Promise<void> {
+/**
+ * POST /channels/{cid}/messages/{mid}/recall
+ * 撤回一条消息；服务端将消息标记为 `status:"recalled"` 并推送 `message.recalled`
+ * 事件。响应体携带更新后的 canonical message envelope。
+ */
+export async function httpRecallMessage(
+  serverSocket: string,
+  accessToken: string,
+  cid: string,
+  mid: string,
+): Promise<ChatMessageWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const channelId = String(cid).trim();
   const messageId = String(mid).trim();
+  if (!channelId) throw new Error("Missing cid");
   if (!messageId) throw new Error("Missing mid");
-  await client.requestJson<void>("DELETE", `/messages/${encodeURIComponent(messageId)}`);
+  return client.requestJson<ChatMessageWire>(
+    "POST",
+    `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/recall`,
+  );
 }
 
 export async function httpUpdateReadState(
@@ -310,17 +325,23 @@ export async function httpGetChannel(serverSocket: string, accessToken: string, 
   return client.requestJson<ChatChannelWire>("GET", `/channels/${encodeURIComponent(channelId)}`);
 }
 
-export async function httpSearchMessages(
+export async function httpListChannelMessagesAround(
   serverSocket: string,
   accessToken: string,
-  query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
+  cid: string,
+  aroundMid: string,
+  before?: number,
+  after?: number,
 ): Promise<ChatMessagePageWire> {
-  const params = new URLSearchParams({ q: query.q });
-  if (query.channelIds?.length) params.set("channel_ids", query.channelIds.join(","));
-  if (query.cursor) params.set("cursor", query.cursor);
-  if (query.limit) params.set("limit", String(Math.min(query.limit, 50)));
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  return client.requestJson<ChatMessagePageWire>("GET", `/messages/search?${params.toString()}`);
+  const channelId = String(cid).trim();
+  if (!channelId) throw new Error("Missing cid");
+  const q: string[] = [];
+  q.push(`around_mid=${encodeURIComponent(aroundMid)}`);
+  if (before != null) q.push(`before=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(before)))))}`);
+  if (after != null) q.push(`after=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(after)))))}`);
+  const path = `/channels/${encodeURIComponent(channelId)}/messages?${q.join("&")}`;
+  return client.requestJson<ChatMessagePageWire>("GET", path);
 }
 
 export async function httpSearchChannelMessages(
@@ -342,37 +363,6 @@ export async function httpSearchChannelMessages(
   if (query.after_mid) q.push(`after_mid=${encodeURIComponent(query.after_mid)}`);
   const path = `/channels/${encodeURIComponent(channelId)}/messages/search?${q.join("&")}`;
   return client.requestJson<ChatMessagePageWire>("GET", path);
-}
-
-export async function httpListChannelMessagesAround(
-  serverSocket: string,
-  accessToken: string,
-  cid: string,
-  aroundMid: string,
-  before?: number,
-  after?: number,
-): Promise<ChatMessagePageWire> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const channelId = String(cid).trim();
-  if (!channelId) throw new Error("Missing cid");
-  const q: string[] = [];
-  q.push(`around_mid=${encodeURIComponent(aroundMid)}`);
-  if (before != null) q.push(`before=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(before)))))}`);
-  if (after != null) q.push(`after=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(after)))))}`);
-  const path = `/channels/${encodeURIComponent(channelId)}/messages?${q.join("&")}`;
-  return client.requestJson<ChatMessagePageWire>("GET", path);
-}
-
-export async function httpEditMessage(
-  serverSocket: string,
-  accessToken: string,
-  mid: string,
-  req: ChatMessageEditWire,
-): Promise<ChatMessageWire> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const messageId = String(mid).trim();
-  if (!messageId) throw new Error("Missing mid");
-  return client.requestJson<ChatMessageWire>("PATCH", `/messages/${encodeURIComponent(messageId)}`, req);
 }
 
 export async function httpPinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void> {
@@ -470,20 +460,6 @@ export async function httpReactToMessage(
  * DELETE /channels/:cid/messages/:mid/reactions?emoji=:emoji
  * 取消消息回应。
  */
-export async function httpGetThreadReplies(
-  serverSocket: string,
-  accessToken: string,
-  rootMessageId: string,
-  cursor?: string,
-  limit?: number,
-): Promise<ChatMessagePageWire> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const params = new URLSearchParams();
-  if (cursor) params.set("cursor", cursor);
-  if (limit) params.set("limit", String(limit));
-  return client.requestJson<ChatMessagePageWire>("GET", `/messages/${encodeURIComponent(rootMessageId)}/thread?${params.toString()}`);
-}
-
 export async function httpRemoveReaction(
   serverSocket: string,
   accessToken: string,
@@ -499,5 +475,30 @@ export async function httpRemoveReaction(
   return client.requestJson<ChatReactionResponseWire>(
     "DELETE",
     `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/reactions?emoji=${encodeURIComponent(emoji)}`,
+  );
+}
+
+/**
+ * POST /channels/{cid}/messages/attachments
+ * 上传频道消息附件（multipart `file` + 可选 `message_type=file|voice`）。
+ */
+export async function httpUploadMessageAttachment(
+  serverSocket: string,
+  accessToken: string,
+  cid: string,
+  file: File,
+  messageType: "file" | "voice" = "file",
+): Promise<ChatMessageAttachmentUploadWire> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const channelId = String(cid).trim();
+  if (!channelId) throw new Error("Missing cid");
+  if (!file) throw new Error("Missing file");
+  const formData = new FormData();
+  formData.append("file", file, file.name || "attachment.bin");
+  formData.append("message_type", messageType === "voice" ? "voice" : "file");
+  return client.requestFormData<ChatMessageAttachmentUploadWire>(
+    "POST",
+    `/channels/${encodeURIComponent(channelId)}/messages/attachments`,
+    formData,
   );
 }

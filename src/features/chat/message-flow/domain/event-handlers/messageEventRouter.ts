@@ -1,11 +1,10 @@
 /**
- * @fileoverview 消息流事件路由器（message.created / message.deleted）。
- * @description chat/message-flow｜application：消息创建/删除事件路由器。
+ * @fileoverview 消息流事件路由器（message.created / message.recalled）。
+ * @description chat/message-flow｜application：消息创建/撤回事件路由器。
  */
 
 import type { ChatMessageRecord } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
-import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 import type {
   ChannelUnreadProjectionPort,
   MessageFlowScopePort,
@@ -19,10 +18,10 @@ export type MessageEventRouterDeps = {
   /**
    * 事件路由器只关心两类事实：
    * - 当前 socket / 当前频道是谁
-   * - 收到创建/删除事件后，如何更新本地时间线与未读数
+   * - 收到创建/撤回事件后，如何更新本地时间线与未读数
    */
   scope: Pick<MessageFlowScopePort, "getActiveServerSocket">;
-  timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions" | "updateMessage" | "markMessageRecalled">;
+  timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "markMessageRecalled">;
   unreadProjection: ChannelUnreadProjectionPort;
   mapWireMessage: (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
   compareMessages: (a: ChatMessage, b: ChatMessage) => number;
@@ -33,7 +32,7 @@ export type MessageEventRouterDeps = {
 /**
  * 创建 message-flow 事件路由器。
  *
- * 该路由器只理解消息创建/删除事件，并把它们投影到本地时间线与未读计数。
+ * 该路由器只理解消息创建/撤回事件，并把它们投影到本地时间线与未读计数。
  */
 export function createMessageEventRouter(deps: MessageEventRouterDeps) {
   /**
@@ -53,37 +52,6 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
       const inserted = deps.timelineState.appendMessageIfMissing(cid, mapped, deps.compareMessages);
       if (inserted && deps.timelineState.readCurrentChannelId() !== cid) deps.unreadProjection.incrementChannelUnread(cid);
       deps.onNewMessage?.(cid, mapped);
-      return true;
-    }
-
-    if (eventType === "message.deleted") {
-      const cid = String(payload?.channelId ?? "").trim();
-      const mid = String(payload?.messageId ?? "").trim();
-      if (!cid || !mid) return true;
-
-      deps.timelineState.removeMessage(cid, mid);
-      // 本地时间线移除后，以可见消息重算角标（服务端仍会把已删消息计入未读）。
-      deps.unreadProjection.recomputeChannelUnreadLocally(cid);
-      return true;
-    }
-
-    if (eventType === "message.reactions_updated") {
-      const cid = String(payload?.channelId ?? "").trim();
-      const mid = String(payload?.messageId ?? "").trim();
-      const reactions = (payload?.reactions ?? []) as MessageReactionSummary[];
-      if (!cid || !mid) return true;
-
-      deps.timelineState.updateMessageReactions(cid, mid, reactions);
-      return true;
-    }
-
-    if (eventType === "message.updated") {
-      const cid = String(payload?.channelId ?? "").trim();
-      const msg = (payload?.message ?? null) as ChatMessageRecord | null;
-      if (!cid || !msg) return true;
-
-      const mapped = deps.mapWireMessage(deps.scope.getActiveServerSocket(), msg);
-      deps.timelineState.updateMessage(cid, mapped.id, () => mapped);
       return true;
     }
 

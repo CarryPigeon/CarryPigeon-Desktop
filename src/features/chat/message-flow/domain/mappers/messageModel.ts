@@ -34,7 +34,13 @@ export function createMessageMapper(deps: MessageModelDeps) {
     const fromAvatarUrl = (m.sender?.avatar ?? "").trim() || undefined;
     const timeMs = Number(m.sentTime ?? 0) || Date.now();
     const domainLabel = String(m.domain ?? "").trim() || "Unknown:Domain";
-    const pluginIdHint = deps.resolveDomainPluginHint(serverSocket, domainLabel) || "";
+    const isWrapperDomain = domainLabel === "Core:ReplyText" || domainLabel === "Core:Forward";
+    const wrapperData = isWrapperDomain && m.data && typeof m.data === "object" ? (m.data as Record<string, unknown>) : null;
+    const contentDomain = isWrapperDomain
+      ? String(wrapperData?.domain ?? (domainLabel === "Core:ReplyText" ? "Core:Text" : "")).trim()
+      : domainLabel;
+    const contentData = wrapperData?.content ?? m.data;
+    const pluginIdHint = deps.resolveDomainPluginHint(serverSocket, contentDomain) || "";
     const domain: MessageDomain = {
       id: domainLabel,
       label: domainLabel,
@@ -74,6 +80,7 @@ export function createMessageMapper(deps: MessageModelDeps) {
     const mentions = (m.mentions ?? [])
       .map((mention) => ({
         userId: String(mention.userId ?? "").trim(),
+        // 服务端 mentions 仅返回 UID 字符串，displayName 留空时由展示层回退到 u:xxxxxx。
         displayName: String(mention.displayName ?? "").trim(),
         type: mention.type,
       }))
@@ -105,13 +112,13 @@ export function createMessageMapper(deps: MessageModelDeps) {
       return typeof maybe.text === "string" ? maybe.text : null;
     }
 
-    if (domainLabel === "Core:Text") {
-      const text = tryReadText(m.data) ?? String(m.preview ?? "");
+    if (domainLabel === "Core:Text" || (isWrapperDomain && contentDomain === "Core:Text")) {
+      const text = tryReadText(contentData) ?? String(m.preview ?? "");
 
       // 检查消息是否包含文件引用标记
       const fileRefRe = /\[file:([^\]]+)\]/g;
       const fileRefs = [...text.matchAll(fileRefRe)];
-      const data = (m.data ?? {}) as Record<string, unknown>;
+      const data = (contentData ?? {}) as Record<string, unknown>;
       const attachments: unknown[] = Array.isArray(data.attachments) ? data.attachments : [];
 
       // 判定：消息内容仅包含 [file:xxx] 标记且附件是图片/视频 → 内联媒体消息
@@ -162,8 +169,7 @@ export function createMessageMapper(deps: MessageModelDeps) {
             forwardedFrom,
             forwardedMessages,
             preview: String(m.preview ?? "").trim() || (isVideo ? `[Video] ${fileName}` : `[Image] ${fileName}`),
-            data: m.data,
-            editedAt: m.editedAt != null ? Number(m.editedAt) : undefined,
+            data: contentData,
             recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined,
             threadRootId: String(m.threadRootId ?? "").trim() || undefined,
             threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined,
@@ -173,11 +179,11 @@ export function createMessageMapper(deps: MessageModelDeps) {
         }
       }
 
-      return { id: mid, kind: "core_text", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt != null ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
+      return { id: mid, kind: "core_text", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
     }
 
-    const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${domainLabel}${domain.version ? `@${domain.version}` : ""}`;
-    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), editedAt: m.editedAt != null ? Number(m.editedAt) : undefined, recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
+    const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${contentDomain}${domain.version ? `@${domain.version}` : ""}`;
+    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
   }
 
   return { mapWireMessage };

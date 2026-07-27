@@ -4,13 +4,15 @@
  */
 
 import { ref } from "vue";
-import type { DeleteChatMessageOutcome, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
+import type { RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { createAsyncTaskRunner } from "./asyncTaskRunner";
 
 /**
  * 消息上下文菜单动作类型。
+ *
+ * 服务端目前不支持硬删除与编辑消息，因此这两个动作已移除。
  */
-export type MessageContextAction = "copy" | "reply" | "delete" | "forward" | "select" | "edit" | "recall" | "thread" | "viewThread" | "pin" | "unpin" | "bookmark" | "unbookmark";
+export type MessageContextAction = "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark";
 
 /**
  * 消息上下文菜单编排依赖。
@@ -19,13 +21,10 @@ export type UseMessageContextMenuDeps = {
   getClipboardText(messageId: string): string | null;
   copyTextToClipboard(text: string): Promise<unknown>;
   startReply(messageId: string): void;
-  deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome>;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   onAsyncError(action: string, error: unknown): void;
   enterMultiSelectMode(firstMessageId: string): void;
   openForwardDialog(messageId: string): void;
-  startEditing(messageId: string): void;
-  openThread(messageId: string): void;
   pinMessage(messageId: string): Promise<void>;
   unpinMessage(messageId: string): Promise<void>;
   bookmarkMessage(messageId: string): void;
@@ -68,9 +67,6 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
       case "recall":
         runAsyncTask(deps.recallMessage(messageId), "chat_recall_menu_failed");
         return;
-      case "delete":
-        runAsyncTask(deps.deleteMessage(messageId), "chat_delete_menu_failed");
-        return;
       case "select":
         deps.enterMultiSelectMode(messageId);
         return;
@@ -78,14 +74,6 @@ export function useMessageContextMenu(deps: UseMessageContextMenuDeps) {
         deps.openForwardDialog(messageId);
         return;
       }
-      case "edit": {
-        deps.startEditing(messageId);
-        return;
-      }
-      case "thread":
-      case "viewThread":
-        deps.openThread(messageId);
-        return;
       case "copy": {
         const text = deps.getClipboardText(messageId);
         if (!text) return;

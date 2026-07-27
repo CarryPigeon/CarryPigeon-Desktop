@@ -529,6 +529,62 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     return { ok: true, status: 204, body: null };
   }
 
+  if (method === "POST" && pathname === "/auth/register") {
+    const body = req.body as { username?: string; password?: string } | null;
+    const username = String(body?.username ?? "").trim();
+    const password = String(body?.password ?? "");
+    if (!username || !password) {
+      return { ok: false, error: apiError(422, "validation_failed", "Missing username or password") };
+    }
+    const existing = [...server.usersById.values()].find((u) => String(u.nickname ?? "").trim() === username);
+    if (existing) {
+      return { ok: false, error: apiError(422, "validation_failed", "username already exists") };
+    }
+    const uid = "1";
+    const prev = server.usersById.get(uid);
+    server.usersById.set(uid, {
+      uid,
+      email: prev?.email ?? "",
+      nickname: username,
+      avatar: prev?.avatar ?? "",
+      backgroundUrl: prev?.backgroundUrl ?? "",
+      bio: prev?.bio ?? "",
+    });
+    return { ok: true, status: 201, body: { uid, username } };
+  }
+
+  if (method === "POST" && pathname === "/auth/login") {
+    const body = req.body as { username?: string; password?: string } | null;
+    const username = String(body?.username ?? "").trim();
+    const password = String(body?.password ?? "");
+    if (!username || !password) {
+      return { ok: false, error: apiError(422, "validation_failed", "Missing username or password") };
+    }
+    const uid = "1";
+    const prev = server.usersById.get(uid);
+    server.usersById.set(uid, {
+      uid,
+      email: prev?.email ?? "",
+      nickname: username,
+      avatar: prev?.avatar ?? "",
+      backgroundUrl: prev?.backgroundUrl ?? "",
+      bio: prev?.bio ?? "",
+    });
+    const now = Date.now();
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        token_type: "Bearer",
+        access_token: `mock-access:password:${username}:${now}`,
+        expires_in: 1800,
+        refresh_token: `mock-refresh:password:${username}:${now}`,
+        uid,
+        is_new_user: false,
+      },
+    };
+  }
+
   if (method === "POST" && pathname === "/auth/tokens") {
     const body = req.body as
       | {
@@ -729,29 +785,6 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     server.usersById.set(session.uid, { ...user, backgroundUrl });
     return { ok: true, status: 200, body: { backgroundUrl } };
   }
-  if (method === "POST" && pathname === "/users/me/avatar") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const shareKey = `pmock-avatar-${session.uid}-${Date.now().toString(16)}`;
-    server.filesByShareKey.set(shareKey, {
-      file_id: shareKey,
-      filename: "avatar.jpg",
-      mime_type: "image/jpeg",
-      size_bytes: 1024,
-    });
-    const avatarUrl = buildProtocolMockDownloadUrl(server.serverSocket, shareKey);
-    const user = server.usersById.get(session.uid) ?? {
-      uid: session.uid,
-      email: session.email,
-      nickname: "Operator",
-      avatar: "",
-      bio: "",
-      backgroundUrl: "",
-    };
-    server.usersById.set(session.uid, { ...user, avatar: avatarUrl });
-    return { ok: true, status: 200, body: { avatarUrl } };
-  }
-
   if (method === "GET" && pathname.startsWith("/users/") && pathname !== "/users/me") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
@@ -915,7 +948,53 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     return { ok: true, status: 200, body: { items, next_cursor: "", has_more: false } };
   }
 
-  if (pathname.startsWith("/channels/") && pathname.includes("/messages") && method === "POST") {
+  if (pathname.startsWith("/channels/") && pathname.endsWith("/messages/attachments") && method === "POST") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const parts = pathname.split("/").filter(Boolean);
+    const cid = decodeURIComponent(parts[1] ?? "").trim();
+    if (!cid) return { ok: false, error: apiError(400, "invalid_request", "Missing cid") };
+    if (!server.channelsById.get(cid)) return { ok: false, error: apiError(404, "not_found", "Channel not found", { cid }) };
+
+    const form = typeof FormData !== "undefined" && req.body instanceof FormData ? req.body : null;
+    const file = form?.get("file") as File | Blob | string | null | undefined;
+    const messageType = String(form?.get("message_type") ?? "file").trim() || "file";
+    const isFileLike =
+      !!file &&
+      typeof file === "object" &&
+      ("size" in file || "name" in file || typeof (file as Blob).arrayBuffer === "function");
+    if (!isFileLike) {
+      return { ok: false, error: apiError(422, "validation_failed", "Missing multipart file") };
+    }
+    const fileObj = file as File & Blob;
+    const filename =
+      typeof fileObj.name === "string" && fileObj.name
+        ? fileObj.name
+        : messageType === "voice"
+          ? "voice.wav"
+          : "attachment.bin";
+    const mimeType = fileObj.type || (messageType === "voice" ? "audio/wav" : "application/octet-stream");
+    const size = Number(fileObj.size ?? 0) || 0;
+    const shareKey = `shr_att_${Date.now().toString(16)}`;
+    const objectKey = `channels/${cid}/messages/${messageType === "voice" ? "voice" : "file"}/accounts/${session.uid}/${shareKey}-${filename}`;
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        object_key: objectKey,
+        share_key: shareKey,
+        filename,
+        mime_type: mimeType,
+        size,
+      },
+    };
+  }
+
+  if (
+    pathname.startsWith("/channels/") &&
+    pathname.endsWith("/messages") &&
+    method === "POST"
+  ) {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
 
@@ -1186,26 +1265,42 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       : undefined;
 
     const hasMerged = Array.isArray(forwardedMessages) && forwardedMessages.length > 0;
+
+    // 单条转发：构造 forwarded_from（需填充真实来源）
+    let singleForwardedFrom: MockForwardedFrom | undefined;
+    if (!hasMerged) {
+      for (const [, channelMsgs] of server.messagesByCid) {
+        const original = channelMsgs.find((m) => (m as { mid: string }).mid === mid);
+        if (original) {
+          const m = original as { mid: string; cid: string; uid: string; preview?: string; send_time: number };
+          singleForwardedFrom = { mid: m.mid, cid: m.cid, uid: m.uid, preview: m.preview ?? "", send_time: m.send_time };
+          break;
+        }
+      }
+    }
+
+    const comment = String(body?.comment ?? "");
+    const data: Record<string, unknown> = {
+      domain: "Core:Text",
+      domain_version: "1.0.0",
+      ...(comment ? { content: { text: comment } } : {}),
+    };
+
     const newMsg: Record<string, unknown> = {
       mid: newMid,
       cid: targetCid,
       uid: session.uid,
-      domain: "Core:Text",
-      domain_version: "1.0",
-      data: { text: body?.comment ?? "" },
+      domain: "Core:Forward",
+      domain_version: "1.0.0",
+      data,
       send_time: Date.now(),
-      preview: body?.comment ?? (hasMerged ? `转发 ${forwardedMessages!.length} 条消息` : ""),
+      preview: comment || (hasMerged ? `转发 ${forwardedMessages!.length} 条消息` : ""),
+      ...(hasMerged ? { forwarded_messages: forwardedMessages } : { forwarded_from: singleForwardedFrom }),
     };
-
-    if (hasMerged) {
-      newMsg.forwarded_messages = forwardedMessages;
-    } else {
-      newMsg.forwarded_from = { mid, cid: "", uid: session.uid, preview: "", send_time: 0 };
-    }
 
     msgs.push(newMsg as ChatMessage);
     emitWs(server, "message.created", { cid: targetCid, message: newMsg });
-    return { ok: true, status: 200, body: newMsg };
+    return { ok: true, status: 201, body: newMsg };
   }
 
   // -------------------------------------------------------------------------

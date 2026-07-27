@@ -16,15 +16,17 @@ export class PerformFileUpload {
    * 执行实际上传（两段式上传的第二段）。
    *
    * @param serverSocket - 服务器 Socket 地址。
+   * @param accessToken - 访问令牌（Bearer），附加到上传请求的 `Authorization` header。
    * @param upload - upload descriptor。
    * @param body - 二进制载荷（Blob/ArrayBuffer/Uint8Array）。
    * @returns Promise<void>。
    */
   execute(
     serverSocket: string,
+    accessToken: string,
     upload: UploadDescriptor,
     body: Blob | ArrayBuffer | Uint8Array,
   ): Promise<void> {
-    return this.fileService.performUpload(serverSocket, upload, body);
+    return this.fileService.performUpload(serverSocket, accessToken, upload, body);
   }
 }

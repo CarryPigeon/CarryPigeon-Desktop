@@ -4,7 +4,7 @@
  * @description 消息搜索面板独立组件，支持键盘导航与关键词高亮。
  */
 
-import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
+import { ref, watch, nextTick, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { debounce } from "@/shared/utils/rateLimit";
 
@@ -23,23 +23,15 @@ const props = defineProps<{
   results: SearchResultItem[];
   activeIndex: number;
   query: string;
-  scope: "channel" | "server";
 }>();
 
 const emit = defineEmits<{
   (event: "search", query: string): void;
-  (event: "update:scope", scope: "channel" | "server"): void;
   (event: "navigate", index: number): void;
   (event: "close"): void;
 }>();
 
 const { t } = useI18n();
-
-/** 搜索范围选项。 */
-const scopeOptions = computed(() => [
-  { label: t("search_current_channel"), value: "channel" },
-  { label: t("search_all_channels"), value: "server" },
-]);
 
 /** 内部搜索查询文本。 */
 const localQuery = ref(props.query);
@@ -188,13 +180,6 @@ function escapeRegex(s: string): string {
   >
     <!-- 搜索栏 -->
     <div class="cp-searchPanel__row">
-      <t-select
-        :value="scope"
-        :options="scopeOptions"
-        size="small"
-        style="width: 100px; flex-shrink: 0;"
-        @change="(v: string) => emit('update:scope', v as 'channel' | 'server')"
-      />
       <t-input
         :value="localQuery"
         :placeholder="t('search_current_channel')"

@@ -13,15 +13,17 @@ import type {
   MessageReactionSummary,
   MessageReplySummary,
   MessageSearchState,
-  ServerMessageSearchResult,
 } from "@/features/chat/message-flow/domain/contracts";
+// 服务端 `GET /messages/search` 端点不存在，本端口不再引用 ServerMessageSearchResult。
 
 /**
  * message-flow 应用层所需的最小 API 能力。
+ *
+ * 服务端目前不提供硬删除 / 编辑 / 全局搜索 / 楼级回复 API，因此本端口不再引述这些能力。
  */
 export type MessageFlowApiPort = Pick<
   ChatApiPort,
-  "sendChannelMessage" | "deleteMessage" | "recallMessage" | "editMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction" | "searchChannelMessages" | "searchMessages" | "listChannelMessagesAround" | "listChannelMembers" | "getThreadReplies"
+  "sendChannelMessage" | "recallMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction" | "searchChannelMessages" | "listChannelMessagesAround" | "listChannelMembers"
 >;
 
 /**
@@ -76,8 +78,6 @@ export type MessageTimelineStatePort = {
   setLoadingMore(channelId: string, loading: boolean): void;
   writeSearchState(state: MessageSearchState): void;
   readSearchState(): MessageSearchState;
-  writeServerSearchState(state: { query: string; loading: boolean; error: string; results: ServerMessageSearchResult[] }): void;
-  writeSearchScope(scope: "channel" | "server"): void;
   setHighlightedMessageId(messageId: string): void;
   readHighlightedMessageId(): string;
   /** 将消息标记为已撤回（将内容替换为占位符）。 */

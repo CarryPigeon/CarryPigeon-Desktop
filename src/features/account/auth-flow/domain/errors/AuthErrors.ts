@@ -8,10 +8,12 @@ export type AuthErrorCode =
   | "missing_email"
   | "missing_code"
   | "missing_email_or_code"
+  | "missing_username_or_password"
   | "missing_token"
   | "missing_refresh_token"
   | "send_code_failed"
   | "login_failed"
+  | "register_failed"
   | "token_login_failed"
   | "refresh_failed"
   | "revoke_failed"
@@ -119,10 +121,14 @@ export function toAuthErrorMessage(e: unknown): string {
         return "Missing code.";
       case "missing_email_or_code":
         return "Missing email or code.";
+      case "missing_username_or_password":
+        return "Missing username or password.";
       case "missing_token":
         return "Missing token.";
       case "missing_refresh_token":
         return "Missing refresh token.";
+      case "register_failed":
+        return e.message || "Register failed.";
       default:
         return e.message || "Auth request failed.";
     }

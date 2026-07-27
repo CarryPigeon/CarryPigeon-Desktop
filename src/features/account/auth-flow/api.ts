@@ -24,7 +24,7 @@ import {
   type SendVerificationCodeOutcome,
   toAuthFlowErrorInfo,
 } from "./application/authFlowOutcome";
-import { signInWithEmailCode } from "./application/loginSessionCoordinator";
+import { signInWithEmailCode, signInWithPassword, registerAndSignInWithPassword } from "./application/loginSessionCoordinator";
 import {
   getCheckRequiredGateUsecase,
   getRevokeTokenUsecase,
@@ -44,6 +44,8 @@ export type {
 export type AuthFlowServerCapabilities = {
   sendVerificationCode(email: string): Promise<SendVerificationCodeOutcome>;
   signInWithEmailCode(email: string, code: string): Promise<AuthSignInOutcome>;
+  signInWithPassword(username: string, password: string): Promise<AuthSignInOutcome>;
+  registerAndSignInWithPassword(username: string, password: string): Promise<AuthSignInOutcome>;
   revokeToken(refreshToken: string): Promise<RevokeTokenOutcome>;
   checkRequiredSetup(): Promise<AuthRequiredSetupOutcome>;
 };
@@ -93,6 +95,12 @@ export function createAuthFlowCapabilities(): AuthFlowCapabilities {
         },
         signInWithEmailCode(email: string, code: string): Promise<AuthSignInOutcome> {
           return signInWithEmailCode(serverSocket, email, code);
+        },
+        signInWithPassword(username: string, password: string): Promise<AuthSignInOutcome> {
+          return signInWithPassword(serverSocket, username, password);
+        },
+        registerAndSignInWithPassword(username: string, password: string): Promise<AuthSignInOutcome> {
+          return registerAndSignInWithPassword(serverSocket, username, password);
         },
         async revokeToken(refreshToken: string): Promise<RevokeTokenOutcome> {
           try {

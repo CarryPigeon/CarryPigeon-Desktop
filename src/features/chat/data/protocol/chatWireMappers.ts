@@ -12,6 +12,8 @@ import type {
   ChatChannelPatchInput,
   ChatChannelRecord,
   ChatForwardedFromRecord,
+  ChatForwardMessageData,
+  ChatLinkPreview,
   ChatMentionRecord,
   ChatMessageMentionRecord,
   ChatMessagePage,
@@ -22,10 +24,13 @@ import type {
   ChatReactionRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
+  ChatReplyMessageData,
   ChatSendMessageInput,
   ChatUnreadState,
   ChatUserRecord,
+  ChatMessageAttachmentUploadResult,
 } from "@/features/chat/domain/types/chatApiModels";
+// ChatMessageMentionRecord 仅在领域模型内部使用，wire 上的 mentions 已改为 string[]。
 import type {
   ChatChannelChangedEvent,
   ChatEventEnvelope,
@@ -49,7 +54,7 @@ import type {
   ChatChannelWire,
   ChatForwardedFromWire,
   ChatMentionWire,
-  ChatMessageMentionWire,
+  ChatMessageAttachmentUploadWire,
   ChatMessagePageWire,
   ChatMessageReactionWire,
   ChatMessageReplyWire,
@@ -58,10 +63,12 @@ import type {
   ChatQuoteReplyWire,
   ChatReadStateResponseWire,
   ChatReadStateWire,
+  ChatReplyMessageWireData,
   ChatSendMessageWire,
   ChatUnreadStateWire,
   ChatUserWire,
 } from "./chatWireModels";
+import type { ChatForwardMessageWireData } from "./chatWireModels";
 import type {
   ChatChannelChangedEventPayloadWire,
   ChatMessageCreatedEventPayloadWire,
@@ -78,7 +85,7 @@ import type {
   ChatMessageRecalledEventPayloadWire,
 } from "./chatWireEvents";
 
-import { asTrimmedString, asOptionalString, asSafeNumber } from "@/shared/data/wireMapperUtils";
+import { asTrimmedString, asOptionalString, asSafeNumber, asEpochMillis } from "@/shared/data/wireMapperUtils";
 
 /**
  * 将用户 wire 模型映射为领域用户记录。
@@ -117,12 +124,26 @@ function mapChatMessageReplyWire(wire: ChatMessageReplyWire | undefined): ChatMe
   };
 }
 
-function mapChatMessageMentionWire(wire: ChatMessageMentionWire): ChatMessageMentionRecord {
-  return {
-    userId: asTrimmedString(wire.uid),
-    displayName: asTrimmedString(wire.display_name),
-    type: (wire.type === "everyone" || wire.type === "here") ? wire.type : undefined,
-  };
+/**
+ * 把消息顶层 mentions（服务端 UID 字符串数组）映射为领域 mention 记录；
+ * 服务端不回传 displayName/type，因此 displayName 留空、type 留 undefined，
+ * 由 message-flow 渲染层在做用户展示时自行回退填充。
+ */
+function wireMentionsToRecords(uids: unknown): ChatMessageMentionRecord[] {
+  if (!Array.isArray(uids)) return [];
+  return uids
+    .map((uid) => asTrimmedString(uid))
+    .filter((uid): uid is string => Boolean(uid))
+    .map((userId) => ({ userId, displayName: "" }));
+}
+
+/**
+ * 把领域 mention 记录序列化为服务端 wire 顶层的 UID 字符串数组。
+ */
+function recordsToWireMentionUids(records: ChatMessageMentionRecord[] | undefined): string[] | undefined {
+  if (!Array.isArray(records) || records.length === 0) return undefined;
+  const uids = records.map((m) => asTrimmedString(m.userId)).filter((uid) => Boolean(uid));
+  return uids.length > 0 ? uids : undefined;
 }
 
 function mapChatMessageReplyRecord(input: ChatMessageReplyRecord): ChatMessageReplyWire {
@@ -132,14 +153,6 @@ function mapChatMessageReplyRecord(input: ChatMessageReplyRecord): ChatMessageRe
     preview: asTrimmedString(input.preview),
     created_at: asSafeNumber(input.createdAt),
     unavailable: Boolean(input.unavailable),
-  };
-}
-
-function mapChatMessageMentionRecord(input: ChatMessageMentionRecord): ChatMessageMentionWire {
-  return {
-    uid: asTrimmedString(input.userId),
-    display_name: asTrimmedString(input.displayName),
-    type: (input.type === "everyone" || input.type === "here") ? input.type : undefined,
   };
 }
 
@@ -210,31 +223,125 @@ function mapChatForwardedFromWire(wire: ChatForwardedFromWire | undefined): Chat
   };
 }
 
+function mapChatForwardedFromRecord(input: ChatForwardedFromRecord | undefined): ChatForwardedFromWire | undefined {
+  if (!input) return undefined;
+  const messageId = asTrimmedString(input.messageId);
+  if (!messageId) return undefined;
+  return {
+    mid: messageId,
+    cid: asTrimmedString(input.channelId),
+    uid: asTrimmedString(input.userId),
+    preview: asTrimmedString(input.preview),
+    send_time: asSafeNumber(input.sentTime),
+  };
+}
+
+function mapChatReplyMessageDataToWire(data: ChatReplyMessageData): ChatReplyMessageWireData {
+  return {
+    content: data.content,
+    reply_to_mid: asOptionalString(data.replyToMessageId),
+    reply_to: data.replyTo ? mapChatMessageReplyRecord(data.replyTo) : undefined,
+    quote_reply: data.quoteReply ? mapChatQuoteReplyRecord(data.quoteReply) : undefined,
+    link_preview: data.linkPreview,
+  };
+}
+
+function mapChatReplyMessageWireDataToRecord(data: ChatReplyMessageWireData): ChatReplyMessageData {
+  return {
+    content: data.content,
+    replyToMessageId: asOptionalString(data.reply_to_mid),
+    replyTo: mapChatMessageReplyWire(data.reply_to),
+    quoteReply: mapChatQuoteReplyWire(data.quote_reply),
+    linkPreview: data.link_preview as ChatLinkPreview | undefined,
+  };
+}
+
+function mapChatForwardMessageDataToWire(data: ChatForwardMessageData): ChatForwardMessageWireData {
+  const forwardMessages = Array.isArray(data.forwardedMessages)
+    ? data.forwardedMessages
+        .map(mapChatForwardedFromRecord)
+        .filter((m): m is ChatForwardedFromWire => m != null)
+    : undefined;
+  return {
+    domain: asTrimmedString(data.domain),
+    domain_version: asTrimmedString(data.domainVersion),
+    content: data.content,
+    forwarded_from: mapChatForwardedFromRecord(data.forwardedFrom),
+    forwarded_messages: forwardMessages,
+  };
+}
+
+function mapChatForwardMessageWireDataToRecord(data: ChatForwardMessageWireData): ChatForwardMessageData {
+  return {
+    domain: asTrimmedString(data.domain),
+    domainVersion: asTrimmedString(data.domain_version),
+    content: data.content,
+    forwardedFrom: mapChatForwardedFromWire(data.forwarded_from),
+    forwardedMessages: Array.isArray(data.forwarded_messages)
+      ? data.forwarded_messages.map(mapChatForwardedFromWire).filter((m): m is ChatForwardedFromRecord => m != null)
+      : undefined,
+  };
+}
+
 /**
  * 将消息 wire 模型映射为领域消息记录。
+ *
+ * 服务端 canonical envelope 固定 10 字段；关系元数据只在 `data` 内按 domain 分支
+ * 约定（Core:ReplyText 含 reply/quote/link_preview、Core:Forward 含 forward 快照），
+ * 在 mapper 内解出后回填到顶层 ChatMessageRecord 对应字段。
+ * `mentions` 整体在顶层为 `string[]`，映射时构造默认 displayName 为空的
+ * `ChatMessageMentionRecord`，由渲染层做用户名回退。
+ * `status` 为 `recalled` 时回填 `recalledAt`，触发撤回态展示。
  */
 export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
+  const domain = asTrimmedString(wire.domain);
+  const sendTime = asSafeNumber(wire.send_time);
+  const mentions: ChatMessageMentionRecord[] = wireMentionsToRecords(wire.mentions);
+
+  let replyToMessageId: string | undefined;
+  let replyTo: ChatMessageReplyRecord | undefined;
+  let quoteReply: ChatQuoteReplyRecord | undefined;
+  let forwardedFrom: ChatForwardedFromRecord | undefined;
+  let forwardedMessages: ChatForwardedFromRecord[] | undefined;
+  let linkPreview: ChatLinkPreview | undefined;
+
+  let data: unknown = wire.data;
+  if (domain === "Core:ReplyText") {
+    const replyData = mapChatReplyMessageWireDataToRecord(wire.data as ChatReplyMessageWireData);
+    data = replyData;
+    replyToMessageId = replyData.replyToMessageId;
+    replyTo = replyData.replyTo;
+    quoteReply = replyData.quoteReply;
+    if (replyData.linkPreview != null) linkPreview = replyData.linkPreview;
+  } else if (domain === "Core:Forward") {
+    const forwardData = mapChatForwardMessageWireDataToRecord(wire.data as ChatForwardMessageWireData);
+    data = forwardData;
+    forwardedFrom = forwardData.forwardedFrom;
+    forwardedMessages = forwardData.forwardedMessages;
+  }
+
+  const status = asTrimmedString(wire.status);
+  const recalledAt = status === "recalled" ? sendTime : undefined;
+
   return {
     id: asTrimmedString(wire.mid),
     channelId: asTrimmedString(wire.cid),
     userId: asTrimmedString(wire.uid),
-    sender: mapChatUserWire(wire.sender),
-    sentTime: asSafeNumber(wire.send_time),
-    domain: asTrimmedString(wire.domain),
+    sender: undefined,
+    sentTime: sendTime,
+    domain,
     domainVersion: asTrimmedString(wire.domain_version),
-    data: wire.data,
+    data,
     preview: asOptionalString(wire.preview),
-    replyToMessageId: asOptionalString(wire.reply_to_mid),
-    replyTo: mapChatMessageReplyWire(wire.reply_to),
-    quoteReply: mapChatQuoteReplyWire(wire.quote_reply),
-    mentions: Array.isArray(wire.mentions) ? wire.mentions.map(mapChatMessageMentionWire) : [],
+    replyToMessageId,
+    replyTo,
+    quoteReply,
+    mentions,
     reactions: wire.reactions?.map(mapChatReactionWire),
-    editedAt: wire.edited_at != null ? asSafeNumber(wire.edited_at) : undefined,
-    editVersion: wire.edit_version != null ? asSafeNumber(wire.edit_version) : undefined,
-    forwardedFrom: mapChatForwardedFromWire(wire.forwarded_from),
-    forwardedMessages: Array.isArray(wire.forwarded_messages)
-      ? wire.forwarded_messages.map(mapChatForwardedFromWire).filter((m): m is ChatForwardedFromRecord => m != null)
-      : undefined,
+    recalledAt,
+    forwardedFrom,
+    forwardedMessages,
+    linkPreview,
   };
 }
 
@@ -244,6 +351,19 @@ export function mapChatReactionWire(wire: ChatMessageReactionWire): ChatReaction
     emoji: asTrimmedString(wire.emoji),
     count: asSafeNumber(wire.count),
     reactedByMe: Boolean(wire.reacted_by_me),
+  };
+}
+
+/** Map message attachment upload wire → domain record. */
+export function mapChatMessageAttachmentUploadWire(
+  wire: ChatMessageAttachmentUploadWire,
+): ChatMessageAttachmentUploadResult {
+  return {
+    objectKey: asTrimmedString(wire.object_key),
+    shareKey: asTrimmedString(wire.share_key),
+    filename: asTrimmedString(wire.filename),
+    mimeType: asTrimmedString(wire.mime_type),
+    size: asSafeNumber(wire.size),
   };
 }
 
@@ -268,7 +388,8 @@ export function mapChatChannelMemberWire(wire: ChatChannelMemberWire): ChatChann
     role: asTrimmedString(wire.role) || "member",
     nickname: asTrimmedString(wire.nickname),
     avatar: asOptionalString(wire.avatar),
-    joinTime: asSafeNumber(wire.join_time),
+    // 服务端 Instant 经 Jackson 常以 epoch 秒序列化；领域层统一为毫秒
+    joinTime: asEpochMillis(wire.join_time),
   };
 }
 
@@ -323,16 +444,35 @@ export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanR
 
 /**
  * 将领域发送消息输入转换为 wire 请求体。
+ *
+ * - 顶层 `mentions` 为 string[]（snowflake UID），与服务端 sendChannelMessageRequest 对齐；
+ * - Core:ReplyText 的 reply/quote/link_preview 关系元数据封装在 `data` 内；
+ * - Core:Forward 的 forward 快照封装在 `data` 内。
  */
 export function mapChatSendMessageInput(input: ChatSendMessageInput): ChatSendMessageWire {
+  const domain = asTrimmedString(input.domain);
+  const isReplyText = domain === "Core:ReplyText";
+  const isForward = domain === "Core:Forward";
+
+  let data: unknown = input.data;
+  if (isReplyText && input.data) {
+    const replyData = input.data as ChatReplyMessageData;
+    data = mapChatReplyMessageDataToWire({
+      content: replyData.content,
+      replyToMessageId: replyData.replyToMessageId ?? input.replyToMessageId,
+      replyTo: replyData.replyTo ?? input.replyTo,
+      quoteReply: replyData.quoteReply ?? input.quoteReply,
+      linkPreview: replyData.linkPreview ?? input.linkPreview,
+    });
+  } else if (isForward && input.data) {
+    data = mapChatForwardMessageDataToWire(input.data as ChatForwardMessageData);
+  }
+
   return {
-    domain: asTrimmedString(input.domain),
+    domain,
     domain_version: asTrimmedString(input.domainVersion),
-    data: input.data,
-    reply_to_mid: asOptionalString(input.replyToMessageId),
-    reply_to: input.replyTo ? mapChatMessageReplyRecord(input.replyTo) : undefined,
-    quote_reply: input.quoteReply ? mapChatQuoteReplyRecord(input.quoteReply) : undefined,
-    mentions: input.mentions?.map(mapChatMessageMentionRecord),
+    data,
+    mentions: recordsToWireMentionUids(input.mentions),
     client_message_id: asOptionalString(input.clientMessageId),
   };
 }
@@ -361,13 +501,14 @@ export function mapChatReadStateResponseWire(wire: ChatReadStateResponseWire): C
 
 /**
  * 将频道更新输入裁剪为服务端接受的 wire patch。
+ *
+ * 服务端 `UpdateChannelProfileRequest` 当前只接受 `name` 与 `brief`；
+ * 修改公告 / 头像暂不支持，相关字段在 domain 层已被删除，此处不再输出。
  */
-export function mapChatChannelPatchInput(input: ChatChannelPatchInput): Partial<Pick<ChatChannelWire, "name" | "brief" | "avatar">> & { announcement?: string } {
-  const output: Partial<Pick<ChatChannelWire, "name" | "brief" | "avatar">> & { announcement?: string } = {};
+export function mapChatChannelPatchInput(input: ChatChannelPatchInput): Partial<Pick<ChatChannelWire, "name" | "brief">> {
+  const output: Partial<Pick<ChatChannelWire, "name" | "brief">> = {};
   if (typeof input.name === "string") output.name = input.name.trim();
   if (typeof input.brief === "string") output.brief = input.brief.trim();
-  if (typeof input.avatar === "string") output.avatar = input.avatar.trim();
-  if (typeof input.announcement === "string") output.announcement = input.announcement.trim();
   return output;
 }
 
@@ -459,8 +600,8 @@ function mapMessageRecalledPayload(wire: ChatMessageRecalledEventPayloadWire): C
   return {
     channelId: asTrimmedString(wire.cid),
     messageId: asTrimmedString(wire.mid),
-    recalledAt: asSafeNumber(wire.recalled_at),
-    recalledByUserId: asTrimmedString(wire.recalled_by_uid),
+    recalledAt: asSafeNumber(wire.recall_time),
+    recalledByUserId: "",
   };
 }
 
@@ -470,7 +611,7 @@ function mapMentionCreatedPayload(wire: MentionCreatedEventPayloadWire): Mention
     channelId: asTrimmedString(wire.cid),
     messageId: asTrimmedString(wire.mid),
     fromUserId: asTrimmedString(wire.from_uid),
-    target: wire.target ? { type: asTrimmedString(wire.target.type), uid: asTrimmedString(wire.target.uid) } : { type: "", uid: "" },
+    target: { type: "user", uid: asTrimmedString(wire.uid) },
     createdAt: asSafeNumber(wire.created_at),
   };
 }

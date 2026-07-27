@@ -535,27 +535,53 @@
 
 - 方法：`POST /api/channels/{cid}/messages`
 - 幂等（推荐）：客户端可发送 `Idempotency-Key: <uuid>`，服务端在一定窗口内对重复 key 返回同一结果，避免重试导致重复消息
-- 请求：
+- 请求（普通文本，`Core:Text`）：
 
 ```json
 {
   "domain": "Core:Text",
   "domain_version": "1.0.0",
   "data": { "text": "hello" },
-  "reply_to_mid": "0"
+  "mentions": ["67890"]
+}
+```
+
+- 请求（引用回复，`Core:ReplyText`；reply/quote/link_preview 关系元数据封装在 `data` 内，`mentions` 在顶层为 `string[]`，详见 `docs/api/15-quote-reply-forward-v1.md`）：
+
+```json
+{
+  "domain": "Core:ReplyText",
+  "domain_version": "1.0.0",
+  "data": {
+    "content": { "text": "回复内容" },
+    "reply_to_mid": "10086",
+    "reply_to": { "mid": "10086", "sender_name": "Bob", "preview": "原始消息", "created_at": 1700000000000, "unavailable": false },
+    "link_preview": { "url": "https://example.com" }
+  },
+  "mentions": ["67890"],
+  "client_message_id": "client-abc"
 }
 ```
 
 - 成功：`201 Created`（返回完整 message）
 
-### 7.3 删除消息（硬删除=消失）
+> 顶层请求体只接受 `domain` / `domain_version` / `data` / `mentions`(string[]) / `client_message_id`；
+> `reply_to_mid` / `reply_to` / `quote_reply` / `link_preview` / `forwarded_from` / `forwarded_messages` 等关系元数据一律由 `data` 承载，不得放在顶层。
 
-- 方法：`DELETE /api/messages/{mid}`
-- 成功：`204 No Content`
+### 7.3 撤回消息（soft recall）
+
+- 方法：`POST /api/channels/{cid}/messages/{mid}/recall`
+- 鉴权：Bearer access token
+- 成功：`200 OK`，返回更新后的完整 message（`status: "recalled"`，`data` 保留原 payload 但客户端渲染层应展示为「该消息已被撤回」）
 
 约定（必须）：
-- 删除成功后，任何历史拉取接口不得再返回该消息。
-- 服务端必须推送 `message.deleted` 事件（见 `docs/api/12-ws-events-v1.md`）。
+- 撤回后，历史拉取接口仍返回该消息，但 `status` 为 `"recalled"`；客户端据此渲染撤回态。
+- 服务端必须推送 `message.recalled` 事件（见 `docs/api/12-ws-events-v1.md`）。
+- 仅消息发送者或频道管理员/owner 可撤回；其他情况返回 `403 forbidden`。
+- 撤回窗口由服务端策略决定（建议 2 分钟内可撤回，超时返回 `409 recall_window_expired`）。
+
+> ⚠️ v1 不再提供「硬删除」端点。原 `DELETE /api/messages/{mid}` 已下线，由本节 `POST .../recall` 取代；
+> 客户端也不再持有删除能力，对应 UI（批量删除、消息移除按钮）已移除。
 
 ## 8. Read State（需登录）
 

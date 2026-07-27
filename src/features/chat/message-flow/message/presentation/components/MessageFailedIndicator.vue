@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview MessageFailedIndicator.vue
- * @description 消息发送失败指示器和重试/删除按钮。
+ * @description 消息发送失败指示器和重试按钮。
  */
 defineProps<{
   messageId: string;
@@ -10,7 +10,6 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: "retry", messageId: string): void;
-  (event: "remove", messageId: string): void;
 }>();
 </script>
 
@@ -20,9 +19,6 @@ const emit = defineEmits<{
     <span class="cp-failedIndicator__text">{{ error || $t("send_failed") }}</span>
     <button class="cp-failedIndicator__btn" @click="emit('retry', messageId)">
       {{ $t("retry") }}
-    </button>
-    <button class="cp-failedIndicator__dismiss" @click="emit('remove', messageId)">
-      <t-icon name="close" />
     </button>
   </div>
 </template>
@@ -63,15 +59,5 @@ const emit = defineEmits<{
 }
 .cp-failedIndicator__btn:hover {
   background: var(--cp-hover-bg);
-}
-.cp-failedIndicator__dismiss {
-  display: inline-flex;
-  align-items: center;
-  border: none;
-  background: transparent;
-  color: var(--cp-text-muted);
-  cursor: pointer;
-  padding: 0 2px;
-  font-size: 12px;
 }
 </style>

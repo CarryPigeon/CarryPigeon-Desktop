@@ -11,12 +11,10 @@
  * 这样 runtime 不需要再分别拼装多个零散 action/paging factory。
  */
 
-import type { ChatMessagePage, ChatMessageRecord, ChatSendMessageInput } from "@/features/chat/domain/types/chatApiModels";
+import type { ChatMessagePage, ChatMessageRecord, ChatReplyMessageData, ChatSendMessageInput } from "@/features/chat/domain/types/chatApiModels";
 import type {
   ChatMessage,
   ComposerSubmitPayload,
-  DeleteChatMessageOutcome,
-  EditChatMessageOutcome,
   MentionCandidate,
   MessageReactionSummary,
   MessageSearchResult,
@@ -24,7 +22,6 @@ import type {
   RecallChatMessageOutcome,
   RemoveReactionOutcome,
   SendChatMessageOutcome,
-  ServerMessageSearchResult,
 } from "@/features/chat/message-flow/domain/contracts";
 import { createMessageActionError, rejectMessageAction } from "../outcomes/messageActionOutcome";
 import type {
@@ -160,30 +157,54 @@ export class MessageFlowApplicationService {
     }
 
     try {
-      const req: ChatSendMessageInput = {
-        domain: apiDomain,
-        domainVersion: apiVersion,
-        data,
-        replyToMessageId: finalReplyToMid,
-        replyTo: replyDraft
-          ? {
-              messageId: replyDraft.messageId,
-              senderName: replyDraft.senderName,
-              preview: replyDraft.preview,
-              createdAt: replyDraft.createdAt,
-              unavailable: replyDraft.unavailable,
-            }
-          : undefined,
-        quoteReply: quoteReply
-          ? {
-              messageId: quoteReply.messageId,
-              userId: quoteReply.userId,
-              preview: quoteReply.preview,
-            }
-          : undefined,
-        mentions: payload?.mentions ?? this.deps.composerState.listDraftMentions().map((m) => ({ userId: m.userId, displayName: m.displayName, type: m.type })),
-        linkPreview: payload?.linkPreview,
-      };
+      const mentions = payload?.mentions ?? this.deps.composerState.listDraftMentions().map((m) => ({ userId: m.userId, displayName: m.displayName, type: m.type }));
+
+      let req: ChatSendMessageInput;
+      const hasReplyContext = Boolean(finalReplyToMid) || Boolean(replyDraft) || Boolean(quoteReply);
+      const isAttachmentDomain = apiDomain === "Core:File" || apiDomain === "Core:Voice";
+      if (hasReplyContext && !isAttachmentDomain) {
+        // 回复/引用消息使用 Core:ReplyText 包装域：
+        // data 内封装嵌套内容、reply_to_mid / reply_to / quote_reply 与 link_preview。
+        // mentions 与 Core:Text 语义一致放在 message 顶层 string[]，由 send mapper 转换。
+        const replyData: ChatReplyMessageData = {
+          content: data,
+          replyToMessageId: finalReplyToMid,
+          replyTo: replyDraft
+            ? {
+                messageId: replyDraft.messageId,
+                senderName: replyDraft.senderName,
+                preview: replyDraft.preview,
+                createdAt: replyDraft.createdAt,
+                unavailable: replyDraft.unavailable,
+              }
+            : undefined,
+          quoteReply: quoteReply
+            ? {
+                messageId: quoteReply.messageId,
+                userId: quoteReply.userId,
+                preview: quoteReply.preview,
+              }
+            : undefined,
+          linkPreview: payload?.linkPreview,
+        };
+        req = {
+          domain: "Core:ReplyText",
+          domainVersion: "1.0.0",
+          data: replyData,
+          mentions: mentions.length > 0 ? mentions : undefined,
+        };
+      } else {
+        // 服务端 Core:Text 顶层只接受 mentions(string[])，link_preview 不在顶层支持；
+        // 普通文本消息的链接预览由本地展示层处理，不通过服务端携带。
+        req = {
+          domain: apiDomain,
+          domainVersion: apiVersion,
+          data,
+          mentions: mentions.length > 0 ? mentions : undefined,
+          linkPreview: payload?.linkPreview,
+        };
+      }
+
       const created = await this.deps.api.sendChannelMessage(socket, token, cid, req, this.createIdempotencyKey());
       const mapped = this.deps.mapWireMessage(socket, created);
       if (this.isScopeStale(requestSocket, requestScopeVersion)) {
@@ -221,165 +242,6 @@ export class MessageFlowApplicationService {
       return {
         ok: false,
         kind: "chat_message_send_rejected",
-        error,
-      };
-    }
-  }
-
-  /**
-   * 删除一条消息。
-   *
-   * 采用“本地先移除，失败再回滚”的乐观删除策略。
-   */
-  async deleteMessage(messageId: string): Promise<DeleteChatMessageOutcome> {
-    const mid = String(messageId).trim();
-    if (!mid) {
-      const error = createMessageActionError("missing_message_id", "Missing message id.");
-      this.deps.composerState.writeActionError(error);
-      return rejectMessageAction("chat_message_delete_rejected", "missing_message_id", "Missing message id.");
-    }
-    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
-    if (!socket || !token) {
-      const error = createMessageActionError("not_signed_in", "Not signed in.");
-      this.deps.composerState.writeActionError(error);
-      return rejectMessageAction("chat_message_delete_rejected", "not_signed_in", "Not signed in.");
-    }
-    const requestSocket = socket;
-    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
-
-    const cid = this.deps.timelineState.readCurrentChannelId();
-    const removal = this.deps.timelineState.beginOptimisticMessageRemoval(cid, mid);
-
-    try {
-      await this.deps.api.deleteMessage(socket, token, mid);
-      if (!this.isScopeStale(requestSocket, requestScopeVersion)) {
-        this.deps.composerState.writeActionError(null);
-      }
-      return {
-        ok: true,
-        kind: "chat_message_deleted",
-        messageId: mid,
-      };
-    } catch (e) {
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
-        return rejectMessageAction(
-          "chat_message_delete_rejected",
-          "stale_runtime_scope",
-          "Chat runtime changed before the delete result could be applied.",
-          undefined,
-          { requestSocket, messageId: mid },
-        );
-      }
-      removal.restore();
-      const error = createMessageActionError("delete_failed", "Delete failed.", e, { messageId: mid, channelId: cid });
-      this.deps.composerState.writeActionError(error);
-      return {
-        ok: false,
-        kind: "chat_message_delete_rejected",
-        error,
-      };
-    }
-  }
-
-  /**
-   * 编辑一条消息。
-   *
-   * 采用"本地先更新，失败再回滚"的乐观编辑策略。
-   */
-  async editMessage(messageId: string, request: { text: string }): Promise<EditChatMessageOutcome> {
-    const mid = String(messageId).trim();
-    if (!mid) {
-      const error = createMessageActionError("missing_message_id", "Missing message id.");
-      this.deps.composerState.writeActionError(error);
-      return rejectMessageAction("chat_message_edit_rejected", "missing_message_id", "Missing message id.");
-    }
-    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
-    if (!socket || !token) {
-      const error = createMessageActionError("not_signed_in", "Not signed in.");
-      this.deps.composerState.writeActionError(error);
-      return rejectMessageAction("chat_message_edit_rejected", "not_signed_in", "Not signed in.");
-    }
-    const requestSocket = socket;
-    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
-
-    const cid = this.deps.timelineState.readCurrentChannelId();
-    if (!cid) {
-      const error = createMessageActionError("channel_not_selected", "No channel selected.");
-      this.deps.composerState.writeActionError(error);
-      return rejectMessageAction("chat_message_edit_rejected", "channel_not_selected", "No channel selected.");
-    }
-
-    // Capture original message for rollback
-    const messages = this.deps.timelineState.listMessages(cid);
-    const originalMessage = messages.find((m) => m.id === mid) ?? null;
-
-    if (originalMessage && originalMessage.from.id !== this.deps.currentUserId) {
-      const error = createMessageActionError("not_message_author", "You can only edit your own messages.");
-      this.deps.composerState.writeActionError(error);
-      return rejectMessageAction("chat_message_edit_rejected", "not_message_author", "You can only edit your own messages.");
-    }
-
-    // Optimistic update: apply new text locally
-    if (originalMessage) {
-      this.deps.timelineState.updateMessage(cid, mid, (old) => ({
-        ...old,
-        kind: "core_text" as const,
-        text: request.text,
-      }));
-    }
-
-    try {
-      const edited = await this.deps.api.editMessage(socket, token, mid, {
-        domain: "Core:Text",
-        domainVersion: "1.0.0",
-        data: { text: request.text },
-        mentions: [],
-      });
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
-        // Rollback optimistic update
-        if (originalMessage) {
-          this.deps.timelineState.updateMessage(cid, mid, () => originalMessage);
-        }
-        return rejectMessageAction(
-          "chat_message_edit_rejected",
-          "stale_runtime_scope",
-          "Chat runtime changed before the edit result could be applied.",
-          undefined,
-          { requestSocket, messageId: mid },
-        );
-      }
-
-      const mapped = this.deps.mapWireMessage(socket, edited);
-      this.deps.timelineState.updateMessage(cid, mid, () => mapped);
-      this.deps.composerState.writeActionError(null);
-
-      return {
-        ok: true,
-        kind: "chat_message_edited",
-        message: mapped,
-      };
-    } catch (e) {
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) {
-        if (originalMessage) {
-          this.deps.timelineState.updateMessage(cid, mid, () => originalMessage);
-        }
-        return rejectMessageAction(
-          "chat_message_edit_rejected",
-          "stale_runtime_scope",
-          "Chat runtime changed before the edit result could be applied.",
-          undefined,
-          { requestSocket, messageId: mid },
-        );
-      }
-      // Rollback on failure
-      if (originalMessage) {
-        this.deps.timelineState.updateMessage(cid, mid, () => originalMessage);
-      }
-      const error = createMessageActionError("edit_failed", "Edit failed.", e, { messageId: mid, channelId: cid });
-      this.deps.composerState.writeActionError(error);
-      return {
-        ok: false,
-        kind: "chat_message_edit_rejected",
         error,
       };
     }
@@ -562,7 +424,9 @@ export class MessageFlowApplicationService {
   /**
    * 撤回一条消息。
    *
-   * 没有乐观更新——服务器通过 `message.recalled` 事件广播结果给所有客户端。
+   * 调用 `POST /channels/{cid}/messages/{mid}/recall`，服务端返回更新后的 canonical
+   * message envelope（`status:"recalled"`），并将其映射回本地 timeline。同时服务端会
+   * 通过 `message.recalled` 事件推送给所有客户端。
    */
   async recallMessage(messageId: string): Promise<RecallChatMessageOutcome> {
     const mid = String(messageId).trim();
@@ -583,7 +447,7 @@ export class MessageFlowApplicationService {
     const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
 
     try {
-      await this.deps.api.recallMessage(socket, token, mid);
+      const recalledRecord = await this.deps.api.recallMessage(socket, token, channelId, mid);
       if (this.isScopeStale(requestSocket, requestScopeVersion)) {
         return rejectMessageAction(
           "chat_message_recall_rejected",
@@ -591,6 +455,10 @@ export class MessageFlowApplicationService {
           "Chat runtime changed before the recall result could be applied.",
         );
       }
+      // 服务端返回的 envelope 已带 status:"recalled"，映射后 timelineState 中对应
+      // 消息的 recalledAt 会被填充，触发撤回态展示。
+      const mapped = this.deps.mapWireMessage(socket, recalledRecord);
+      this.deps.timelineState.updateMessage(channelId, mid, () => mapped);
       return {
         ok: true,
         kind: "chat_message_recalled",
@@ -636,15 +504,15 @@ export class MessageFlowApplicationService {
   async searchCurrentChannel(query: string): Promise<void> {
     const q = String(query ?? "").trim();
     if (!q) {
-      this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" });
+      this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
       return;
     }
     const cid = this.deps.timelineState.readCurrentChannelId();
     if (!cid) return;
-    this.deps.timelineState.writeSearchState({ query: q, loading: true, error: "", results: [], serverResults: [], searchScope: "channel" });
+    this.deps.timelineState.writeSearchState({ query: q, loading: true, error: "", results: [] });
     const [socket, token] = await this.deps.scope.getSocketAndValidToken();
     if (!socket || !token) {
-      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results: [], serverResults: [], searchScope: "channel" });
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results: [] });
       return;
     }
     const requestSocket = socket;
@@ -659,47 +527,10 @@ export class MessageFlowApplicationService {
           preview: message.kind === "core_text" ? message.text : message.preview,
         };
       });
-      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results, serverResults: [], searchScope: "channel" });
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results });
     } catch {
       if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
-      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "Search failed.", results: [], serverResults: [], searchScope: "channel" });
-    }
-  }
-
-  /**
-   * 在服务器范围内搜索消息。
-   */
-  async searchServerMessages(query: string, channelIds?: string[]): Promise<void> {
-    const q = String(query ?? "").trim();
-    if (!q) {
-      this.deps.timelineState.writeServerSearchState({ query: "", loading: false, error: "", results: [] });
-      return;
-    }
-    this.deps.timelineState.writeSearchScope("server");
-    this.deps.timelineState.writeServerSearchState({ query: q, loading: true, error: "", results: [] });
-    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
-    if (!socket || !token) {
-      this.deps.timelineState.writeServerSearchState({ query: q, loading: false, error: "", results: [] });
-      return;
-    }
-    const requestSocket = socket;
-    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
-    try {
-      const page = await this.deps.api.searchMessages(socket, token, { q, channelIds, limit: 30 });
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
-      const results: ServerMessageSearchResult[] = page.items.map((item) => {
-        const message = this.deps.mapWireMessage(socket, item);
-        return {
-          message,
-          preview: message.kind === "core_text" ? message.text : message.preview,
-          channelId: (item as any).channelId ?? "",
-          channelName: "",
-        };
-      });
-      this.deps.timelineState.writeServerSearchState({ query: q, loading: false, error: "", results });
-    } catch {
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
-      this.deps.timelineState.writeServerSearchState({ query: q, loading: false, error: "Search failed.", results: [] });
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "Search failed.", results: [] });
     }
   }
 
@@ -735,8 +566,7 @@ export class MessageFlowApplicationService {
    * 清除搜索状态。
    */
   clearSearch(): void {
-    this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [], serverResults: [], searchScope: "channel" });
-    this.deps.timelineState.writeServerSearchState({ query: "", loading: false, error: "", results: [] });
+    this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
     this.deps.timelineState.setHighlightedMessageId("");
   }
 

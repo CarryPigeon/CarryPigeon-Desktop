@@ -12,19 +12,18 @@ import { ProfileError } from "../domain/errors/ProfileErrors";
 
 /**
  * `/users/me` 响应：当前用户资料。
- * 字段名与服务端 snake_case 响应对齐。
+ * 服务端实际字段：`uid`、`email`、`nickname`、`avatar`（无 `background_url` / `brief`）。
  */
 export type ApiUserMe = {
   uid: string;
   email?: string;
   nickname?: string;
   avatar?: string;
-  background_url?: string;
 };
 
 /**
  * 用户公开资料（对外展示）。
- * 字段名与服务端 snake_case 响应对齐。
+ * 服务端实际字段：`uid`、`nickname`、`avatar`（无 `bio`、`background_url`）。
  */
 export type ApiUserPublic = {
   uid: string;
@@ -36,14 +35,10 @@ export type ApiUserPublic = {
 };
 
 /**
- * 上传背景图片响应。
+ * 上传背景图片响应（服务端 snake_case）。
  */
 export type ApiUploadBackgroundResponse = {
-  backgroundUrl: string;
-};
-
-export type ApiUploadAvatarResponse = {
-  avatarUrl: string;
+  background_url: string;
 };
 
 type ApiUsersBatchResponse = {
@@ -57,6 +52,7 @@ type ApiUpdateUserEmailRequest = {
 
 type ApiUpdateUserProfileRequest = {
   username: string;
+  /** 服务端 @NotNull；调用方可省略，http 层会发 "" */
   avatar?: string;
   brief: string;
 };
@@ -190,13 +186,12 @@ export async function httpUpdateUserProfile(
   input: ApiUpdateUserProfileRequest,
 ): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const body: { username: string; brief: string; avatar?: string } = {
+  // 服务端 PatchCurrentUserProfileRequest：username / avatar / brief 均为 @NotNull
+  const body: { username: string; brief: string; avatar: string } = {
     username: String(input.username ?? "").trim(),
     brief: String(input.brief ?? ""),
+    avatar: input.avatar != null ? String(input.avatar).trim() : "",
   };
-  if (input.avatar != null && input.avatar.trim()) {
-    body.avatar = input.avatar.trim();
-  }
   if (!body.username) {
     throw new ProfileError({ code: "update_profile_failed", message: "Missing username." });
   }
@@ -229,36 +224,17 @@ export async function httpUploadBackgroundImage(
       "/users/me/background",
       formData,
     );
-    return res.backgroundUrl;
+    // 优先 snake_case（真实服务端）；兼容 protocol mock 的 camelCase
+    const url = String(res.background_url ?? (res as { backgroundUrl?: string }).backgroundUrl ?? "").trim();
+    if (!url) {
+      throw new ProfileError({
+        code: "upload_background_failed",
+        message: "Upload background image failed: missing background_url",
+      });
+    }
+    return url;
   } catch (e) {
     rethrowProfileError("upload_background_failed", "Upload background image failed", e);
   }
 }
 
-/**
- * 上传用户头像。
- *
- * @param serverSocket - 服务端 socket。
- * @param accessToken - Access token。
- * @param file - 头像图片文件。
- * @returns 头像图片 URL。
- */
-export async function httpUploadAvatarImage(
-  serverSocket: string,
-  accessToken: string,
-  file: File,
-): Promise<string> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  try {
-    const formData = new FormData();
-    formData.append("avatar", file);
-    const res = await client.requestFormData<ApiUploadAvatarResponse>(
-      "POST",
-      "/users/me/avatar",
-      formData,
-    );
-    return res.avatarUrl;
-  } catch (e) {
-    rethrowProfileError("upload_avatar_failed", "Upload avatar image failed", e);
-  }
-}

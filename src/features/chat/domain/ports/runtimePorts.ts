@@ -54,8 +54,12 @@ export type ChatCoreApiPort = {
     req: ChatSendMessageInput,
     idempotencyKey?: string,
   ): Promise<ChatMessageRecord>;
-  deleteMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void>;
-  recallMessage(serverSocket: string, accessToken: string, messageId: string): Promise<void>;
+  recallMessage(
+    serverSocket: string,
+    accessToken: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<ChatMessageRecord>;
   reactToMessage(
     serverSocket: string,
     accessToken: string,
@@ -83,12 +87,6 @@ export type ChatCoreApiPort = {
     channelId: string,
     patch: ChatChannelPatchInput,
   ): Promise<ChatChannelRecord>;
-  editMessage(
-    serverSocket: string,
-    accessToken: string,
-    mid: string,
-    req: { domain: string; domainVersion: string; data: unknown; mentions?: Array<{ type: string; uid: string }>; expectedEditVersion?: number },
-  ): Promise<ChatMessageRecord>;
   pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void>;
   unpinMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void>;
   listPins(serverSocket: string, accessToken: string, cid: string, cursor?: string, limit?: number): Promise<{ items: ChatPinRecord[]; nextCursor?: string; hasMore?: boolean }>;
@@ -107,11 +105,6 @@ export type ChatCoreApiPort = {
     cid: string,
     query: { q: string; cursor?: string; limit?: number; senderUid?: string; domain?: string; beforeMid?: string; afterMid?: string },
   ): Promise<ChatMessagePage>;
-  searchMessages(
-    serverSocket: string,
-    accessToken: string,
-    query: { q: string; channelIds?: string[]; cursor?: string; limit?: number },
-  ): Promise<ChatMessagePage>;
   listChannelMessagesAround(
     serverSocket: string,
     accessToken: string,
@@ -121,13 +114,6 @@ export type ChatCoreApiPort = {
     after?: number,
   ): Promise<ChatMessagePage>;
   getChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelRecord>;
-  getThreadReplies(
-    serverSocket: string,
-    accessToken: string,
-    rootMessageId: string,
-    cursor?: string,
-    limit?: number,
-  ): Promise<ChatMessagePage>;
 };
 
 /**

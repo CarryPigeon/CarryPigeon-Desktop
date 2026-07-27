@@ -9,6 +9,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
+import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
 import { readAuthToken } from "@/shared/utils/localState";
 import { downloadFile, getDownloadTasks, resumeDownload } from "@/shared/file-transfer";
 import { createLogger } from "@/shared/utils/logger";
@@ -48,6 +49,12 @@ const isImage = computed(() => {
   const mime = props.mimeType?.toLowerCase() ?? "";
   return mime.startsWith("image/");
 });
+
+// 图片预览需要 Bearer 鉴权，浏览器原生 <img> 无法附加 Authorization，故用 objectURL。
+const { objectUrl: previewUrl } = useAuthedObjectUrl(
+  () => (isImage.value ? downloadUrl.value : ""),
+  () => getActiveChatServerSocket(),
+);
 
 /**
  * 将字节数格式化为紧凑可读标签。
@@ -120,7 +127,7 @@ function handleDismissTask(): void {
   <!-- 组件：FileRefMessageBubble｜职责：渲染文件引用消息 -->
   <div class="cp-fileBubble">
     <div v-if="isImage && downloadUrl" class="cp-fileBubble__preview" @click="emit('openLightbox', { url: downloadUrl, fileName: props.filename })">
-      <img :src="downloadUrl" :alt="props.filename" class="cp-fileBubble__img" />
+      <img v-if="previewUrl" :src="previewUrl" :alt="props.filename" class="cp-fileBubble__img" />
     </div>
     <div class="cp-fileBubble__info">
       <div class="cp-fileBubble__icon">{{ getFileIcon(props.mimeType) }}</div>

@@ -1,6 +1,6 @@
-//#region node_modules/.pnpm/@vue+shared@3.5.31/node_modules/@vue/shared/dist/shared.esm-bundler.js
+//#region node_modules/.pnpm/@vue+shared@3.5.40/node_modules/@vue/shared/dist/shared.esm-bundler.js
 /**
-* @vue/shared v3.5.31
+* @vue/shared v3.5.40
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
 * @license MIT
 **/
@@ -229,9 +229,9 @@ function normalizeCssVarValue(value) {
 	return String(value);
 }
 //#endregion
-//#region node_modules/.pnpm/@vue+reactivity@3.5.31/node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js
+//#region node_modules/.pnpm/@vue+reactivity@3.5.40/node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js
 /**
-* @vue/reactivity v3.5.31
+* @vue/reactivity v3.5.40
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
 * @license MIT
 **/
@@ -259,9 +259,15 @@ var EffectScope = class {
 		*/
 		this.cleanups = [];
 		this._isPaused = false;
+		this._warnOnRun = true;
 		this.__v_skip = true;
-		this.parent = activeEffectScope;
-		if (!detached && activeEffectScope) this.index = (activeEffectScope.scopes || (activeEffectScope.scopes = [])).push(this) - 1;
+		if (!detached && activeEffectScope) if (activeEffectScope.active) {
+			this.parent = activeEffectScope;
+			this.index = (activeEffectScope.scopes || (activeEffectScope.scopes = [])).push(this) - 1;
+		} else {
+			this._active = false;
+			this._warnOnRun = false;
+		}
 	}
 	get active() {
 		return this._active;
@@ -270,7 +276,10 @@ var EffectScope = class {
 		if (this._active) {
 			this._isPaused = true;
 			let i, l;
-			if (this.scopes) for (i = 0, l = this.scopes.length; i < l; i++) this.scopes[i].pause();
+			if (this.scopes) {
+				const scopes = this.scopes.slice();
+				for (i = 0, l = scopes.length; i < l; i++) scopes[i].pause();
+			}
 			for (i = 0, l = this.effects.length; i < l; i++) this.effects[i].pause();
 		}
 	}
@@ -282,8 +291,12 @@ var EffectScope = class {
 			if (this._isPaused) {
 				this._isPaused = false;
 				let i, l;
-				if (this.scopes) for (i = 0, l = this.scopes.length; i < l; i++) this.scopes[i].resume();
-				for (i = 0, l = this.effects.length; i < l; i++) this.effects[i].resume();
+				if (this.scopes) {
+					const scopes = this.scopes.slice();
+					for (i = 0, l = scopes.length; i < l; i++) scopes[i].resume();
+				}
+				const effects = this.effects.slice();
+				for (i = 0, l = effects.length; i < l; i++) effects[i].resume();
 			}
 		}
 	}
@@ -296,7 +309,7 @@ var EffectScope = class {
 			} finally {
 				activeEffectScope = currentEffectScope;
 			}
-		} else if (!!(process.env.NODE_ENV !== "production")) warn$2(`cannot run an inactive effect scope.`);
+		} else if (!!(process.env.NODE_ENV !== "production") && this._warnOnRun) warn$2(`cannot run an inactive effect scope.`);
 	}
 	/**
 	* This should only be called on non-detached scopes
@@ -314,7 +327,17 @@ var EffectScope = class {
 	*/
 	off() {
 		if (this._on > 0 && --this._on === 0) {
-			activeEffectScope = this.prevScope;
+			if (activeEffectScope === this) activeEffectScope = this.prevScope;
+			else {
+				let current = activeEffectScope;
+				while (current) {
+					if (current.prevScope === this) {
+						current.prevScope = this.prevScope;
+						break;
+					}
+					current = current.prevScope;
+				}
+			}
 			this.prevScope = void 0;
 		}
 	}
@@ -327,7 +350,8 @@ var EffectScope = class {
 			for (i = 0, l = this.cleanups.length; i < l; i++) this.cleanups[i]();
 			this.cleanups.length = 0;
 			if (this.scopes) {
-				for (i = 0, l = this.scopes.length; i < l; i++) this.scopes[i].stop(true);
+				const scopes = this.scopes.slice();
+				for (i = 0, l = scopes.length; i < l; i++) scopes[i].stop(true);
 				this.scopes.length = 0;
 			}
 			if (!this.detached && this.parent && !fromParent) {
@@ -377,7 +401,8 @@ var ReactiveEffect = class {
 		*/
 		this.cleanup = void 0;
 		this.scheduler = void 0;
-		if (activeEffectScope && activeEffectScope.active) activeEffectScope.effects.push(this);
+		if (activeEffectScope) if (activeEffectScope.active) activeEffectScope.effects.push(this);
+		else this.flags &= -2;
 	}
 	pause() {
 		this.flags |= 64;
@@ -1032,7 +1057,7 @@ var MutableReactiveHandler = class extends BaseReactiveHandler {
 		}
 		const hadKey = isArrayWithIntegerKey ? Number(key) < target.length : hasOwn$1(target, key);
 		const result = Reflect.set(target, key, value, /* @__PURE__ */ isRef(target) ? target : receiver);
-		if (target === /* @__PURE__ */ toRaw(receiver)) {
+		if (target === /* @__PURE__ */ toRaw(receiver) && result) {
 			if (!hadKey) trigger(target, "add", key, value);
 			else if (hasChanged(value, oldValue)) trigger(target, "set", key, value, oldValue);
 		}
@@ -1246,9 +1271,6 @@ function targetTypeMap(rawType) {
 		default: return 0;
 	}
 }
-function getTargetType(value) {
-	return value["__v_skip"] || !Object.isExtensible(value) ? 0 : targetTypeMap(toRawType(value));
-}
 // @__NO_SIDE_EFFECTS__
 function reactive(target) {
 	if (/* @__PURE__ */ isReadonly(target)) return target;
@@ -1272,10 +1294,11 @@ function createReactiveObject(target, isReadonly2, baseHandlers, collectionHandl
 		return target;
 	}
 	if (target["__v_raw"] && !(isReadonly2 && target["__v_isReactive"])) return target;
-	const targetType = getTargetType(target);
-	if (targetType === 0) return target;
+	if (target["__v_skip"] || !Object.isExtensible(target)) return target;
 	const existingProxy = proxyMap.get(target);
 	if (existingProxy) return existingProxy;
+	const targetType = targetTypeMap(toRawType(target));
+	if (targetType === 0) return target;
 	const proxy = new Proxy(target, targetType === 2 ? collectionHandlers : baseHandlers);
 	proxyMap.set(target, proxy);
 	return proxy;
@@ -1640,8 +1663,9 @@ function watch$1(source, cb, options = EMPTY_OBJ) {
 	if (once && cb) {
 		const _cb = cb;
 		cb = (...args) => {
-			_cb(...args);
+			const res = _cb(...args);
 			watchHandle();
+			return res;
 		};
 	}
 	let oldValue = isMultiSource ? new Array(source.length).fill(INITIAL_WATCHER_VALUE) : INITIAL_WATCHER_VALUE;
@@ -1649,7 +1673,7 @@ function watch$1(source, cb, options = EMPTY_OBJ) {
 		if (!(effect.flags & 1) || !effect.dirty && !immediateFirstRun) return;
 		if (cb) {
 			const newValue = effect.run();
-			if (deep || forceTrigger || (isMultiSource ? newValue.some((v, i) => hasChanged(v, oldValue[i])) : hasChanged(newValue, oldValue))) {
+			if (immediateFirstRun || deep || forceTrigger || (isMultiSource ? newValue.some((v, i) => hasChanged(v, oldValue[i])) : hasChanged(newValue, oldValue))) {
 				if (cleanup) cleanup();
 				const currentWatcher = activeWatcher;
 				activeWatcher = effect;
@@ -1710,9 +1734,9 @@ function traverse(value, depth = Infinity, seen) {
 	return value;
 }
 //#endregion
-//#region node_modules/.pnpm/@vue+runtime-core@3.5.31/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js
+//#region node_modules/.pnpm/@vue+runtime-core@3.5.40/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js
 /**
-* @vue/runtime-core v3.5.31
+* @vue/runtime-core v3.5.40
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
 * @license MIT
 **/
@@ -2252,10 +2276,12 @@ function withCtx(fn, ctx = currentRenderingInstance, isNonScopedSlot) {
 	const renderFnWithContext = (...args) => {
 		if (renderFnWithContext._d) setBlockTracking(-1);
 		const prevInstance = setCurrentRenderingInstance(ctx);
+		const prevStackSize = blockStack.length;
 		let res;
 		try {
 			res = fn(...args);
 		} finally {
+			for (let i = blockStack.length; i > prevStackSize; i--) closeBlock();
 			setCurrentRenderingInstance(prevInstance);
 			if (renderFnWithContext._d) setBlockTracking(1);
 		}
@@ -2435,6 +2461,7 @@ function createPathGetter(ctx, path) {
 		return cur;
 	};
 }
+var pendingMounts = /* @__PURE__ */ new WeakMap();
 var TeleportEndKey = /* @__PURE__ */ Symbol("_vte");
 var isTeleport = (type) => type.__isTeleport;
 var isTeleportDisabled = (props) => props && (props.disabled || props.disabled === "");
@@ -2460,58 +2487,71 @@ var TeleportImpl = {
 	name: "Teleport",
 	__isTeleport: true,
 	process(n1, n2, container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized, internals) {
-		const { mc: mountChildren, pc: patchChildren, pbc: patchBlockChildren, o: { insert, querySelector, createText, createComment } } = internals;
+		const { mc: mountChildren, pc: patchChildren, pbc: patchBlockChildren, o: { insert, querySelector, createText, createComment, parentNode } } = internals;
 		const disabled = isTeleportDisabled(n2.props);
-		let { shapeFlag, children, dynamicChildren } = n2;
+		let { dynamicChildren } = n2;
 		if (!!(process.env.NODE_ENV !== "production") && isHmrUpdating) {
 			optimized = false;
 			dynamicChildren = null;
 		}
+		const mount = (vnode, container2, anchor2) => {
+			if (vnode.shapeFlag & 16) mountChildren(vnode.children, container2, anchor2, parentComponent, parentSuspense, namespace, slotScopeIds, optimized);
+		};
+		const mountToTarget = (vnode = n2) => {
+			const disabled2 = isTeleportDisabled(vnode.props);
+			const target = vnode.target = resolveTarget(vnode.props, querySelector);
+			const targetAnchor = prepareAnchor(target, vnode, createText, insert);
+			if (target) {
+				if (namespace !== "svg" && isTargetSVG(target)) namespace = "svg";
+				else if (namespace !== "mathml" && isTargetMathML(target)) namespace = "mathml";
+				if (parentComponent && parentComponent.isCE) (parentComponent.ce._teleportTargets || (parentComponent.ce._teleportTargets = /* @__PURE__ */ new Set())).add(target);
+				if (!disabled2) {
+					mount(vnode, target, targetAnchor);
+					updateCssVars(vnode, false);
+				}
+			} else if (!!(process.env.NODE_ENV !== "production") && !disabled2) warn$1("Invalid Teleport target on mount:", target, `(${typeof target})`);
+		};
+		const queuePendingMount = (vnode) => {
+			const mountJob = () => {
+				if (pendingMounts.get(vnode) !== mountJob) return;
+				pendingMounts.delete(vnode);
+				if (isTeleportDisabled(vnode.props)) {
+					const mountContainer = parentNode(vnode.el) || container;
+					mount(vnode, mountContainer, vnode.anchor);
+					updateCssVars(vnode, true);
+				}
+				mountToTarget(vnode);
+			};
+			pendingMounts.set(vnode, mountJob);
+			queuePostRenderEffect(mountJob, parentSuspense);
+		};
 		if (n1 == null) {
 			const placeholder = n2.el = !!(process.env.NODE_ENV !== "production") ? createComment("teleport start") : createText("");
 			const mainAnchor = n2.anchor = !!(process.env.NODE_ENV !== "production") ? createComment("teleport end") : createText("");
 			insert(placeholder, container, anchor);
 			insert(mainAnchor, container, anchor);
-			const mount = (container2, anchor2) => {
-				if (shapeFlag & 16) mountChildren(children, container2, anchor2, parentComponent, parentSuspense, namespace, slotScopeIds, optimized);
-			};
-			const mountToTarget = () => {
-				const target = n2.target = resolveTarget(n2.props, querySelector);
-				const targetAnchor = prepareAnchor(target, n2, createText, insert);
-				if (target) {
-					if (namespace !== "svg" && isTargetSVG(target)) namespace = "svg";
-					else if (namespace !== "mathml" && isTargetMathML(target)) namespace = "mathml";
-					if (parentComponent && parentComponent.isCE) (parentComponent.ce._teleportTargets || (parentComponent.ce._teleportTargets = /* @__PURE__ */ new Set())).add(target);
-					if (!disabled) {
-						mount(target, targetAnchor);
-						updateCssVars(n2, false);
-					}
-				} else if (!!(process.env.NODE_ENV !== "production") && !disabled) warn$1("Invalid Teleport target on mount:", target, `(${typeof target})`);
-			};
-			if (disabled) {
-				mount(container, mainAnchor);
-				updateCssVars(n2, true);
-			}
 			if (isTeleportDeferred(n2.props) || parentSuspense && parentSuspense.pendingBranch) {
-				n2.el.__isMounted = false;
-				queuePostRenderEffect(() => {
-					if (n2.el.__isMounted !== false) return;
-					mountToTarget();
-					delete n2.el.__isMounted;
-				}, parentSuspense);
-			} else mountToTarget();
-		} else {
-			n2.el = n1.el;
-			n2.targetStart = n1.targetStart;
-			const mainAnchor = n2.anchor = n1.anchor;
-			const target = n2.target = n1.target;
-			const targetAnchor = n2.targetAnchor = n1.targetAnchor;
-			if (n1.el.__isMounted === false) {
-				queuePostRenderEffect(() => {
-					TeleportImpl.process(n1, n2, container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized, internals);
-				}, parentSuspense);
+				queuePendingMount(n2);
 				return;
 			}
+			if (disabled) {
+				mount(n2, container, mainAnchor);
+				updateCssVars(n2, true);
+			}
+			mountToTarget();
+		} else {
+			n2.el = n1.el;
+			const mainAnchor = n2.anchor = n1.anchor;
+			const pendingMount = pendingMounts.get(n1);
+			if (pendingMount) {
+				pendingMount.flags |= 8;
+				pendingMounts.delete(n1);
+				queuePendingMount(n2);
+				return;
+			}
+			n2.targetStart = n1.targetStart;
+			const target = n2.target = n1.target;
+			const targetAnchor = n2.targetAnchor = n1.targetAnchor;
 			const wasDisabled = isTeleportDisabled(n1.props);
 			const currentContainer = wasDisabled ? container : target;
 			const currentAnchor = wasDisabled ? mainAnchor : targetAnchor;
@@ -2525,26 +2565,32 @@ var TeleportImpl = {
 				if (!wasDisabled) moveTeleport(n2, container, mainAnchor, internals, 1);
 				else if (n2.props && n1.props && n2.props.to !== n1.props.to) n2.props.to = n1.props.to;
 			} else if ((n2.props && n2.props.to) !== (n1.props && n1.props.to)) {
-				const nextTarget = n2.target = resolveTarget(n2.props, querySelector);
-				if (nextTarget) moveTeleport(n2, nextTarget, null, internals, 0);
-				else if (!!(process.env.NODE_ENV !== "production")) warn$1("Invalid Teleport target on update:", target, `(${typeof target})`);
+				const nextTarget = resolveTarget(n2.props, querySelector);
+				if (nextTarget) {
+					n2.target = nextTarget;
+					moveTeleport(n2, nextTarget, null, internals, 0);
+				} else if (!!(process.env.NODE_ENV !== "production")) warn$1("Invalid Teleport target on update:", target, `(${typeof target})`);
 			} else if (wasDisabled) moveTeleport(n2, target, targetAnchor, internals, 1);
 			updateCssVars(n2, disabled);
 		}
 	},
 	remove(vnode, parentComponent, parentSuspense, { um: unmount, o: { remove: hostRemove } }, doRemove) {
 		const { shapeFlag, children, anchor, targetStart, targetAnchor, target, props } = vnode;
+		const disabled = isTeleportDisabled(props);
+		const shouldRemove = doRemove || !disabled;
+		const pendingMount = pendingMounts.get(vnode);
+		if (pendingMount) {
+			pendingMount.flags |= 8;
+			pendingMounts.delete(vnode);
+		}
 		if (target) {
 			hostRemove(targetStart);
 			hostRemove(targetAnchor);
 		}
 		doRemove && hostRemove(anchor);
-		if (shapeFlag & 16) {
-			const shouldRemove = doRemove || !isTeleportDisabled(props);
-			for (let i = 0; i < children.length; i++) {
-				const child = children[i];
-				unmount(child, parentComponent, parentSuspense, shouldRemove, !!child.dynamicChildren);
-			}
+		if (!pendingMount && (disabled || target) && shapeFlag & 16) for (let i = 0; i < children.length; i++) {
+			const child = children[i];
+			unmount(child, parentComponent, parentSuspense, shouldRemove, !!child.dynamicChildren);
 		}
 	},
 	move: moveTeleport,
@@ -2555,7 +2601,7 @@ function moveTeleport(vnode, container, parentAnchor, { o: { insert }, m: move }
 	const { el, anchor, shapeFlag, children, props } = vnode;
 	const isReorder = moveType === 2;
 	if (isReorder) insert(el, container, parentAnchor);
-	if (!isReorder || isTeleportDisabled(props)) {
+	if (!pendingMounts.has(vnode) && (!isReorder || isTeleportDisabled(props))) {
 		if (shapeFlag & 16) for (let i = 0; i < children.length; i++) move(children[i], container, parentAnchor, 2);
 	}
 	if (isReorder) insert(anchor, container, parentAnchor);
@@ -2678,8 +2724,8 @@ var BaseTransitionImpl = {
 		const state = useTransitionState();
 		return () => {
 			const children = slots.default && getTransitionRawChildren(slots.default(), true);
-			if (!children || !children.length) return;
-			const child = findNonCommentChild(children);
+			const child = children && children.length ? findNonCommentChild(children) : instance.subTree ? createCommentVNode() : void 0;
+			if (!child) return;
 			const rawProps = /* @__PURE__ */ toRaw(props);
 			const { mode } = rawProps;
 			if (!!(process.env.NODE_ENV !== "production") && mode && mode !== "in-out" && mode !== "out-in" && mode !== "default") warn$1(`invalid <transition> mode: ${mode}`);
@@ -3114,9 +3160,10 @@ function createHydrationFunctions(rendererInternals) {
 	};
 	const hydrateElement = (el, vnode, parentComponent, parentSuspense, slotScopeIds, optimized) => {
 		optimized = optimized || !!vnode.dynamicChildren;
-		const { type, props, patchFlag, shapeFlag, dirs, transition } = vnode;
+		const { type, dynamicProps, props, patchFlag, shapeFlag, dirs, transition } = vnode;
 		const forcePatch = type === "input" || type === "option";
-		if (!!(process.env.NODE_ENV !== "production") || forcePatch || patchFlag !== -1) {
+		const hasDynamicProps = !!dynamicProps;
+		if (!!(process.env.NODE_ENV !== "production") || forcePatch || hasDynamicProps || patchFlag !== -1) {
 			if (dirs) invokeDirectiveHook(vnode, null, parentComponent, "created");
 			let needCallTransitionHooks = false;
 			if (isTemplateNode(el)) {
@@ -3132,16 +3179,12 @@ function createHydrationFunctions(rendererInternals) {
 			}
 			if (shapeFlag & 16 && !(props && (props.innerHTML || props.textContent))) {
 				let next = hydrateChildren(el.firstChild, vnode, el, parentComponent, parentSuspense, slotScopeIds, optimized);
-				let hasWarned = false;
-				while (next) {
-					if (!isMismatchAllowed(el, 1)) {
-						if ((!!(process.env.NODE_ENV !== "production") || false) && !hasWarned) {
-							warn$1(`Hydration children mismatch on`, el, `
+				if (next && !isMismatchAllowed(el, 1)) {
+					process.env.NODE_ENV !== "production" && warn$1(`Hydration children mismatch on`, el, `
 Server rendered element contains more child nodes than client vdom.`);
-							hasWarned = true;
-						}
-						logMismatchError();
-					}
+					logMismatchError();
+				}
+				while (next) {
 					const cur = next;
 					next = next.nextSibling;
 					remove(cur);
@@ -3161,11 +3204,12 @@ Server rendered element contains more child nodes than client vdom.`);
 				}
 			}
 			if (props) {
-				if (!!(process.env.NODE_ENV !== "production") || forcePatch || !optimized || patchFlag & 48) {
+				if (!!(process.env.NODE_ENV !== "production") || forcePatch || hasDynamicProps || !optimized || patchFlag & 48) {
 					const isCustomElement = el.tagName.includes("-");
+					const namespace = el.namespaceURI.includes("svg") ? "svg" : el.namespaceURI.includes("MathML") ? "mathml" : void 0;
 					for (const key in props) {
 						if ((!!(process.env.NODE_ENV !== "production") || false) && !(dirs && dirs.some((d) => d.dir.created)) && propHasMismatch(el, key, props[key], vnode, parentComponent)) logMismatchError();
-						if (forcePatch && (key.endsWith("value") || key === "indeterminate") || isOn(key) && !isReservedProp(key) || key[0] === "." || isCustomElement && !isReservedProp(key)) patchProp(el, key, null, props[key], void 0, parentComponent);
+						if (forcePatch && (key.endsWith("value") || key === "indeterminate") || isOn(key) && !isReservedProp(key) || key[0] === "." || isCustomElement && !isReservedProp(key) || dynamicProps && dynamicProps.includes(key)) patchProp(el, key, null, props[key], namespace, parentComponent);
 					}
 				} else if (props.onClick) patchProp(el, "onClick", null, props.onClick, void 0, parentComponent);
 				else if (patchFlag & 4 && /* @__PURE__ */ isReactive(props.style)) for (const key in props.style) props.style[key];
@@ -3185,7 +3229,7 @@ Server rendered element contains more child nodes than client vdom.`);
 		optimized = optimized || !!parentVNode.dynamicChildren;
 		const children = parentVNode.children;
 		const l = children.length;
-		let hasWarned = false;
+		let hasCheckedMismatch = false;
 		for (let i = 0; i < l; i++) {
 			const vnode = optimized ? children[i] : children[i] = normalizeVNode(children[i]);
 			const isText = vnode.type === Text$1;
@@ -3199,13 +3243,13 @@ Server rendered element contains more child nodes than client vdom.`);
 				node = hydrateNode(node, vnode, parentComponent, parentSuspense, slotScopeIds, optimized);
 			} else if (isText && !vnode.children) insert(vnode.el = createText(""), container);
 			else {
-				if (!isMismatchAllowed(container, 1)) {
-					if ((!!(process.env.NODE_ENV !== "production") || false) && !hasWarned) {
-						warn$1(`Hydration children mismatch on`, container, `
+				if (!hasCheckedMismatch) {
+					hasCheckedMismatch = true;
+					if (!isMismatchAllowed(container, 1)) {
+						process.env.NODE_ENV !== "production" && warn$1(`Hydration children mismatch on`, container, `
 Server rendered element contains fewer child nodes than client vdom.`);
-						hasWarned = true;
+						logMismatchError();
 					}
-					logMismatchError();
 				}
 				patch(null, vnode, container, null, parentComponent, parentSuspense, getContainerType(container), slotScopeIds);
 			}
@@ -3225,7 +3269,7 @@ Server rendered element contains fewer child nodes than client vdom.`);
 		}
 	};
 	const handleMismatch = (node, vnode, parentComponent, parentSuspense, slotScopeIds, isFragment) => {
-		if (!isMismatchAllowed(node.parentElement, 1)) {
+		if (!isNodeMismatchAllowed(node, vnode)) {
 			process.env.NODE_ENV !== "production" && warn$1(`Hydration node mismatch:
 - rendered on server:`, node, node.nodeType === 3 ? `(text)` : isComment(node) && node.data === "[" ? `(start of fragment)` : ``, `
 - expected on client:`, vnode.type);
@@ -3377,7 +3421,9 @@ var MismatchTypeString = {
 };
 function isMismatchAllowed(el, allowedType) {
 	if (allowedType === 0 || allowedType === 1) while (el && !el.hasAttribute(allowMismatchAttr)) el = el.parentElement;
-	const allowedAttr = el && el.getAttribute(allowMismatchAttr);
+	return isMismatchAllowedByAttr(el && el.getAttribute(allowMismatchAttr), allowedType);
+}
+function isMismatchAllowedByAttr(allowedAttr, allowedType) {
 	if (allowedAttr == null) return false;
 	else if (allowedAttr === "") return true;
 	else {
@@ -3385,6 +3431,16 @@ function isMismatchAllowed(el, allowedType) {
 		if (allowedType === 0 && list.includes("children")) return true;
 		return list.includes(MismatchTypeString[allowedType]);
 	}
+}
+function isNodeMismatchAllowed(node, vnode) {
+	return isMismatchAllowed(node.parentElement, 1) || isMismatchAllowedByNode(node) || isMismatchAllowedByVNode(vnode);
+}
+function isMismatchAllowedByNode(node) {
+	return node.nodeType === 1 && isMismatchAllowedByAttr(node.getAttribute(allowMismatchAttr), 1);
+}
+function isMismatchAllowedByVNode({ props }) {
+	const allowedAttr = props && props[allowMismatchAttr];
+	return typeof allowedAttr === "string" && isMismatchAllowedByAttr(allowedAttr, 1);
 }
 var requestIdleCallback = getGlobalThis().requestIdleCallback || ((cb) => setTimeout(cb, 1));
 var cancelIdleCallback = getGlobalThis().cancelIdleCallback || ((id) => clearTimeout(id));
@@ -3500,6 +3556,7 @@ function defineAsyncComponent(source) {
 		name: "AsyncComponentWrapper",
 		__asyncLoader: load,
 		__asyncHydrate(el, instance, hydrate) {
+			const wasConnected = el.isConnected;
 			let patched = false;
 			(instance.bu || (instance.bu = [])).push(() => patched = true);
 			const performHydrate = () => {
@@ -3507,6 +3564,7 @@ function defineAsyncComponent(source) {
 					if (!!(process.env.NODE_ENV !== "production")) warn$1(`Skipping lazy hydration for component '${getComponentName(resolvedComp) || resolvedComp.__file}': it was updated before lazy hydration performed.`);
 					return;
 				}
+				if (!el.parentNode || wasConnected && !el.isConnected) return;
 				hydrate();
 			};
 			const doHydrate = hydrateStrategy ? () => {
@@ -3536,10 +3594,18 @@ function defineAsyncComponent(source) {
 			const loaded = /* @__PURE__ */ ref(false);
 			const error = /* @__PURE__ */ ref();
 			const delayed = /* @__PURE__ */ ref(!!delay);
-			if (delay) setTimeout(() => {
+			let timeoutTimer;
+			let delayTimer;
+			onUnmounted(() => {
+				if (timeoutTimer != null) clearTimeout(timeoutTimer);
+				if (delayTimer != null) clearTimeout(delayTimer);
+			});
+			if (delay) delayTimer = setTimeout(() => {
+				if (instance.isUnmounted) return;
 				delayed.value = false;
 			}, delay);
-			if (timeout != null) setTimeout(() => {
+			if (timeout != null) timeoutTimer = setTimeout(() => {
+				if (instance.isUnmounted) return;
 				if (!loaded.value && !error.value) {
 					const err = /* @__PURE__ */ new Error(`Async component timed out after ${timeout}ms.`);
 					onError(err);
@@ -3547,9 +3613,14 @@ function defineAsyncComponent(source) {
 				}
 			}, timeout);
 			load().then(() => {
+				if (instance.isUnmounted) return;
 				loaded.value = true;
 				if (instance.parent && isKeepAlive(instance.parent.vnode)) instance.parent.update();
 			}).catch((err) => {
+				if (instance.isUnmounted) {
+					pendingRequest = null;
+					return;
+				}
 				onError(err);
 				error.value = err;
 			});
@@ -3880,11 +3951,12 @@ function createSlots(slots, dynamicSlots) {
 	}
 	return slots;
 }
-function renderSlot(slots, name, props = {}, fallback, noSlotted) {
+function renderSlot(slots, name, props = {}, fallback, noSlotted, branchKey) {
 	if (currentRenderingInstance.ce || currentRenderingInstance.parent && isAsyncWrapper(currentRenderingInstance.parent) && currentRenderingInstance.parent.ce) {
-		const hasProps = Object.keys(props).length > 0;
-		if (name !== "default") props.name = name;
-		return openBlock(), createBlock(Fragment, null, [createVNode("slot", props, fallback && fallback())], hasProps ? -2 : 64);
+		const slotProps = branchKey != null && props.key == null ? extend$1({}, props, { key: branchKey }) : props;
+		const hasProps = Object.keys(slotProps).length > 0;
+		if (name !== "default") slotProps.name = name;
+		return openBlock(), createBlock(Fragment, null, [createVNode("slot", slotProps, fallback && fallback())], hasProps ? -2 : 64);
 	}
 	let slot = slots[name];
 	if (!!(process.env.NODE_ENV !== "production") && slot && slot.length > 1) {
@@ -3892,12 +3964,20 @@ function renderSlot(slots, name, props = {}, fallback, noSlotted) {
 		slot = () => [];
 	}
 	if (slot && slot._c) slot._d = false;
+	const prevStackSize = blockStack.length;
 	openBlock();
-	const validSlotContent = slot && ensureValidVNode(slot(props));
-	const slotKey = props.key || validSlotContent && validSlotContent.key;
-	const rendered = createBlock(Fragment, { key: (slotKey && !isSymbol$1(slotKey) ? slotKey : `_${name}`) + (!validSlotContent && fallback ? "_fb" : "") }, validSlotContent || (fallback ? fallback() : []), validSlotContent && slots._ === 1 ? 64 : -2);
+	let rendered;
+	try {
+		const validSlotContent = slot && ensureValidVNode(slot(props));
+		const slotKey = props.key || branchKey || validSlotContent && validSlotContent.key;
+		rendered = createBlock(Fragment, { key: (slotKey && !isSymbol$1(slotKey) ? slotKey : `_${name}`) + (!validSlotContent && fallback ? "_fb" : "") }, validSlotContent || (fallback ? fallback() : []), validSlotContent && slots._ === 1 ? 64 : -2);
+	} catch (err) {
+		for (let i = blockStack.length; i > prevStackSize; i--) closeBlock();
+		throw err;
+	} finally {
+		if (slot && slot._c) slot._d = true;
+	}
 	if (!noSlotted && rendered.scopeId) rendered.slotScopeIds = [rendered.scopeId + "-s"];
-	if (slot && slot._c) slot._d = true;
 	return rendered;
 }
 function ensureValidVNode(vnodes) {
@@ -4589,12 +4669,13 @@ function useModel(props, name, options = EMPTY_OBJ) {
 				const emittedValue = options.set ? options.set(value) : value;
 				if (!hasChanged(emittedValue, localValue) && !(prevSetValue !== EMPTY_OBJ && hasChanged(value, prevSetValue))) return;
 				const rawProps = i.vnode.props;
-				if (!(rawProps && (name in rawProps || camelizedName in rawProps || hyphenatedName in rawProps) && (`onUpdate:${name}` in rawProps || `onUpdate:${camelizedName}` in rawProps || `onUpdate:${hyphenatedName}` in rawProps))) {
+				const hasVModel = !!(rawProps && (name in rawProps || camelizedName in rawProps || hyphenatedName in rawProps) && (`onUpdate:${name}` in rawProps || `onUpdate:${camelizedName}` in rawProps || `onUpdate:${hyphenatedName}` in rawProps));
+				if (!hasVModel) {
 					localValue = value;
 					trigger();
 				}
 				i.emit(`update:${name}`, emittedValue);
-				if (hasChanged(value, emittedValue) && hasChanged(value, prevSetValue) && !hasChanged(emittedValue, prevEmittedValue)) trigger();
+				if (hasChanged(value, prevSetValue) && (hasChanged(value, emittedValue) && !hasChanged(emittedValue, prevEmittedValue) || hasVModel && prevSetValue !== EMPTY_OBJ && !hasChanged(emittedValue, localValue))) trigger();
 				prevSetValue = value;
 				prevEmittedValue = emittedValue;
 			}
@@ -4684,7 +4765,8 @@ function normalizeEmitsOptions(comp, appContext, asMixin = false) {
 }
 function isEmitListener(options, key) {
 	if (!options || !isOn(key)) return false;
-	key = key.slice(2).replace(/Once$/, "");
+	key = key.slice(2);
+	key = key === "Once" ? key : key.replace(/Once$/, "");
 	return hasOwn$1(options, key[0].toLowerCase() + key.slice(1)) || hasOwn$1(options, hyphenate(key)) || hasOwn$1(options, key);
 }
 var accessedAttrs = false;
@@ -5110,13 +5192,14 @@ function getInvalidTypeMessage(name, value, expectedTypes) {
 	const receivedType = toRawType(value);
 	const expectedValue = styleValue(value, expectedType);
 	const receivedValue = styleValue(value, receivedType);
-	if (expectedTypes.length === 1 && isExplicable(expectedType) && !isBoolean$1(expectedType, receivedType)) message += ` with value ${expectedValue}`;
+	if (expectedTypes.length === 1 && isExplicable(expectedType) && isCoercible(expectedType, receivedType)) message += ` with value ${expectedValue}`;
 	message += `, got ${receivedType} `;
 	if (isExplicable(receivedType)) message += `with value ${receivedValue}.`;
 	return message;
 }
 function styleValue(value, type) {
-	if (type === "String") return `"${value}"`;
+	if (isSymbol$1(value)) return value.toString();
+	else if (type === "String") return `"${value}"`;
 	else if (type === "Number") return `${Number(value)}`;
 	else return `${value}`;
 }
@@ -5127,8 +5210,11 @@ function isExplicable(type) {
 		"boolean"
 	].some((elem) => type.toLowerCase() === elem);
 }
-function isBoolean$1(...args) {
-	return args.some((elem) => elem.toLowerCase() === "boolean");
+function isCoercible(...args) {
+	return args.every((elem) => {
+		const value = elem.toLowerCase();
+		return value !== "boolean" && value !== "symbol";
+	});
 }
 var isInternalKey = (key) => key === "_" || key === "_ctx" || key === "$stable";
 var normalizeSlotValue = (value) => isArray$1(value) ? value.map(normalizeVNode) : [normalizeVNode(value)];
@@ -5386,7 +5472,10 @@ function baseCreateRenderer(options, createHydrationFns) {
 		}
 	};
 	const mountChildren = (children, container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized, start = 0) => {
-		for (let i = start; i < children.length; i++) patch(null, children[i] = optimized ? cloneIfMounted(children[i]) : normalizeVNode(children[i]), container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized);
+		for (let i = start; i < children.length; i++) {
+			const child = children[i] = optimized ? cloneIfMounted(children[i]) : normalizeVNode(children[i]);
+			patch(null, child, container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized);
+		}
 	};
 	const patchElement = (n1, n2, parentComponent, parentSuspense, namespace, slotScopeIds, optimized) => {
 		const el = n2.el = n1.el;
@@ -5400,7 +5489,7 @@ function baseCreateRenderer(options, createHydrationFns) {
 		if (vnodeHook = newProps.onVnodeBeforeUpdate) invokeVNodeHook(vnodeHook, parentComponent, n2, n1);
 		if (dirs) invokeDirectiveHook(n2, n1, parentComponent, "beforeUpdate");
 		parentComponent && toggleRecurse(parentComponent, true);
-		if (!!(process.env.NODE_ENV !== "production") && isHmrUpdating) {
+		if (!!(process.env.NODE_ENV !== "production") && isHmrUpdating || dynamicChildren && (!n1.dynamicChildren || n1.dynamicChildren.length !== dynamicChildren.length)) {
 			patchFlag = 0;
 			optimized = false;
 			dynamicChildren = null;
@@ -5440,7 +5529,8 @@ function baseCreateRenderer(options, createHydrationFns) {
 		for (let i = 0; i < newChildren.length; i++) {
 			const oldVNode = oldChildren[i];
 			const newVNode = newChildren[i];
-			patch(oldVNode, newVNode, oldVNode.el && (oldVNode.type === Fragment || !isSameVNodeType(oldVNode, newVNode) || oldVNode.shapeFlag & 198) ? hostParentNode(oldVNode.el) : fallbackContainer, null, parentComponent, parentSuspense, namespace, slotScopeIds, true);
+			const container = oldVNode.el && (oldVNode.type === Fragment || !isSameVNodeType(oldVNode, newVNode) || oldVNode.shapeFlag & 198) ? hostParentNode(oldVNode.el) : fallbackContainer;
+			patch(oldVNode, newVNode, container, null, parentComponent, parentSuspense, namespace, slotScopeIds, true);
 		}
 	};
 	const patchProps = (el, oldProps, newProps, parentComponent, namespace) => {
@@ -5782,19 +5872,23 @@ function baseCreateRenderer(options, createHydrationFns) {
 			moveStaticNode(vnode, container, anchor);
 			return;
 		}
-		if (moveType !== 2 && shapeFlag & 1 && transition) if (moveType === 0) {
+		if (moveType !== 2 && shapeFlag & 1 && transition) if (moveType === 0) if (transition.persisted && !el[leaveCbKey]) hostInsert(el, container, anchor);
+		else {
 			transition.beforeEnter(el);
 			hostInsert(el, container, anchor);
 			queuePostRenderEffect(() => transition.enter(el), parentSuspense);
-		} else {
+		}
+		else {
 			const { leave, delayLeave, afterLeave } = transition;
 			const remove2 = () => {
 				if (vnode.ctx.isUnmounted) hostRemove(el);
 				else hostInsert(el, container, anchor);
 			};
 			const performLeave = () => {
+				const wasLeaving = el._isLeaving || !!el[leaveCbKey];
 				if (el._isLeaving) el[leaveCbKey](true);
-				leave(el, () => {
+				if (transition.persisted && !wasLeaving) remove2();
+				else leave(el, () => {
 					remove2();
 					afterLeave && afterLeave();
 				});
@@ -6166,15 +6260,19 @@ function createSuspenseBoundary(vnode, parentSuspense, parentComponent, containe
 			if (suspense.isHydrating) suspense.isHydrating = false;
 			else if (!resume) {
 				delayEnter = activeBranch && pendingBranch.transition && pendingBranch.transition.mode === "out-in";
+				let hasUpdatedAnchor = false;
 				if (delayEnter) activeBranch.transition.afterLeave = () => {
 					if (pendingId === suspense.pendingId) {
-						move(pendingBranch, container2, anchor === initialAnchor ? next(activeBranch) : anchor, 0);
+						move(pendingBranch, container2, anchor === initialAnchor && !hasUpdatedAnchor ? next(activeBranch) : anchor, 0);
 						queuePostFlushCb(effects);
 						if (isInFallback && vnode2.ssFallback) vnode2.ssFallback.el = null;
 					}
 				};
 				if (activeBranch && !suspense.isFallbackMountPending) {
-					if (parentNode(activeBranch.el) === container2) anchor = next(activeBranch);
+					if (parentNode(activeBranch.el) === container2) {
+						anchor = next(activeBranch);
+						hasUpdatedAnchor = true;
+					}
 					unmount(activeBranch, parentComponent2, suspense, true);
 					if (!delayEnter && isInFallback && vnode2.ssFallback) queuePostRenderEffect(() => vnode2.ssFallback.el = null, suspense);
 				}
@@ -6239,6 +6337,7 @@ function createSuspenseBoundary(vnode, parentSuspense, parentComponent, containe
 				handleError(err, instance, 0);
 			}).then((asyncSetupResult) => {
 				if (instance.isUnmounted || suspense.isUnmounted || suspense.pendingId !== instance.suspenseId) return;
+				unsetCurrentInstance();
 				instance.asyncResolved = true;
 				const { vnode: vnode2 } = instance;
 				if (!!(process.env.NODE_ENV !== "production")) pushWarningContext(vnode2);
@@ -6543,6 +6642,10 @@ function normalizeChildren(vnode, children) {
 		}
 	}
 	else if (isFunction$1(children)) {
+		if (shapeFlag & 65) {
+			normalizeChildren(vnode, { default: children });
+			return;
+		}
 		children = {
 			default: children,
 			_ctx: currentRenderingInstance
@@ -7093,7 +7196,7 @@ function isMemoSame(cached, memo) {
 	if (isBlockTreeEnabled > 0 && currentBlock) currentBlock.push(cached);
 	return true;
 }
-var version = "3.5.31";
+var version = "3.5.40";
 var warn = !!(process.env.NODE_ENV !== "production") ? warn$1 : NOOP;
 var ErrorTypeStrings = ErrorTypeStrings$1;
 var devtools = (process.env.NODE_ENV, devtools$1);
@@ -7114,9 +7217,9 @@ var resolveFilter = null;
 var compatUtils = null;
 var DeprecationTypes = null;
 //#endregion
-//#region node_modules/.pnpm/@vue+runtime-dom@3.5.31/node_modules/@vue/runtime-dom/dist/runtime-dom.esm-bundler.js
+//#region node_modules/.pnpm/@vue+runtime-dom@3.5.40/node_modules/@vue/runtime-dom/dist/runtime-dom.esm-bundler.js
 /**
-* @vue/runtime-dom v3.5.31
+* @vue/runtime-dom v3.5.40
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
 * @license MIT
 **/
@@ -7514,7 +7617,10 @@ function patchStyle(el, prev, next) {
 		}
 		for (const key in next) {
 			if (key === "display") hasControlledDisplay = true;
-			setStyle$1(style, key, next[key]);
+			const value = next[key];
+			if (value != null) {
+				if (!shouldPreserveTextareaResizeStyle(el, key, !isString$1(prev) && prev ? prev[key] : void 0, value)) setStyle$1(style, key, value);
+			} else setStyle$1(style, key, "");
 		}
 	} else if (isCssString) {
 		if (prev !== next) {
@@ -7563,6 +7669,9 @@ function autoPrefix(style, rawName) {
 		if (prefixed in style) return prefixCache[rawName] = prefixed;
 	}
 	return rawName;
+}
+function shouldPreserveTextareaResizeStyle(el, key, prev, next) {
+	return el.tagName === "TEXTAREA" && (key === "width" || key === "height") && isString$1(next) && prev === next;
 }
 var xlinkNS = "http://www.w3.org/1999/xlink";
 function patchAttr(el, key, value, isSVG, instance, isBoolean = isSpecialBooleanAttr(key)) {
@@ -7624,16 +7733,15 @@ function patchEvent(el, rawName, prevValue, nextValue, instance = null) {
 		}
 	}
 }
-var optionsModifierRE = /(?:Once|Passive|Capture)$/;
+var optionsModifierRE = /(Once|Passive|Capture)$/;
+var optionsModifierEventRE = /^on:?(?:Once|Passive|Capture)$/;
 function parseName(name) {
 	let options;
-	if (optionsModifierRE.test(name)) {
-		options = {};
-		let m;
-		while (m = name.match(optionsModifierRE)) {
-			name = name.slice(0, name.length - m[0].length);
-			options[m[0].toLowerCase()] = true;
-		}
+	let m;
+	while ((m = name.match(optionsModifierRE)) && !optionsModifierEventRE.test(name)) {
+		if (!options) options = {};
+		name = name.slice(0, name.length - m[1].length);
+		options[m[1].toLowerCase()] = true;
 	}
 	return [name[2] === ":" ? name.slice(3) : hyphenate(name.slice(2)), options];
 }
@@ -7644,7 +7752,21 @@ function createInvoker(initialValue, instance) {
 	const invoker = (e) => {
 		if (!e._vts) e._vts = Date.now();
 		else if (e._vts <= invoker.attached) return;
-		callWithAsyncErrorHandling(patchStopImmediatePropagation(e, invoker.value), instance, 5, [e]);
+		const value = invoker.value;
+		if (isArray$1(value)) {
+			const originalStop = e.stopImmediatePropagation;
+			e.stopImmediatePropagation = () => {
+				originalStop.call(e);
+				e._stopped = true;
+			};
+			const handlers = value.slice();
+			const args = [e];
+			for (let i = 0; i < handlers.length; i++) {
+				if (e._stopped) break;
+				const handler = handlers[i];
+				if (handler) callWithAsyncErrorHandling(handler, instance, 5, args);
+			}
+		} else callWithAsyncErrorHandling(value, instance, 5, [e]);
 	};
 	invoker.value = initialValue;
 	invoker.attached = getNow();
@@ -7655,16 +7777,6 @@ function sanitizeEventValue(value, propName) {
 	warn(`Wrong type passed as event handler to ${propName} - did you forget @ or : in front of your prop?
 Expected function or array of functions, received type ${typeof value}.`);
 	return NOOP;
-}
-function patchStopImmediatePropagation(e, value) {
-	if (isArray$1(value)) {
-		const originalStop = e.stopImmediatePropagation;
-		e.stopImmediatePropagation = () => {
-			originalStop.call(e);
-			e._stopped = true;
-		};
-		return value.map((fn) => (e2) => !e2._stopped && fn && fn(e2));
-	} else return value;
 }
 var isNativeOn = (key) => key.charCodeAt(0) === 111 && key.charCodeAt(1) === 110 && key.charCodeAt(2) > 96 && key.charCodeAt(2) < 123;
 var patchProp = (el, key, prevValue, nextValue, namespace, parentComponent) => {
@@ -8160,7 +8272,7 @@ var TransitionGroup = /* @__PURE__ */ decorate({
 			prevChildren = [];
 			if (children) for (let i = 0; i < children.length; i++) {
 				const child = children[i];
-				if (child.el && child.el instanceof Element) {
+				if (child.el && child.el instanceof Element && !child.el[vShowHidden]) {
 					prevChildren.push(child);
 					setTransitionHooks(child, resolveTransitionHooks(child, cssTransitionProps, state, instance));
 					positionMap.set(child, getPosition(child.el));
@@ -8340,10 +8452,10 @@ var vModelRadio = {
 var vModelSelect = {
 	deep: true,
 	created(el, { value, modifiers: { number } }, vnode) {
-		const isSetModel = isSet$1(value);
+		el._modelValue = value;
 		addEventListener(el, "change", () => {
 			const selectedVal = Array.prototype.filter.call(el.options, (o) => o.selected).map((o) => number ? looseToNumber(getValue$1(o)) : getValue$1(o));
-			el[assignKey](el.multiple ? isSetModel ? new Set(selectedVal) : selectedVal : selectedVal[0]);
+			el[assignKey](el.multiple ? isSet$1(el._modelValue) ? new Set(selectedVal) : selectedVal : selectedVal[0]);
 			el._assigning = true;
 			nextTick(() => {
 				el._assigning = false;
@@ -8354,7 +8466,8 @@ var vModelSelect = {
 	mounted(el, { value }) {
 		setSelected(el, value);
 	},
-	beforeUpdate(el, _binding, vnode) {
+	beforeUpdate(el, { value }, vnode) {
+		el._modelValue = value;
 		el[assignKey] = getModelAssigner(vnode);
 	},
 	updated(el, { value }) {
@@ -8593,9 +8706,9 @@ var initDirectivesForSSR = () => {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/vue@3.5.31_typescript@6.0.3/node_modules/vue/dist/vue.runtime.esm-bundler.js
+//#region node_modules/.pnpm/vue@3.5.40_typescript@6.0.3/node_modules/vue/dist/vue.runtime.esm-bundler.js
 /**
-* vue v3.5.31
+* vue v3.5.40
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
 * @license MIT
 **/
@@ -8607,9 +8720,9 @@ var compile = () => {
 	if (!!(process.env.NODE_ENV !== "production")) warn("Runtime compilation is not supported in this build of Vue. Configure your bundler to alias \"vue\" to \"vue/dist/vue.esm-bundler.js\".");
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-26d65784.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-390963eb.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -8626,9 +8739,9 @@ function _unsupportedIterableToArray$9(r, a) {
 	}
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-557b68dd.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-adf8ce39.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -8645,9 +8758,9 @@ function _toConsumableArray(r) {
 	return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray$9(r) || _nonIterableSpread();
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-f038e2b4.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-d84a2ec7.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -8660,9 +8773,9 @@ function _typeof$3(o) {
 	}, _typeof$3(o);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-98dac781.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-07d8f2aa.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -8755,7 +8868,8 @@ function objectToString(value) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseGetTag.js
 /** `Object#toString` result references. */
-var nullTag = "[object Null]", undefinedTag = "[object Undefined]";
+var nullTag = "[object Null]";
+var undefinedTag = "[object Undefined]";
 /** Built-in value references. */
 var symToStringTag = Symbol$1 ? Symbol$1.toStringTag : void 0;
 /**
@@ -8869,7 +8983,8 @@ var isArray = Array.isArray;
 /** Used as references for various `Number` constants. */
 var INFINITY$2 = Infinity;
 /** Used to convert symbols to primitives and strings. */
-var symbolProto$2 = Symbol$1 ? Symbol$1.prototype : void 0, symbolToString = symbolProto$2 ? symbolProto$2.toString : void 0;
+var symbolProto$2 = Symbol$1 ? Symbol$1.prototype : void 0;
+var symbolToString = symbolProto$2 ? symbolProto$2.toString : void 0;
 /**
 * The base implementation of `_.toString` which doesn't convert nullish
 * values to empty strings.
@@ -8997,7 +9112,8 @@ function toNumber$1(value) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/toFinite.js
 /** Used as references for various `Number` constants. */
-var INFINITY$1 = Infinity, MAX_INTEGER = 17976931348623157e292;
+var INFINITY$1 = Infinity;
+var MAX_INTEGER = 17976931348623157e292;
 /**
 * Converts `value` to a finite number.
 *
@@ -9083,7 +9199,10 @@ function identity(value) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/isFunction.js
 /** `Object#toString` result references. */
-var asyncTag = "[object AsyncFunction]", funcTag$2 = "[object Function]", genTag$1 = "[object GeneratorFunction]", proxyTag = "[object Proxy]";
+var asyncTag = "[object AsyncFunction]";
+var funcTag$2 = "[object Function]";
+var genTag$1 = "[object GeneratorFunction]";
+var proxyTag = "[object Proxy]";
 /**
 * Checks if `value` is classified as a `Function` object.
 *
@@ -9159,7 +9278,8 @@ var reRegExpChar$1 = /[\\^$.*+?()[\]{}|]/g;
 /** Used to detect host constructors (Safari). */
 var reIsHostCtor = /^\[object .+?Constructor\]$/;
 /** Used for built-in method references. */
-var funcProto$1 = Function.prototype, objectProto$3 = Object.prototype;
+var funcProto$1 = Function.prototype;
+var objectProto$3 = Object.prototype;
 /** Used to resolve the decompiled source of functions. */
 var funcToString$1 = funcProto$1.toString;
 /** Used to check objects for own properties. */
@@ -9286,7 +9406,8 @@ function copyArray(source, array) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_shortOut.js
 /** Used to detect hot functions by number of calls within a span of milliseconds. */
-var HOT_COUNT = 800, HOT_SPAN = 16;
+var HOT_COUNT = 800;
+var HOT_SPAN = 16;
 var nativeNow = Date.now;
 /**
 * Creates a function that'll short out and invoke `identity` instead
@@ -9837,8 +9958,30 @@ var isBuffer = (Buffer$1 ? Buffer$1.isBuffer : void 0) || stubFalse;
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseIsTypedArray.js
 /** `Object#toString` result references. */
-var argsTag$2 = "[object Arguments]", arrayTag$2 = "[object Array]", boolTag$4 = "[object Boolean]", dateTag$4 = "[object Date]", errorTag$2 = "[object Error]", funcTag$1 = "[object Function]", mapTag$6 = "[object Map]", numberTag$4 = "[object Number]", objectTag$4 = "[object Object]", regexpTag$3 = "[object RegExp]", setTag$6 = "[object Set]", stringTag$4 = "[object String]", weakMapTag$2 = "[object WeakMap]";
-var arrayBufferTag$3 = "[object ArrayBuffer]", dataViewTag$4 = "[object DataView]", float32Tag$2 = "[object Float32Array]", float64Tag$2 = "[object Float64Array]", int8Tag$2 = "[object Int8Array]", int16Tag$2 = "[object Int16Array]", int32Tag$2 = "[object Int32Array]", uint8Tag$2 = "[object Uint8Array]", uint8ClampedTag$2 = "[object Uint8ClampedArray]", uint16Tag$2 = "[object Uint16Array]", uint32Tag$2 = "[object Uint32Array]";
+var argsTag$2 = "[object Arguments]";
+var arrayTag$2 = "[object Array]";
+var boolTag$4 = "[object Boolean]";
+var dateTag$4 = "[object Date]";
+var errorTag$2 = "[object Error]";
+var funcTag$1 = "[object Function]";
+var mapTag$6 = "[object Map]";
+var numberTag$4 = "[object Number]";
+var objectTag$4 = "[object Object]";
+var regexpTag$3 = "[object RegExp]";
+var setTag$6 = "[object Set]";
+var stringTag$4 = "[object String]";
+var weakMapTag$2 = "[object WeakMap]";
+var arrayBufferTag$3 = "[object ArrayBuffer]";
+var dataViewTag$4 = "[object DataView]";
+var float32Tag$2 = "[object Float32Array]";
+var float64Tag$2 = "[object Float64Array]";
+var int8Tag$2 = "[object Int8Array]";
+var int16Tag$2 = "[object Int16Array]";
+var int32Tag$2 = "[object Int32Array]";
+var uint8Tag$2 = "[object Uint8Array]";
+var uint8ClampedTag$2 = "[object Uint8ClampedArray]";
+var uint16Tag$2 = "[object Uint16Array]";
+var uint32Tag$2 = "[object Uint32Array]";
 /** Used to identify `toStringTag` values of typed arrays. */
 var typedArrayTags = {};
 typedArrayTags[float32Tag$2] = typedArrayTags[float64Tag$2] = typedArrayTags[int8Tag$2] = typedArrayTags[int16Tag$2] = typedArrayTags[int32Tag$2] = typedArrayTags[uint8Tag$2] = typedArrayTags[uint8ClampedTag$2] = typedArrayTags[uint16Tag$2] = typedArrayTags[uint32Tag$2] = true;
@@ -10053,7 +10196,8 @@ function keysIn(object) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_isKey.js
 /** Used to match property names within property paths. */
-var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/, reIsPlainProp = /^\w*$/;
+var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/;
+var reIsPlainProp = /^\w*$/;
 /**
 * Checks if `value` is a property name and not a property path.
 *
@@ -10733,7 +10877,8 @@ var getPrototype = overArg(Object.getPrototypeOf, Object);
 /** `Object#toString` result references. */
 var objectTag$3 = "[object Object]";
 /** Used for built-in method references. */
-var funcProto = Function.prototype, objectProto = Object.prototype;
+var funcProto = Function.prototype;
+var objectProto = Object.prototype;
 /** Used to resolve the decompiled source of functions. */
 var funcToString = funcProto.toString;
 /** Used to check objects for own properties. */
@@ -10842,15 +10987,28 @@ function asciiToArray(string) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_unicodeToArray.js
 /** Used to compose unicode character classes. */
-var rsAstralRange$2 = "\\ud800-\\udfff", rsComboRange$2 = "\\u0300-\\u036f\\ufe20-\\ufe2f\\u20d0-\\u20ff", rsVarRange$2 = "\\ufe0e\\ufe0f";
+var rsAstralRange$2 = "\\ud800-\\udfff";
+var rsComboRange$2 = "\\u0300-\\u036f\\ufe20-\\ufe2f\\u20d0-\\u20ff";
+var rsVarRange$2 = "\\ufe0e\\ufe0f";
 /** Used to compose unicode capture groups. */
-var rsAstral$1 = "[" + rsAstralRange$2 + "]", rsCombo$2 = "[" + rsComboRange$2 + "]", rsFitz$1 = "\\ud83c[\\udffb-\\udfff]", rsModifier$2 = "(?:" + rsCombo$2 + "|" + rsFitz$1 + ")", rsNonAstral$2 = "[^" + rsAstralRange$2 + "]", rsRegional$2 = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair$2 = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsZWJ$2 = "\\u200d";
+var rsAstral$1 = "[" + rsAstralRange$2 + "]";
+var rsCombo$2 = "[" + rsComboRange$2 + "]";
+var rsFitz$1 = "\\ud83c[\\udffb-\\udfff]";
+var rsModifier$2 = "(?:" + rsCombo$2 + "|" + rsFitz$1 + ")";
+var rsNonAstral$2 = "[^" + rsAstralRange$2 + "]";
+var rsRegional$2 = "(?:\\ud83c[\\udde6-\\uddff]){2}";
+var rsSurrPair$2 = "[\\ud800-\\udbff][\\udc00-\\udfff]";
+var rsZWJ$2 = "\\u200d";
 /** Used to compose unicode regexes. */
-var reOptMod$2 = rsModifier$2 + "?", rsOptVar$2 = "[" + rsVarRange$2 + "]?", rsOptJoin$2 = "(?:" + rsZWJ$2 + "(?:" + [
+var reOptMod$2 = rsModifier$2 + "?";
+var rsOptVar$2 = "[" + rsVarRange$2 + "]?";
+var rsOptJoin$2 = "(?:" + rsZWJ$2 + "(?:" + [
 	rsNonAstral$2,
 	rsRegional$2,
 	rsSurrPair$2
-].join("|") + ")" + rsOptVar$2 + reOptMod$2 + ")*", rsSeq$2 = rsOptVar$2 + reOptMod$2 + rsOptJoin$2, rsSymbol$1 = "(?:" + [
+].join("|") + ")" + rsOptVar$2 + reOptMod$2 + ")*";
+var rsSeq$2 = rsOptVar$2 + reOptMod$2 + rsOptJoin$2;
+var rsSymbol$1 = "(?:" + [
 	rsNonAstral$2 + rsCombo$2 + "?",
 	rsCombo$2,
 	rsRegional$2,
@@ -11237,15 +11395,47 @@ function hasUnicodeWord(string) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_unicodeWords.js
 /** Used to compose unicode character classes. */
-var rsAstralRange$1 = "\\ud800-\\udfff", rsComboRange$1 = "\\u0300-\\u036f\\ufe20-\\ufe2f\\u20d0-\\u20ff", rsDingbatRange = "\\u2700-\\u27bf", rsLowerRange = "a-z\\xdf-\\xf6\\xf8-\\xff", rsMathOpRange = "\\xac\\xb1\\xd7\\xf7", rsNonCharRange = "\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\xbf", rsPunctuationRange = "\\u2000-\\u206f", rsSpaceRange = " \\t\\x0b\\f\\xa0\\ufeff\\n\\r\\u2028\\u2029\\u1680\\u180e\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u202f\\u205f\\u3000", rsUpperRange = "A-Z\\xc0-\\xd6\\xd8-\\xde", rsVarRange$1 = "\\ufe0e\\ufe0f", rsBreakRange = rsMathOpRange + rsNonCharRange + rsPunctuationRange + rsSpaceRange;
+var rsAstralRange$1 = "\\ud800-\\udfff";
+var rsComboRange$1 = "\\u0300-\\u036f\\ufe20-\\ufe2f\\u20d0-\\u20ff";
+var rsDingbatRange = "\\u2700-\\u27bf";
+var rsLowerRange = "a-z\\xdf-\\xf6\\xf8-\\xff";
+var rsMathOpRange = "\\xac\\xb1\\xd7\\xf7";
+var rsNonCharRange = "\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\xbf";
+var rsPunctuationRange = "\\u2000-\\u206f";
+var rsSpaceRange = " \\t\\x0b\\f\\xa0\\ufeff\\n\\r\\u2028\\u2029\\u1680\\u180e\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u202f\\u205f\\u3000";
+var rsUpperRange = "A-Z\\xc0-\\xd6\\xd8-\\xde";
+var rsVarRange$1 = "\\ufe0e\\ufe0f";
+var rsBreakRange = rsMathOpRange + rsNonCharRange + rsPunctuationRange + rsSpaceRange;
 /** Used to compose unicode capture groups. */
-var rsApos = "['’]", rsBreak = "[" + rsBreakRange + "]", rsCombo$1 = "[" + rsComboRange$1 + "]", rsDigits = "\\d+", rsDingbat = "[" + rsDingbatRange + "]", rsLower = "[" + rsLowerRange + "]", rsMisc = "[^" + rsAstralRange$1 + rsBreakRange + rsDigits + rsDingbatRange + rsLowerRange + rsUpperRange + "]", rsModifier$1 = "(?:" + rsCombo$1 + "|\\ud83c[\\udffb-\\udfff])", rsNonAstral$1 = "[^" + rsAstralRange$1 + "]", rsRegional$1 = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair$1 = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsUpper = "[" + rsUpperRange + "]", rsZWJ$1 = "\\u200d";
+var rsApos = "['’]";
+var rsBreak = "[" + rsBreakRange + "]";
+var rsCombo$1 = "[" + rsComboRange$1 + "]";
+var rsDigits = "\\d+";
+var rsDingbat = "[" + rsDingbatRange + "]";
+var rsLower = "[" + rsLowerRange + "]";
+var rsMisc = "[^" + rsAstralRange$1 + rsBreakRange + rsDigits + rsDingbatRange + rsLowerRange + rsUpperRange + "]";
+var rsModifier$1 = "(?:" + rsCombo$1 + "|\\ud83c[\\udffb-\\udfff])";
+var rsNonAstral$1 = "[^" + rsAstralRange$1 + "]";
+var rsRegional$1 = "(?:\\ud83c[\\udde6-\\uddff]){2}";
+var rsSurrPair$1 = "[\\ud800-\\udbff][\\udc00-\\udfff]";
+var rsUpper = "[" + rsUpperRange + "]";
+var rsZWJ$1 = "\\u200d";
 /** Used to compose unicode regexes. */
-var rsMiscLower = "(?:" + rsLower + "|" + rsMisc + ")", rsMiscUpper = "(?:" + rsUpper + "|" + rsMisc + ")", rsOptContrLower = "(?:" + rsApos + "(?:d|ll|m|re|s|t|ve))?", rsOptContrUpper = "(?:" + rsApos + "(?:D|LL|M|RE|S|T|VE))?", reOptMod$1 = rsModifier$1 + "?", rsOptVar$1 = "[" + rsVarRange$1 + "]?", rsOptJoin$1 = "(?:" + rsZWJ$1 + "(?:" + [
+var rsMiscLower = "(?:" + rsLower + "|" + rsMisc + ")";
+var rsMiscUpper = "(?:" + rsUpper + "|" + rsMisc + ")";
+var rsOptContrLower = "(?:" + rsApos + "(?:d|ll|m|re|s|t|ve))?";
+var rsOptContrUpper = "(?:" + rsApos + "(?:D|LL|M|RE|S|T|VE))?";
+var reOptMod$1 = rsModifier$1 + "?";
+var rsOptVar$1 = "[" + rsVarRange$1 + "]?";
+var rsOptJoin$1 = "(?:" + rsZWJ$1 + "(?:" + [
 	rsNonAstral$1,
 	rsRegional$1,
 	rsSurrPair$1
-].join("|") + ")" + rsOptVar$1 + reOptMod$1 + ")*", rsOrdLower = "\\d*(?:1st|2nd|3rd|(?![123])\\dth)(?=\\b|[A-Z_])", rsOrdUpper = "\\d*(?:1ST|2ND|3RD|(?![123])\\dTH)(?=\\b|[a-z_])", rsSeq$1 = rsOptVar$1 + reOptMod$1 + rsOptJoin$1, rsEmoji = "(?:" + [
+].join("|") + ")" + rsOptVar$1 + reOptMod$1 + ")*";
+var rsOrdLower = "\\d*(?:1st|2nd|3rd|(?![123])\\dth)(?=\\b|[A-Z_])";
+var rsOrdUpper = "\\d*(?:1ST|2ND|3RD|(?![123])\\dTH)(?=\\b|[a-z_])";
+var rsSeq$1 = rsOptVar$1 + reOptMod$1 + rsOptJoin$1;
+var rsEmoji = "(?:" + [
 	rsDingbat,
 	rsRegional$1,
 	rsSurrPair$1
@@ -11350,7 +11540,8 @@ var camelCase = createCompounder(function(result, word, index) {
 });
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/chunk.js
-var nativeCeil$2 = Math.ceil, nativeMax$3 = Math.max;
+var nativeCeil$2 = Math.ceil;
+var nativeMax$3 = Math.max;
 /**
 * Creates an array of elements split into groups the length of `size`.
 * If `array` can't be split evenly, the final chunk will be the remaining
@@ -11520,7 +11711,8 @@ var freeExports = typeof exports == "object" && exports && !exports.nodeType && 
 /** Detect free variable `module`. */
 var freeModule = freeExports && typeof module == "object" && module && !module.nodeType && module;
 /** Built-in value references. */
-var Buffer = freeModule && freeModule.exports === freeExports ? root$1.Buffer : void 0, allocUnsafe = Buffer ? Buffer.allocUnsafe : void 0;
+var Buffer = freeModule && freeModule.exports === freeExports ? root$1.Buffer : void 0;
+var allocUnsafe = Buffer ? Buffer.allocUnsafe : void 0;
 /**
 * Creates a clone of  `buffer`.
 *
@@ -11693,10 +11885,18 @@ var Set$1 = getNative(root$1, "Set");
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_getTag.js
 /** `Object#toString` result references. */
-var mapTag$5 = "[object Map]", objectTag$2 = "[object Object]", promiseTag = "[object Promise]", setTag$5 = "[object Set]", weakMapTag$1 = "[object WeakMap]";
+var mapTag$5 = "[object Map]";
+var objectTag$2 = "[object Object]";
+var promiseTag = "[object Promise]";
+var setTag$5 = "[object Set]";
+var weakMapTag$1 = "[object WeakMap]";
 var dataViewTag$3 = "[object DataView]";
 /** Used to detect maps, sets, and weakmaps. */
-var dataViewCtorString = toSource(DataView), mapCtorString = toSource(Map$1), promiseCtorString = toSource(Promise$1), setCtorString = toSource(Set$1), weakMapCtorString = toSource(WeakMap$1);
+var dataViewCtorString = toSource(DataView);
+var mapCtorString = toSource(Map$1);
+var promiseCtorString = toSource(Promise$1);
+var setCtorString = toSource(Set$1);
+var weakMapCtorString = toSource(WeakMap$1);
 /**
 * Gets the `toStringTag` of `value`.
 *
@@ -11787,7 +11987,8 @@ function cloneRegExp(regexp) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_cloneSymbol.js
 /** Used to convert symbols to primitives and strings. */
-var symbolProto$1 = Symbol$1 ? Symbol$1.prototype : void 0, symbolValueOf$1 = symbolProto$1 ? symbolProto$1.valueOf : void 0;
+var symbolProto$1 = Symbol$1 ? Symbol$1.prototype : void 0;
+var symbolValueOf$1 = symbolProto$1 ? symbolProto$1.valueOf : void 0;
 /**
 * Creates a clone of the `symbol` object.
 *
@@ -11815,8 +12016,25 @@ function cloneTypedArray(typedArray, isDeep) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_initCloneByTag.js
 /** `Object#toString` result references. */
-var boolTag$3 = "[object Boolean]", dateTag$3 = "[object Date]", mapTag$4 = "[object Map]", numberTag$3 = "[object Number]", regexpTag$2 = "[object RegExp]", setTag$4 = "[object Set]", stringTag$3 = "[object String]", symbolTag$2 = "[object Symbol]";
-var arrayBufferTag$2 = "[object ArrayBuffer]", dataViewTag$2 = "[object DataView]", float32Tag$1 = "[object Float32Array]", float64Tag$1 = "[object Float64Array]", int8Tag$1 = "[object Int8Array]", int16Tag$1 = "[object Int16Array]", int32Tag$1 = "[object Int32Array]", uint8Tag$1 = "[object Uint8Array]", uint8ClampedTag$1 = "[object Uint8ClampedArray]", uint16Tag$1 = "[object Uint16Array]", uint32Tag$1 = "[object Uint32Array]";
+var boolTag$3 = "[object Boolean]";
+var dateTag$3 = "[object Date]";
+var mapTag$4 = "[object Map]";
+var numberTag$3 = "[object Number]";
+var regexpTag$2 = "[object RegExp]";
+var setTag$4 = "[object Set]";
+var stringTag$3 = "[object String]";
+var symbolTag$2 = "[object Symbol]";
+var arrayBufferTag$2 = "[object ArrayBuffer]";
+var dataViewTag$2 = "[object DataView]";
+var float32Tag$1 = "[object Float32Array]";
+var float64Tag$1 = "[object Float64Array]";
+var int8Tag$1 = "[object Int8Array]";
+var int16Tag$1 = "[object Int16Array]";
+var int32Tag$1 = "[object Int32Array]";
+var uint8Tag$1 = "[object Uint8Array]";
+var uint8ClampedTag$1 = "[object Uint8ClampedArray]";
+var uint16Tag$1 = "[object Uint16Array]";
+var uint32Tag$1 = "[object Uint32Array]";
 /**
 * Initializes an object clone based on its `toStringTag`.
 *
@@ -11938,10 +12156,36 @@ var isSet = nodeIsSet ? baseUnary(nodeIsSet) : baseIsSet;
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseClone.js
 /** Used to compose bitmasks for cloning. */
-var CLONE_DEEP_FLAG$2 = 1, CLONE_FLAT_FLAG$1 = 2, CLONE_SYMBOLS_FLAG$2 = 4;
+var CLONE_DEEP_FLAG$2 = 1;
+var CLONE_FLAT_FLAG$1 = 2;
+var CLONE_SYMBOLS_FLAG$2 = 4;
 /** `Object#toString` result references. */
-var argsTag$1 = "[object Arguments]", arrayTag$1 = "[object Array]", boolTag$2 = "[object Boolean]", dateTag$2 = "[object Date]", errorTag$1 = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag$2 = "[object Map]", numberTag$2 = "[object Number]", objectTag$1 = "[object Object]", regexpTag$1 = "[object RegExp]", setTag$2 = "[object Set]", stringTag$2 = "[object String]", symbolTag$1 = "[object Symbol]", weakMapTag = "[object WeakMap]";
-var arrayBufferTag$1 = "[object ArrayBuffer]", dataViewTag$1 = "[object DataView]", float32Tag = "[object Float32Array]", float64Tag = "[object Float64Array]", int8Tag = "[object Int8Array]", int16Tag = "[object Int16Array]", int32Tag = "[object Int32Array]", uint8Tag = "[object Uint8Array]", uint8ClampedTag = "[object Uint8ClampedArray]", uint16Tag = "[object Uint16Array]", uint32Tag = "[object Uint32Array]";
+var argsTag$1 = "[object Arguments]";
+var arrayTag$1 = "[object Array]";
+var boolTag$2 = "[object Boolean]";
+var dateTag$2 = "[object Date]";
+var errorTag$1 = "[object Error]";
+var funcTag = "[object Function]";
+var genTag = "[object GeneratorFunction]";
+var mapTag$2 = "[object Map]";
+var numberTag$2 = "[object Number]";
+var objectTag$1 = "[object Object]";
+var regexpTag$1 = "[object RegExp]";
+var setTag$2 = "[object Set]";
+var stringTag$2 = "[object String]";
+var symbolTag$1 = "[object Symbol]";
+var weakMapTag = "[object WeakMap]";
+var arrayBufferTag$1 = "[object ArrayBuffer]";
+var dataViewTag$1 = "[object DataView]";
+var float32Tag = "[object Float32Array]";
+var float64Tag = "[object Float64Array]";
+var int8Tag = "[object Int8Array]";
+var int16Tag = "[object Int16Array]";
+var int32Tag = "[object Int32Array]";
+var uint8Tag = "[object Uint8Array]";
+var uint8ClampedTag = "[object Uint8ClampedArray]";
+var uint16Tag = "[object Uint16Array]";
+var uint32Tag = "[object Uint32Array]";
 /** Used to identify `toStringTag` values supported by `_.clone`. */
 var cloneableTags = {};
 cloneableTags[argsTag$1] = cloneableTags[arrayTag$1] = cloneableTags[arrayBufferTag$1] = cloneableTags[dataViewTag$1] = cloneableTags[boolTag$2] = cloneableTags[dateTag$2] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag$2] = cloneableTags[numberTag$2] = cloneableTags[objectTag$1] = cloneableTags[regexpTag$1] = cloneableTags[setTag$2] = cloneableTags[stringTag$2] = cloneableTags[symbolTag$1] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
@@ -12005,7 +12249,8 @@ function baseClone(value, bitmask, customizer, key, object, stack) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/cloneDeep.js
 /** Used to compose bitmasks for cloning. */
-var CLONE_DEEP_FLAG$1 = 1, CLONE_SYMBOLS_FLAG$1 = 4;
+var CLONE_DEEP_FLAG$1 = 1;
+var CLONE_SYMBOLS_FLAG$1 = 4;
 /**
 * This method is like `_.clone` except that it recursively clones `value`.
 *
@@ -12109,7 +12354,8 @@ function cacheHas(cache, key) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_equalArrays.js
 /** Used to compose bitmasks for value comparisons. */
-var COMPARE_PARTIAL_FLAG$5 = 1, COMPARE_UNORDERED_FLAG$3 = 2;
+var COMPARE_PARTIAL_FLAG$5 = 1;
+var COMPARE_UNORDERED_FLAG$3 = 2;
 /**
 * A specialized version of `baseIsEqualDeep` for arrays with support for
 * partial deep comparisons.
@@ -12191,12 +12437,23 @@ function setToArray(set) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_equalByTag.js
 /** Used to compose bitmasks for value comparisons. */
-var COMPARE_PARTIAL_FLAG$4 = 1, COMPARE_UNORDERED_FLAG$2 = 2;
+var COMPARE_PARTIAL_FLAG$4 = 1;
+var COMPARE_UNORDERED_FLAG$2 = 2;
 /** `Object#toString` result references. */
-var boolTag$1 = "[object Boolean]", dateTag$1 = "[object Date]", errorTag = "[object Error]", mapTag$1 = "[object Map]", numberTag$1 = "[object Number]", regexpTag = "[object RegExp]", setTag$1 = "[object Set]", stringTag$1 = "[object String]", symbolTag = "[object Symbol]";
-var arrayBufferTag = "[object ArrayBuffer]", dataViewTag = "[object DataView]";
+var boolTag$1 = "[object Boolean]";
+var dateTag$1 = "[object Date]";
+var errorTag = "[object Error]";
+var mapTag$1 = "[object Map]";
+var numberTag$1 = "[object Number]";
+var regexpTag = "[object RegExp]";
+var setTag$1 = "[object Set]";
+var stringTag$1 = "[object String]";
+var symbolTag = "[object Symbol]";
+var arrayBufferTag = "[object ArrayBuffer]";
+var dataViewTag = "[object DataView]";
 /** Used to convert symbols to primitives and strings. */
-var symbolProto = Symbol$1 ? Symbol$1.prototype : void 0, symbolValueOf = symbolProto ? symbolProto.valueOf : void 0;
+var symbolProto = Symbol$1 ? Symbol$1.prototype : void 0;
+var symbolValueOf = symbolProto ? symbolProto.valueOf : void 0;
 /**
 * A specialized version of `baseIsEqualDeep` for comparing objects of
 * the same `toStringTag`.
@@ -12302,7 +12559,9 @@ function equalObjects(object, other, bitmask, customizer, equalFunc, stack) {
 /** Used to compose bitmasks for value comparisons. */
 var COMPARE_PARTIAL_FLAG$2 = 1;
 /** `Object#toString` result references. */
-var argsTag = "[object Arguments]", arrayTag = "[object Array]", objectTag = "[object Object]";
+var argsTag = "[object Arguments]";
+var arrayTag = "[object Array]";
+var objectTag = "[object Object]";
 /** Used to check objects for own properties. */
 var hasOwnProperty$4 = Object.prototype.hasOwnProperty;
 /**
@@ -12369,7 +12628,8 @@ function baseIsEqual(value, other, bitmask, customizer, stack) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseIsMatch.js
 /** Used to compose bitmasks for value comparisons. */
-var COMPARE_PARTIAL_FLAG$1 = 1, COMPARE_UNORDERED_FLAG$1 = 2;
+var COMPARE_PARTIAL_FLAG$1 = 1;
+var COMPARE_UNORDERED_FLAG$1 = 2;
 /**
 * The base implementation of `_.isMatch` without support for iteratee shorthands.
 *
@@ -12538,7 +12798,8 @@ function hasIn(object, path) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseMatchesProperty.js
 /** Used to compose bitmasks for value comparisons. */
-var COMPARE_PARTIAL_FLAG = 1, COMPARE_UNORDERED_FLAG = 2;
+var COMPARE_PARTIAL_FLAG = 1;
+var COMPARE_UNORDERED_FLAG = 2;
 /**
 * The base implementation of `_.matchesProperty` which doesn't clone `srcValue`.
 *
@@ -12725,7 +12986,8 @@ var now$1 = function() {
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/debounce.js
 /** Error message constants. */
 var FUNC_ERROR_TEXT$1 = "Expected a function";
-var nativeMax$2 = Math.max, nativeMin$2 = Math.min;
+var nativeMax$2 = Math.max;
+var nativeMin$2 = Math.min;
 /**
 * Creates a debounced function that delays invoking `func` until after `wait`
 * milliseconds have elapsed since the last time the debounced function was
@@ -13154,7 +13416,8 @@ function last$1(array) {
 * Used to match `RegExp`
 * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
 */
-var reRegExpChar = /[\\^$.*+?()[\]{}|]/g, reHasRegExpChar = RegExp(reRegExpChar.source);
+var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+var reHasRegExpChar = RegExp(reRegExpChar.source);
 /**
 * Escapes the `RegExp` special characters "^", "$", "\", ".", "*", "+",
 * "?", "(", ")", "[", "]", "{", "}", and "|" in `string`.
@@ -13253,7 +13516,8 @@ function baseGt(value, other) {
 }
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseInRange.js
-var nativeMax$1 = Math.max, nativeMin$1 = Math.min;
+var nativeMax$1 = Math.max;
+var nativeMin$1 = Math.min;
 /**
 * The base implementation of `_.inRange` which doesn't coerce arguments.
 *
@@ -13487,7 +13751,8 @@ var isDate$2 = nodeIsDate ? baseUnary(nodeIsDate) : baseIsDate;
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/isEmpty.js
 /** `Object#toString` result references. */
-var mapTag = "[object Map]", setTag = "[object Set]";
+var mapTag = "[object Map]";
+var setTag = "[object Set]";
 /** Used to check objects for own properties. */
 var hasOwnProperty$3 = Object.prototype.hasOwnProperty;
 /**
@@ -13933,7 +14198,9 @@ function customOmitClone(value) {
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/omit.js
 /** Used to compose bitmasks for cloning. */
-var CLONE_DEEP_FLAG = 1, CLONE_FLAT_FLAG = 2, CLONE_SYMBOLS_FLAG = 4;
+var CLONE_DEEP_FLAG = 1;
+var CLONE_FLAT_FLAG = 2;
+var CLONE_SYMBOLS_FLAG = 4;
 /**
 * The opposite of `_.pick`; this method creates an object composed of the
 * own and inherited enumerable property paths of `object` that are not omitted.
@@ -14083,15 +14350,28 @@ var asciiSize = baseProperty("length");
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_unicodeSize.js
 /** Used to compose unicode character classes. */
-var rsAstralRange = "\\ud800-\\udfff", rsComboRange = "\\u0300-\\u036f\\ufe20-\\ufe2f\\u20d0-\\u20ff", rsVarRange = "\\ufe0e\\ufe0f";
+var rsAstralRange = "\\ud800-\\udfff";
+var rsComboRange = "\\u0300-\\u036f\\ufe20-\\ufe2f\\u20d0-\\u20ff";
+var rsVarRange = "\\ufe0e\\ufe0f";
 /** Used to compose unicode capture groups. */
-var rsAstral = "[" + rsAstralRange + "]", rsCombo = "[" + rsComboRange + "]", rsFitz = "\\ud83c[\\udffb-\\udfff]", rsModifier = "(?:" + rsCombo + "|" + rsFitz + ")", rsNonAstral = "[^" + rsAstralRange + "]", rsRegional = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsZWJ = "\\u200d";
+var rsAstral = "[" + rsAstralRange + "]";
+var rsCombo = "[" + rsComboRange + "]";
+var rsFitz = "\\ud83c[\\udffb-\\udfff]";
+var rsModifier = "(?:" + rsCombo + "|" + rsFitz + ")";
+var rsNonAstral = "[^" + rsAstralRange + "]";
+var rsRegional = "(?:\\ud83c[\\udde6-\\uddff]){2}";
+var rsSurrPair = "[\\ud800-\\udbff][\\udc00-\\udfff]";
+var rsZWJ = "\\u200d";
 /** Used to compose unicode regexes. */
-var reOptMod = rsModifier + "?", rsOptVar = "[" + rsVarRange + "]?", rsOptJoin = "(?:" + rsZWJ + "(?:" + [
+var reOptMod = rsModifier + "?";
+var rsOptVar = "[" + rsVarRange + "]?";
+var rsOptJoin = "(?:" + rsZWJ + "(?:" + [
 	rsNonAstral,
 	rsRegional,
 	rsSurrPair
-].join("|") + ")" + rsOptVar + reOptMod + ")*", rsSeq = rsOptVar + reOptMod + rsOptJoin, rsSymbol = "(?:" + [
+].join("|") + ")" + rsOptVar + reOptMod + ")*";
+var rsSeq = rsOptVar + reOptMod + rsOptJoin;
+var rsSymbol = "(?:" + [
 	rsNonAstral + rsCombo + "?",
 	rsCombo,
 	rsRegional,
@@ -14239,7 +14519,8 @@ function basePullAt(array, indexes) {
 }
 //#endregion
 //#region node_modules/.pnpm/lodash-es@4.18.1/node_modules/lodash-es/_baseRange.js
-var nativeCeil = Math.ceil, nativeMax = Math.max;
+var nativeCeil = Math.ceil;
+var nativeMax = Math.max;
 /**
 * The base implementation of `_.range` and `_.rangeRight` which doesn't
 * coerce arguments.
@@ -14638,9 +14919,9 @@ var xorWith = baseRest(function(arrays) {
 	return baseXor(arrayFilter(arrays, isArrayLikeObject), void 0, comparator);
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-ea5fbe21.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-ff183185.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -14675,9 +14956,9 @@ function _slicedToArray(r, e) {
 	return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray$9(r, e) || _nonIterableRest();
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-57027bda.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-0841ee8f.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -14686,9 +14967,9 @@ function getDefaultExportFromCjs(x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-05bddb06.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-12b4e978.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -14726,7 +15007,12 @@ performanceNow$2.exports;
 }).call(commonjsGlobal);
 var performanceNowExports = performanceNow$2.exports;
 raf$2.exports;
-var now = performanceNowExports, root = typeof window === "undefined" ? commonjsGlobal : window, vendors = ["moz", "webkit"], suffix = "AnimationFrame", raf = root["request" + suffix], caf = root["cancel" + suffix] || root["cancelRequest" + suffix];
+var now = performanceNowExports;
+var root = typeof window === "undefined" ? commonjsGlobal : window;
+var vendors = ["moz", "webkit"];
+var suffix = "AnimationFrame";
+var raf = root["request" + suffix];
+var caf = root["cancel" + suffix] || root["cancelRequest" + suffix];
 for (var i = 0; !raf && i < vendors.length; i++) {
 	raf = root[vendors[i] + "Request" + suffix];
 	caf = root[vendors[i] + "Cancel" + suffix] || root[vendors[i] + "CancelRequest" + suffix];
@@ -15171,9 +15457,9 @@ var sanitizeSvg = function sanitizeSvg(svgText) {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-f1da7269.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-9fc6972b.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -15478,9 +15764,9 @@ dayjs_min$1.exports;
 var dayjs_minExports = dayjs_min$1.exports;
 var dayjs = /*@__PURE__*/ getDefaultExportFromCjs(dayjs_minExports);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-57949dcd.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-cf105282.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -15823,9 +16109,9 @@ var zhCn = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/config-provider/utils/context.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/config-provider/utils/context.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -15850,6 +16136,7 @@ var defaultConfig = {
 	dialog: {
 		closeOnEscKeydown: true,
 		closeOnOverlayClick: true,
+		placement: "top",
 		confirmBtnTheme: {
 			"default": "primary",
 			info: "primary",
@@ -15857,6 +16144,13 @@ var defaultConfig = {
 			danger: "primary",
 			success: "primary"
 		}
+	},
+	loading: {
+		size: "medium",
+		delay: 0,
+		showOverlay: true,
+		inheritColor: false,
+		preventScrollThrough: true
 	},
 	message: {},
 	popconfirm: { confirmBtnTheme: {
@@ -15920,9 +16214,9 @@ var mergeWith = function mergeWith(defaultGlobalConfig2, injectConfig) {
 	});
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/config-provider/hooks/useConfig.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/config-provider/hooks/useConfig.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16009,9 +16303,9 @@ var provideConfig = function provideConfig(props) {
 	return mergedGlobalConfig;
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-192d0c88.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-a1cbfaae.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16040,9 +16334,9 @@ function observe(element, root, callback, marginBottom) {
 	return io;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-5b369203.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-4c65e11b.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16071,9 +16365,9 @@ var log = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-652c99fe.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-3f53eff0.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16210,9 +16504,9 @@ function getFileList(files) {
 	return fileList;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-a4f55e3b.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-46776e3b.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16229,9 +16523,9 @@ function _classCallCheck(a, n) {
 	if (!(a instanceof n)) throw new TypeError("Cannot call a class as a function");
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-920eff5b.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-8aebe545.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16247,9 +16541,9 @@ var CLEAR_REG = /^KeyC$/i;
 var ALL_REG = /^(KeyA|KeyL)$/i;
 var CHECKED_CODE_REG = /^(Enter|Space)$/i;
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-9ce910b6.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-5975d369.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -16677,7 +16971,9 @@ function useImagePreviewUrl(imgUrl) {
 	}, { immediate: true });
 	return { previewUrl };
 }
-var expand = EAnimationType.expand, ripple = EAnimationType.ripple, fade = EAnimationType.fade;
+var expand = EAnimationType.expand;
+var ripple = EAnimationType.ripple;
+var fade = EAnimationType.fade;
 function useKeepAnimation() {
 	var globalConfig = useConfig("animation").globalConfig;
 	var keepAnimation = function keepAnimation(type) {
@@ -16862,6 +17158,8 @@ function setStyle(el, styles) {
 	});
 }
 var period = 200;
+var rippleExtraWidth = 20;
+var rippleSkew = "skewX(-8deg)";
 var elementTransitionPeriod = 200;
 var noneRippleBg = "rgba(0, 0, 0, 0)";
 var defaultRippleColor = "rgba(0, 0, 0, 0.35)";
@@ -16889,7 +17187,6 @@ function useRipple$1(el, fixedRippleColor) {
 		var elStyle = getComputedStyle(dom);
 		var elBorder = parseInt(elStyle.borderWidth, 10);
 		var border = elBorder > 0 ? elBorder : 0;
-		var width = dom.offsetWidth;
 		if (rippleContainer.value.parentNode === null) {
 			setStyle(rippleContainer.value, {
 				position: "absolute",
@@ -16907,11 +17204,11 @@ function useRipple$1(el, fixedRippleColor) {
 		setStyle(ripple, {
 			marginTop: "0",
 			marginLeft: "0",
-			right: "".concat(width, "px"),
-			width: "".concat(width + 20, "px"),
+			right: "100%",
+			width: "calc(100% + ".concat(rippleExtraWidth, "px)"),
 			height: "100%",
 			transition: "transform ".concat(period, "ms cubic-bezier(.38, 0, .24, 1), background ").concat(period * 2, "ms linear"),
-			transform: "skewX(-8deg)",
+			transform: rippleSkew,
 			pointerEvents: "none",
 			position: "absolute",
 			zIndex: 0,
@@ -16931,7 +17228,7 @@ function useRipple$1(el, fixedRippleColor) {
 		if (initPosition === "" || initPosition === "static") dom.style.position = "relative";
 		rippleContainer.value.insertBefore(ripple, rippleContainer.value.firstChild);
 		setTimeout(function() {
-			ripple.style.transform = "translateX(".concat(width, "px)");
+			ripple.style.transform = "translateX(calc(100% - ".concat(rippleExtraWidth, "px)) ").concat(rippleSkew);
 		}, 0);
 		var cleared = false;
 		var classChangeObserver = null;
@@ -17394,7 +17691,7 @@ function useVirtualScrollNew(container, params) {
 		scrollToElement
 	};
 }
-function ownKeys$1$200(e, r) {
+function ownKeys$1$201(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
 		var o = Object.getOwnPropertySymbols(e);
@@ -17404,12 +17701,12 @@ function ownKeys$1$200(e, r) {
 	}
 	return t;
 }
-function _objectSpread$1$199(e) {
+function _objectSpread$1$200(e) {
 	for (var r = 1; r < arguments.length; r++) {
 		var t = null != arguments[r] ? arguments[r] : {};
-		r % 2 ? ownKeys$1$200(Object(t), !0).forEach(function(r) {
+		r % 2 ? ownKeys$1$201(Object(t), !0).forEach(function(r) {
 			_defineProperty$2(e, r, t[r]);
-		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$1$200(Object(t)).forEach(function(r) {
+		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$1$201(Object(t)).forEach(function(r) {
 			Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
 		});
 	}
@@ -17426,7 +17723,7 @@ var DEFAULT_OPTIONS$1 = {
 };
 function useMutationObservable(targetEl, callback) {
 	var options = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : DEFAULT_OPTIONS$1;
-	var mergedOptions = /* @__PURE__ */ ref(_objectSpread$1$199(_objectSpread$1$199({}, DEFAULT_OPTIONS$1), options));
+	var mergedOptions = /* @__PURE__ */ ref(_objectSpread$1$200(_objectSpread$1$200({}, DEFAULT_OPTIONS$1), options));
 	var observer = null;
 	var initObserver = function initObserver() {
 		var _observer;
@@ -17444,7 +17741,7 @@ function useMutationObservable(targetEl, callback) {
 		return options;
 	}, function(newOptions) {
 		if (!isEqual(newOptions, mergedOptions.value)) {
-			mergedOptions.value = _objectSpread$1$199(_objectSpread$1$199({}, DEFAULT_OPTIONS$1), newOptions);
+			mergedOptions.value = _objectSpread$1$200(_objectSpread$1$200({}, DEFAULT_OPTIONS$1), newOptions);
 			initObserver();
 		}
 	}, { deep: true });
@@ -17487,7 +17784,7 @@ function useVariables(variables) {
 	});
 	return values;
 }
-function ownKeys$201(e, r) {
+function ownKeys$202(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
 		var o = Object.getOwnPropertySymbols(e);
@@ -17497,12 +17794,12 @@ function ownKeys$201(e, r) {
 	}
 	return t;
 }
-function _objectSpread$200(e) {
+function _objectSpread$201(e) {
 	for (var r = 1; r < arguments.length; r++) {
 		var t = null != arguments[r] ? arguments[r] : {};
-		r % 2 ? ownKeys$201(Object(t), !0).forEach(function(r) {
+		r % 2 ? ownKeys$202(Object(t), !0).forEach(function(r) {
 			_defineProperty$2(e, r, t[r]);
-		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$201(Object(t)).forEach(function(r) {
+		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$202(Object(t)).forEach(function(r) {
 			Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
 		});
 	}
@@ -17510,7 +17807,7 @@ function _objectSpread$200(e) {
 }
 function useEventForward(componentsProps, internalHandlers) {
 	return computed(function() {
-		var merged = _objectSpread$200({}, componentsProps);
+		var merged = _objectSpread$201({}, componentsProps);
 		Object.keys(internalHandlers !== null && internalHandlers !== void 0 ? internalHandlers : {}).forEach(function(key) {
 			var selfDefinedHandler = componentsProps === null || componentsProps === void 0 ? void 0 : componentsProps[key];
 			var internalHandler = internalHandlers === null || internalHandlers === void 0 ? void 0 : internalHandlers[key];
@@ -17532,9 +17829,9 @@ function useEventForward(componentsProps, internalHandlers) {
 	});
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-4de66dd0.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-b9c8a688.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -17557,9 +17854,9 @@ function _objectWithoutProperties$1(e, t) {
 	return i;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-9b3b77bb.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-92b8be55.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -17700,13 +17997,13 @@ function isSafari() {
 	return /Safari/.test(ua) && !/Chrome/.test(ua);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/icon/gradient.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/icon/gradient.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
-function ownKeys$199(e, r) {
+function ownKeys$200(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
 		var o = Object.getOwnPropertySymbols(e);
@@ -17716,12 +18013,12 @@ function ownKeys$199(e, r) {
 	}
 	return t;
 }
-function _objectSpread$198(e) {
+function _objectSpread$199(e) {
 	for (var r = 1; r < arguments.length; r++) {
 		var t = null != arguments[r] ? arguments[r] : {};
-		r % 2 ? ownKeys$199(Object(t), !0).forEach(function(r) {
+		r % 2 ? ownKeys$200(Object(t), !0).forEach(function(r) {
 			_defineProperty$2(e, r, t[r]);
-		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$199(Object(t)).forEach(function(r) {
+		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$200(Object(t)).forEach(function(r) {
 			Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
 		});
 	}
@@ -17745,8 +18042,8 @@ function circleAdapter(circleElem) {
 	if (color && getIEVersion() > 11) {
 		var matched = color.match(/[\d.]+/g);
 		var endColor = matched ? "rgba(".concat(matched[0], ", ").concat(matched[1], ", ").concat(matched[2], ", 0)") : "";
-		setStyle(circleElem, _objectSpread$198(_objectSpread$198({}, basicStyle), {}, { background: "conic-gradient(from 90deg at 50% 50%,".concat(endColor, " 0deg, ").concat(color, " 360deg)") }));
-	} else setStyle(circleElem, _objectSpread$198(_objectSpread$198({}, basicStyle), {}, { background: "" }));
+		setStyle(circleElem, _objectSpread$199(_objectSpread$199({}, basicStyle), {}, { background: "conic-gradient(from 90deg at 50% 50%,".concat(endColor, " 0deg, ").concat(color, " 360deg)") }));
+	} else setStyle(circleElem, _objectSpread$199(_objectSpread$199({}, basicStyle), {}, { background: "" }));
 }
 var GradientIcon = /* @__PURE__ */ defineComponent({
 	name: "TLoadingGradient",
@@ -17780,9 +18077,9 @@ var GradientIcon = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -17795,37 +18092,40 @@ var props$97 = {
 	"default": { type: [String, Function] },
 	delay: {
 		type: Number,
-		"default": 0
+		"default": void 0
 	},
 	fullscreen: Boolean,
 	indicator: {
 		type: [Boolean, Function],
 		"default": true
 	},
-	inheritColor: Boolean,
+	inheritColor: {
+		type: Boolean,
+		"default": void 0
+	},
 	loading: {
 		type: Boolean,
 		"default": true
 	},
 	preventScrollThrough: {
 		type: Boolean,
-		"default": true
+		"default": void 0
 	},
 	showOverlay: {
 		type: Boolean,
-		"default": true
+		"default": void 0
 	},
 	size: {
 		type: String,
-		"default": "medium"
+		"default": void 0
 	},
 	text: { type: [String, Function] },
 	zIndex: { type: Number }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/loading.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/loading.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -17853,34 +18153,59 @@ var _Loading = /* @__PURE__ */ defineComponent({
 		var renderTNodeJSX = useTNodeJSX();
 		var renderContent = useContent();
 		var SIZE = useCommonClassName$1().SIZE;
+		var globalConfig = useConfig("loading").globalConfig;
+		var delay = computed(function() {
+			var _props2$delay;
+			return (_props2$delay = props2.delay) !== null && _props2$delay !== void 0 ? _props2$delay : globalConfig.value.delay;
+		});
+		var size = computed(function() {
+			var _props2$size;
+			return (_props2$size = props2.size) !== null && _props2$size !== void 0 ? _props2$size : globalConfig.value.size;
+		});
+		var zIndex = computed(function() {
+			var _props2$zIndex;
+			return (_props2$zIndex = props2.zIndex) !== null && _props2$zIndex !== void 0 ? _props2$zIndex : globalConfig.value.zIndex;
+		});
+		var showOverlay = computed(function() {
+			var _props2$showOverlay;
+			return (_props2$showOverlay = props2.showOverlay) !== null && _props2$showOverlay !== void 0 ? _props2$showOverlay : globalConfig.value.showOverlay;
+		});
+		var inheritColor = computed(function() {
+			var _props2$inheritColor;
+			return (_props2$inheritColor = props2.inheritColor) !== null && _props2$inheritColor !== void 0 ? _props2$inheritColor : globalConfig.value.inheritColor;
+		});
+		var preventScrollThrough = computed(function() {
+			var _props2$preventScroll;
+			return (_props2$preventScroll = props2.preventScrollThrough) !== null && _props2$preventScroll !== void 0 ? _props2$preventScroll : globalConfig.value.preventScrollThrough;
+		});
 		var countDelay = function countDelay() {
 			delayShowLoading.value = false;
 			var timer = setTimeout(function() {
 				delayShowLoading.value = true;
 				clearTimeout(timer);
-			}, props2.delay);
+			}, delay.value);
 		};
 		var teleportElement = useTeleport(function() {
 			return props2.attach;
 		});
 		var delayCounted = computed(function() {
-			return Boolean(!props2.delay || props2.delay && delayShowLoading.value);
+			return Boolean(!delay.value || delay.value && delayShowLoading.value);
 		});
 		var styles = computed(function() {
 			var styles2 = {};
-			if (props2.zIndex !== void 0) styles2.zIndex = props2.zIndex;
+			if (zIndex.value !== void 0) styles2.zIndex = zIndex.value;
 			if (![
 				"small",
 				"medium",
 				"large"
-			].includes(props2.size)) styles2["font-size"] = props2.size;
+			].includes(size.value)) styles2["font-size"] = size.value;
 			return styles2;
 		});
 		var hasContent = computed(function() {
 			return Boolean(props2["default"] || slots["default"] || props2.content || slots.content);
 		});
 		var lockFullscreen = computed(function() {
-			return props2.preventScrollThrough && props2.fullscreen;
+			return preventScrollThrough.value && props2.fullscreen;
 		});
 		var showText = computed(function() {
 			return Boolean(props2.text || slots.text);
@@ -17897,8 +18222,8 @@ var _Loading = /* @__PURE__ */ defineComponent({
 		var classes = computed(function() {
 			var baseClasses = [
 				centerClass.value,
-				getPropertyValFromObj(SIZE.value, props2.size),
-				_defineProperty$2({}, inheritColorClass.value, props2.inheritColor)
+				getPropertyValFromObj(SIZE.value, size.value),
+				_defineProperty$2({}, inheritColorClass.value, inheritColor.value)
 			];
 			var fullScreenClasses = [
 				name.value,
@@ -17911,12 +18236,12 @@ var _Loading = /* @__PURE__ */ defineComponent({
 				attachClasses: baseClasses.concat([
 					name.value,
 					fullClass.value,
-					_defineProperty$2({}, overlayClass.value, props2.showOverlay)
+					_defineProperty$2({}, overlayClass.value, showOverlay.value)
 				]),
 				withContentClasses: baseClasses.concat([
 					name.value,
 					fullClass.value,
-					_defineProperty$2({}, overlayClass.value, props2.showOverlay)
+					_defineProperty$2({}, overlayClass.value, showOverlay.value)
 				]),
 				fullScreenClasses,
 				normalClasses: baseClasses.concat([name.value])
@@ -17930,7 +18255,7 @@ var _Loading = /* @__PURE__ */ defineComponent({
 			} else lockFullscreen.value && removeClass(document.body, lockClass.value);
 		});
 		onMounted(function() {
-			props2.delay && countDelay();
+			delay.value && countDelay();
 		});
 		return function() {
 			var _classes$value = classes.value, fullScreenClasses = _classes$value.fullScreenClasses, baseClasses = _classes$value.baseClasses, withContentClasses = _classes$value.withContentClasses, attachClasses = _classes$value.attachClasses, normalClasses = _classes$value.normalClasses;
@@ -17973,12 +18298,33 @@ var _Loading = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/plugin.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/plugin.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
+function ownKeys$199(e, r) {
+	var t = Object.keys(e);
+	if (Object.getOwnPropertySymbols) {
+		var o = Object.getOwnPropertySymbols(e);
+		r && (o = o.filter(function(r) {
+			return Object.getOwnPropertyDescriptor(e, r).enumerable;
+		})), t.push.apply(t, o);
+	}
+	return t;
+}
+function _objectSpread$198(e) {
+	for (var r = 1; r < arguments.length; r++) {
+		var t = null != arguments[r] ? arguments[r] : {};
+		r % 2 ? ownKeys$199(Object(t), !0).forEach(function(r) {
+			_defineProperty$2(e, r, t[r]);
+		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys$199(Object(t)).forEach(function(r) {
+			Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
+		});
+	}
+	return e;
+}
 var fullScreenLoadingInstance = null;
 function mergeDefaultProps(props) {
 	return merge({
@@ -17997,8 +18343,9 @@ function createLoading(props, context) {
 		var loadingOptions = /* @__PURE__ */ reactive(mergedProps);
 		parentRelativeClass.value = usePrefixClass("loading__parent--relative").value;
 		lockClass.value = usePrefixClass("loading--lock").value;
+		var globalConfig = useConfig("loading").globalConfig;
 		return function() {
-			return h(_Loading, loadingOptions);
+			return h(_Loading, _objectSpread$198(_objectSpread$198({}, globalConfig.value), loadingOptions));
 		};
 	} });
 	var attach = getAttach(mergedProps.fullscreen ? "body" : mergedProps.attach);
@@ -18040,9 +18387,9 @@ LoadingPlugin.install = function(app) {
 	LoadingPlugin._context = app._context;
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/directive.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/directive.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -18084,9 +18431,9 @@ var vLoading = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/loading/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -18095,9 +18442,9 @@ var Loading = withInstall$1(_Loading, _Loading.name, {
 	comp: vLoading
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/button/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/button/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -18200,9 +18547,9 @@ var props$96 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/button/button.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/button/button.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -18279,15 +18626,15 @@ var TButton = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/button/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/button/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Button = withInstall$1(TButton);
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/_chunks/dep-22bff531.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/_chunks/dep-22bff531.js
 function _typeof$2(o) {
 	"@babel/helpers - typeof";
 	return _typeof$2 = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o) {
@@ -18319,7 +18666,7 @@ function _defineProperty$1(e, r, t) {
 	}) : e[r] = t, e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/render-fn.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/render-fn.js
 var camel2Kebab = (camelString) => {
 	if ([
 		"strokeLinecap",
@@ -18348,7 +18695,7 @@ var ConfigContext = {
 	locale: "zh-CN"
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/use-common-classname.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/use-common-classname.js
 function useCommonClassName() {
 	var { classPrefix } = ConfigContext;
 	return {
@@ -18380,7 +18727,7 @@ function useCommonClassName() {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/use-size-props.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/use-size-props.js
 function useSizeProps(size) {
 	var COMMON_SIZE_CLASS_NAMES = useCommonClassName().SIZE;
 	var className = computed(() => {
@@ -18396,7 +18743,7 @@ function useSizeProps(size) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/add-rectangle.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/add-rectangle.js
 function ownKeys$197(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -18520,7 +18867,7 @@ var addRectangle = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/add.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/add.js
 function ownKeys$196(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -18624,7 +18971,7 @@ var add$1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/arrow-triangle-down-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/arrow-triangle-down-filled.js
 function ownKeys$195(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -18721,7 +19068,7 @@ var arrowTriangleDownFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/arrow-triangle-up-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/arrow-triangle-up-filled.js
 function ownKeys$194(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -18818,7 +19165,7 @@ var arrowTriangleUpFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/backtop.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/backtop.js
 function ownKeys$193(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -18922,7 +19269,7 @@ var backtop = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/browse-off.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/browse-off.js
 function ownKeys$192(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19035,7 +19382,7 @@ var browseOff = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/browse.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/browse.js
 function ownKeys$191(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19170,7 +19517,7 @@ var browse = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/calendar.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/calendar.js
 function ownKeys$190(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19291,7 +19638,7 @@ var calendar = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/caret-right-small.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/caret-right-small.js
 function ownKeys$189(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19389,7 +19736,7 @@ var caretRightSmall = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/check-circle-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/check-circle-filled.js
 function ownKeys$188(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19486,7 +19833,7 @@ var checkCircleFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/check.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/check.js
 function ownKeys$187(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19590,7 +19937,7 @@ var check = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-down.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-down.js
 function ownKeys$186(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19694,7 +20041,7 @@ var chevronDown = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-left-double.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-left-double.js
 function ownKeys$185(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19798,7 +20145,7 @@ var chevronLeftDouble = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-left.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-left.js
 function ownKeys$184(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -19902,7 +20249,7 @@ var chevronLeft = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-right-circle.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-right-circle.js
 function ownKeys$183(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20026,7 +20373,7 @@ var chevronRightCircle = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-right-double.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-right-double.js
 function ownKeys$182(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20130,7 +20477,7 @@ var chevronRightDouble = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-right.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-right.js
 function ownKeys$181(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20234,7 +20581,7 @@ var chevronRight = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-up.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/chevron-up.js
 function ownKeys$180(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20338,7 +20685,7 @@ var chevronUp = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/close-circle-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/close-circle-filled.js
 function ownKeys$179(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20435,7 +20782,7 @@ var closeCircleFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/close.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/close.js
 function ownKeys$178(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20539,7 +20886,7 @@ var close = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/copy.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/copy.js
 function ownKeys$177(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20663,7 +21010,7 @@ var copy = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/delete.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/delete.js
 function ownKeys$176(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20787,7 +21134,7 @@ var _delete = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/download.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/download.js
 function ownKeys$175(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -20900,7 +21247,7 @@ var download = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/edit-1.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/edit-1.js
 function ownKeys$174(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21021,7 +21368,7 @@ var edit1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/ellipsis.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/ellipsis.js
 function ownKeys$173(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21148,7 +21495,7 @@ var ellipsis = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/error-circle-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/error-circle-filled.js
 function ownKeys$172(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21245,7 +21592,7 @@ var errorCircleFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/error.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/error.js
 function ownKeys$171(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21349,7 +21696,7 @@ var error = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-copy.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-copy.js
 function ownKeys$170(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21472,7 +21819,7 @@ var fileCopy = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-excel.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-excel.js
 function ownKeys$169(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21595,7 +21942,7 @@ var fileExcel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-pdf.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-pdf.js
 function ownKeys$168(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21708,7 +22055,7 @@ var filePdf = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-powerpoint.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-powerpoint.js
 function ownKeys$167(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21831,7 +22178,7 @@ var filePowerpoint = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-word.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file-word.js
 function ownKeys$166(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -21954,7 +22301,7 @@ var fileWord = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/file.js
 function ownKeys$165(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22064,7 +22411,7 @@ var file = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/filter.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/filter.js
 function ownKeys$164(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22179,7 +22526,7 @@ var filter = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/help-circle-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/help-circle-filled.js
 function ownKeys$163(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22276,7 +22623,7 @@ var helpCircleFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/image-error.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/image-error.js
 function ownKeys$162(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22389,7 +22736,7 @@ var imageError = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/image.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/image.js
 function ownKeys$161(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22523,7 +22870,7 @@ var image = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/info-circle-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/info-circle-filled.js
 function ownKeys$160(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22620,7 +22967,7 @@ var infoCircleFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/minus-rectangle.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/minus-rectangle.js
 function ownKeys$159(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22744,7 +23091,7 @@ var minusRectangle = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/mirror.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/mirror.js
 function ownKeys$158(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22888,7 +23235,7 @@ var mirror = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/page-first.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/page-first.js
 function ownKeys$157(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -22992,7 +23339,7 @@ var pageFirst = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/page-last.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/page-last.js
 function ownKeys$156(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23096,7 +23443,7 @@ var pageLast = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/refresh.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/refresh.js
 function ownKeys$155(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23200,7 +23547,7 @@ var refresh = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/remove.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/remove.js
 function ownKeys$154(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23304,7 +23651,7 @@ var remove = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/rotation.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/rotation.js
 function ownKeys$153(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23408,7 +23755,7 @@ var rotation = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/round.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/round.js
 function ownKeys$152(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23523,7 +23870,7 @@ var round$1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/search.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/search.js
 function ownKeys$151(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23647,7 +23994,7 @@ var search = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/setting.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/setting.js
 function ownKeys$150(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23781,7 +24128,7 @@ var setting = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/star-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/star-filled.js
 function ownKeys$149(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23878,7 +24225,7 @@ var starFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/time-filled.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/time-filled.js
 function ownKeys$148(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -23975,7 +24322,7 @@ var timeFilled = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/time.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/time.js
 function ownKeys$147(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -24099,7 +24446,7 @@ var time = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/upload.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/upload.js
 function ownKeys$146(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -24212,7 +24559,7 @@ var upload$1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/video.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/video.js
 function ownKeys$145(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -24342,7 +24689,7 @@ var video = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/zoom-in.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/zoom-in.js
 function ownKeys$144(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -24466,7 +24813,7 @@ var zoomIn$1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/zoom-out.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/components/zoom-out.js
 function ownKeys$143(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -24590,7 +24937,7 @@ var zoomOut$1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/check-url-and-load.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/utils/check-url-and-load.js
 var isServer = typeof window === "undefined";
 function checkScriptAndLoad(url, className) {
 	if (isServer) return;
@@ -24602,7 +24949,7 @@ function checkScriptAndLoad(url, className) {
 	document.body.appendChild(svg);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/svg-sprite/props/props.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/svg-sprite/props/props.js
 var props$95 = {
 	name: {
 		type: String,
@@ -24623,7 +24970,7 @@ var props$95 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.4_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/svg-sprite/svg-sprite.js
+//#region node_modules/.pnpm/tdesign-icons-vue-next@0.4.6_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-icons-vue-next/esm/svg-sprite/svg-sprite.js
 function ownKeys$142(e, r) {
 	var t = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -24646,11 +24993,11 @@ function _objectSpread$141(e) {
 	return e;
 }
 var { classPrefix } = ConfigContext;
-var CDN_ICONFONT_URL = "https://tdesign.gtimg.com/icon/0.4.2/fonts/index.js";
+var CDN_ICONFONT_URL = "https://tdesign.gtimg.com/icon/0.4.3/fonts/index.js";
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/icon/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/icon/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -24691,19 +25038,19 @@ var Icon = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }), "TIcon");
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/link/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/link/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -24802,9 +25149,9 @@ var Link = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/row-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/row-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -24854,9 +25201,9 @@ var props$93 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/hooks/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/hooks/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -24878,9 +25225,9 @@ function useRowSize() {
 	return size;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -24995,9 +25342,9 @@ function getColClasses(name, props) {
 	return _objectSpread$140(_defineProperty$2(_defineProperty$2(_defineProperty$2(_defineProperty$2(_defineProperty$2(_defineProperty$2({}, "".concat(name), true), "".concat(name, "-").concat(span), !isUndefined(span)), "".concat(name, "-order-").concat(order), order), "".concat(name, "-offset-").concat(offset), offset), "".concat(name, "-push-").concat(push), push), "".concat(name, "-pull-").concat(pull), pull), ColSizeClasses);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/row.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/row.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25026,14 +25373,14 @@ var _Row = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/col.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/col.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25098,18 +25445,18 @@ var _Col = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/grid/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Row = withInstall$1(_Row);
 var Col = withInstall$1(_Col);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/layout.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/layout.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25129,14 +25476,14 @@ var _Layout = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/header.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/header.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25158,14 +25505,14 @@ var _Header = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/footer.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/footer.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25187,14 +25534,14 @@ var _Footer = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/aside.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/aside.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25225,14 +25572,14 @@ var _Aside = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/content.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/content.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25251,9 +25598,9 @@ var _Content = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/layout/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25263,19 +25610,19 @@ var Header = withInstall$1(_Header);
 var Footer = withInstall$1(_Footer);
 var Content = withInstall$1(_Content);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/divider/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/divider/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25333,9 +25680,9 @@ var Divider = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/space/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/space/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25372,9 +25719,9 @@ var props$86 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/space/space.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/space/space.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25406,9 +25753,9 @@ var sizeMap = {
 };
 var defaultNeedPolyfill = getFlexGapPolyFill();
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/space/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/space/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25465,9 +25812,9 @@ var Space = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25520,17 +25867,17 @@ var props$85 = {
 	title: { type: [String, Function] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var descriptionsKey = Symbol("TDescriptions");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-73f6632a.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-bc9070ef.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25559,9 +25906,9 @@ function itemTypeIsProps(itemsType, item) {
 	return itemsType === ItemsType.props;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/descriptions-row.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/descriptions-row.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25641,9 +25988,9 @@ var DescriptionsRow = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/descriptions.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/descriptions.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25731,14 +26078,14 @@ var _Descriptions = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/descriptions-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/descriptions-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -25755,18 +26102,18 @@ var _DescriptionsItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/descriptions/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Descriptions = withInstall$1(_Descriptions);
 var DescriptionsItem = withInstall$1(_DescriptionsItem);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-9cac91c1.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-128e8914.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -26111,19 +26458,19 @@ try {
 }
 var _regeneratorRuntime = /*@__PURE__*/ getDefaultExportFromCjs(regenerator);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/affix/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/affix/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -26279,9 +26626,9 @@ var Affix = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -26917,9 +27264,9 @@ function copyText(_text) {
 	div.remove();
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -26957,17 +27304,17 @@ var props$82 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var AnchorInjectionKey = Symbol("AnchorInjectionProvide");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27173,9 +27520,9 @@ var _Anchor = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27207,9 +27554,9 @@ var props$81 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27306,9 +27653,9 @@ var _AnchorItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27350,9 +27697,9 @@ var props$80 = {
 	onDurationEnd: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-6cf403ac.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-84cacab2.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27632,9 +27979,9 @@ var _Message = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/message-list.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/message-list.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27745,9 +28092,9 @@ var MessageList = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/plugin.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/plugin.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -27867,9 +28214,9 @@ Object.keys(extraApi$2).forEach(function(funcName) {
 	MessagePlugin[funcName] = extraApi$2[funcName];
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-target-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-target-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29177,9 +29524,9 @@ var createPopper = /*#__PURE__*/ popperGenerator({ defaultModifiers: [
 	hide_default
 ] });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29251,9 +29598,9 @@ var popupProps = {
 	onVisibleChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/container.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/container.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29401,9 +29748,9 @@ var Container = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/popup.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/popup.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29471,9 +29818,9 @@ function attachListeners(elm) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popup/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29823,9 +30170,9 @@ var Popup = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-target.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/anchor-target.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29865,9 +30212,9 @@ var _AnchorTarget = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/anchor/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29875,9 +30222,9 @@ var Anchor = withInstall$1(_Anchor);
 var AnchorItem = withInstall$1(_AnchorItem);
 var AnchorTarget = withInstall$1(_AnchorTarget);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29911,9 +30258,9 @@ var props$78 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/breadcrumb-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/breadcrumb-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29953,9 +30300,9 @@ var props$77 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -29991,9 +30338,9 @@ var props$76 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30018,9 +30365,9 @@ var useMouse = function useMouse() {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/tooltip.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/tooltip.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30046,9 +30393,9 @@ function _objectSpread$133(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tooltip/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30133,9 +30480,9 @@ var Tooltip = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/breadcrumb-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/breadcrumb-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30250,9 +30597,9 @@ var _BreadcrumbItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/hooks/useEllipsis.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/hooks/useEllipsis.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30319,9 +30666,9 @@ var useEllipsis = function useEllipsis(props, getBreadcrumbItems, ellipsisConten
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/hooks/useBreadcrumbOptions.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/hooks/useBreadcrumbOptions.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30386,14 +30733,14 @@ var useBreadcrumbOptions = function useBreadcrumbOptions(props) {
 	}) };
 };
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/breadcrumb/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30431,9 +30778,9 @@ var Breadcrumb = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var BreadcrumbItem = withInstall$1(_BreadcrumbItem);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30467,9 +30814,9 @@ var dropdownItemProps = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30538,9 +30885,9 @@ var _DropdownItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30616,9 +30963,9 @@ var props$75 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown-menu.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown-menu.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30776,9 +31123,9 @@ var _DropdownMenu = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/hooks/useDropdownOptions.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/hooks/useDropdownOptions.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30860,9 +31207,9 @@ function useDropdownOptions(props) {
 	});
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/dropdown.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30888,9 +31235,9 @@ function _objectSpread$126(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dropdown/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -30961,9 +31308,9 @@ var Dropdown = withInstall$1(/* @__PURE__ */ defineComponent({
 var DropdownItem = withInstall$1(_DropdownItem);
 var DropdownMenu = withInstall$1(_DropdownMenu);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31017,9 +31364,9 @@ var props$74 = {
 	onExpand: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/utils/v-menu.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/utils/v-menu.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31243,9 +31590,9 @@ var VMenu = /*#__PURE__*/ function() {
 	]);
 }();
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31384,9 +31731,9 @@ var _Menu = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/head-menu-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/head-menu-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31430,9 +31777,9 @@ var props$73 = {
 	onExpand: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-panel-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-panel-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31455,9 +31802,9 @@ var tabPanelProps = {
 	onRemove: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31492,9 +31839,9 @@ var _TabPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31561,9 +31908,9 @@ var props$72 = {
 	onRemove: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-nav-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-nav-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31644,9 +31991,9 @@ var TTabNavItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-nav-bar.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-nav-bar.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -31715,9 +32062,9 @@ var TTabNavBar = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-nav.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/tab-nav.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -32035,14 +32382,14 @@ var TTabNav = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tabs/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -32130,9 +32477,9 @@ var Tabs = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var TabPanel = withInstall$1(_TabPanel);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/submenu-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/submenu-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -32146,9 +32493,9 @@ var props$71 = {
 	value: { type: [String, Number] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/common-components/fake-arrow.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/common-components/fake-arrow.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -32191,9 +32538,9 @@ var FakeArrow = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/submenu.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/submenu.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -32541,9 +32888,9 @@ var _Submenu = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/components/popup-overflow-content.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/components/popup-overflow-content.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -32583,9 +32930,9 @@ var PopupOverflowContent = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/head-menu.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/head-menu.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33089,9 +33436,9 @@ var _HeadMenu = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33125,9 +33472,9 @@ var props$70 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33247,14 +33594,14 @@ var _MenuItem = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu-group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/menu-group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33270,9 +33617,9 @@ var _MenuGroup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/menu/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33282,9 +33629,9 @@ var Submenu = withInstall$1(_Submenu);
 var MenuItem = withInstall$1(_MenuItem);
 var MenuGroup = withInstall$1(_MenuGroup);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33411,9 +33758,9 @@ var props$68 = {
 	onWheel: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33452,9 +33799,9 @@ var ValidateStatus = /* @__PURE__ */ function(ValidateStatus2) {
 var FormInjectionKey = Symbol("FormProvide");
 var FormItemInjectionKey = Symbol("FormItemProvide");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useLengthLimit.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useLengthLimit.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33504,9 +33851,9 @@ function useLengthLimit(params) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useInput.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useInput.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33698,9 +34045,9 @@ function useInput(props, expose) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useInputEventHandler.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useInputEventHandler.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33766,9 +34113,9 @@ function useInputEventHandler(props, isHover, isComposition) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useInputWidth.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/hooks/useInputWidth.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33804,9 +34151,9 @@ function useInputWidth(props, inputRef, innerValue) {
 	return { inputPreRef };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/input.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/input.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -33986,14 +34333,14 @@ var _Input = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/input-group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/input-group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34012,18 +34359,18 @@ var _InputGroup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Input = withInstall$1(_Input);
 var InputGroup = withInstall$1(_InputGroup);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34135,9 +34482,9 @@ var props$67 = {
 	onValidate: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-578e1806.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-f0e28f54.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34403,9 +34750,9 @@ function largeNumberToFixed(number) {
 	return [num1, decimalNumber].join(".");
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-f86e55ff.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-54d936f6.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34558,9 +34905,9 @@ function formatThousandths(number) {
 	return number;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/hooks/useInputNumber.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/hooks/useInputNumber.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34854,9 +35201,9 @@ function useInputNumber(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/input-number.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/input-number.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34882,9 +35229,9 @@ function _objectSpread$118(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-number/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -34948,9 +35295,9 @@ var InputNumber = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -35051,9 +35398,9 @@ var props$66 = {
 	onTagChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -35157,9 +35504,9 @@ var props$65 = {
 	onRemove: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useDragSorter.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useDragSorter.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -35246,9 +35593,9 @@ function useDragSorter(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useHover.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useHover.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -35270,9 +35617,9 @@ function useHover(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useTagScroll.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useTagScroll.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -35364,9 +35711,9 @@ function useTagScroll(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-a8b40385.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-35d348a7.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36271,14 +36618,14 @@ function validateWCAG2Parms(parms) {
 	};
 }
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/tag.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/tag.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36438,9 +36785,9 @@ var _Tag = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36481,9 +36828,9 @@ var props$63 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36576,9 +36923,9 @@ var _CheckTag = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag-group-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag-group-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36604,9 +36951,9 @@ var props$62 = {
 	onChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag-group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/check-tag-group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36676,9 +37023,9 @@ var _CheckTagGroup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36686,9 +37033,9 @@ var Tag = withInstall$1(_Tag);
 var CheckTag = withInstall$1(_CheckTag);
 var CheckTagGroup = withInstall$1(_CheckTagGroup);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useTagList.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/hooks/useTagList.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36840,9 +37187,9 @@ function useTagList(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/tag-input.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/tag-input.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -36876,9 +37223,9 @@ var useComponentClassName$1 = function useComponentClassName() {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tag-input/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37010,13 +37357,14 @@ var TagInput = withInstall$1(/* @__PURE__ */ defineComponent({
 			if (v) scrollElement.classList.add("".concat(scrollElementClass, "--scrollable"));
 			else scrollElement.classList.remove("".concat(scrollElementClass, "--scrollable"));
 		});
+		var instance = getCurrentInstance();
 		var updateSuffixWidth = function updateSuffixWidth(selector, cssVar, widthRef) {
-			var _tagInputRef$value2;
-			var wrapperEl = (_tagInputRef$value2 = tagInputRef.value) === null || _tagInputRef$value2 === void 0 ? void 0 : _tagInputRef$value2.$el;
-			if (!wrapperEl) return;
+			var _instance$proxy;
+			var wrapperEl = instance === null || instance === void 0 || (_instance$proxy = instance.proxy) === null || _instance$proxy === void 0 ? void 0 : _instance$proxy.$el;
+			if (!wrapperEl || wrapperEl.nodeType !== 1) return;
 			var inputEl = wrapperEl.querySelector(".".concat(classPrefix.value, "-input"));
 			if (!inputEl) return;
-			var targetEl = wrapperEl.querySelector(selector);
+			var targetEl = inputEl.querySelector(selector);
 			var width = targetEl ? targetEl.getBoundingClientRect().width : 0;
 			if (width !== widthRef.value) {
 				widthRef.value = width;
@@ -37032,18 +37380,24 @@ var TagInput = withInstall$1(/* @__PURE__ */ defineComponent({
 			});
 		};
 		watch(function() {
+			var _tagValue$value3;
 			return [
 				excessTagsDisplayType.value,
 				suffix.value,
 				showClearIcon.value,
 				classPrefix.value,
-				isBreakLine.value
+				isBreakLine.value,
+				size.value,
+				(_tagValue$value3 = tagValue.value) === null || _tagValue$value3 === void 0 ? void 0 : _tagValue$value3.length
 			];
 		}, function() {
 			handleSuffixWidthUpdate();
 		});
+		onMounted(function() {
+			handleSuffixWidthUpdate();
+		});
 		return function() {
-			var _inputProps$value3, _tagValue$value3;
+			var _inputProps$value3, _tagValue$value4;
 			var suffixIconNode = showClearIcon.value ? createVNode(CloseCircleFilledIcon$1, {
 				"class": CLEAR_CLASS.value,
 				"onClick": onClearClick
@@ -37078,7 +37432,7 @@ var TagInput = withInstall$1(/* @__PURE__ */ defineComponent({
 				"ref": tagInputRef,
 				"borderless": borderless.value,
 				"readonly": readonly,
-				"showInput": !readonly || !tagValue.value || !((_tagValue$value3 = tagValue.value) !== null && _tagValue$value3 !== void 0 && _tagValue$value3.length),
+				"showInput": !readonly || !tagValue.value || !((_tagValue$value4 = tagValue.value) !== null && _tagValue$value4 !== void 0 && _tagValue$value4.length),
 				"value": tInputValue.value,
 				"autoWidth": true,
 				"size": size.value,
@@ -37106,9 +37460,9 @@ var TagInput = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/hooks/useMultiple.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/hooks/useMultiple.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37239,9 +37593,9 @@ function useMultiple(props, context, popupRef) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/hooks/useOverlayInnerStyle.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/hooks/useOverlayInnerStyle.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37309,9 +37663,9 @@ function useOverlayInnerStyle(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/hooks/useSingle.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/hooks/useSingle.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37478,9 +37832,9 @@ function useSingle$1(props, context, popupRef) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/select-input.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/select-input.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37515,9 +37869,9 @@ var useComponentClassName = function useComponentClassName() {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select-input/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37608,9 +37962,9 @@ var SelectInput = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/option-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/option-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37635,9 +37989,9 @@ var props$61 = {
 	] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37680,17 +38034,17 @@ var props$60 = {
 	onChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var CheckboxGroupInjectionKey = Symbol("CheckboxGroupProvide");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/hooks/useCheckboxLazyLoad.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/hooks/useCheckboxLazyLoad.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37713,9 +38067,9 @@ function useCheckboxLazyLoad(labelRef, lazyLoad) {
 	return { showCheckbox };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/hooks/useKeyboardEvent.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/hooks/useKeyboardEvent.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37736,9 +38090,9 @@ function useKeyboardEvent(handleChange) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/checkbox.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/checkbox.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -37890,14 +38244,14 @@ var _Checkbox = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38078,18 +38432,18 @@ var _Group$1 = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/checkbox/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Checkbox = withInstall$1(_Checkbox);
 var CheckboxGroup = withInstall$1(_Group$1);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38185,17 +38539,17 @@ var getNewMultipleValue = function getNewMultipleValue(innerValue, optionValue) 
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var selectInjectKey = Symbol("selectProvide");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/option.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/option.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38361,14 +38715,14 @@ var _Option = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/option-group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/option-group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38400,9 +38754,9 @@ var _OptionGroup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38548,9 +38902,9 @@ var props$57 = {
 	onSearch: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/hooks/useKeyboardControl.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/hooks/useKeyboardControl.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38652,9 +39006,9 @@ function useKeyboardControl(_ref) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/hooks/usePanelVirtualScroll.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/hooks/usePanelVirtualScroll.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38719,9 +39073,9 @@ var usePanelVirtualScroll = function usePanelVirtualScroll(props) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/hooks/useSelectOptions.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/hooks/useSelectOptions.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -38953,9 +39307,9 @@ var useSelectOptions = function useSelectOptions(props, keys, inputValue, innerV
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/components/select-panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/components/select-panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39091,9 +39445,9 @@ var SelectPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/select.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/select.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39175,9 +39529,9 @@ function _objectSpread$107(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/select/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39682,19 +40036,19 @@ var Select = withInstall$1(/* @__PURE__ */ defineComponent({
 var Option = withInstall$1(_Option);
 var OptionGroup = withInstall$1(_OptionGroup);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-adornment/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/input-adornment/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39733,9 +40087,9 @@ var InputAdornment = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39832,9 +40186,9 @@ var props$55 = {
 	onPageSizeChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/hooks/useMoreAction.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/hooks/useMoreAction.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39861,9 +40215,9 @@ function useMoreAction(props, pageCount, innerCurrent) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/hooks/usePaginationClasses.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/hooks/usePaginationClasses.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -39928,9 +40282,9 @@ function usePaginationClasses(props, innerCurrent, innerPageSize, name) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/pagination.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/pagination.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40008,6 +40362,7 @@ var _Pagination = /* @__PURE__ */ defineComponent({
 			var toPageCurrent = pageIndex;
 			if (pageIndex < min) toPageCurrent = min;
 			else if (pageIndex > pageCount.value) toPageCurrent = pageCount.value;
+			if (toPageCurrent === innerCurrent.value) return;
 			pageInfo = pageInfo || {
 				current: toPageCurrent,
 				previous: innerCurrent.value,
@@ -40189,9 +40544,9 @@ var _Pagination = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/pagination-mini-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/pagination-mini-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40233,9 +40588,9 @@ var props$54 = {
 	onChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/pagination-mini.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/pagination-mini.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40347,18 +40702,18 @@ var _PaginationMini = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/pagination/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Pagination = withInstall$1(_Pagination);
 var PaginationMini = withInstall$1(_PaginationMini);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40416,9 +40771,9 @@ var props$53 = {
 	onChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/step-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/step-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40453,9 +40808,9 @@ var stepItemProps = {
 	value: { type: [String, Number] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/step-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/step-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40545,14 +40900,14 @@ var _StepItem = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/steps/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40644,9 +40999,9 @@ var Steps = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var StepItem = withInstall$1(_StepItem);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40695,9 +41050,9 @@ var props$52 = {
 	onHover: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/sticky-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/sticky-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40716,9 +41071,9 @@ var stickyItemProps = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/sticky-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/sticky-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40819,9 +41174,9 @@ var _StickyItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/sticky-tool.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/sticky-tool.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -40927,28 +41282,28 @@ var _StickyTool = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/sticky-tool/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var StickyItem = withInstall$1(_StickyItem);
 var StickyTool = withInstall$1(_StickyTool);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/back-top/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/back-top/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41089,9 +41444,9 @@ var BackTop = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41177,9 +41532,9 @@ var props$50 = {
 	onSelect: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/components/highlight-option.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/components/highlight-option.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41216,9 +41571,9 @@ var _HighlightOption = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/components/option-list.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/components/option-list.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41370,9 +41725,9 @@ var AutoCompleteOptionList = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/auto-complete.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/auto-complete.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41401,9 +41756,9 @@ function _isSlot$29(s) {
 	return typeof s === "function" || Object.prototype.toString.call(s) === "[object Object]" && !isVNode(s);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/auto-complete/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41553,9 +41908,9 @@ var AutoComplete = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var HighlightOption = withInstall$1(_HighlightOption);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/utils/className.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/utils/className.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41580,9 +41935,9 @@ function getCascaderItemIconClass(prefix, node, STATUS, cascaderContext) {
 	return ["".concat(prefix, "-cascader__item-icon"), "".concat(prefix, "-icon")].concat(_toConsumableArray(getNodeStatusClass(node, STATUS, cascaderContext)));
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/utils/helper.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/utils/helper.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41677,9 +42032,9 @@ function filterOptions(nodes, filter, panelIndex) {
 	});
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/utils/effect.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/utils/effect.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41796,9 +42151,9 @@ var treeStoreExpendEffect = function treeStoreExpendEffect(treeStore, value, exp
 	treeStore.refreshNodes();
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/components/Item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/components/Item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -41895,9 +42250,9 @@ var Item = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -42057,9 +42412,9 @@ var props$49 = {
 	onRemove: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/components/Panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/components/Panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -42368,9 +42723,9 @@ function mitt_default(n) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-aa9cf5ff.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-abbb1a9d.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -42434,6 +42789,12 @@ var TreeNodeModel = /*#__PURE__*/ function() {
 			key: "disabled",
 			get: function get() {
 				return this[nodeKey].isDisabled();
+			}
+		},
+		{
+			key: "level",
+			get: function get() {
+				return this.getLevel();
 			}
 		},
 		{
@@ -43488,9 +43849,9 @@ var TreeNode = /*#__PURE__*/ function() {
 	]);
 }();
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-33b547cf.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-7039c4a5.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44064,9 +44425,9 @@ var TreeStore = /*#__PURE__*/ function() {
 	]);
 }();
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/hooks/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/hooks/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44257,9 +44618,9 @@ var useCascaderContext = function useCascaderContext(props) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/cascader.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/cascader.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44439,9 +44800,9 @@ var _Cascader = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/cascader-panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/cascader-panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44465,18 +44826,18 @@ var _CascaderPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/cascader/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Cascader = withInstall$1(_Cascader);
 var CascaderPanel = withInstall$1(_CascaderPanel);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-b8f28b6e.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-c05afcc8.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44641,9 +45002,9 @@ customParseFormat$2.exports;
 var customParseFormatExports = customParseFormat$2.exports;
 var customParseFormat$1 = /*@__PURE__*/ getDefaultExportFromCjs(customParseFormatExports);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-6eb7ecfc.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-ce5b44b1.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44895,9 +45256,9 @@ function initYearMonthTime(_ref5) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useSingleValue.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useSingleValue.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -44938,9 +45299,9 @@ function useSingleValue(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useSingle.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useSingle.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -45090,9 +45451,9 @@ function useSingle(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-51cb07f0.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-bc94003b.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -45136,9 +45497,9 @@ advancedFormat$2.exports;
 var advancedFormatExports = advancedFormat$2.exports;
 var advancedFormat$1 = /*@__PURE__*/ getDefaultExportFromCjs(advancedFormatExports);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-93996aed.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-519de3c0.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -45761,9 +46122,9 @@ function computePaginationDisabled(range, mode, year, month) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -45928,9 +46289,9 @@ var datePickerProps = {
 	onYearChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useDisableDate.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useDisableDate.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -45950,9 +46311,9 @@ function useDisableDate(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useRangeValue.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useRangeValue.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46023,9 +46384,9 @@ function useRangeValue(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useRange.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useRange.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46230,9 +46591,9 @@ function useRange(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useTableData.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useTableData.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46356,9 +46717,9 @@ function useTableData(props) {
 	});
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useSelectRange.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/hooks/useSelectRange.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46423,9 +46784,9 @@ function useSelectRange(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Header.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Header.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46661,9 +47022,9 @@ var TDateHeader = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Cell.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Cell.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46738,9 +47099,9 @@ var TDatePickerCell = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Table.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Table.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46870,9 +47231,9 @@ var TDateTable = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -46968,7 +47329,7 @@ var props$48 = {
 	onPick: Function
 };
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -47062,6 +47423,7 @@ var panelColProps = function panelColProps() {
 			type: String,
 			"default": ""
 		},
+		internalValue: { type: String },
 		range: {
 			type: Array,
 			"default": function _default() {
@@ -47079,9 +47441,9 @@ var panelColProps = function panelColProps() {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-bd277a22.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-6a654623.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -47195,6 +47557,10 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 			if (isStepsSet) return dayjs().hour(0).minute(0).second(0);
 			return dayjs();
 		});
+		var emitChange = function emitChange(formattedVal, e) {
+			var _props$internalValue, _props$onChange;
+			if (formattedVal !== ((_props$internalValue = props.internalValue) !== null && _props$internalValue !== void 0 ? _props$internalValue : value.value)) (_props$onChange = props.onChange) === null || _props$onChange === void 0 || _props$onChange.call(props, formattedVal, e);
+		};
 		watch(function() {
 			return dayjsValue.value;
 		}, function() {
@@ -47268,7 +47634,7 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 			return Math.abs(Math.max(0, itemIdx) * timeItemTotalHeight);
 		};
 		var handleScroll = function handleScroll(col, idx, e) {
-			var _colsRef$idx, _props$onChange;
+			var _colsRef$idx;
 			var val;
 			var formattedVal;
 			if (!props.isShowPanel) return;
@@ -47300,7 +47666,7 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 				else if (meridiem === "pm" && currentHour < 12) formattedVal = dayjsValue.value.hour(currentHour + 12).format(format.value);
 				else formattedVal = dayjsValue.value.format(format.value);
 			}
-			if (formattedVal !== value.value) (_props$onChange = props.onChange) === null || _props$onChange === void 0 || _props$onChange.call(props, formattedVal, e);
+			emitChange(formattedVal, e);
 			if (distance !== scrollTop) {
 				var _scrollCtrl$scrollTo;
 				var scrollCtrl = colsRef[cols.value.indexOf(col)];
@@ -47312,21 +47678,25 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 			}
 		};
 		var scrollToTime = function scrollToTime(col, time, idx) {
-			var _scrollCtrl$scrollTo2;
 			var behavior = arguments.length > 3 && arguments[3] !== void 0 ? arguments[3] : "auto";
 			var distance = getScrollDistance(col, time);
 			var scrollCtrl = colsRef[idx];
-			if (!scrollCtrl || scrollCtrl.scrollTop === distance || !timeItemCanUsed(col, time)) return;
-			(_scrollCtrl$scrollTo2 = scrollCtrl.scrollTo) === null || _scrollCtrl$scrollTo2 === void 0 || _scrollCtrl$scrollTo2.call(scrollCtrl, {
+			if (!scrollCtrl || scrollCtrl.scrollTop === distance || !timeItemCanUsed(col, time) || !scrollCtrl.scrollTo) return false;
+			scrollCtrl.scrollTo({
 				top: distance,
 				behavior
 			});
+			return true;
 		};
 		var handleTimeItemClick = function handleTimeItemClick(col, el, idx, e) {
 			if (!timeItemCanUsed(col, el)) return;
 			if (timeArr.includes(col)) {
 				if (col === EPickerCols.hour && dayjsValue.value.format("a") === "pm" && cols.value.includes(EPickerCols.meridiem)) el = Number(el) + 12;
-				scrollToTime(col, el, idx, "smooth");
+				if (!timeItemCanUsed(col, el)) return;
+				if (!scrollToTime(col, el, idx, "smooth")) {
+					var _dayjsValue$value$col2, _dayjsValue$value2;
+					emitChange((_dayjsValue$value$col2 = (_dayjsValue$value2 = dayjsValue.value)[col]) === null || _dayjsValue$value$col2 === void 0 ? void 0 : _dayjsValue$value$col2.call(_dayjsValue$value2, el).format(format.value), e);
+				}
 			} else {
 				var currentHour = dayjsValue.value.hour();
 				if (el === "am" && currentHour >= 12) {
@@ -47347,8 +47717,8 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 			nextTick(function() {
 				cols.value.forEach(function(col, idx) {
 					if (!isStepsSet || isStepsSet && value.value) {
-						var _dayjsValue$value$col2, _dayjsValue$value2;
-						scrollToTime(col, timeArr.includes(col) ? (_dayjsValue$value$col2 = (_dayjsValue$value2 = dayjsValue.value)[col]) === null || _dayjsValue$value$col2 === void 0 ? void 0 : _dayjsValue$value$col2.call(_dayjsValue$value2) : dayjsValue.value.format("a"), idx, behavior);
+						var _dayjsValue$value$col3, _dayjsValue$value3;
+						scrollToTime(col, timeArr.includes(col) ? (_dayjsValue$value$col3 = (_dayjsValue$value3 = dayjsValue.value)[col]) === null || _dayjsValue$value$col3 === void 0 ? void 0 : _dayjsValue$value$col3.call(_dayjsValue$value3) : dayjsValue.value.format("a"), idx, behavior);
 					} else {
 						var _getColList;
 						scrollToTime(col, (_getColList = getColList(col)) === null || _getColList === void 0 ? void 0 : _getColList[0], idx, behavior);
@@ -47358,10 +47728,10 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 			props.resetTriggerScroll();
 		};
 		var isCurrent = function isCurrent(col, colItem) {
-			var _dayjsValue$value$col3, _dayjsValue$value3;
+			var _dayjsValue$value$col4, _dayjsValue$value4;
 			var colVal;
 			if (col === EPickerCols.meridiem) return dayjsValue.value.format("a") === colItem;
-			colVal = (_dayjsValue$value$col3 = (_dayjsValue$value3 = dayjsValue.value)[col]) === null || _dayjsValue$value$col3 === void 0 ? void 0 : _dayjsValue$value$col3.call(_dayjsValue$value3);
+			colVal = (_dayjsValue$value$col4 = (_dayjsValue$value4 = dayjsValue.value)[col]) === null || _dayjsValue$value$col4 === void 0 ? void 0 : _dayjsValue$value$col4.call(_dayjsValue$value4);
 			if (col === EPickerCols.hour && /[h]{1}/.test(format.value)) colVal %= 12;
 			return colVal === Number(colItem);
 		};
@@ -47399,9 +47769,9 @@ var SinglePanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/panel/time-picker-panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/panel/time-picker-panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -47515,6 +47885,7 @@ var _TimePickerPanel = /* @__PURE__ */ defineComponent({
 				"format": props.format || "HH:mm:ss",
 				"steps": props.steps || DEFAULT_STEPS,
 				"value": dayjs(props.value, props.format).isValid() ? props.value : defaultValue.value,
+				"internalValue": props.value,
 				"triggerScroll": triggerScroll.value,
 				"onChange": props.onChange,
 				"resetTriggerScroll": resetTriggerScroll,
@@ -47535,9 +47906,9 @@ var _TimePickerPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/time-picker.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/time-picker.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -47683,9 +48054,9 @@ var _TimePicker = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -47763,9 +48134,9 @@ var props$47 = {
 	onMouseleave: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/range-input.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/range-input.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48033,9 +48404,9 @@ var _RangeInput = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/range-input-popup-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/range-input-popup-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48077,9 +48448,9 @@ var props$46 = {
 	onPopupVisibleChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/range-input-popup.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/range-input-popup.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48138,18 +48509,18 @@ var _RangeInputPopup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/range-input/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var RangeInput = withInstall$1(_RangeInput);
 var RangeInputPopup = withInstall$1(_RangeInputPopup);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/time-range-picker-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/time-range-picker-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48240,9 +48611,9 @@ var props$45 = {
 	onPick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/time-range-picker.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/time-range-picker.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48456,9 +48827,9 @@ var _TimeRangePicker = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/time-picker/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48466,9 +48837,9 @@ var TimePicker = withInstall$1(_TimePicker);
 var TimeRangePicker = withInstall$1(_TimeRangePicker);
 var TimePickerPanel = withInstall$1(_TimePickerPanel);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48520,9 +48891,9 @@ var triggerMap = {
 	next: "arrow-next"
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/PanelContent.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/PanelContent.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48660,9 +49031,9 @@ var TPanelContent = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Footer.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/base/Footer.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48732,9 +49103,9 @@ var TDateFooter = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/ExtraContent.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/ExtraContent.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48773,9 +49144,9 @@ var TExtraContent = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/SinglePanel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/SinglePanel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -48933,9 +49304,9 @@ var TSinglePanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DatePicker.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DatePicker.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -49264,9 +49635,9 @@ var _DatePicker = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/date-picker-panel-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/date-picker-panel-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -49285,9 +49656,9 @@ var datePickerPanelProps = {
 	onYearChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DatePickerPanel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DatePickerPanel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -49482,9 +49853,9 @@ var _DatePickerPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/date-range-picker-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/date-range-picker-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -49654,9 +50025,9 @@ var dateRangePickerProps = {
 	onYearChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/RangePanel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/components/panel/RangePanel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -49743,8 +50114,8 @@ var TRangePanel = /* @__PURE__ */ defineComponent({
 		});
 		var hidePreselection = !props.panelPreselection && props.value.length === 2;
 		var disableDateOptions = computed(function() {
-			var startDateValue = new Date(parseToDayjs(props.value[0], format.value, "start").toDate().setHours(0, 0, 0));
-			var endDateValue = new Date(parseToDayjs(props.value[1], format.value, "end").toDate().setHours(23, 59, 59));
+			var startDateValue = props.value[0] ? new Date(parseToDayjs(props.value[0], format.value, "start").toDate().setHours(0, 0, 0)) : void 0;
+			var endDateValue = props.value[1] ? new Date(parseToDayjs(props.value[1], format.value, "end").toDate().setHours(23, 59, 59)) : void 0;
 			var start = props.isFirstValueSelected && props.activeIndex === 1 ? startDateValue : void 0;
 			var end = props.isFirstValueSelected && props.activeIndex === 0 ? endDateValue : void 0;
 			if (props.disabled && isArray(props.disabled)) {
@@ -49839,6 +50210,10 @@ var TRangePanel = /* @__PURE__ */ defineComponent({
 				cell: props.cell
 			};
 		});
+		var selectedValue = computed(function() {
+			if (props.disabled && isArray(props.disabled) && props.disabled[0] !== props.disabled[1]) return props.value[props.disabled[0] ? 1 : 0];
+			return props.value[props.activeIndex];
+		});
 		return function() {
 			return createVNode("div", {
 				"class": [COMPONENT_NAME.value, _defineProperty$2({}, "".concat(COMPONENT_NAME.value, "--direction-row"), ["left", "right"].includes(props.presetsPlacement))],
@@ -49849,7 +50224,7 @@ var TRangePanel = /* @__PURE__ */ defineComponent({
 			}, [
 				["top", "left"].includes(props.presetsPlacement) ? createVNode(TExtraContent, {
 					"presets": props.presets,
-					"selectedValue": props.value[props.activeIndex],
+					"selectedValue": selectedValue.value,
 					"enableTimePicker": props.enableTimePicker,
 					"onPresetClick": props.onPresetClick,
 					"onConfirmClick": props.onConfirmClick,
@@ -49886,7 +50261,7 @@ var TRangePanel = /* @__PURE__ */ defineComponent({
 				}, panelContentProps.value), null)]),
 				["bottom", "right"].includes(props.presetsPlacement) ? createVNode(TExtraContent, {
 					"presets": props.presets,
-					"selectedValue": props.value[props.activeIndex],
+					"selectedValue": selectedValue.value,
 					"enableTimePicker": props.enableTimePicker,
 					"onPresetClick": props.onPresetClick,
 					"onConfirmClick": props.onConfirmClick,
@@ -49898,9 +50273,9 @@ var TRangePanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DateRangePicker.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DateRangePicker.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -49924,7 +50299,7 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 		var isSelected = /* @__PURE__ */ ref(false);
 		watch(popupVisible, function(visible) {
 			if (visible) {
-				if (isArray(props2.disabled)) activeIndex.value = props2.disabled[0] ? 1 : 0;
+				if (isSingleSideDisabled()) activeIndex.value = isArray(props2.disabled) && props2.disabled[0] ? 1 : 0;
 				isSelected.value = false;
 				cacheValue.value = formatDate(value.value || [], {
 					format: formatRef.value.valueType,
@@ -50013,6 +50388,30 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 				else confirmValueChange();
 			}
 		});
+		function normalizeRangeValue(nextValue) {
+			return [nextValue[0] || "", nextValue[1] || ""];
+		}
+		function getInvalidIndex(nextValue) {
+			return nextValue.findIndex(function(v, index) {
+				if (!v) return !(isArray(props2.disabled) && props2.disabled[index]);
+				return !isValidDate(v, formatRef.value.format);
+			});
+		}
+		function getDayjsValue(nextValue) {
+			return nextValue.map(function(v, i) {
+				var _props2$defaultTime;
+				return v ? parseToDayjs(v, formatRef.value.format, void 0, void 0, (_props2$defaultTime = props2.defaultTime) === null || _props2$defaultTime === void 0 ? void 0 : _props2$defaultTime[i]) : null;
+			});
+		}
+		function isSingleSideDisabled() {
+			return isArray(props2.disabled) && props2.disabled.filter(Boolean).length === 1;
+		}
+		function getAvailableActiveIndex() {
+			if (!isArray(props2.disabled)) return activeIndex.value;
+			if (props2.disabled[0] && !props2.disabled[1]) return 1;
+			if (!props2.disabled[0] && props2.disabled[1]) return 0;
+			return activeIndex.value;
+		}
 		function onCellMouseEnter(date) {
 			isHoverCell.value = true;
 			var nextValue = _toConsumableArray(inputValue.value);
@@ -50026,34 +50425,43 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 		function onCellClick(date, _ref2) {
 			var _props2$onPick;
 			var e = _ref2.e;
+			var nextActiveIndex = getAvailableActiveIndex();
+			activeIndex.value = nextActiveIndex;
 			(_props2$onPick = props2.onPick) === null || _props2$onPick === void 0 || _props2$onPick.call(props2, date, {
 				e,
-				partial: activeIndex.value ? "end" : "start"
+				partial: nextActiveIndex ? "end" : "start"
 			});
 			isHoverCell.value = false;
 			isSelected.value = true;
 			var nextValue = _toConsumableArray(inputValue.value);
-			nextValue[activeIndex.value] = formatDate(date, { format: formatRef.value.format });
-			cacheValue.value = nextValue;
-			inputValue.value = nextValue;
-			if (props2.enableTimePicker) return;
-			var notValidIndex = nextValue.findIndex(function(v) {
-				return !v || !isValidDate(v, formatRef.value.format);
-			});
-			if (notValidIndex === -1 && nextValue.length === 2) if (!isFirstValueSelected.value && parseToDayjs(nextValue[0], formatRef.value.format).isAfter(parseToDayjs(nextValue[1], formatRef.value.format))) {
-				nextValue[activeIndex.value ? 0 : 1] = "";
-				cacheValue.value = nextValue;
-				inputValue.value = nextValue;
-			} else onRawChange === null || onRawChange === void 0 || onRawChange(formatDate(nextValue, {
+			nextValue[nextActiveIndex] = formatDate(date, { format: formatRef.value.format });
+			var normalizedValue = normalizeRangeValue(nextValue);
+			cacheValue.value = normalizedValue;
+			inputValue.value = normalizedValue;
+			if (props2.enableTimePicker) {
+				var selectedValue = _toConsumableArray(normalizedValue);
+				var selectedActiveIndex = nextActiveIndex;
+				setTimeout(function() {
+					popupVisible.value = true;
+					activeIndex.value = selectedActiveIndex;
+					isSelected.value = true;
+					cacheValue.value = selectedValue;
+					inputValue.value = selectedValue;
+				});
+				return;
+			}
+			var notValidIndex = getInvalidIndex(normalizedValue);
+			if (notValidIndex === -1 && normalizedValue.length === 2) if (!isFirstValueSelected.value && normalizedValue[0] && normalizedValue[1] && parseToDayjs(normalizedValue[0], formatRef.value.format).isAfter(parseToDayjs(normalizedValue[1], formatRef.value.format))) {
+				normalizedValue[activeIndex.value ? 0 : 1] = "";
+				cacheValue.value = normalizedValue;
+				inputValue.value = normalizedValue;
+			} else onRawChange === null || onRawChange === void 0 || onRawChange(formatDate(normalizedValue, {
 				format: formatRef.value.format,
 				targetFormat: formatRef.value.valueType,
 				autoSwap: true,
 				defaultTime: props2.defaultTime
 			}), {
-				dayjsValue: nextValue.map(function(v, i) {
-					var _props2$defaultTime;
-					return parseToDayjs(v, formatRef.value.format, void 0, void 0, (_props2$defaultTime = props2.defaultTime) === null || _props2$defaultTime === void 0 ? void 0 : _props2$defaultTime[i]);
-				}),
+				dayjsValue: getDayjsValue(normalizedValue),
 				trigger: "pick"
 			});
 			if (Array.isArray(props2.disabled)) return;
@@ -50061,7 +50469,7 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 				var nextIndex = notValidIndex;
 				if (nextIndex === -1) nextIndex = activeIndex.value ? 0 : 1;
 				activeIndex.value = nextIndex;
-				isFirstValueSelected.value = nextValue.some(function(v) {
+				isFirstValueSelected.value = normalizedValue.some(function(v) {
 					return !!v;
 				});
 			} else popupVisible.value = false;
@@ -50138,10 +50546,8 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 			cacheValue.value = formatDate(nextInputValue, { format: formatRef.value.format });
 		}
 		var confirmValueChange = function confirmValueChange(e) {
-			var nextValue = _toConsumableArray(inputValue.value);
-			if (nextValue.findIndex(function(v) {
-				return !v || !isValidDate(v, formatRef.value.format);
-			}) === -1 && nextValue.length === 2) if (!isFirstValueSelected.value && parseToDayjs(nextValue[0], formatRef.value.format).isAfter(parseToDayjs(nextValue[1], formatRef.value.format))) {
+			var nextValue = normalizeRangeValue(_toConsumableArray(inputValue.value));
+			if (getInvalidIndex(nextValue) === -1 && nextValue.length === 2) if (!isFirstValueSelected.value && nextValue[0] && nextValue[1] && parseToDayjs(nextValue[0], formatRef.value.format).isAfter(parseToDayjs(nextValue[1], formatRef.value.format))) {
 				nextValue[activeIndex.value ? 0 : 1] = "";
 				cacheValue.value = nextValue;
 				inputValue.value = nextValue;
@@ -50156,16 +50562,13 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 				var isSame = Array.isArray(formattedValue) && formattedValue.length === 2 && formattedValue[0] != null && formattedValue[1] != null && value.value[0] != null && value.value[1] != null && dayjs(formattedValue[0]).valueOf() === dayjs(value.value[0]).valueOf() && dayjs(formattedValue[1]).valueOf() === dayjs(value.value[1]).valueOf();
 				props2 === null || props2 === void 0 || (_props2$onConfirm = props2.onConfirm) === null || _props2$onConfirm === void 0 || _props2$onConfirm.call(props2, {
 					date: nextValue.map(function(v) {
-						return dayjs(v).toDate();
+						return v ? dayjs(v).toDate() : null;
 					}),
 					e: e || null,
 					partial: activeIndex.value ? "end" : "start"
 				});
 				if (!isSame) onRawChange === null || onRawChange === void 0 || onRawChange(formattedValue, {
-					dayjsValue: nextValue.map(function(v, i) {
-						var _props2$defaultTime2;
-						return parseToDayjs(v, formatRef.value.format, void 0, void 0, (_props2$defaultTime2 = props2.defaultTime) === null || _props2$defaultTime2 === void 0 ? void 0 : _props2$defaultTime2[i]);
-					}),
+					dayjsValue: getDayjsValue(nextValue),
 					trigger: "confirm"
 				});
 			}
@@ -50173,11 +50576,9 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 		function onConfirmClick(_ref4) {
 			var e = _ref4.e;
 			confirmValueChange(e);
-			var nextValue = _toConsumableArray(inputValue.value);
-			var notValidIndex = nextValue.findIndex(function(v) {
-				return !v || !isValidDate(v, formatRef.value.format);
-			});
-			if (Array.isArray(props2.disabled)) popupVisible.value = false;
+			var nextValue = normalizeRangeValue(_toConsumableArray(inputValue.value));
+			var notValidIndex = getInvalidIndex(nextValue);
+			if (isSingleSideDisabled()) popupVisible.value = false;
 			else if (!isFirstValueSelected.value) {
 				var nextIndex = notValidIndex;
 				if (nextIndex === -1) nextIndex = activeIndex.value ? 0 : 1;
@@ -50200,8 +50601,8 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 					defaultTime: props2.defaultTime
 				}), {
 					dayjsValue: presetValue.map(function(p, i) {
-						var _props2$defaultTime3;
-						return parseToDayjs(p, formatRef.value.format, void 0, void 0, (_props2$defaultTime3 = props2.defaultTime) === null || _props2$defaultTime3 === void 0 ? void 0 : _props2$defaultTime3[i]);
+						var _props2$defaultTime2;
+						return parseToDayjs(p, formatRef.value.format, void 0, void 0, (_props2$defaultTime2 = props2.defaultTime) === null || _props2$defaultTime2 === void 0 ? void 0 : _props2$defaultTime2[i]);
 					}),
 					trigger: "preset"
 				});
@@ -50332,9 +50733,9 @@ var _DateRangePicker = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/date-range-picker-panel-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/date-range-picker-panel-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -50355,9 +50756,9 @@ var dateRangePickerPanelProps = {
 	onYearChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DateRangePickerPanel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/DateRangePickerPanel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -50704,9 +51105,9 @@ var _DateRangePickerPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/date-picker/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -50715,9 +51116,9 @@ var DatePickerPanel = withInstall$1(_DatePickerPanel);
 var DateRangePicker = withInstall$1(_DateRangePicker);
 var DateRangePickerPanel = withInstall$1(_DateRangePickerPanel);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -50815,9 +51216,9 @@ var props$44 = {
 	onValidate: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/utils/form-model.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/utils/form-model.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -51610,9 +52011,9 @@ function _validate() {
 	return _validate.apply(this, arguments);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/utils/form-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/utils/form-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -51621,9 +52022,9 @@ function getFormItemClassName(componentName, name) {
 	return "".concat(componentName, "__").concat(name).replace(/(\[|\]|\.)+/g, "_");
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/form.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/form.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -51835,9 +52236,9 @@ var _Form = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/form-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/form-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -51888,9 +52289,9 @@ var props$43 = {
 	tips: { type: [String, Function] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/form-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/form-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52311,18 +52712,18 @@ var _FormItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/form/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Form = withInstall$1(_Form);
 var FormItem = withInstall$1(_FormItem);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52363,18 +52764,18 @@ var props$42 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var RadioGroupInjectionKey = Symbol("RadioGroupProvide");
 var RadioButtonInjectionKey = Symbol("RadioButtonProvide");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/radio.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/radio.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52476,9 +52877,9 @@ var _Radio = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/radio-group-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/radio-group-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52561,9 +52962,9 @@ var props$41 = {
 	onChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/radio-button.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/radio-button.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52613,9 +53014,9 @@ var _RadioButton = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/hooks/useKeyboard.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/hooks/useKeyboard.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52646,9 +53047,9 @@ function useKeyboard(radioGroupRef, setInnerValue) {
 	});
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/hooks/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/hooks/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52697,9 +53098,9 @@ function useMutationObserver(target, callback) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52883,9 +53284,9 @@ var _Group = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/radio/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52893,9 +53294,9 @@ var Radio = withInstall$1(_Radio);
 var RadioGroup = withInstall$1(_Group);
 var RadioButton = withInstall$1(_RadioButton);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-cd6944e9.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-62329e33.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -52931,17 +53332,17 @@ var formatPrecision = function formatPrecision(value, precision) {
 	return Number(parseFloat("".concat(value)).toFixed(precision));
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var sliderPropsInjectKey = Symbol("sliderProps");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/hooks/useSliderInput.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/hooks/useSliderInput.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53009,9 +53410,9 @@ var useSliderInput = function useSliderInput(config) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/slider-mark.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/slider-mark.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53046,9 +53447,9 @@ var TSliderMark = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/hooks/useSliderMark.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/hooks/useSliderMark.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53108,9 +53509,9 @@ var useSliderMark = function useSliderMark(config) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53171,9 +53572,9 @@ var props$40 = {
 	onChangeEnd: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/hooks/useSliderTooltip.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/hooks/useSliderTooltip.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53252,9 +53653,9 @@ var useSliderTooltip = function useSliderTooltip(tooltipConfig) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/slider-button.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/slider-button.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53441,14 +53842,14 @@ var _SliderButton = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/slider/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53783,19 +54184,19 @@ var Slider = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var SliderButton = withInstall$1(_SliderButton);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/switch/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/switch/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53925,9 +54326,9 @@ var Switch = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/textarea/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/textarea/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -53988,53 +54389,52 @@ var props$38 = {
 	onValidate: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/textarea/textarea.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/textarea/textarea.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var TEXTAREA_STYLE = "\n  min-height:0 !important;\n  max-height:none !important;\n  height:0 !important;\n  visibility:hidden !important;\n  overflow:hidden !important;\n  position:absolute !important;\n  z-index:-1000 !important;\n  top:0 !important;\n  right:0 !important\n";
-var hiddenTextarea;
 function calcTextareaHeight(targetElement) {
-	var _hiddenTextarea;
 	var minRows = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;
 	var maxRows = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : null;
-	if (!hiddenTextarea) {
-		hiddenTextarea = document.createElement("textarea");
-		document.body.appendChild(hiddenTextarea);
+	var hiddenTextarea = document.createElement("textarea");
+	document.body.appendChild(hiddenTextarea);
+	try {
+		var _calculateNodeSize = calculateNodeSize(targetElement), paddingSize = _calculateNodeSize.paddingSize, borderSize = _calculateNodeSize.borderSize, boxSizing = _calculateNodeSize.boxSizing, sizingStyle = _calculateNodeSize.sizingStyle;
+		hiddenTextarea.setAttribute("style", "".concat(sizingStyle, ";").concat(TEXTAREA_STYLE));
+		hiddenTextarea.value = targetElement.value || targetElement.placeholder || "";
+		var height = hiddenTextarea.scrollHeight;
+		var result = {};
+		var isBorderbox = boxSizing === "border-box";
+		var isContentbox = boxSizing === "content-box";
+		if (isBorderbox) height += borderSize;
+		else if (isContentbox) height -= paddingSize;
+		hiddenTextarea.value = "";
+		var singleRowHeight = hiddenTextarea.scrollHeight - paddingSize;
+		var calcHeight = function calcHeight(rows) {
+			var rowsHeight = singleRowHeight * rows;
+			if (isBorderbox) rowsHeight = rowsHeight + paddingSize + borderSize;
+			return rowsHeight;
+		};
+		if (!isNull(minRows)) {
+			var minHeight = calcHeight(minRows);
+			height = Math.max(minHeight, height);
+			result.minHeight = "".concat(minHeight, "px");
+		}
+		if (!isNull(maxRows)) height = Math.min(calcHeight(maxRows), height);
+		result.height = "".concat(height, "px");
+		return result;
+	} finally {
+		var _hiddenTextarea$paren;
+		(_hiddenTextarea$paren = hiddenTextarea.parentNode) === null || _hiddenTextarea$paren === void 0 || _hiddenTextarea$paren.removeChild(hiddenTextarea);
 	}
-	var _calculateNodeSize = calculateNodeSize(targetElement), paddingSize = _calculateNodeSize.paddingSize, borderSize = _calculateNodeSize.borderSize, boxSizing = _calculateNodeSize.boxSizing, sizingStyle = _calculateNodeSize.sizingStyle;
-	hiddenTextarea.setAttribute("style", "".concat(sizingStyle, ";").concat(TEXTAREA_STYLE));
-	hiddenTextarea.value = targetElement.value || targetElement.placeholder || "";
-	var height = hiddenTextarea.scrollHeight;
-	var result = {};
-	var isBorderbox = boxSizing === "border-box";
-	var isContentbox = boxSizing === "content-box";
-	if (isBorderbox) height += borderSize;
-	else if (isContentbox) height -= paddingSize;
-	hiddenTextarea.value = "";
-	var singleRowHeight = hiddenTextarea.scrollHeight - paddingSize;
-	(_hiddenTextarea = hiddenTextarea) === null || _hiddenTextarea === void 0 || (_hiddenTextarea = _hiddenTextarea.parentNode) === null || _hiddenTextarea === void 0 || _hiddenTextarea.removeChild(hiddenTextarea);
-	hiddenTextarea = null;
-	var calcHeight = function calcHeight(rows) {
-		var rowsHeight = singleRowHeight * rows;
-		if (isBorderbox) rowsHeight = rowsHeight + paddingSize + borderSize;
-		return rowsHeight;
-	};
-	if (!isNull(minRows)) {
-		var minHeight = calcHeight(minRows);
-		height = Math.max(minHeight, height);
-		result.minHeight = "".concat(minHeight, "px");
-	}
-	if (!isNull(maxRows)) height = Math.min(calcHeight(maxRows), height);
-	result.height = "".concat(height, "px");
-	return result;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/textarea/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/textarea/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54229,9 +54629,9 @@ var Textarea = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54378,9 +54778,9 @@ function getLefCount(nodes) {
 	return total;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/components/transfer-search.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/components/transfer-search.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54424,9 +54824,9 @@ var Search = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/hooks/useDragSort.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/hooks/useDragSort.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54486,9 +54886,9 @@ function useDragSort$1(currentValue, curPageData, handleDataChange) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/components/transfer-list.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/components/transfer-list.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54798,9 +55198,9 @@ var TransferList = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54903,9 +55303,9 @@ var props$37 = {
 	onSearch: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/components/transfer-operations.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/components/transfer-operations.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -54994,9 +55394,9 @@ var TransferOperations = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/transfer.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/transfer.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55004,9 +55404,9 @@ function _isSlot$22(s) {
 	return typeof s === "function" || Object.prototype.toString.call(s) === "[object Object]" && !isVNode(s);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/transfer/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55210,7 +55610,7 @@ var Transfer = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55240,9 +55640,9 @@ function useVModel(props, refsProps) {
 	return vm;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useDraggable.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useDraggable.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55369,9 +55769,9 @@ function useDraggable(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55455,9 +55855,9 @@ function getNode(store, item) {
 	return node;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useDragHandle.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useDragHandle.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55524,9 +55924,9 @@ function useDragHandle(state) {
 	return { drag };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeAction.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeAction.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55613,9 +56013,9 @@ function useTreeAction(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useItemState.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useItemState.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55635,9 +56035,9 @@ function useItemState(props, context) {
 	} };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useItemEvents.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useItemEvents.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55679,9 +56079,9 @@ function useItemEvents(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderIcon.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderIcon.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55724,9 +56124,9 @@ function useRenderIcon(state) {
 	} };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderLabel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderLabel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55793,9 +56193,9 @@ function useRenderLabel(state) {
 	} };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderLine.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderLine.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55838,9 +56238,9 @@ function useRenderLine(state) {
 	} };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderOperations.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useRenderOperations.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55869,9 +56269,9 @@ function useRenderOperations(state) {
 	} };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeItem.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeItem.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -55996,9 +56396,9 @@ function useTreeItem(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/tree-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/tree-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56043,9 +56443,9 @@ var TreeItem = /* @__PURE__ */ defineComponent(_objectSpread$71(_objectSpread$71
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeEvents.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeEvents.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56094,9 +56494,9 @@ function useTreeEvents(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeNodes.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeNodes.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56162,9 +56562,9 @@ function useTreeNodes(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeScroll.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeScroll.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56266,9 +56666,9 @@ function useTreeScroll(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeState.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeState.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56312,9 +56712,9 @@ function useTreeState(props, context) {
 	return { state };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeStore.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeStore.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56460,9 +56860,9 @@ function useTreeStore(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeStyles.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/hooks/useTreeStyles.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56522,9 +56922,9 @@ function useTreeStyles(state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56646,9 +57046,9 @@ var props$36 = {
 	onScroll: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/tree.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/tree.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56677,9 +57077,9 @@ function _isSlot$20(s) {
 	return typeof s === "function" || Object.prototype.toString.call(s) === "[object Object]" && !isVNode(s);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -56898,9 +57298,9 @@ var Tree = withInstall(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree-select/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree-select/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -57022,9 +57422,9 @@ var props$35 = {
 	onSearch: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree-select/tree-select.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree-select/tree-select.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -57075,9 +57475,9 @@ function _objectSpread$69(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree-select/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/tree-select/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -57446,9 +57846,9 @@ var TreeSelect = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/color-picker-panel-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/color-picker-panel-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -57517,9 +57917,9 @@ var props$34 = {
 	onRecentColorsChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-863731bb.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-462ec1db.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -57684,9 +58084,9 @@ var COLOR_FORMAT_INPUTS = {
 	}]
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-6c281967.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-0092f1d8.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58473,9 +58873,9 @@ var getColorFormatInputs = function getColorFormatInputs() {
 	return configs;
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/hooks/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/hooks/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58487,9 +58887,9 @@ var useBaseClassName = function useBaseClassName(className) {
 	});
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58581,9 +58981,9 @@ var props$33 = {
 	onRecentColorsChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/format/inputs.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/format/inputs.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58701,9 +59101,9 @@ var FormatInputs = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/format/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/format/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58782,9 +59182,9 @@ var FormatPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/base-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/base-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58799,9 +59199,9 @@ var baseProps = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/slider.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/slider.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58910,9 +59310,9 @@ var ColorSlider = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/alpha.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/alpha.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -58955,9 +59355,9 @@ var AlphaSlider = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/header.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/header.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59038,9 +59438,9 @@ var PanelHeader = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/hue.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/hue.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59063,9 +59463,9 @@ var HueSlider = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/linear-gradient.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/linear-gradient.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59295,9 +59695,9 @@ var LinearGradient = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/saturation.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/saturation.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59383,9 +59783,9 @@ var SaturationPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/swatches.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/swatches.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59505,9 +59905,9 @@ var SwatchesPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/panel/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59707,9 +60107,9 @@ var ColorPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/color-picker-panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/color-picker-panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59752,9 +60152,9 @@ var _ColorPickerPanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/trigger/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/components/trigger/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59844,9 +60244,9 @@ var DefaultTrigger = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/color-picker.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/color-picker.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59919,18 +60319,18 @@ var _ColorPicker = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/color-picker/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var ColorPickerPanel = withInstall$1(_ColorPickerPanel);
 var ColorPicker = withInstall$1(_ColorPicker);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -59963,9 +60363,9 @@ var props$32 = {
 	onError: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60045,9 +60445,9 @@ var props$31 = {
 	onLoad: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image/image.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image/image.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60073,9 +60473,9 @@ function _objectSpread$57(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60244,9 +60644,9 @@ var Image$1 = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/avatar.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/avatar.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60370,9 +60770,9 @@ var _Avatar = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/avatar-group-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/avatar-group-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60394,9 +60794,9 @@ var props$30 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60438,28 +60838,28 @@ var _AvatarGroup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/avatar/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Avatar = withInstall$1(_Avatar);
 var AvatarGroup = withInstall$1(_AvatarGroup);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/badge/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/badge/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60548,9 +60948,9 @@ var Badge = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60623,9 +61023,9 @@ var props$28 = {
 	onMonthChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60641,9 +61041,9 @@ var DAY_CN_MAP = {
 	7: "日"
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60754,9 +61154,9 @@ var createDefaultCurDate$1 = function createDefaultCurDate() {
 	return dayjs(dayjs().format("YYYY-MM-DD"));
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useState.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useState.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60846,9 +61246,9 @@ function useState(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useCalendarClass.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useCalendarClass.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -60914,9 +61314,9 @@ function useCalendarCellClass() {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useController.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useController.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61016,9 +61416,9 @@ function userController(props, state) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useColHeaders.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/hooks/useColHeaders.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61047,9 +61447,9 @@ function useColHeaders(props, state) {
 	}) };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/calendar-cell.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/calendar-cell.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61152,9 +61552,9 @@ var CalendarCellItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/calendar.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/calendar.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61222,9 +61622,9 @@ function _isSlot$16(s) {
 	return typeof s === "function" || Object.prototype.toString.call(s) === "[object Object]" && !isVNode(s);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/calendar/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61542,19 +61942,19 @@ var Calendar = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/card/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/card/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61729,9 +62129,9 @@ var Card = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/comment/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/comment/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61749,9 +62149,9 @@ var props$26 = {
 	reply: { type: [String, Function] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/comment/comment.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/comment/comment.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61759,9 +62159,9 @@ function _isSlot$15(s) {
 	return typeof s === "function" || Object.prototype.toString.call(s) === "[object Object]" && !isVNode(s);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/comment/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/comment/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61814,9 +62214,9 @@ var Comment = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61854,9 +62254,9 @@ var props$25 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/MaintenanceSvg.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/MaintenanceSvg.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61888,9 +62288,9 @@ var MaintenanceSvg = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/NetworkErrorSvg.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/NetworkErrorSvg.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61922,9 +62322,9 @@ var NetworkErrorSvg = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/EmptySvg.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/EmptySvg.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61962,9 +62362,9 @@ var EmptySvg = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/FailSvg.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/FailSvg.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -61988,9 +62388,9 @@ var FailSvg = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/SuccessSvg.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/components/SuccessSvg.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62014,14 +62414,14 @@ var SuccessSvg = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/empty/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62116,9 +62516,9 @@ var Empty = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-29665670.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-62b42a8a.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62344,9 +62744,9 @@ function useRotate() {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageItem.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageItem.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62590,9 +62990,9 @@ var TImageItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageModalIcon.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageModalIcon.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62619,9 +63019,9 @@ var TImageViewerIcon = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62697,7 +63097,6 @@ var props$24 = {
 	},
 	placement: {
 		type: String,
-		"default": "top",
 		validator: function validator(val) {
 			if (!val) return true;
 			return ["top", "center"].includes(val);
@@ -62742,9 +63141,9 @@ var props$24 = {
 	onOverlayClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/hooks/useAction.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/hooks/useAction.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62838,9 +63237,9 @@ function useAction(action) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/hooks/useSameTarget.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/hooks/useSameTarget.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62862,9 +63261,9 @@ function useSameTarget(handleClick) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-686cac2c.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-b5fcf4de.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62887,9 +63286,9 @@ function getScrollbarWidth() {
 	return container.offsetWidth - container.clientWidth;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62927,9 +63326,9 @@ function initDragEvent(dragBox) {
 	});
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/dialog-card-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/dialog-card-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -62985,9 +63384,9 @@ var dialogCardProps = {
 	onConfirm: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/dialog-card.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/dialog-card.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63052,6 +63451,10 @@ var _DialogCard = /* @__PURE__ */ defineComponent({
 		var isFullScreen = computed(function() {
 			return props.mode === "full-screen";
 		});
+		var placement = computed(function() {
+			var _props$placement;
+			return (_props$placement = props.placement) !== null && _props$placement !== void 0 ? _props$placement : globalConfig.value.placement;
+		});
 		var closeBtnAction = function closeBtnAction(e) {
 			var _props$onCloseBtnClic;
 			return props === null || props === void 0 || (_props$onCloseBtnClic = props.onCloseBtnClick) === null || _props$onCloseBtnClic === void 0 ? void 0 : _props$onCloseBtnClic.call(props, { e });
@@ -63076,7 +63479,7 @@ var _DialogCard = /* @__PURE__ */ defineComponent({
 				props.dialogClassName
 			];
 			if (isFullScreen.value) dialogClass2.push("".concat(COMPONENT_NAME.value, "__fullscreen"));
-			else dialogClass2.push("".concat(COMPONENT_NAME.value, "--default"), "".concat(COMPONENT_NAME.value, "--").concat(props.placement));
+			else dialogClass2.push("".concat(COMPONENT_NAME.value, "--default"), "".concat(COMPONENT_NAME.value, "--").concat(placement.value));
 			return dialogClass2;
 		});
 		var dialogStyle = computed(function() {
@@ -63148,9 +63551,9 @@ var _DialogCard = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/dialog.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/dialog.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63209,6 +63612,10 @@ var _Dialog = /* @__PURE__ */ defineComponent({
 		var isFullScreen = computed(function() {
 			return props2.mode === "full-screen";
 		});
+		var placement = computed(function() {
+			var _props2$placement;
+			return (_props2$placement = props2.placement) !== null && _props2$placement !== void 0 ? _props2$placement : globalConfig.value.placement;
+		});
 		var computedVisible = computed(function() {
 			return props2.visible;
 		});
@@ -63220,7 +63627,7 @@ var _Dialog = /* @__PURE__ */ defineComponent({
 			if (isModal.value || isModeLess.value) return [
 				"".concat(COMPONENT_NAME.value, "__position"),
 				!!props2.top && "".concat(COMPONENT_NAME.value, "--top"),
-				"".concat(props2.placement && !props2.top ? "".concat(COMPONENT_NAME.value, "--").concat(props2.placement) : "")
+				"".concat(placement.value && !props2.top ? "".concat(COMPONENT_NAME.value, "--").concat(placement.value) : "")
 			];
 			return [];
 		});
@@ -63236,7 +63643,7 @@ var _Dialog = /* @__PURE__ */ defineComponent({
 		});
 		var isTopInteractivePopup = usePopupManager("dialog", { visible: computedVisible }).isTopInteractivePopup;
 		var isMounted = /* @__PURE__ */ ref(false);
-		var cardVisible = /* @__PURE__ */ ref(props2.visible);
+		var cardVisible = /* @__PURE__ */ ref(!props2.lazy || props2.visible);
 		watch(function() {
 			return props2.visible;
 		}, function(value) {
@@ -63288,6 +63695,7 @@ var _Dialog = /* @__PURE__ */ defineComponent({
 			}
 		};
 		var keyboardEvent = function keyboardEvent(e) {
+			if (e.code === "Escape" && e.isComposing) return;
 			if (e.code === "Escape" && isTopInteractivePopup()) {
 				var _props2$onEscKeydown, _props2$closeOnEscKey;
 				(_props2$onEscKeydown = props2.onEscKeydown) === null || _props2$onEscKeydown === void 0 || _props2$onEscKeydown.call(props2, { e });
@@ -63333,7 +63741,7 @@ var _Dialog = /* @__PURE__ */ defineComponent({
 		};
 		var afterLeave = function afterLeave() {
 			var _dialogCardRef$value2, _dialogCardRef$value3, _props2$onClosed;
-			cardVisible.value = false;
+			cardVisible.value = !props2.destroyOnClose;
 			(_dialogCardRef$value2 = dialogCardRef.value) === null || _dialogCardRef$value2 === void 0 || (_dialogCardRef$value3 = _dialogCardRef$value2.resetPosition) === null || _dialogCardRef$value3 === void 0 || _dialogCardRef$value3.call(_dialogCardRef$value2);
 			(_props2$onClosed = props2.onClosed) === null || _props2$onClosed === void 0 || _props2$onClosed.call(props2);
 		};
@@ -63408,9 +63816,9 @@ var _Dialog = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/plugin.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/plugin.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63474,6 +63882,7 @@ var createDialog = function createDialog(props, context) {
 			dialogOptions.value = _objectSpread$49(_objectSpread$49({}, options), newOptions);
 		} });
 		return function() {
+			var _dialogOptions$value$;
 			var onClose = options.onClose || function() {
 				visible.value = false;
 				if (options.destroyOnClose) setTimeout(function() {
@@ -63484,6 +63893,7 @@ var createDialog = function createDialog(props, context) {
 			delete options.style;
 			return h(_Dialog, _objectSpread$49(_objectSpread$49({}, dialogOptions.value), {}, {
 				onClose,
+				lazy: (_dialogOptions$value$ = dialogOptions.value.lazy) !== null && _dialogOptions$value$ !== void 0 ? _dialogOptions$value$ : true,
 				visible: visible.value
 			}));
 		};
@@ -63537,18 +63947,18 @@ Object.keys(extraApi$1).forEach(function(funcName) {
 	DialogPlugin[funcName] = extraApi$1[funcName];
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/dialog/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Dialog = withInstall$1(_Dialog);
 var DialogCard = withInstall$1(_DialogCard);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63635,9 +64045,9 @@ var props$23 = {
 	onIndexChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageViewerUtils.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageViewerUtils.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63744,9 +64154,9 @@ var TImageViewerUtils = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageViewerModal.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/base/ImageViewerModal.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63843,9 +64253,9 @@ var TImageViewerModal = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63858,9 +64268,9 @@ var EVENT_CODE = /* @__PURE__ */ function(EVENT_CODE2) {
 	return EVENT_CODE2;
 }(EVENT_CODE || {});
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63869,9 +64279,9 @@ var getOverlay = function getOverlay(props) {
 	return props.mode === "modal";
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/image-viewer.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/image-viewer.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -63965,9 +64375,9 @@ var formatImages = function formatImages(images) {
 	});
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/image-viewer/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64309,14 +64719,14 @@ var ImageViewer = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/list-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/list-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64339,9 +64749,9 @@ var _ListItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64376,14 +64786,14 @@ var props$21 = {
 	onScroll: Function
 };
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/hooks/useListItems.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/hooks/useListItems.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64485,9 +64895,9 @@ var useListItems = function useListItems() {
 	}) };
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/hooks/useListVirtualScroll.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/hooks/useListVirtualScroll.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64568,9 +64978,9 @@ var useListVirtualScroll = function useListVirtualScroll(scroll, listRef, listIt
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/list.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/list.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64650,14 +65060,14 @@ var _List = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/list-item-meta.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/list-item-meta.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64689,9 +65099,9 @@ var _ListItemMeta = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/list/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64699,9 +65109,9 @@ var List = withInstall$1(_List);
 var ListItem = withInstall$1(_ListItem);
 var ListItemMeta = withInstall$1(_ListItemMeta);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/progress/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/progress/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64761,9 +65171,9 @@ var props$19 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/progress/progress.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/progress/progress.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -64793,9 +65203,9 @@ var STATUS_ICON = [
 	"warning"
 ];
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/progress/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/progress/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65005,9 +65415,9 @@ var Progress = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/skeleton/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/skeleton/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65052,9 +65462,9 @@ var props$18 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/skeleton/skeleton.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/skeleton/skeleton.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65148,9 +65558,9 @@ var getColItemStyle = function getColItemStyle(obj) {
 	return style;
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/skeleton/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/skeleton/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65223,9 +65633,9 @@ var Skeleton = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/statistic/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/statistic/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65266,9 +65676,9 @@ var props$17 = {
 	value: { type: Number }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/statistic/statistic.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/statistic/statistic.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65401,9 +65811,9 @@ function getFormatValue(value, decimalPlaces, separator) {
 	return value.toLocaleString(void 0, options).replace(/,|，/g, separator);
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/statistic/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/statistic/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65511,9 +65921,9 @@ var Statistic = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65587,9 +65997,9 @@ var props$16 = {
 	onChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/swiper-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/swiper-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65691,9 +66101,9 @@ var _SwiperItem = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/swiper.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/swiper.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -65728,9 +66138,9 @@ var defaultNavigation = {
 	type: "bars"
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/swiper/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66011,9 +66421,9 @@ var Swiper = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var SwiperItem = withInstall$1(_SwiperItem);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/base-table-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/base-table-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66176,9 +66586,9 @@ var baseTableProps = {
 	onScrollY: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useMultiHeader.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useMultiHeader.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66253,9 +66663,9 @@ function getThList(columns) {
 	return list;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useClassName.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useClassName.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66416,9 +66826,9 @@ function useClassName() {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/ellipsis.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/ellipsis.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66525,9 +66935,9 @@ var TEllipsis = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useTableHeader.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useTableHeader.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66609,9 +67019,9 @@ function useTableHeader(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useColumnResize.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useColumnResize.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -66864,9 +67274,9 @@ function useColumnResize(params) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useFixed.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useFixed.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -67335,9 +67745,9 @@ function useFixed(props, context, finalColumns, affixRef) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/utils/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/utils/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -67409,9 +67819,9 @@ function getAffixProps(mainAffixProps, subAffixProps) {
 	return {};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/usePagination.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/usePagination.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -67509,9 +67919,9 @@ function usePagination(props, context, tableContentRef) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useAffix.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useAffix.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -67777,9 +68187,9 @@ function useAffix(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useLazyLoad.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useLazyLoad.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -67814,9 +68224,9 @@ function useLazyLoad(containerRef, childRef, params) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowspanAndColspan.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowspanAndColspan.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -67885,9 +68295,9 @@ function useRowspanAndColspan(data, columns, rowKey, rowspanAndColspan) {
 	return { skipSpansMap };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/tr.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/tr.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68145,9 +68555,9 @@ var TrElement = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/tbody.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/tbody.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68324,9 +68734,9 @@ var TBody = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useStyle.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useStyle.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68364,9 +68774,9 @@ function useStyle(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/thead.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/thead.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68531,9 +68941,9 @@ var THead = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/tfoot.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/tfoot.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68645,9 +69055,9 @@ var TFoot = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowHighlight.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowHighlight.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68882,9 +69292,9 @@ function useRowHighlight(props, tableRef) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useHoverKeyboardEvent.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useHoverKeyboardEvent.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -68983,9 +69393,9 @@ function useHoverKeyboardEvent(props, tableRef) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/base-table.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/base-table.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -69482,9 +69892,9 @@ var _BaseTable = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/primary-table-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/primary-table-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -69600,9 +70010,9 @@ var primaryTableProps = {
 	onValidate: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/column-checkbox-group.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/column-checkbox-group.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -69709,9 +70119,9 @@ var ColumnCheckboxGroup = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useColumnController.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useColumnController.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -69914,9 +70324,9 @@ function useColumnController(props, context) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowExpand.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowExpand.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -70014,9 +70424,9 @@ function useRowExpand(props, context) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-8aed7391.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-897771e4.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -70075,9 +70485,9 @@ function getColumnsResetValue(columns) {
 	return resetValue;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowSelect.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useRowSelect.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -70358,9 +70768,9 @@ function useRowSelect(props, tableSelectedClasses) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/sorter-button.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/sorter-button.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -70438,9 +70848,9 @@ var SorterButton = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useSorter.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useSorter.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -70618,9 +71028,9 @@ function useSorter(props, _ref) {
 	return { renderSortIcon };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/filter-controller.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/filter-controller.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -70792,9 +71202,9 @@ var TableFilterController = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useFilter.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useFilter.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -71592,15 +72002,52 @@ function _dispatchEvent(info) {
 		newDraggableIndex
 	}, info));
 }
-var dragEl, parentEl, ghostEl, rootEl, nextEl, lastDownEl, cloneEl, cloneHidden, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, activeGroup, putSortable, awaitingDragStarted = false, ignoreNextClick = false, sortables = [], tapEvt, touchEvt, lastDx, lastDy, tapDistanceLeft, tapDistanceTop, moved, lastTarget, lastDirection, pastFirstInvertThresh = false, isCircumstantialInvert = false, targetMoveDistance, ghostRelativeParent, ghostRelativeParentInitialScroll = [], _silent = false, savedInputChecked = [];
+var dragEl;
+var parentEl;
+var ghostEl;
+var rootEl;
+var nextEl;
+var lastDownEl;
+var cloneEl;
+var cloneHidden;
+var oldIndex;
+var newIndex;
+var oldDraggableIndex;
+var newDraggableIndex;
+var activeGroup;
+var putSortable;
+var awaitingDragStarted = false;
+var ignoreNextClick = false;
+var sortables = [];
+var tapEvt;
+var touchEvt;
+var lastDx;
+var lastDy;
+var tapDistanceLeft;
+var tapDistanceTop;
+var moved;
+var lastTarget;
+var lastDirection;
+var pastFirstInvertThresh = false;
+var isCircumstantialInvert = false;
+var targetMoveDistance;
+var ghostRelativeParent;
+var ghostRelativeParentInitialScroll = [];
+var _silent = false;
+var savedInputChecked = [];
 /** @const */
-var documentExists = typeof document !== "undefined", PositionGhostAbsolutely = IOS, CSSFloatProperty = Edge || IE11OrLess ? "cssFloat" : "float", supportDraggable = documentExists && !ChromeForAndroid && !IOS && "draggable" in document.createElement("div"), supportCssPointerEvents = function() {
+var documentExists = typeof document !== "undefined";
+var PositionGhostAbsolutely = IOS;
+var CSSFloatProperty = Edge || IE11OrLess ? "cssFloat" : "float";
+var supportDraggable = documentExists && !ChromeForAndroid && !IOS && "draggable" in document.createElement("div");
+var supportCssPointerEvents = function() {
 	if (!documentExists) return;
 	if (IE11OrLess) return false;
 	var el = document.createElement("x");
 	el.style.cssText = "pointer-events:auto";
 	return el.style.pointerEvents === "auto";
-}(), _detectDirection = function _detectDirection(el, options) {
+}();
+var _detectDirection = function _detectDirection(el, options) {
 	var elCSS = css(el), elWidth = parseInt(elCSS.width) - parseInt(elCSS.paddingLeft) - parseInt(elCSS.paddingRight) - parseInt(elCSS.borderLeftWidth) - parseInt(elCSS.borderRightWidth), child1 = getChild(el, 0, options), child2 = getChild(el, 1, options), firstChildCSS = child1 && css(child1), secondChildCSS = child2 && css(child2), firstChildWidth = firstChildCSS && parseInt(firstChildCSS.marginLeft) + parseInt(firstChildCSS.marginRight) + getRect(child1).width, secondChildWidth = secondChildCSS && parseInt(secondChildCSS.marginLeft) + parseInt(secondChildCSS.marginRight) + getRect(child2).width;
 	if (elCSS.display === "flex") return elCSS.flexDirection === "column" || elCSS.flexDirection === "column-reverse" ? "vertical" : "horizontal";
 	if (elCSS.display === "grid") return elCSS.gridTemplateColumns.split(" ").length <= 1 ? "vertical" : "horizontal";
@@ -71609,10 +72056,12 @@ var documentExists = typeof document !== "undefined", PositionGhostAbsolutely = 
 		return child2 && (secondChildCSS.clear === "both" || secondChildCSS.clear === touchingSideChild2) ? "vertical" : "horizontal";
 	}
 	return child1 && (firstChildCSS.display === "block" || firstChildCSS.display === "flex" || firstChildCSS.display === "table" || firstChildCSS.display === "grid" || firstChildWidth >= elWidth && elCSS[CSSFloatProperty] === "none" || child2 && elCSS[CSSFloatProperty] === "none" && firstChildWidth + secondChildWidth > elWidth) ? "vertical" : "horizontal";
-}, _dragElInRowColumn = function _dragElInRowColumn(dragRect, targetRect, vertical) {
+};
+var _dragElInRowColumn = function _dragElInRowColumn(dragRect, targetRect, vertical) {
 	var dragElS1Opp = vertical ? dragRect.left : dragRect.top, dragElS2Opp = vertical ? dragRect.right : dragRect.bottom, dragElOppLength = vertical ? dragRect.width : dragRect.height, targetS1Opp = vertical ? targetRect.left : targetRect.top, targetS2Opp = vertical ? targetRect.right : targetRect.bottom, targetOppLength = vertical ? targetRect.width : targetRect.height;
 	return dragElS1Opp === targetS1Opp || dragElS2Opp === targetS2Opp || dragElS1Opp + dragElOppLength / 2 === targetS1Opp + targetOppLength / 2;
-}, _detectNearestEmptySortable = function _detectNearestEmptySortable(x, y) {
+};
+var _detectNearestEmptySortable = function _detectNearestEmptySortable(x, y) {
 	var ret;
 	sortables.some(function(sortable) {
 		var threshold = sortable[expando].options.emptyInsertThreshold;
@@ -71621,7 +72070,8 @@ var documentExists = typeof document !== "undefined", PositionGhostAbsolutely = 
 		if (insideHorizontally && insideVertically) return ret = sortable;
 	});
 	return ret;
-}, _prepareGroup = function _prepareGroup(options) {
+};
+var _prepareGroup = function _prepareGroup(options) {
 	function toFn(value, pull) {
 		return function(to, from, dragEl, evt) {
 			var sameGroup = to.options.group.name && from.options.group.name && to.options.group.name === from.options.group.name;
@@ -71643,9 +72093,11 @@ var documentExists = typeof document !== "undefined", PositionGhostAbsolutely = 
 	group.checkPut = toFn(originalGroup.put);
 	group.revertClone = originalGroup.revertClone;
 	options.group = group;
-}, _hideGhostForTarget = function _hideGhostForTarget() {
+};
+var _hideGhostForTarget = function _hideGhostForTarget() {
 	if (!supportCssPointerEvents && ghostEl) css(ghostEl, "display", "none");
-}, _unhideGhostForTarget = function _unhideGhostForTarget() {
+};
+var _unhideGhostForTarget = function _unhideGhostForTarget() {
 	if (!supportCssPointerEvents && ghostEl) css(ghostEl, "display", "");
 };
 if (documentExists && !ChromeForAndroid) document.addEventListener("click", function(evt) {
@@ -72647,7 +73099,14 @@ Sortable.create = function(el, options) {
 	return new Sortable(el, options);
 };
 Sortable.version = version$1;
-var autoScrolls = [], scrollEl, scrollRootEl, scrolling = false, lastAutoScrollX, lastAutoScrollY, touchEvt$1, pointerElemChangedInterval;
+var autoScrolls = [];
+var scrollEl;
+var scrollRootEl;
+var scrolling = false;
+var lastAutoScrollX;
+var lastAutoScrollY;
+var touchEvt$1;
+var pointerElemChangedInterval;
 function AutoScrollPlugin() {
 	function AutoScroll() {
 		this.defaults = {
@@ -72832,9 +73291,9 @@ _extends(Remove, { pluginName: "removeOnSpill" });
 Sortable.mount(new AutoScrollPlugin());
 Sortable.mount(Remove, Revert);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useDragSort.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useDragSort.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -73049,9 +73508,9 @@ function useDragSort(props, context, params) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useAsyncLoading.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useAsyncLoading.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -73098,9 +73557,9 @@ function useAsyncLoading(props) {
 	return { renderAsyncLoading };
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-5f240748.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-0a28b8f9.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -73108,9 +73567,9 @@ function _toArray(r) {
 	return _arrayWithHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray$9(r) || _nonIterableRest();
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/editable-cell.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/components/editable-cell.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -73476,9 +73935,9 @@ var EditableCell = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useEditableRow.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useEditableRow.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -73697,9 +74156,9 @@ function useRowEdit(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/primary-table.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/primary-table.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -74027,9 +74486,9 @@ var _PrimaryTable = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/enhanced-table-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/enhanced-table-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -74052,9 +74511,9 @@ var enhancedTableProps = {
 	onTreeExpandChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-a7f4fc16.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-44317ff7.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -74857,9 +75316,9 @@ function useTreeDataExpand(props, params) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useTreeData.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useTreeData.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75092,9 +75551,9 @@ function useTreeData(props, context) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useTreeSelect.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/hooks/useTreeSelect.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75290,9 +75749,9 @@ function useTreeSelect(props, treeDataMap) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/enhanced-table.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/enhanced-table.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75426,9 +75885,9 @@ var _EnhancedTable = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/table/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75437,9 +75896,9 @@ var PrimaryTable = withInstall$1(_PrimaryTable);
 var EnhancedTable = withInstall$1(_EnhancedTable);
 var Table = withInstall$1(cloneDeep(_PrimaryTable), "TTable");
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75485,9 +75944,9 @@ var TimeLineProps = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/hooks/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/hooks/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75507,9 +75966,9 @@ var DEFAULT_PROVIDER = computed(function() {
 	};
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/timeline-item-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/timeline-item-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75537,9 +75996,9 @@ var props$15 = {
 	onClick: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/timeline-item.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/timeline-item.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75626,14 +76085,14 @@ var _TimelineItem = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/timeline/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75686,14 +76145,14 @@ var Timeline = withInstall$1(/* @__PURE__ */ defineComponent({
 }));
 var TimelineItem = withInstall$1(_TimelineItem);
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/collapse.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/collapse.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75766,9 +76225,9 @@ var _Collapse = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/collapse-panel-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/collapse-panel-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75789,9 +76248,9 @@ var props$13 = {
 	value: { type: [String, Number] }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/collapse-panel.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/collapse-panel.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75894,18 +76353,18 @@ var _CollapsePanel = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/collapse/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Collapse = withInstall$1(_Collapse);
 var CollapsePanel = withInstall$1(_CollapsePanel);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -75954,9 +76413,9 @@ var props$12 = {
 	zIndex: { type: Number }
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/watermark.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/watermark.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76164,9 +76623,9 @@ function _arrayLikeToArray$1(r, a) {
 	return n;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/watermark/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76293,19 +76752,19 @@ var Watermark = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/rate/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/rate/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76457,9 +76916,9 @@ var Rate = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/text-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/text-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76500,9 +76959,9 @@ var props$10 = {
 	underline: Boolean
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/paragraph-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/paragraph-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76515,9 +76974,9 @@ var props$9 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/components/ellipsis.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/components/ellipsis.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76621,10 +77080,7 @@ var Ellipsis = /* @__PURE__ */ defineComponent({
 				display: "flex",
 				alignItems: "flex-end"
 			} }, [
-				tooltipProps && createVNode(Tooltip, {
-					"content": tooltipProps.content,
-					"placement": "top-right"
-				}, null),
+				tooltipProps && createVNode(Tooltip, mergeProps(tooltipProps, { "placement": "top-right" }), null),
 				createVNode("p", { "style": props2.ellipsis ? ellipsisStyles.value : {} }, [content.value]),
 				renderEllipsisExpand(),
 				(_props2$renderCopy = props2.renderCopy) === null || _props2$renderCopy === void 0 ? void 0 : _props2$renderCopy.call(props2)
@@ -76633,9 +77089,9 @@ var Ellipsis = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/text.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/text.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76753,9 +77209,9 @@ var _Text = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/typography.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/typography.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76775,9 +77231,9 @@ var _Typography = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/title-props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/title-props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76805,9 +77261,9 @@ var props$8 = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/title.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/title.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76853,9 +77309,9 @@ var _Title = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/paragraph.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/paragraph.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76902,9 +77358,9 @@ var _Paragraph = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/typography/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76913,9 +77369,9 @@ var Text = withInstall$1(_Text);
 var Title = withInstall$1(_Title);
 var Paragraph = withInstall$1(_Paragraph);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -76983,13 +77439,14 @@ var props$7 = {
 	onRefresh: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-275254a1.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-ca84f078.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
-var _Mode, _Ecc;
+var _Mode;
+var _Ecc;
 function _createForOfIteratorHelper(r, e) {
 	var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
 	if (!t) {
@@ -78206,9 +78663,9 @@ var useQRCode = function useQRCode(opt) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78277,9 +78734,9 @@ var QRCodeStatusProps = {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/qrcode-canvas.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/qrcode-canvas.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78357,9 +78814,9 @@ var QRCodeCanvas = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/qrcode-svg.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/qrcode-svg.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78422,9 +78879,9 @@ var QRCodeSVG = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/qrcode-status.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/components/qrcode-status.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78466,14 +78923,14 @@ var QRcodeStatus = /* @__PURE__ */ defineComponent({
 	}
 });
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/qrcode/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78541,19 +78998,19 @@ var QRCode = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }), "TQrcode");
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/alert/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/alert/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78715,9 +79172,9 @@ var Alert = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78817,9 +79274,9 @@ var props$5 = {
 	onSizeDragEnd: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/hooks/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/hooks/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -78944,9 +79401,9 @@ var useDrag$1 = function useDrag(props) {
 	};
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/drawer.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/drawer.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79054,6 +79511,7 @@ var _Drawer = /* @__PURE__ */ defineComponent({
 		});
 		var handleEscKeydown = function handleEscKeydown(e) {
 			var _props2$closeOnEscKey;
+			if (e.key === "Escape" && e.isComposing) return;
 			if (((_props2$closeOnEscKey = props2.closeOnEscKeydown) !== null && _props2$closeOnEscKey !== void 0 ? _props2$closeOnEscKey : globalConfig.value.closeOnEscKeydown) && e.key === "Escape" && isVisible.value && isTopInteractivePopup()) {
 				var _props2$onEscKeydown;
 				(_props2$onEscKeydown = props2.onEscKeydown) === null || _props2$onEscKeydown === void 0 || _props2$onEscKeydown.call(props2, { e });
@@ -79257,9 +79715,9 @@ var _Drawer = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/plugin.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/plugin.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79361,17 +79819,17 @@ DrawerPlugin.install = function(app) {
 	app.config.globalProperties.$drawer = createDrawer;
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/drawer/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Drawer = withInstall$1(_Drawer);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79421,9 +79879,9 @@ var props$4 = {
 	onSkip: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/getScrollParent.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/getScrollParent.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79447,9 +79905,9 @@ function scrollToParentVisibleArea(element) {
 	parent.scrollTop = element.offsetTop - parent.offsetTop;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/getRelativePosition.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/getRelativePosition.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79473,9 +79931,9 @@ function getRelativePosition(elm) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/getTargetElm.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/getTargetElm.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79491,9 +79949,9 @@ function getTargetElm(elm) {
 	} else return document.body;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/scrollToElm.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/utils/scrollToElm.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79505,14 +79963,14 @@ function scrollToElm(elm) {
 	}
 }
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/guide/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79898,17 +80356,17 @@ var Guide = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/message/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Message = withInstall$1(_Message);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79951,9 +80409,9 @@ var props$3 = {
 	onDurationEnd: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -79979,9 +80437,9 @@ var PLACEMENT_OFFSET = {
 };
 var PLACEMENT_LIST = Object.keys(PLACEMENT_OFFSET);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/utils/animate.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/utils/animate.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80077,9 +80535,9 @@ var fadeOut = function fadeOut(dom, placement, onFinish) {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/notification.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/notification.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80195,9 +80653,9 @@ var _Notification = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/notification-list.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/notification-list.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80316,9 +80774,9 @@ var NotificationList = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/plugin.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/plugin.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80423,17 +80881,17 @@ Object.keys(extraApi).forEach(function(funcName) {
 	NotificationPlugin[funcName] = extraApi[funcName];
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/notification/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 var Notification = withInstall$1(_Notification);
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popconfirm/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popconfirm/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80514,9 +80972,9 @@ var props$2 = {
 	onVisibleChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popconfirm/popconfirm.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popconfirm/popconfirm.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80542,9 +81000,9 @@ function _objectSpread$9(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popconfirm/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/popconfirm/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80629,9 +81087,9 @@ var Popconfirm = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/props.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/props.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80799,9 +81257,9 @@ var props$1 = {
 	onWaitingUploadFilesChange: Function
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/constants/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/constants/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80845,9 +81303,9 @@ var commonProps = {
 	imageViewerProps: Object
 };
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/normal-file.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/normal-file.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -80982,9 +81440,9 @@ var NormalFile = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/hooks/useDrag.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/hooks/useDrag.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -81026,9 +81484,9 @@ function useDrag(props, accept) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/dragger-file.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/dragger-file.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -81230,9 +81688,9 @@ var DraggerFile = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/image-card.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/image-card.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -81415,9 +81873,9 @@ var ImageCard = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/multiple-flow-list.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/multiple-flow-list.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -81749,9 +82207,9 @@ var MultipleFlowList = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/custom-file.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/components/custom-file.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -81817,9 +82275,9 @@ var CustomFile = /* @__PURE__ */ defineComponent({
 	}
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/hooks/useUpload.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/hooks/useUpload.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -82762,9 +83220,9 @@ function useUpload(props) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/upload.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/upload.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -82790,9 +83248,9 @@ function _objectSpread(e) {
 	return e;
 }
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/upload/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -82987,19 +83445,19 @@ var Upload = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/config-provider/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/config-provider/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -83015,9 +83473,9 @@ var ConfigProvider = withInstall$1(/* @__PURE__ */ defineComponent({
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-6fc321d8.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/_chunks/dep-81d72f88.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -83154,9 +83612,9 @@ var components = /*#__PURE__*/ Object.freeze({
 	ConfigProvider
 });
 //#endregion
-//#region node_modules/.pnpm/tdesign-vue-next@1.20.2_vue@3.5.31_typescript@6.0.3_/node_modules/tdesign-vue-next/es/index.mjs
+//#region node_modules/.pnpm/tdesign-vue-next@1.20.3_vue@3.5.40_typescript@6.0.3_/node_modules/tdesign-vue-next/es/index.mjs
 /**
-* tdesign v1.20.2
+* tdesign v1.20.3
 * (c) 2026 tdesign
 * @license MIT
 */
@@ -83168,7 +83626,7 @@ function install(app, config) {
 }
 var index = {
 	install,
-	version: "1.20.2"
+	version: "1.20.3"
 };
 //#endregion
 export { Affix, Alert, Anchor, AnchorItem, AnchorTarget, Aside, AutoComplete, Avatar, AvatarGroup, BackTop, Badge, BaseTable, BaseTransition, BaseTransitionPropsValidators, Breadcrumb, BreadcrumbItem, Button, Calendar, Card, Cascader, CascaderPanel, CheckTag, CheckTagGroup, Checkbox, CheckboxGroup, Col, Collapse, CollapsePanel, ColorPicker, ColorPickerPanel, ConfigProvider, Content, DatePicker, DatePickerPanel, DateRangePicker, DateRangePickerPanel, DeprecationTypes, Descriptions, DescriptionsItem, Dialog, DialogCard, DialogPlugin, Divider, Drawer, DrawerPlugin, Dropdown, DropdownItem, DropdownMenu, EffectScope, Empty, EnhancedTable, ErrorCodes, ErrorTypeStrings, Footer, Form, FormItem, Fragment, Guide, HeadMenu, Header, HighlightOption, Icon, Image$1 as Image, ImageViewer, Input, InputAdornment, InputGroup, InputNumber, KeepAlive, Layout, Link, List, ListItem, ListItemMeta, Loading, vLoading as LoadingDirective, LoadingPlugin, Menu, MenuGroup, MenuItem, Message, MessagePlugin, Notification, NotificationPlugin as NotifyPlugin, Option, OptionGroup, Pagination, PaginationMini, Paragraph, Popconfirm, Popup, PrimaryTable, Progress, QRCode, Radio, RadioButton, RadioGroup, RangeInput, RangeInputPopup, Rate, ReactiveEffect, Row, Select, SelectInput, Skeleton, Slider, SliderButton, Space, Static, Statistic, StepItem, Steps, StickyItem, StickyTool, Submenu, Suspense, Swiper, SwiperItem, Switch, index as TDesign, TabPanel, Table, Tabs, Tag, TagInput, Teleport, Textarea, TimePicker, TimePickerPanel, TimeRangePicker, Timeline, TimelineItem, Title, Tooltip, TrackOpTypes, Transfer, Transition, TransitionGroup, Tree, TreeSelect, TriggerOpTypes, Typography, Upload, VueElement, Watermark, assertNumber, callWithAsyncErrorHandling, callWithErrorHandling, camelize, capitalize, cloneVNode, compatUtils, compile, computed, createApp, createBlock, createCommentVNode, createElementBlock, createBaseVNode as createElementVNode, createHydrationRenderer, createPropsRestProxy, createRenderer, createSSRApp, createSlots, createStaticVNode, createTextVNode, createVNode, customRef, defineAsyncComponent, defineComponent, defineCustomElement, defineEmits, defineExpose, defineModel, defineOptions, defineProps, defineSSRCustomElement, defineSlots, devtools, effect, effectScope, getCurrentInstance, getCurrentScope, getCurrentWatcher, getTransitionRawChildren, guardReactiveProps, h, handleError, hasInjectionContext, hydrate, hydrateOnIdle, hydrateOnInteraction, hydrateOnMediaQuery, hydrateOnVisible, initCustomFormatter, initDirectivesForSSR, inject, install, isMemoSame, isProxy, isReactive, isReadonly, isRef, isRuntimeOnly, isShallow, isVNode, markRaw, mergeDefaults, mergeModels, mergeProps, nextTick, nodeOps, normalizeClass, normalizeProps, normalizeStyle, onActivated, onBeforeMount, onBeforeUnmount, onBeforeUpdate, onDeactivated, onErrorCaptured, onMounted, onRenderTracked, onRenderTriggered, onScopeDispose, onServerPrefetch, onUnmounted, onUpdated, onWatcherCleanup, openBlock, patchProp, popScopeId, provide, proxyRefs, pushScopeId, queuePostFlushCb, reactive, readonly, ref, registerRuntimeCompiler, render, renderList, renderSlot, resolveComponent, resolveDirective, resolveDynamicComponent, resolveFilter, resolveTransitionHooks, setBlockTracking, setDevtoolsHook, setTransitionHooks, shallowReactive, shallowReadonly, shallowRef, ssrContextKey, ssrUtils, stop, toDisplayString, toHandlerKey, toHandlers, toRaw, toRef, toRefs, toValue, transformVNodeArgs, triggerRef, unref, useAttrs, useCssModule, useCssVars, useHost, useId, useModel, useSSRContext, useShadowRoot, useSlots, useTemplateRef, useTransitionState, vModelCheckbox, vModelDynamic, vModelRadio, vModelSelect, vModelText, vShow, version, warn, watch, watchEffect, watchPostEffect, watchSyncEffect, withAsyncContext, withCtx, withDefaults, withDirectives, withKeys, withMemo, withModifiers, withScopeId };

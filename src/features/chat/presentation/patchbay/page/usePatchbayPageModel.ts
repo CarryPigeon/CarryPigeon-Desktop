@@ -12,7 +12,7 @@ import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createLogger } from "@/shared/utils/logger";
 import { toast } from "@/shared/utils/toast";
 import { debounce } from "@/shared/utils/rateLimit";
-import type { ChatLinkPreview, ChatMessageRecord } from "@/features/chat/domain/types/chatApiModels";
+import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import {
   chatConnectionDetail,
@@ -20,7 +20,7 @@ import {
   retryChatConnection,
 } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
-import type { ChatMessage, DeleteChatMessageOutcome, MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
+import type { MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
 import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
@@ -40,7 +40,6 @@ import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "../view-models/useChannelRailModel";
 import { useMembersRailModel } from "../view-models/useMembersRailModel";
 import { useChatCenterModel } from "../view-models/useChatCenterModel";
-import { useThreadPanelModel } from "../components/thread/useThreadPanelModel";
 import { copyTextToClipboard } from "@/shared/utils/clipboard";
 import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
@@ -107,13 +106,9 @@ type PatchbayPageRawModel = {
   channelDialogs: PatchbayChannelDialogsModel;
   quickSwitcher: PatchbayQuickSwitcherModel;
   channels: ComputedRef<readonly ChannelSummary[]>;
-  editingMessageId: Ref<string>;
-  handleEditMessage(messageId: string, text: string): void;
-  clearEditingMessageId(): void;
   linkPreview: Ref<ChatLinkPreview | null>;
   fetchLinkPreview(url: string): Promise<void>;
   dismissLinkPreview(): void;
-  threadPanel: ReturnType<typeof useThreadPanelModel>;
   domainRegistryStore: unknown;
   /** 右侧成员栏是否打开。 */
   rightRailOpen: Ref<boolean>;
@@ -156,28 +151,6 @@ export type PatchbayPageModel = ShallowUnwrapRef<PatchbayPageRawModel>;
  * 3. 最后才回到具体组件。
  */
 
-function toThreadRootMessage(
-  msg: ChatMessage | null,
-  channelId: string,
-): ChatMessageRecord | undefined {
-  if (!msg) return undefined;
-  return {
-    id: msg.id,
-    channelId,
-    userId: msg.from.id,
-    sender: {
-      id: msg.from.id,
-      nickname: msg.from.name,
-      avatar: msg.from.avatarUrl,
-    },
-    sentTime: msg.timeMs,
-    domain: msg.domain.label,
-    domainVersion: msg.domain.version ?? "",
-    data: undefined,
-    preview: "preview" in msg ? (msg.preview as string | undefined) : undefined,
-  };
-}
-
 export function usePatchbayPageModel(): PatchbayPageModel {
   const router = useRouter();
   const route = useRoute();
@@ -202,7 +175,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     allChannels: computed(() => roomDirectorySnapshot.value.allChannels),
   });
   const flashMessage = ref<string>("");
-  const editingMessageId = ref<string>("");
   const linkPreview = ref<ChatLinkPreview | null>(null);
   const rightRailOpen = ref(false);
   const RIGHT_RAIL_MIN_WIDTH = 1100;
@@ -486,33 +458,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     currentChannelMessageFlow.beginReply(messageId);
   }
 
-  function handleDeleteShortcut(messageId: string): void {
-    runAsyncTask(currentChannelMessageFlow.deleteMessage(messageId) as Promise<DeleteChatMessageOutcome>, "chat_delete_shortcut_failed");
-  }
-
-  function startEditingMessage(messageId: string): void {
-    editingMessageId.value = messageId;
-  }
-
-  function clearEditingMessageId(): void {
-    editingMessageId.value = "";
-  }
-
-  function handleEditMessage(messageId: string, text: string): void {
-    runAsyncTask(
-      currentChannelMessageFlow.editMessage(messageId, { text }).then((outcome) => {
-        editingMessageId.value = "";
-        if (!outcome.ok) {
-          logger.error("Action: chat_edit_message_failed", {
-            messageId,
-            error: String(outcome.error),
-          });
-        }
-      }),
-      "chat_edit_message_failed",
-    );
-  }
-
   /**
    * 置顶消息。
    *
@@ -588,13 +533,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       return ok;
     },
     startReply: currentChannelMessageFlow.beginReply,
-    deleteMessage: async (messageId: string) => {
-      const outcome = await currentChannelMessageFlow.deleteMessage(messageId);
-      if (!outcome.ok) {
-        void toast.error(outcome.error.message || t("delete_failed"));
-      }
-      return outcome;
-    },
     recallMessage: async (messageId: string) => {
       const outcome = await currentChannelMessageFlow.recallMessage(messageId) as RecallChatMessageOutcome;
       if (!outcome.ok) {
@@ -609,23 +547,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openForwardDialog: (messageId: string) => {
       _openForwardDialog(messageId);
     },
-    startEditing: (messageId: string) => {
-      startEditingMessage(messageId);
-    },
-    openThread: (messageId) => threadPanel.openThread(messageId),
     pinMessage: (messageId: string) => handlePinMessage(messageId),
     unpinMessage: (messageId: string) => handleUnpinMessage(messageId),
     bookmarkMessage: (messageId: string) => handleBookmarkMessage(messageId),
     unbookmarkMessage: (messageId: string) => handleUnbookmarkMessage(messageId),
-  });
-
-  const showEdit = computed(() => {
-    const mid = menuMessageId.value;
-    if (!mid) return false;
-    const message = currentChannelMessageFlow.findMessageById(mid);
-    if (!message) return false;
-    if (message.from.id !== currentUserId.value) return false;
-    return true;
   });
 
   const showRecall = computed(() => {
@@ -636,46 +561,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     if (message.from.id !== currentUserId.value) return false;
     if (message.recalledAt != null && message.recalledAt > 0) return false;
     return true;
-  });
-
-  const threadPanel = useThreadPanelModel({
-    getThreadReplies: async (rootMessageId, cursor) => {
-      if (IS_STORE_MOCK) {
-        return { items: [], nextCursor: undefined, hasMore: false };
-      }
-      const s = socket.value;
-      if (!s) return { items: [], nextCursor: undefined, hasMore: false };
-      const token = (await ensureValidAccessToken(s)).trim();
-      if (!token) return { items: [], nextCursor: undefined, hasMore: false };
-      return httpChatApiPort.getThreadReplies(s, token, rootMessageId, cursor);
-    },
-    sendThreadReply: async (rootMessageId, text) => {
-      if (IS_STORE_MOCK) return;
-      const s = socket.value;
-      if (!s) return;
-      const token = (await ensureValidAccessToken(s)).trim();
-      if (!token) return;
-      const cid = currentSessionSnapshot.value.currentChannelId;
-      await httpChatApiPort.sendChannelMessage(s, token, cid, {
-        domain: "Core:Text",
-        domainVersion: "1",
-        data: { text, threadRootId: rootMessageId },
-      });
-    },
-    findMessageById: (id) =>
-      toThreadRootMessage(
-        currentChannelMessageFlow.findMessageById(id),
-        currentSessionSnapshot.value.currentChannelId,
-      ),
-    currentChannelId: currentSessionSnapshot.value.currentChannelId,
-  });
-
-  const showViewThread = computed(() => {
-    const mid = menuMessageId.value;
-    if (!mid) return false;
-    const message = currentChannelMessageFlow.findMessageById(mid);
-    if (!message) return false;
-    return (message as { threadReplyCount?: number }).threadReplyCount != null && (message as { threadReplyCount?: number }).threadReplyCount! > 0;
   });
 
   /**
@@ -769,7 +654,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     domainRegistryView,
     onLoadMoreMessages: handleLoadMoreMessages,
     onReplyShortcut: handleReplyShortcut,
-    onDeleteShortcut: handleDeleteShortcut,
     onMessageContextMenu: handleMessageContextMenu,
     onForwardMessage: async (mid, req) => {
       if (IS_STORE_MOCK) {
@@ -963,9 +847,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     open: menuOpen,
     x: menuX,
     y: menuY,
-    showEdit,
     showRecall,
-    showViewThread,
     canPin,
     isPinned,
     isBookmarked,
@@ -1029,13 +911,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     channelSettingsMenu,
     channelDialogs,
     quickSwitcher,
-    editingMessageId,
-    handleEditMessage,
-    clearEditingMessageId,
     linkPreview,
     fetchLinkPreview,
     dismissLinkPreview,
-    threadPanel,
     domainRegistryStore: domainRegistryView,
     rightRailOpen,
     toggleRightRail,

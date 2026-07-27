@@ -8,6 +8,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { getChatCapabilities } from "@/features/chat/public/api";
 import { buildFileDownloadUrl } from "@/shared/file-transfer";
+import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
 import type { FileRecord } from "../../domain/contracts";
 
 const props = defineProps<{
@@ -44,6 +45,12 @@ const downloadUrl = computed(() => {
   if (!socket) return "";
   return buildFileDownloadUrl(socket, props.file.shareKey);
 });
+
+// 文件下载端点受 Bearer 鉴权保护，原生媒体标签无法附加 Authorization，故用 objectURL。
+const { objectUrl: mediaObjectUrl } = useAuthedObjectUrl(
+  () => downloadUrl.value,
+  () => getChatCapabilities().getServerSocket() ?? "",
+);
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -92,28 +99,28 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
             <img
               v-if="previewType === 'image'"
               class="cp-previewPanel__media"
-              :src="downloadUrl"
+              :src="mediaObjectUrl"
               :alt="file.filename"
             />
             <!-- Video Preview -->
             <video
               v-else-if="previewType === 'video'"
               class="cp-previewPanel__media"
-              :src="downloadUrl"
+              :src="mediaObjectUrl"
               controls
             />
             <!-- Audio Preview -->
             <audio
               v-else-if="previewType === 'audio'"
               class="cp-previewPanel__audio"
-              :src="downloadUrl"
+              :src="mediaObjectUrl"
               controls
             />
             <!-- PDF Preview -->
             <object
               v-else-if="previewType === 'pdf'"
               class="cp-previewPanel__pdf"
-              :data="downloadUrl"
+              :data="mediaObjectUrl"
               type="application/pdf"
             >
               <p>{{ t("file_no_preview") }}</p>

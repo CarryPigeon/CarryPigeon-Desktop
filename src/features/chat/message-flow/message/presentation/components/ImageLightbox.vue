@@ -9,6 +9,11 @@ import { useI18n } from "vue-i18n";
 import { useFocusTrap } from "@/shared/utils/useFocusTrap";
 import { createLogger } from "@/shared/utils/logger";
 import AppIcon from "@/shared/ui/AppIcon.vue";
+import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
+import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
+import { ensureValidAccessToken } from "@/shared/net/auth/api";
+import { readAuthToken } from "@/shared/utils/localState";
+import AuthedThumb from "./AuthedThumb.vue";
 
 const logger = createLogger("ImageLightbox");
 const { t } = useI18n();
@@ -62,6 +67,15 @@ const totalCount = computed(() => props.images.length);
 const hasPrev = computed(() => currentIndex.value > 0);
 const hasNext = computed(() => currentIndex.value < totalCount.value - 1);
 const counterText = computed(() => `${currentIndex.value + 1} / ${totalCount.value}`);
+
+// 主图下载端点受 Bearer 鉴权保护，原生 <img>/<video> 无法附加 Authorization，故用 objectURL。
+const { objectUrl: mediaObjectUrl } = useAuthedObjectUrl(
+  () => currentImage.value?.url ?? "",
+  () => getActiveChatServerSocket(),
+);
+
+// 缩略图鉴权所需的 server socket（供 v-for 中的 AuthedThumb 使用）。
+const activeSocket = computed(() => getActiveChatServerSocket());
 
 /** 当前媒体是否为视频（优先使用传入的 isVideo 标记，回退到文件名后缀判断）。 */
 const isVideo = computed(() => {
@@ -128,7 +142,19 @@ async function downloadImage(): Promise<void> {
 
   isDownloading.value = true;
   try {
-    const response = await fetch(currentImage.value.url);
+    const socket = getActiveChatServerSocket();
+    let token = "";
+    if (socket) {
+      try {
+        token = (await ensureValidAccessToken(socket)).trim();
+      } catch {
+        token = "";
+      }
+      if (!token) token = readAuthToken(socket).trim();
+    }
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const response = await fetch(currentImage.value.url, { headers });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -350,7 +376,7 @@ watch(
           <video
             v-if="currentImage && isVideo"
             :key="`video-${currentIndex}`"
-            :src="currentImage.url"
+            :src="mediaObjectUrl"
             class="cp-lightbox__image cp-lightbox__video"
             controls
             autoplay
@@ -361,7 +387,7 @@ watch(
           <img
             v-else-if="currentImage"
             :key="`img-${currentIndex}`"
-            :src="currentImage.url"
+            :src="mediaObjectUrl"
             :alt="currentImage.fileName"
             class="cp-lightbox__image"
             :style="{
@@ -396,8 +422,9 @@ watch(
           type="button"
           @click="currentIndex = idx; resetView()"
         >
-          <img
-            :src="img.url"
+          <AuthedThumb
+            :url="img.url"
+            :server-socket="activeSocket"
             :alt="img.fileName"
             class="cp-lightbox__thumbImg"
           />
