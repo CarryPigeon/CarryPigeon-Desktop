@@ -6,7 +6,7 @@
 
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { getChatCapabilities } from "@/features/chat/public/api";
+import { readActiveFileServerSocket } from "../../composition/activeServerSocket";
 import { buildFileDownloadUrl } from "@/shared/file-transfer";
 import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
 import type { FileRecord } from "../../domain/contracts";
@@ -41,7 +41,7 @@ const previewType = computed<"image" | "video" | "audio" | "pdf" | "other" | "to
 
 const downloadUrl = computed(() => {
   if (!props.file) return "";
-  const socket = getChatCapabilities().getServerSocket();
+  const socket = readActiveFileServerSocket();
   if (!socket) return "";
   return buildFileDownloadUrl(socket, props.file.shareKey);
 });
@@ -49,7 +49,7 @@ const downloadUrl = computed(() => {
 // 文件下载端点受 Bearer 鉴权保护，原生媒体标签无法附加 Authorization，故用 objectURL。
 const { objectUrl: mediaObjectUrl } = useAuthedObjectUrl(
   () => downloadUrl.value,
-  () => getChatCapabilities().getServerSocket() ?? "",
+  () => readActiveFileServerSocket() ?? "",
 );
 
 function formatSize(bytes: number): string {
@@ -74,7 +74,7 @@ function getTypeIcon(mimeType: string): string {
 
 async function handleCopyLink(file: FileRecord): Promise<void> {
   const { copyTextToClipboard } = await import("@/shared/utils/clipboard");
-  const fullUrl = buildFileDownloadUrl(getChatCapabilities().getServerSocket(), file.shareKey);
+  const fullUrl = buildFileDownloadUrl(readActiveFileServerSocket(), file.shareKey);
   const ok = await copyTextToClipboard(fullUrl || file.shareKey);
   if (ok) {
     emit("copyLink", file);

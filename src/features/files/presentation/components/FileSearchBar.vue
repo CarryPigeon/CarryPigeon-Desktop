@@ -8,7 +8,7 @@ import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { debounce } from "@/shared/utils/rateLimit";
 import { getFilesCapabilities } from "../../api";
-import { getChatCapabilities } from "@/features/chat/public/api";
+import { readActiveFileServerSocket } from "../../composition/activeServerSocket";
 import { readAuthToken } from "@/shared/utils/localState";
 import type { FileListQuery, UploaderInfo } from "../../domain/contracts";
 
@@ -28,7 +28,7 @@ const filters = ref({
 });
 
 onMounted(async () => {
-  const socket = getChatCapabilities().getServerSocket();
+  const socket = readActiveFileServerSocket();
   if (!socket) return;
   const token = readAuthToken(socket) || "";
   try {

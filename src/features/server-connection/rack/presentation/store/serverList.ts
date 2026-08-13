@@ -6,7 +6,7 @@
 import { computed, ref } from "vue";
 import { getServerRackStatePort } from "@/features/server-connection/rack/di/rack.di";
 import type { ServerRackRecord, StoredServerRacksState } from "@/features/server-connection/rack/domain/types/serverRackTypes";
-import { currentServerSocket, setServerSocket } from "./currentServer";
+import { bindCurrentSocketStatePersist, currentServerSocket, setServerSocket } from "./currentServer";
 import { setServerTlsConfigProvider } from "@/shared/net/tls/serverTlsConfigProvider";
 
 /**
@@ -110,8 +110,12 @@ function persist(): void {
       tlsFingerprint: rack.tlsFingerprint,
       notifyMode: rack.notifyMode,
     })),
+    currentServerSocket: currentServerSocket.value.trim(),
   });
 }
+
+bindCurrentSocketStatePersist(persist);
+if (currentServerSocket.value.trim() && state.value.servers.length > 0) persist();
 
 /**
  * 计算 rails / quick switcher 使用的机架列表。

@@ -10,8 +10,8 @@
  * - 在 WS 不可用（如自签证书场景）时，自动降级为 HTTP polling。
  */
 
-import { watch } from "vue";
 import { createLogger } from "@/shared/utils/logger";
+import { watchInDetachedScope } from "@/shared/utils/watchInDetachedScope";
 import type { ChatApiGateway, ChatEventsGateway } from "@/features/chat/composition/contracts/chatGateway";
 import type { ChatRuntimeAggregateStore } from "@/features/chat/composition/contracts/chatStoreTypes";
 import { assembleChatStoreRuntime } from "@/features/chat/composition/store/assembleChatStoreRuntime";
@@ -76,9 +76,12 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     totalUnreadCount,
   } = state;
 
-  watch(
+  watchInDetachedScope(
     () => sessionSharedContext.scope.getActiveServerSocket(),
-    () => {
+    (nextSocket, previousSocket) => {
+      const next = String(nextSocket ?? "").trim();
+      const previous = String(previousSocket ?? "").trim();
+      if (next === previous) return;
       // server workspace 变化时，由 session 子域负责清理当前频道与连接期状态。
       session.resetForServerChange();
     },

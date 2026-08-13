@@ -184,7 +184,8 @@ if (!isSubWindow && hasTauriRuntime) {
     }
   });
 } else if (!isSubWindow) {
-  // 无 Tauri runtime（纯前端 dev 模式）：立即标记就绪
+  // 无 Tauri runtime（纯前端 dev 模式）：恢复已持久化的当前服务器后标记就绪。
+  ensureInitialServerSelection();
   resolveStartup('ready');
 } else {
   // 子窗口（如截图遮罩、popover 等）：无需主窗口运行时，立即标记就绪以渲染 UI

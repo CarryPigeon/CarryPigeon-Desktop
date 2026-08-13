@@ -4,6 +4,7 @@
  * 收敛 chat 当前工作区的启动、切服、插件桥接与依赖刷新链路，避免页面层手工编排跨 feature 调用顺序。
  */
 
+import { createLogger } from "@/shared/utils/logger";
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
 import type { ServerWorkspaceActivationOutcome } from "@/features/server-connection/api-types";
 
@@ -138,6 +139,8 @@ export type ChatWorkspaceCoordinator = {
  * 构建 chat 工作区协调器。
  */
 export function createChatWorkspaceCoordinator(deps: ChatWorkspaceCoordinatorDeps): ChatWorkspaceCoordinator {
+  const logger = createLogger("chatWorkspaceCoordinator");
+
   function createWorkspaceCommandError(
     code: ChatWorkspaceCommandErrorCode,
     fallbackMessage: string,
@@ -186,16 +189,12 @@ export function createChatWorkspaceCoordinator(deps: ChatWorkspaceCoordinatorDep
    * 运行 chat 对某个 workspace 的标准启动流水线。
    *
    * 顺序固定：
-   * 1. 激活 server workspace
-   * 2. 刷新插件目录
-   * 3. 刷新消息 domain 目录
-   * 4. 刷新 required 状态
-   * 5. 确保插件 runtime 已就绪
-   * 6. 确保 chat session 已就绪
+   * 1. 激活 server workspace（必需）
+   * 2. 刷新插件目录 / domain 目录 / required 状态 / runtime（尽力而为）
+   * 3. 确保 chat session 已就绪（必需）
    *
-   * 设计原因：
-   * - 这些步骤跨越 server-connection / plugins / chat/session 三个 feature/子域；
-   * - 若散落在页面层，会迅速演化为隐式编排脚本。
+   * 插件步骤失败不应阻断频道列表：浏览器联调没有 Tauri 插件运行时，
+   * 且服务端 `required_plugins` 经常为空。
    */
   async function runWorkspacePipeline<TSuccessKind extends string, TFailureKind extends string>(
     serverSocket: string,
@@ -219,46 +218,34 @@ export function createChatWorkspaceCoordinator(deps: ChatWorkspaceCoordinatorDep
     try {
       await deps.plugins.refreshCatalog();
     } catch (error) {
-      return rejectWorkspaceCommand(
-        failureKind,
-        "plugin_catalog_refresh_failed",
-        "Failed to refresh plugin catalog.",
-        error,
-        { serverSocket: socket },
-      );
+      logger.warn("Action: chat_workspace_plugin_catalog_refresh_failed", {
+        serverSocket: socket,
+        error: String(error),
+      });
     }
     try {
       await deps.plugins.refreshDomainCatalog(socket);
     } catch (error) {
-      return rejectWorkspaceCommand(
-        failureKind,
-        "plugin_domain_catalog_refresh_failed",
-        "Failed to refresh message domain catalog.",
-        error,
-        { serverSocket: socket },
-      );
+      logger.warn("Action: chat_workspace_plugin_domain_catalog_refresh_failed", {
+        serverSocket: socket,
+        error: String(error),
+      });
     }
     try {
       await deps.plugins.refreshRequiredPluginsState();
     } catch (error) {
-      return rejectWorkspaceCommand(
-        failureKind,
-        "plugin_required_state_refresh_failed",
-        "Failed to refresh required plugin state.",
-        error,
-        { serverSocket: socket },
-      );
+      logger.warn("Action: chat_workspace_plugin_required_state_refresh_failed", {
+        serverSocket: socket,
+        error: String(error),
+      });
     }
     try {
       await deps.plugins.ensureRuntime(socket);
     } catch (error) {
-      return rejectWorkspaceCommand(
-        failureKind,
-        "plugin_runtime_ensure_failed",
-        "Failed to ensure chat plugin runtime.",
-        error,
-        { serverSocket: socket },
-      );
+      logger.warn("Action: chat_workspace_plugin_runtime_ensure_failed", {
+        serverSocket: socket,
+        error: String(error),
+      });
     }
     try {
       await deps.session.ensureChatReady();

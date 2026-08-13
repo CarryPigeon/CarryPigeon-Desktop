@@ -618,6 +618,7 @@ export const zh_cn = {
   file_manager: "文件管理",
   file_search_placeholder: "搜索文件…",
   file_list_empty: "暂无文件",
+  file_no_active_server: "当前没有已连接的服务器",
   file_type: "类型",
   file_uploaded_at: "上传时间",
   file_uploader: "上传者",

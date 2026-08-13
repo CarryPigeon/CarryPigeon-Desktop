@@ -14,11 +14,17 @@ import type { ServerRackStatePort } from "../domain/ports/ServerRackStatePort";
  * 过滤掉 localStorage 中的 mock socket 机架记录。
  * 防止之前 mock 模式写入的数据在非 mock 模式下被使用。
  */
+function isMockSocket(serverSocket: string | undefined): boolean {
+  return String(serverSocket ?? "").trim().toLowerCase().startsWith("mock://");
+}
+
 function filterMockRacks(state: StoredServerRacksState): StoredServerRacksState {
   if (IS_MOCK_ENABLED) return state;
+  const currentServerSocket = isMockSocket(state.currentServerSocket) ? "" : String(state.currentServerSocket ?? "").trim();
   return {
     ...state,
-    servers: state.servers.filter((r) => !r.serverSocket?.trim().toLowerCase().startsWith("mock://")),
+    servers: state.servers.filter((r) => !isMockSocket(r.serverSocket)),
+    currentServerSocket,
   };
 }
 
