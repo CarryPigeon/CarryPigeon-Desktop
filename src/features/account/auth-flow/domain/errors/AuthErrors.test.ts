@@ -114,6 +114,16 @@ describe("toAuthErrorMessage", () => {
     expect(toAuthErrorMessage(err)).toBe("Custom send code error");
   });
 
+  it("should hint password login when the server has no mail service", () => {
+    const err = new AuthError({
+      code: "send_code_failed",
+      message: "mail service is unavailable",
+      status: 503,
+      reason: "mail_service_unavailable",
+    });
+    expect(toAuthErrorMessage(err)).toContain("username and password");
+  });
+
   it("should handle plain Error", () => {
     expect(toAuthErrorMessage(new Error("plain"))).toBe("plain");
   });

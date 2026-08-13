@@ -8,7 +8,7 @@
  * - 提供 `avatarUrl` 时展示实际头像图片；未提供时回退到首字母徽章。
  */
 
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import type { CSSProperties } from "vue";
 
 const props = withDefaults(
@@ -26,7 +26,14 @@ const props = withDefaults(
   },
 );
 
-const hasAvatarImage = computed(() => (props.avatarUrl ?? "").trim().length > 0);
+const imageFailed = ref(false);
+watch(
+  () => props.avatarUrl,
+  () => {
+    imageFailed.value = false;
+  },
+);
+const hasAvatarImage = computed(() => !imageFailed.value && (props.avatarUrl ?? "").trim().length > 0);
 
 /**
  * 将字符串确定性映射为 hue（0..359）。
@@ -119,7 +126,7 @@ const styleVars = computed(computeStyleVarsForProps);
   <!-- 组件：AvatarBadge｜职责：统一头像（有图片用图片，无图片用首字母徽章） -->
   <!-- 区块：<span> .cp-avatar -->
   <span class="cp-avatar" :class="{ 'cp-avatar--image': hasAvatarImage }" :style="styleVars" :title="props.name" aria-hidden="true">
-    <img v-if="hasAvatarImage" class="cp-avatar__img" :src="props.avatarUrl" :alt="props.name" />
+    <img v-if="hasAvatarImage" class="cp-avatar__img" :src="props.avatarUrl" :alt="props.name" @error="imageFailed = true" />
     <span v-else class="cp-avatar__inner">{{ initial }}</span>
   </span>
 </template>

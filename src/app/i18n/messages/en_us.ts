@@ -161,7 +161,7 @@ export const en_us = {
   servers_subtitle: "Racks · TLS policy · Notify mode",
   servers_active_label: "ACTIVE",
   servers_add_rack: "Add rack",
-  server_socket_placeholder: "tls://host:port · tcp://host:port · https://host:port · mock://handshake",
+  server_socket_placeholder: "http://127.0.0.1:8080 · https://host:port · tls://host:port",
   servers_open_patchbay: "Open Patchbay",
   scope_key: "scope key",
   scope_key_title: "scope key",
