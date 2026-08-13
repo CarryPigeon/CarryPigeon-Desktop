@@ -12,13 +12,6 @@ const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), 
   version: string;
 };
 
-// vue/tdesign 经 import map 指向的共享 vendor（/vendor/vendor.mjs）解析，
-// 确保宿主主包与运行时加载的插件共享同一 Vue/TDesign 运行时实例。
-// - dev：将裸模块名 vue/tdesign-vue-next 精确重定向到该 URL（dev 服务器直接托管 public/ 下的文件）。
-// - build：将其 external，使产物保留裸模块名，运行期由 index.html 的 import map 解析。
-// 两者都指向同一文件，故 dev 与 build 均为同一实例。
-const VENDOR_URL = "/vendor/vendor.mjs";
-
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   const isBuild = command === "build";
@@ -42,13 +35,10 @@ export default defineConfig(({ command }) => {
     resolve: {
       alias: [
         { find: "@", replacement: path.resolve(__dirname, "src") },
-        // 仅 dev 下重定向：用正则精确匹配裸模块名，避免误伤 tdesign-vue-next/es/style/index.css 等子路径导入。
-        ...(isBuild
-          ? []
-          : [
-              { find: /^vue$/, replacement: VENDOR_URL },
-              { find: /^tdesign-vue-next$/, replacement: VENDOR_URL },
-            ]),
+        // build 产物仍 external vue/tdesign，由 index.html import map 指向 /vendor/vendor.mjs。
+        // Vite 8 的 import-analysis 不能把 URL `/vendor/vendor.mjs` 解析成 dev 模块；
+        // 若 alias 到 public/vendor/vendor.mjs，会被当成静态资源且缺少 `Text` 等 named export。
+        // 因此 dev 宿主改走 node_modules 预构建，保证浏览器联调可启动。
       ],
     },
     css: {
@@ -130,9 +120,7 @@ export default defineConfig(({ command }) => {
 
     // Optimize dependency pre-bundling
     optimizeDeps: {
-      // vue/tdesign 由 import map 经 /vendor/vendor.mjs 提供，dev 下不预构建。
-      include: ['vue-router', '@tauri-apps/api'],
-      exclude: ['vue', 'tdesign-vue-next'],
+      include: ['vue', 'vue-router', 'tdesign-vue-next', '@tauri-apps/api'],
     },
   };
 });
