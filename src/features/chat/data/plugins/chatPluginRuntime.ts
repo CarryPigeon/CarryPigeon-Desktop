@@ -6,7 +6,17 @@
 
 import { getPluginsCapabilities } from "@/features/plugins/api";
 
-const pluginsCapabilities = getPluginsCapabilities();
+/**
+ * 延迟读取 plugins capability，避免 `plugins/api` 初始化期间形成循环依赖。
+ *
+ * `plugins/api` → domain registry → `chat/public/api` → message-flow → 本文件。
+ * 若在模块顶层调用 `getPluginsCapabilities()`，会在 `pluginsCapabilitiesSingleton`
+ * 仍处于暂时性死区时再次进入，导致 TDZ 异常。
+ */
+function pluginsCapabilities() {
+  return getPluginsCapabilities();
+}
+
 type PluginsServerCapabilities = ReturnType<ReturnType<typeof getPluginsCapabilities>["forServer"]>;
 type DomainRegistryHostBridge = Parameters<PluginsServerCapabilities["attachHostBridge"]>[0];
 type PluginComposerPayload = Parameters<DomainRegistryHostBridge["sendMessage"]>[0];
@@ -15,14 +25,14 @@ type PluginComposerPayload = Parameters<DomainRegistryHostBridge["sendMessage"]>
  * 刷新当前 server 对应的 chat domain 目录。
  */
 export function refreshChatDomainCatalog(serverSocket: string): Promise<void> {
-  return pluginsCapabilities.forServer(serverSocket).refreshDomainCatalog();
+  return pluginsCapabilities().forServer(serverSocket).refreshDomainCatalog();
 }
 
 /**
  * 确保当前 server 的插件运行时已加载。
  */
 export function ensureChatPluginRuntimeLoaded(serverSocket: string): Promise<void> {
-  return pluginsCapabilities.forServer(serverSocket).ensureRuntimeLoaded();
+  return pluginsCapabilities().forServer(serverSocket).ensureRuntimeLoaded();
 }
 
 /**
@@ -31,35 +41,35 @@ export function ensureChatPluginRuntimeLoaded(serverSocket: string): Promise<voi
  * host bridge 负责把“发送消息、打开能力”等宿主动作暴露给插件 runtime。
  */
 export function attachChatPluginHostBridge(serverSocket: string, bridge: DomainRegistryHostBridge): void {
-  pluginsCapabilities.forServer(serverSocket).attachHostBridge(bridge);
+  pluginsCapabilities().forServer(serverSocket).attachHostBridge(bridge);
 }
 
 /**
  * 卸载当前 server 的 chat host bridge。
  */
 export function detachChatPluginHostBridge(serverSocket: string): void {
-  pluginsCapabilities.forServer(serverSocket).detachHostBridge();
+  pluginsCapabilities().forServer(serverSocket).detachHostBridge();
 }
 
 /**
  * 读取当前 server 对应的 domain registry runtime capability。
  */
 export function getChatDomainRegistryView(serverSocket: string) {
-  return pluginsCapabilities.forServer(serverSocket).getRuntimeCapabilities();
+  return pluginsCapabilities().forServer(serverSocket).getRuntimeCapabilities();
 }
 
 /**
  * 读取当前 server 下 chat 可用的消息 domain 列表。
  */
 export function getAvailableChatMessageDomains(serverSocket: string) {
-  return pluginsCapabilities.forServer(serverSocket).getAvailableMessageDomains();
+  return pluginsCapabilities().forServer(serverSocket).getAvailableMessageDomains();
 }
 
 /**
  * 解析某个消息 domain 对应的插件提示信息。
  */
 export function resolveChatDomainPluginHint(serverSocket: string, domain: string): string {
-  return pluginsCapabilities.forServer(serverSocket).resolveDomainPluginHint(domain);
+  return pluginsCapabilities().forServer(serverSocket).resolveDomainPluginHint(domain);
 }
 
 /**

@@ -213,6 +213,7 @@ export const tauriTcpConnector: TcpConnectorPort = {
       // 服务端只暴露 HTTP(8080) + 可选 WS(18080)，没有自定义原生 TCP 握手协议，
       // 因此原生 TCP 分支仅对显式声明 `tcp://`/`tls://`/`mock://` 等 scheme 的输入保留。
       if (!isExplicitNativeTransport(serverSocketKey)) {
+        // HTTP+WS 路径：浏览器预览没有 SQLite，ensureServerDb 在无 Tauri 时为空操作。
         await Promise.all([ensureServerDb(serverSocketKey), verifyHttpApi(serverSocketKey)]);
         logger.info("Action: network_http_like_socket_tcp_handshake_skipped", { serverSocket: serverSocketKey });
         return;
