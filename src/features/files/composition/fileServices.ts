@@ -20,9 +20,7 @@ let fileListUploadersPort: FileListUploadersPort | null = null;
 
 function createFileListPort(): FileListPort {
   return selectByMockMode<FileListPort>({
-    off: () => async (_serverSocket: string, _accessToken: string, _query: FileListQuery) => {
-      throw new Error("File listing requires a real backend. Use mock mode 'store' or 'protocol' for development.");
-    },
+    off: () => httpListFiles,
     store: () => mockListFiles,
     protocol: () => httpListFiles,
   });
@@ -30,9 +28,7 @@ function createFileListPort(): FileListPort {
 
 function createFileDeletePort(): FileDeletePort {
   return selectByMockMode<FileDeletePort>({
-    off: () => async (_serverSocket: string, _accessToken: string, _request: FileDeleteRequest) => {
-      throw new Error("File deletion requires a real backend. Use mock mode 'store' or 'protocol' for development.");
-    },
+    off: () => httpDeleteFile,
     store: () => mockDeleteFile,
     protocol: () => httpDeleteFile,
   });
@@ -40,9 +36,7 @@ function createFileDeletePort(): FileDeletePort {
 
 function createFileBatchDeletePort(): FileBatchDeletePort {
   return selectByMockMode<FileBatchDeletePort>({
-    off: () => async (_serverSocket: string, _accessToken: string, _request: BatchFileRequest) => {
-      throw new Error("Batch file deletion requires a real backend. Use mock mode 'store' or 'protocol' for development.");
-    },
+    off: () => httpBatchDeleteFiles,
     store: () => mockBatchDeleteFiles,
     protocol: () => httpBatchDeleteFiles,
   });
@@ -50,9 +44,7 @@ function createFileBatchDeletePort(): FileBatchDeletePort {
 
 function createFileListUploadersPort(): FileListUploadersPort {
   return selectByMockMode<FileListUploadersPort>({
-    off: () => async (_serverSocket: string, _accessToken: string) => {
-      throw new Error("Uploader listing requires a real backend. Use mock mode 'store' or 'protocol' for development.");
-    },
+    off: () => httpListUploaders,
     store: () => mockListUploaders,
     protocol: () => httpListUploaders,
   });

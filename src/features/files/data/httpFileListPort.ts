@@ -4,7 +4,11 @@
  */
 
 import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
+import { isApiRequestError } from "@/shared/net/http/apiErrors";
+import { createLogger } from "@/shared/utils/logger";
 import type { FileRecord, FileListQuery, FileDeleteRequest, BatchFileRequest, UploaderInfo } from "../domain/contracts";
+
+const logger = createLogger("httpFileListPort");
 
 type FileRecordWire = {
   id: string;
@@ -47,6 +51,14 @@ function mapFileRecordWire(wire: FileRecordWire): FileRecord {
   };
 }
 
+/**
+ * CarryPigeon-Server 当前只提供上传申请/下载，没有文件库列表接口。
+ * 404 视为“服务端未实现该能力”，列表类接口返回空，避免真实联调时把文件管理页打成硬错误。
+ */
+function isMissingFileLibraryEndpoint(error: unknown): boolean {
+  return isApiRequestError(error) && (error.status === 404 || error.reason === "not_found");
+}
+
 export async function httpListFiles(serverSocket: string, accessToken: string, query: FileListQuery): Promise<FileRecord[]> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const q: string[] = [];
@@ -60,22 +72,52 @@ export async function httpListFiles(serverSocket: string, accessToken: string, q
   if (query.dateFrom) q.push(`date_from=${encodeURIComponent(query.dateFrom)}`);
   if (query.dateTo) q.push(`date_to=${encodeURIComponent(query.dateTo)}`);
   const path = `/files/list${q.length ? `?${q.join("&")}` : ""}`;
-  const res = await client.requestJson<ApiListFilesResponse>("GET", path);
-  return Array.isArray(res?.items) ? res.items.map(mapFileRecordWire) : [];
+  try {
+    const res = await client.requestJson<ApiListFilesResponse>("GET", path);
+    return Array.isArray(res?.items) ? res.items.map(mapFileRecordWire) : [];
+  } catch (error) {
+    if (isMissingFileLibraryEndpoint(error)) {
+      logger.warn("Action: files_list_endpoint_missing", { path });
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function httpDeleteFile(serverSocket: string, accessToken: string, request: FileDeleteRequest): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  await client.requestJson("POST", "/files/delete", { file_id: request.fileId, share_key: request.shareKey });
+  try {
+    await client.requestJson("POST", "/files/delete", { file_id: request.fileId, share_key: request.shareKey });
+  } catch (error) {
+    if (isMissingFileLibraryEndpoint(error)) {
+      throw new Error("This server does not support file library deletion.");
+    }
+    throw error;
+  }
 }
 
 export async function httpBatchDeleteFiles(serverSocket: string, accessToken: string, request: BatchFileRequest): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  await client.requestJson("POST", "/files/batch-delete", { file_ids: request.fileIds });
+  try {
+    await client.requestJson("POST", "/files/batch-delete", { file_ids: request.fileIds });
+  } catch (error) {
+    if (isMissingFileLibraryEndpoint(error)) {
+      throw new Error("This server does not support file library deletion.");
+    }
+    throw error;
+  }
 }
 
 export async function httpListUploaders(serverSocket: string, accessToken: string): Promise<UploaderInfo[]> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const res = await client.requestJson<ApiUploadersResponse>("GET", "/files/uploaders");
-  return Array.isArray(res?.items) ? res.items : [];
+  try {
+    const res = await client.requestJson<ApiUploadersResponse>("GET", "/files/uploaders");
+    return Array.isArray(res?.items) ? res.items : [];
+  } catch (error) {
+    if (isMissingFileLibraryEndpoint(error)) {
+      logger.warn("Action: files_uploaders_endpoint_missing", {});
+      return [];
+    }
+    throw error;
+  }
 }

@@ -161,7 +161,7 @@ export const zh_cn = {
   servers_subtitle: "服务器 · TLS 策略 · 通知模式",
   servers_active_label: "活动",
   servers_add_rack: "添加服务器",
-  server_socket_placeholder: "tls://host:port · tcp://host:port · https://host:port · mock://handshake",
+  server_socket_placeholder: "http://127.0.0.1:8080 · https://host:port · tls://host:port",
   servers_open_patchbay: "打开枢纽",
   scope_key: "范围键",
   scope_key_title: "scope key",

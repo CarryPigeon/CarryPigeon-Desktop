@@ -58,14 +58,76 @@ export class ApiRequestError extends Error {
    * @param envelope - 已解析的 API 错误信封。
    */
   constructor(envelope: ApiErrorEnvelope) {
-    const message = envelope.error.message || envelope.error.reason || "request_failed";
+    const parsed = parseApiErrorEnvelope(envelope, envelope.error?.status ?? 0);
+    const message = parsed.error.message || parsed.error.reason || "request_failed";
     super(message);
     this.name = "ApiRequestError";
-    this.status = envelope.error.status;
-    this.reason = envelope.error.reason;
-    this.requestId = envelope.error.request_id ?? "";
-    this.details = (envelope.error.details ?? {}) as Record<string, unknown>;
+    this.status = parsed.error.status;
+    this.reason = parsed.error.reason;
+    this.requestId = parsed.error.request_id ?? "";
+    this.details = (parsed.error.details ?? {}) as Record<string, unknown>;
   }
+}
+
+/**
+ * 将未知 JSON 错误体归一化为 CarryPigeon 错误信封。
+ *
+ * 兼容：
+ * - 标准信封 `{ error: { status, reason, message, request_id, details } }`
+ * - Spring Boot 默认 404 `{ status, error: "Not Found", path, timestamp }`
+ */
+export function parseApiErrorEnvelope(raw: unknown, fallbackStatus = 0): ApiErrorEnvelope {
+  const fallback: ApiErrorEnvelope = {
+    error: {
+      status: Number.isFinite(fallbackStatus) ? Math.trunc(fallbackStatus) : 0,
+      reason: "http_error",
+      message: `HTTP ${fallbackStatus}`,
+    },
+  };
+  if (!raw || typeof raw !== "object") return fallback;
+
+  const rec = raw as Record<string, unknown>;
+  const inner = rec.error;
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+    const e = inner as Record<string, unknown>;
+    const statusRaw = Number(e.status ?? fallbackStatus);
+    const status = Number.isFinite(statusRaw) ? Math.trunc(statusRaw) : fallback.error.status;
+    const reason = String(e.reason ?? "").trim() || "http_error";
+    const message = typeof e.message === "string" && e.message.trim() ? e.message : reason;
+    const requestId = typeof e.request_id === "string" ? e.request_id : undefined;
+    const details = e.details && typeof e.details === "object" && !Array.isArray(e.details)
+      ? (e.details as Record<string, unknown>)
+      : undefined;
+    return {
+      error: {
+        status,
+        reason,
+        message,
+        request_id: requestId,
+        details,
+      },
+    };
+  }
+
+  // Spring MVC 未命中路由时返回默认错误 JSON，error 是字符串而不是对象。
+  const springStatusRaw = Number(rec.status ?? fallbackStatus);
+  const springStatus = Number.isFinite(springStatusRaw) ? Math.trunc(springStatusRaw) : fallback.error.status;
+  if (typeof inner === "string" || typeof rec.path === "string") {
+    const springError = typeof inner === "string" ? inner.trim() : "";
+    return {
+      error: {
+        status: springStatus,
+        reason: springStatus === 404 ? "not_found" : "http_error",
+        message: springError || `HTTP ${springStatus}`,
+        details: {
+          path: rec.path,
+          timestamp: rec.timestamp,
+        },
+      },
+    };
+  }
+
+  return fallback;
 }
 
 /**

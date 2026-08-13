@@ -13,7 +13,7 @@
  *   走 Tauri(Rust reqwest) 的 `api_request_json` 命令作为替代实现。
  */
 
-import { ApiRequestError, type ApiErrorEnvelope } from "./apiErrors";
+import { ApiRequestError, parseApiErrorEnvelope, type ApiErrorEnvelope } from "./apiErrors";
 import { toHttpOrigin } from "./serverOrigin";
 import { createLogger } from "@/shared/utils/logger";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
@@ -207,17 +207,7 @@ async function toApiError(res: Response, url: string, method: string): Promise<A
     contentType: ct,
     rawBody: rawText.slice(0, 2000),
   });
-  if (rawJson && typeof rawJson === "object" && "error" in rawJson) {
-    return new ApiRequestError(rawJson as ApiErrorEnvelope);
-  }
-  return new ApiRequestError({
-    error: {
-      status: res.status,
-      reason: "http_error",
-      message: `HTTP ${res.status}`,
-      details: { status_text: res.statusText, raw_body: rawText.slice(0, 500) },
-    },
-  });
+  return new ApiRequestError(parseApiErrorEnvelope(rawJson, res.status));
 }
 
 /**

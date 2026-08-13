@@ -112,6 +112,9 @@ export function toAuthErrorMessage(e: unknown): string {
   }
 
   if (isAuthError(e)) {
+    if (e.reason === "mail_service_unavailable" || e.reason === "email_delivery_failed") {
+      return "This server does not have email verification enabled. Sign in with username and password instead.";
+    }
     switch (e.code) {
       case "missing_server_socket":
         return "Missing server socket.";
