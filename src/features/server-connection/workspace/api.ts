@@ -9,8 +9,8 @@
  * - 跨 feature 只暴露 plain snapshot / observer / command，不直接暴露 Vue `ref`/`computed`。
  */
 
-import { watch } from "vue";
 import { createLatestAsyncController } from "@/shared/utils/latestAsync";
+import { watchInDetachedScope } from "@/shared/utils/watchInDetachedScope";
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
 import { getConnectivityCapabilities } from "../connectivity/api";
 import { getRackCapabilities, type ServerRack } from "../rack/api";
@@ -252,8 +252,11 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
     try {
       const shouldConnect = options?.connect !== false;
       const shouldRefreshInfo = options?.refreshInfo !== false;
+      const alreadyConnected =
+        connectivityCapabilities.getSnapshot().phase === "connected" &&
+        readCurrentServerWorkspaceSocket() === socket;
 
-      if (shouldConnect) {
+      if (shouldConnect && !alreadyConnected) {
         await connectivityCapabilities.connectWithRetry(socket, options?.connectOptions);
         if (!switchCommandController.isCurrent(token)) {
           return {
@@ -332,9 +335,7 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
   function observeCurrentServerWorkspaceSnapshot(
     observer: (snapshot: ServerWorkspaceSnapshot) => void,
   ): () => void {
-    return watch(readCurrentServerWorkspaceSnapshot, (snapshot) => {
-      observer(snapshot);
-    }, { immediate: true });
+    return watchInDetachedScope(readCurrentServerWorkspaceSnapshot, observer, { immediate: true });
   }
 
   return {

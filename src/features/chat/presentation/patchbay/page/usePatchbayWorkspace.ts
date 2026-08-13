@@ -9,6 +9,7 @@ import type { ComposerSubmitPayload, SendChatMessageOutcome } from "@/features/c
 import type { ServerWorkspaceActivationOutcome } from "@/features/server-connection/api-types";
 import {
   chatServerRacks,
+  getActiveChatServerSocket,
   switchChatServerWorkspace,
   useChatServerWorkspace,
 } from "@/features/chat/composition/serverWorkspaceAdapter";
@@ -94,7 +95,7 @@ export function usePatchbayWorkspace(deps: UsePatchbayWorkspaceDeps): PatchbayWo
    */
   const workspaceCoordinator = createChatWorkspaceCoordinator({
     workspace: {
-      getCurrentSocket: () => socket.value,
+      getCurrentSocket: () => getActiveChatServerSocket() || String(socket.value ?? "").trim(),
       switchWorkspace(serverSocket: string): Promise<ServerWorkspaceActivationOutcome> {
         return switchChatServerWorkspace(serverSocket, {
           connect: true,

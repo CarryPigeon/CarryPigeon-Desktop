@@ -616,6 +616,7 @@ export const en_us = {
   file_manager: "File Manager",
   file_search_placeholder: "Search files…",
   file_list_empty: "No files",
+  file_no_active_server: "No active server connection",
   file_type: "Type",
   file_uploaded_at: "Uploaded at",
   file_uploader: "Uploader",

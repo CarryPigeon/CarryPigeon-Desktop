@@ -8,7 +8,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { getFilesCapabilities } from "../../api";
-import { getChatCapabilities } from "@/features/chat/public/api";
+import { readActiveFileServerSocket } from "../../composition/activeServerSocket";
 import { readAuthToken } from "@/shared/utils/localState";
 import { buildFileDownloadUrl } from "@/shared/file-transfer";
 import { downloadFile } from "@/shared/file-transfer";
@@ -65,9 +65,9 @@ const isDeletingMultiple = computed(() => deletingIds.value.length > 1);
 let requestSeq = 0;
 
 async function loadFiles(reset: boolean = false): Promise<void> {
-  const socket = getChatCapabilities().getServerSocket();
+  const socket = readActiveFileServerSocket();
   if (!socket) {
-    error.value = "No active server connection";
+    error.value = t("file_no_active_server");
     return;
   }
   const token = readAuthToken(socket) || "";
@@ -157,7 +157,7 @@ function handleClearSelection(): void {
 }
 
 async function handleDownload(file: FileRecord): Promise<void> {
-  const socket = getChatCapabilities().getServerSocket();
+  const socket = readActiveFileServerSocket();
   const token = readAuthToken(socket || "") || "";
   const url = buildFileDownloadUrl(socket || "", file.shareKey);
   if (url) {
@@ -191,7 +191,7 @@ function handleBatchDeleteRequest(): void {
 }
 
 async function confirmDelete(): Promise<void> {
-  const socket = getChatCapabilities().getServerSocket();
+  const socket = readActiveFileServerSocket();
   if (!socket) return;
   const token = readAuthToken(socket) || "";
 

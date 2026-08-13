@@ -38,4 +38,10 @@ export type ServerRackRecord = {
  */
 export type StoredServerRacksState = {
   servers: ServerRackRecord[];
+  /**
+   * 当前选中的 server socket。
+   *
+   * 旧持久化记录可能没有该字段；读取时由 `resolvePersistedCurrentSocket` 回退到置顶/第一项。
+   */
+  currentServerSocket?: string;
 };
