@@ -4,10 +4,11 @@
  * 该模块是 data-layer 适配器：提供一个小而清晰的类型化 API，用于对 Rust 管理的数据库执行 SQL。
  *
  * 设计要点：
- * - 前端不直接接触 SQLite；所有操作都通过 `invokeTauri` 命令转交给 Rust 侧执行。
+ * - 桌面端不直接接触 SQLite；所有操作都通过 `invokeTauri` 命令转交给 Rust 侧执行。
+ * - 浏览器预览没有 Tauri bridge：本地 DB 命令改为空操作，让 HTTP+WS 联调可以在 `pnpm run dev` 下进行。
  * - 通过字符串 key 对 DB 实例做命名空间隔离，以支持 system DB 与 per-server DB 并存。
  */
-import { invokeTauri } from "@/shared/tauri";
+import { invokeTauri, isTauriRuntimeAvailable } from "@/shared/tauri";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import SHA256 from "crypto-js/sha256";
 import type { DbExecResult, DbQueryResult, DbStatement, DbValue } from "./types";
@@ -96,30 +97,37 @@ export function createDbClient(key: string): DbClient {
   const dbKey = key.trim();
   return {
     async init(path?: string, kind?: DbInitKind): Promise<void> {
+      if (!isTauriRuntimeAvailable()) return;
       await invokeTauri(TAURI_COMMANDS.dbInit, { req: { key: dbKey, path, kind } });
     },
 
     async execute(sql: string, params?: DbValue[]): Promise<DbExecResult> {
+      if (!isTauriRuntimeAvailable()) return { rows_affected: 0, last_insert_rowid: null };
       return invokeTauri<DbExecResult>(TAURI_COMMANDS.dbExecute, { req: { key: dbKey, sql, params } });
     },
 
     async query(sql: string, columns: string[], params?: DbValue[]): Promise<DbQueryResult> {
+      if (!isTauriRuntimeAvailable()) return { columns, rows: [] };
       return invokeTauri<DbQueryResult>(TAURI_COMMANDS.dbQuery, { req: { key: dbKey, sql, params, columns } });
     },
 
     async transaction(statements: DbStatement[]): Promise<DbExecResult[]> {
+      if (!isTauriRuntimeAvailable()) return [];
       return invokeTauri<DbExecResult[]>(TAURI_COMMANDS.dbTransaction, { req: { key: dbKey, statements } });
     },
 
     async close(): Promise<void> {
+      if (!isTauriRuntimeAvailable()) return;
       await invokeTauri(TAURI_COMMANDS.dbClose, { key: dbKey });
     },
 
     async remove(): Promise<void> {
+      if (!isTauriRuntimeAvailable()) return;
       await invokeTauri(TAURI_COMMANDS.dbRemove, { key: dbKey });
     },
 
     async path(): Promise<string> {
+      if (!isTauriRuntimeAvailable()) return "";
       return invokeTauri<string>(TAURI_COMMANDS.dbPath, { key: dbKey });
     },
   };
