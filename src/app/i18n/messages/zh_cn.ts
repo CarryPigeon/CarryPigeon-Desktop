@@ -422,6 +422,7 @@ export const zh_cn = {
   channel_search_placeholder: "搜索频道（名称/ID）",
   channels_joined: "已加入",
   channels_joined_empty: "本地无匹配频道",
+  chat_workspace_bootstrap_failed: "无法同步聊天工作区，频道列表可能为空",
   channels_discover: "未加入频道",
   channels_discover_empty: "暂不支持服务端搜索",
   channels_uncategorized: "未分类",

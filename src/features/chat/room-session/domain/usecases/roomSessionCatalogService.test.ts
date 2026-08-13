@@ -58,6 +58,21 @@ function timeline(ids: string[], baseTime = 100): ChatMessage[] {
   return ids.map((id, i) => ({ id, timeMs: baseTime + i } as unknown as ChatMessage));
 }
 
+describe("RoomSessionCatalogApplicationService.refreshChannels membership", () => {
+  it("treats GET /channels rows as joined even when the summary omits joined", async () => {
+    const { service, channelsRef } = makeService({
+      channels: [{ id: "1", name: "public" } as ChatChannel],
+      unreads: [],
+      timelineByCid: {},
+      markerByCid: {},
+    });
+    await service.refreshChannels();
+    expect(channelsRef).toEqual([
+      expect.objectContaining({ id: "1", name: "public", joined: true, joinRequested: false }),
+    ]);
+  });
+});
+
 describe("RoomSessionCatalogApplicationService.refreshChannels unread override", () => {
   it("overrides server unread with local recompute when timeline is loaded", async () => {
     // 服务端说 c1 有 3 条未读，但本地时间线全部在已读标记之前 -> 应显示为 0

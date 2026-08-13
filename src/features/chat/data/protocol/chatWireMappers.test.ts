@@ -85,6 +85,22 @@ describe("mapChatChannelWire", () => {
     const result = mapChatChannelWire(wire as any);
     expect(result.name).toBe("ch2");
   });
+
+  it("maps CarryPigeon-Server ChannelSummary fields without joined/type", () => {
+    const wire = {
+      cid: "1",
+      name: "public",
+      brief: "",
+      avatar: "",
+      owner_uid: "1001",
+    };
+    const result = mapChatChannelWire(wire as any);
+    expect(result.id).toBe("1");
+    expect(result.name).toBe("public");
+    expect(result.ownerUserId).toBe("1001");
+    expect(result.joined).toBeUndefined();
+    expect(result.type).toBeUndefined();
+  });
 });
 
 // ── mapChatUnreadStateWire ──

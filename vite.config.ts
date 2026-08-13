@@ -83,6 +83,18 @@ export default defineConfig(({ command }) => {
         // 3. tell vite to ignore watching `src-tauri`
         ignored: ["**/src-tauri/**"],
       },
+      // 浏览器预览联调：把同 origin 的 `/api` 转到 CarryPigeon-Server，避开受保护接口 OPTIONS 预检 500。
+      proxy: {
+        "/api/ws": {
+          target: process.env.VITE_DEV_WS_PROXY_TARGET || "ws://127.0.0.1:18080",
+          ws: true,
+          changeOrigin: true,
+        },
+        "/api": {
+          target: process.env.VITE_DEV_API_PROXY_TARGET || "http://127.0.0.1:8080",
+          changeOrigin: true,
+        },
+      },
     },
 
     // Build optimizations

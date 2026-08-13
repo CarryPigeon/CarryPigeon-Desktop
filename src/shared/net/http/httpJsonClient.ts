@@ -6,6 +6,7 @@
  * - 在有 token 时附加 `Authorization: Bearer ...`
  * - 解析 JSON 成功响应
  * - 将非 2xx 响应归一化为 `ApiRequestError`
+ * - 浏览器 Vite 预览下，对本机默认 HTTP 服务走同 origin `/api` 代理，避开 CORS 预检失败
  *
  * 设计原则：
  * - 不做完整 SDK（避免过度抽象）；各 feature 的 data adapter 仍应保留自己的 DTO/映射。
@@ -14,6 +15,7 @@
  */
 
 import { ApiRequestError, parseApiErrorEnvelope, type ApiErrorEnvelope } from "./apiErrors";
+import { getDevProxiedApiBaseUrl, shouldUseDevApiProxy } from "./devApiProxy";
 import { toHttpOrigin } from "./serverOrigin";
 import { createLogger } from "@/shared/utils/logger";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
@@ -53,6 +55,9 @@ export type HttpJsonClientConfig = {
  * @returns 例如 `https://host:port/api`（无尾随 `/`）；失败时返回空字符串。
  */
 function toApiBaseUrl(serverSocket: string): string {
+  if (shouldUseDevApiProxy(serverSocket)) {
+    return getDevProxiedApiBaseUrl();
+  }
   const origin = toHttpOrigin(serverSocket);
   if (!origin) return "";
   return `${origin}/api`;

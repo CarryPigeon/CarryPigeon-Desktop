@@ -259,7 +259,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
 
   async function bootstrapWorkspace(): Promise<void> {
     const outcome = await bootstrapCurrentWorkspace();
-    if (!outcome.ok) logAsyncError("chat_patchbay_bootstrap_rejected", outcome.error);
+    if (!outcome.ok) {
+      logAsyncError("chat_patchbay_bootstrap_rejected", outcome.error);
+      toast.error(t("chat_workspace_bootstrap_failed"));
+    }
   }
 
   function handleQuickSwitcherRouteSelect(path: string): void {

@@ -8,6 +8,7 @@
  * - `docs/api/12-WebSocket事件清单（v1，标准版）.md`
  */
 
+import { getDevProxiedWsUrl, shouldUseDevApiProxy } from "@/shared/net/http/devApiProxy";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import { compareEventId } from "@/shared/net/ws/eventId";
 import { getDeviceId } from "@/shared/utils/deviceId";
@@ -189,7 +190,11 @@ export function connectChatWs(
   const origin = toHttpOrigin(socket);
   if (!origin) throw new Error("无法解析 server origin");
   const wsOrigin = toWsOrigin(origin);
-  const wsUrl = normalizeWsUrlOverride(options?.wsUrlOverride ?? "", wsOrigin) || `${wsOrigin}/api/ws`;
+  const proxiedWsUrl = shouldUseDevApiProxy(socket) ? getDevProxiedWsUrl() : "";
+  const wsUrl =
+    proxiedWsUrl ||
+    normalizeWsUrlOverride(options?.wsUrlOverride ?? "", wsOrigin) ||
+    `${wsOrigin}/api/ws`;
 
   let ws: WebSocket | null = null;
   let pingTimer: number | null = null;

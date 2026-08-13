@@ -420,6 +420,7 @@ export const en_us = {
   channel_search_placeholder: "Search channels (name/ID)",
   channels_joined: "Joined",
   channels_joined_empty: "No local matches",
+  chat_workspace_bootstrap_failed: "Failed to sync the chat workspace; the channel list may be empty",
   channels_discover: "Not Joined",
   channels_discover_empty: "Server search unavailable",
   channels_uncategorized: "Uncategorized",
