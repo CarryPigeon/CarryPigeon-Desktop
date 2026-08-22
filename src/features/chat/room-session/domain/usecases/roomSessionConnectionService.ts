@@ -10,10 +10,12 @@
 import type { ChatEventsConnectOptions } from "@/features/chat/domain/types/chatEventModels";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 import type { PollingFallbackController } from "../services/pollingFallback";
+import type { PreferenceCatchUpScheduler } from "../services/preferenceCatchUpScheduler";
 import type { ChatSessionWsManager } from "../services/wsManager";
 
 type LoggerLike = {
   info(message: string, payload?: Record<string, unknown>): void;
+  warn(message: string, payload?: Record<string, unknown>): void;
 };
 
 type SessionListenerStopper = (() => void) | null;
@@ -51,6 +53,14 @@ export type RoomSessionConnectionApplicationServiceDeps = {
   wsManager: ChatSessionWsManager;
   polling: PollingFallbackController | null;
   stopPolling: () => void;
+  /**
+   * 偏好感知补拉调度器（可空）。
+   *
+   * 背景：服务端 realtime 会按通知偏好过滤 mentions_only/muted 频道的
+   * `message.created` 事件，该类频道无法依赖 WS 推送保持实时，
+   * 由客户端低频补拉兜底；会话就绪后启动，切服/销毁由外层停止。
+   */
+  preferenceCatchUp: PreferenceCatchUpScheduler | null;
   startAutoRefresh: (socketKey: string) => { stop: () => void };
   onAuthSessionChanged: (socketKey: string, listener: (session: { accessToken?: string } | null) => void) => () => void;
   onWsEvent: (evt: ChatEventEnvelope) => void;
@@ -62,7 +72,19 @@ export type RoomSessionConnectionApplicationServiceDeps = {
  */
 export class RoomSessionConnectionApplicationService {
   private readonly inFlightByScope = new Map<string, Promise<void>>();
-  private readonly reconnectScheduledByScope = new Set<string>();
+  /**
+   * 已进入“WS 降级 → HTTP polling”状态的 socket 集合。
+   *
+   * 由 WS 客户端的 onConnectionLost / onConnectionRestored 回调驱动，
+   * 用于保证降级只启动一次、恢复只停止一次。
+   */
+  private readonly degradedSockets = new Set<string>();
+  /**
+   * 每个 socket 上一次“用新 token 重建连接”所使用的 token。
+   *
+   * 用于在 auth 错误风暴中避免拿同一个失效 token 反复重建。
+   */
+  private readonly lastRecoveryTokenBySocket = new Map<string, string>();
   private sessionHooksSocket = "";
   private stopAutoRefresh: AutoRefreshStopper = null;
   private stopSessionListener: SessionListenerStopper = null;
@@ -82,6 +104,10 @@ export class RoomSessionConnectionApplicationService {
     this.stopAutoRefresh = null;
     this.stopSessionListener = null;
     this.sessionHooksSocket = "";
+    // 作用域钩子已释放：降级与重建尝试的记录一并清理，
+    // 避免切服后旧 socket 的降级态影响新作用域。
+    this.degradedSockets.clear();
+    this.lastRecoveryTokenBySocket.clear();
   }
 
   /**
@@ -114,6 +140,9 @@ export class RoomSessionConnectionApplicationService {
     const task = (async () => {
       if (isStale()) return;
       this.ensureSessionHooks(requestSocket);
+      // 会话就绪即启动偏好补拉：无论走 WS 还是 polling，
+      // mentions_only/muted 频道都需要客户端自行补拉保持时间线与未读新鲜。
+      this.deps.preferenceCatchUp?.start(requestSocket);
 
       await this.deps.refreshChannels();
       if (isStale()) return;
@@ -149,18 +178,14 @@ export class RoomSessionConnectionApplicationService {
       }
 
       if (isStale()) return;
-      this.deps.stopPolling();
 
-      const options: ChatEventsConnectOptions = {
-        wsUrlOverride: this.deps.getWsUrlOverride(key),
-        onResumeFailed: (reason) => {
-          this.deps.onResumeFailed(key, reason);
-        },
-        onAuthError: () => {
-          this.scheduleReconnect(requestScopeKey);
-        },
-      };
-      this.deps.wsManager.ensureConnected(key, token, this.deps.onWsEvent, options);
+      const options = this.buildConnectOptions(key);
+      const { reused } = this.deps.wsManager.ensureConnected(key, token, this.deps.onWsEvent, options);
+      if (!reused) {
+        // 新建连接视为一次恢复尝试：乐观停止降级轮询；
+        // 若随后认证仍失败，onConnectionLost 会重新降级，不会出现永久静默。
+        this.markFreshConnectionCreated(key);
+      }
     })().finally(() => {
       this.inFlightByScope.delete(requestScopeKey);
     });
@@ -191,14 +216,95 @@ export class RoomSessionConnectionApplicationService {
   }
 
   /**
-   * 在 authError 等需要延迟重连的场景下安排一次异步重入。
+   * 构建某个 socket 的 WS 连接选项（含降级/恢复/认证错误回调）。
    */
-  private scheduleReconnect(scopeKey: string): void {
-    if (this.reconnectScheduledByScope.has(scopeKey)) return;
-    this.reconnectScheduledByScope.add(scopeKey);
-    window.setTimeout(() => {
-      this.reconnectScheduledByScope.delete(scopeKey);
-      void this.ensureChatReady();
-    }, 0);
+  private buildConnectOptions(socketKey: string): ChatEventsConnectOptions {
+    return {
+      wsUrlOverride: this.deps.getWsUrlOverride(socketKey),
+      onResumeFailed: (reason) => {
+        this.deps.onResumeFailed(socketKey, reason);
+      },
+      onAuthError: (reason) => {
+        this.handleAuthError(socketKey, reason);
+      },
+      onConnectionLost: () => {
+        this.degradeToPolling(socketKey);
+      },
+      onConnectionRestored: () => {
+        this.recoverFromPolling(socketKey);
+      },
+    };
+  }
+
+  /**
+   * 新建 WS 连接后的统一处理：清除降级标记并乐观停止 polling。
+   *
+   * 若新连接随后认证失败，onConnectionLost 会重新进入降级态。
+   */
+  private markFreshConnectionCreated(socketKey: string): void {
+    const key = String(socketKey ?? "").trim();
+    if (!key) return;
+    this.degradedSockets.delete(key);
+    if (!this.deps.polling?.isRunningFor(key)) return;
+    this.deps.stopPolling();
+  }
+
+  /**
+   * 连接持续失败：降级为 HTTP polling（幂等）。
+   */
+  private degradeToPolling(socketKey: string): void {
+    const key = String(socketKey ?? "").trim();
+    if (!key) return;
+    this.degradedSockets.add(key);
+    if (this.deps.polling?.isRunningFor(key)) return;
+    this.deps.stopPolling();
+    this.deps.logger.info("Action: chat_ws_degraded_to_polling", { socket: key });
+    this.deps.polling?.start(key);
+  }
+
+  /**
+   * 连接恢复：退出降级态并停止 polling。
+   */
+  private recoverFromPolling(socketKey: string): void {
+    const key = String(socketKey ?? "").trim();
+    if (!key) return;
+    if (!this.degradedSockets.delete(key)) return;
+    this.deps.logger.info("Action: chat_ws_recovered_from_polling", { socket: key });
+    this.deps.stopPolling();
+  }
+
+  /**
+   * 处理 auth/reauth 错误：尝试用最新 token 强制重建连接；
+   * 拿不到“不同的有效 token”时降级为 polling 兜底。
+   */
+  private handleAuthError(socketKey: string, reason: string): void {
+    const key = String(socketKey ?? "").trim();
+    if (!key) return;
+    void (async () => {
+      try {
+        const [socket, rawToken] = await this.deps.getSocketAndValidToken();
+        const freshToken = String(rawToken ?? "").trim();
+        const lastAttempted = this.lastRecoveryTokenBySocket.get(key) ?? "";
+        if (socket !== key || !freshToken || freshToken === lastAttempted) {
+          // 拿不到新 token，或与上次重建尝试相同：先降级轮询，
+          // 等 token 真正轮换后再由下一次 auth 错误触发重建。
+          this.degradeToPolling(key);
+          return;
+        }
+        this.lastRecoveryTokenBySocket.set(key, freshToken);
+        this.deps.logger.warn("Action: chat_ws_reconnect_with_fresh_token", {
+          socket: key,
+          reason,
+        });
+        this.deps.wsManager.forceReconnect(key, freshToken, this.deps.onWsEvent, this.buildConnectOptions(key));
+        this.markFreshConnectionCreated(key);
+      } catch (error) {
+        this.deps.logger.warn("Action: chat_ws_auth_error_recovery_failed", {
+          socket: key,
+          error: String(error),
+        });
+        this.degradeToPolling(key);
+      }
+    })();
   }
 }

@@ -96,12 +96,34 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     state: deps.readStateProjection,
   });
 
+  /**
+   * mention 触发的频道最新页补拉：按 cid 去重并发中的补拉，
+   * 避免短时间多条提及造成重复请求（不依赖调用方是否已包一层 dedupe）。
+   */
+  const mentionRefreshInFlight = new Map<string, Promise<void>>();
+
   return function handleWsEvent(env: ChatEventEnvelope): void {
     const eventType = String(env.eventType ?? "").trim();
     const payload = env.payload && typeof env.payload === "object" ? (env.payload as Record<string, unknown>) : null;
 
     if (routeGovernanceEvent(eventType, payload)) return;
     if (routeMessageEvent(eventType, payload)) return;
+
+    // 服务端 realtime 会按通知偏好过滤 mentions_only/muted 频道的 message.created，
+    // 但 mention.created 始终可达 —— 用它作为该类频道时间线的即时补拉信号。
+    if (eventType === "mention.created") {
+      const cid = String(payload?.channelId ?? "").trim();
+      if (cid && !mentionRefreshInFlight.has(cid)) {
+        const pending = Promise.resolve()
+          .then(() => deps.refreshChannelLatestPage(cid))
+          .finally(() => {
+            if (mentionRefreshInFlight.get(cid) === pending) mentionRefreshInFlight.delete(cid);
+          });
+        mentionRefreshInFlight.set(cid, pending);
+      }
+      return;
+    }
+
     if (routeReadStateEvent(eventType, payload)) return;
 
     deps.logger.debug("Action: chat_ws_event_ignored", { eventType });

@@ -37,7 +37,9 @@ const {
   goBack,
 } = useChannelInfoPage();
 
-const membershipStatusText = computed(() => (membershipStatus.value === "joined" ? "joined" : "not joined"));
+const membershipStatusText = computed(() =>
+  membershipStatus.value === "joined" ? t("membership_joined") : t("membership_not_joined"),
+);
 </script>
 
 <template>
@@ -46,10 +48,10 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
   <main class="cp-info">
     <ErrorBoundary>
       <header class="cp-info__head">
-        <button class="cp-info__back" type="button" @click="goBack">Back</button>
+        <button class="cp-info__back" type="button" @click="goBack">{{ t("go_back") }}</button>
         <div class="cp-info__title">
           <div class="cp-info__name">{{ channelName }}</div>
-          <div class="cp-info__sub">Channel</div>
+          <div class="cp-info__sub">{{ t("channels") }}</div>
         </div>
         <div class="cp-info__headRight">
           <button class="cp-info__btn" type="button" @click="openInPatchbay">{{ t("back_to_patchbay") }}</button>
@@ -58,7 +60,7 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
 
       <section class="cp-info__body">
         <div class="cp-info__card">
-          <div class="cp-info__k">channel_id</div>
+          <div class="cp-info__k">{{ t("channel_id_label") }}</div>
           <div class="cp-info__v"><MonoTag :value="channelId || '—'" :copyable="true" /></div>
         </div>
         <div class="cp-info__card wide">
@@ -66,11 +68,11 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
           <div v-if="!isEditing" class="cp-info__v">{{ channelBrief || t("channel_brief_placeholder") }}</div>
           <div v-else class="cp-info__edit">
             <div class="cp-info__editField">
-              <div class="cp-info__editLabel">name</div>
+              <div class="cp-info__editLabel">{{ t("edit_name_label") }}</div>
               <t-input v-model="draftChannelName" clearable />
             </div>
             <div class="cp-info__editField">
-              <div class="cp-info__editLabel">brief</div>
+              <div class="cp-info__editLabel">{{ t("edit_brief_label") }}</div>
               <t-textarea v-model="draftChannelBrief" :autosize="{ minRows: 3, maxRows: 6 }" />
             </div>
             <div v-if="actionError" class="cp-info__error">{{ actionError }}</div>
@@ -83,7 +85,7 @@ const membershipStatusText = computed(() => (membershipStatus.value === "joined"
           </div>
         </div>
         <div class="cp-info__card wide">
-          <div class="cp-info__k">membership</div>
+          <div class="cp-info__k">{{ t("membership_label") }}</div>
           <div class="cp-info__v">
             <span class="cp-info__pill" :data-ok="membershipStatus === 'joined'">{{ membershipStatusText }}</span>
             <button v-if="canRequestJoin" class="cp-info__btn primary" type="button" :disabled="joinRequested || isRequestingJoin" @click="handleJoin">

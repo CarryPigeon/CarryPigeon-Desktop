@@ -72,5 +72,6 @@ export function mapApiChannel(c: ChatChannelRecord): ChannelSummary {
     announcement: c.announcement,
     categoryId: c.categoryId ? String(c.categoryId).trim() : undefined,
     categoryName: c.categoryName ? String(c.categoryName).trim() : undefined,
+    channelType: c.type ? String(c.type).trim() : undefined,
   };
 }

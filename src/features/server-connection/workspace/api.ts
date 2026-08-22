@@ -151,6 +151,30 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
     rackCapabilities.selectSocket(serverSocket);
   }
 
+  /**
+   * 确保某个 server 在 rack 目录中有条目（兜底，修复“已登录但服务器列表为空”）。
+   *
+   * 背景：此前只在登录页成功路径补建 rack；自动恢复会话或刷新失败时会漏建。
+   * 行为：
+   * - 目录无该 socket 条目 → 以 server info 名称（缺省占位 "Server"）新增；
+   * - 已有条目但名称为占位名且拿到真实名称 → 更名；用户自定义名称不覆盖。
+   */
+  function ensureRackEntryForSocket(serverSocket: string): void {
+    const trimmed = String(serverSocket ?? "").trim();
+    if (!trimmed) return;
+    const existing = rackCapabilities.listDirectory().find((item) => item.serverSocket === trimmed);
+    const infoName = String(serverInfoCapabilities.getSnapshot(trimmed)?.name ?? "").trim();
+    if (!existing) {
+      rackCapabilities.addServer(trimmed, infoName || "Server");
+      return;
+    }
+    const isPlaceholderName =
+      existing.name.trim() === "" || existing.name === "Default" || existing.name === "Unnamed Rack";
+    if (isPlaceholderName && infoName && infoName !== existing.name) {
+      rackCapabilities.updateServerNameBySocket(trimmed, infoName);
+    }
+  }
+
   function readCurrentServerWorkspaceInfo(): ServerInfo | null {
     return cloneServerInfo(serverInfoCapabilities.getSnapshot(readCurrentServerWorkspaceSocket()));
   }
@@ -168,6 +192,7 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
     }
     try {
       await connectivityCapabilities.connectWithRetry(socket, options);
+      ensureRackEntryForSocket(socket);
       return {
         ok: true,
         kind: "server_connection_ready",
@@ -193,6 +218,7 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
     }
     try {
       await connectivityCapabilities.retry();
+      ensureRackEntryForSocket(socket);
       return {
         ok: true,
         kind: "server_connection_ready",
@@ -292,6 +318,8 @@ export function createServerWorkspaceCapabilities(): ServerWorkspaceCapabilities
           };
         }
       }
+
+      ensureRackEntryForSocket(socket);
 
       return {
         ok: true,

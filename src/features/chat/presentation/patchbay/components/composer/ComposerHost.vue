@@ -94,6 +94,14 @@ const canSend = computed(computeCanSend);
 const { t } = useI18n();
 const logger = createLogger("ComposerHost");
 
+/**
+ * 当前是否选中内置语音域（Core:Voice）。
+ *
+ * 语音与 Core:Text 同级：选中该域时，输入区渲染为语音录制面板，
+ * 录制完成直接走发送流程；不再依赖工具栏常驻录音按钮。
+ */
+const isVoiceDomain = computed(() => props.domainId.trim() === "Core:Voice");
+
 const domainExpanded = ref(false);
 const isUploadingVoice = ref(false);
 
@@ -389,9 +397,9 @@ function selectSystemMention(type: "everyone" | "here"): void {
 <template>
   <!-- 组件：ComposerHost｜职责：统一发送区（工具栏 + 输入 + 发送） -->
   <section ref="composerEl" class="cp-composer" :class="{ 'cp-composer--collapsed': collapsed }">
-    <!-- 折叠态：只显示占位输入条 -->
+    <!-- 折叠态：只显示占位输入条（v-show 保持挂载，配合展开动画平滑切换） -->
     <div
-      v-if="collapsed"
+      v-show="collapsed"
       class="cp-composer__collapsed"
       role="button"
       tabindex="0"
@@ -403,8 +411,11 @@ function selectSystemMention(type: "everyone" | "here"): void {
       <button class="cp-composer__send" type="button" disabled>{{ t('send') }}</button>
     </div>
 
+    <!-- 展开态：常驻挂载；外层用 grid-template-rows 0fr↔1fr 做高度过渡，折叠时 inert 防误焦 -->
+    <div class="cp-composer__expander" :data-open="!collapsed" :inert="collapsed">
+      <div class="cp-composer__expandedClip">
     <!-- 展开态：完整编辑器 -->
-    <div v-else class="cp-composer__expanded" @focusin="expand" @focusout="handleBlur">
+    <div class="cp-composer__expanded" @focusin="expand" @focusout="handleBlur">
       <div v-if="props.replyTitle || props.replySnippet" class="cp-reply">
         <div class="cp-reply__left">
           <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
@@ -442,11 +453,6 @@ function selectSystemMention(type: "everyone" | "here"): void {
           @send-text="handleStickerText"
         />
         <FileUploadButton @error="(err: string) => emit('file-upload-error', err)" />
-        <VoiceMessageRecorder
-          :disabled="isUploadingVoice"
-          @recorded="handleVoiceRecorded"
-          @error="(msg: string) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
-        />
         <ScreenshotButton />
       </div>
     </div>
@@ -471,6 +477,17 @@ function selectSystemMention(type: "everyone" | "here"): void {
           @submit="handlePluginSubmit"
         />
       </div>
+      <template v-else-if="isVoiceDomain">
+        <!-- 语音域编辑器：录制面板（录制完成即发送） -->
+        <div class="cp-composer__voice">
+          <VoiceMessageRecorder
+            :disabled="Boolean(props.disabled)"
+            @recorded="handleVoiceRecorded"
+            @error="(msg: string) => logger.error('Action: chat_voice_message_recorder_error', { error: msg })"
+          />
+          <span class="cp-composer__hint">{{ t("voice_composer_hint") }}</span>
+        </div>
+      </template>
       <template v-else>
         <AttachmentPreviewBar
           :attachments="attachments"
@@ -494,8 +511,13 @@ function selectSystemMention(type: "everyone" | "here"): void {
     <!-- 操作行：发送按钮 -->
     <div class="cp-composer__actions">
       <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
-      <div v-else-if="props.domainId.trim() !== 'Core:Text'" class="cp-composer__hint">{{ t("no_composer_available") }}</div>
-      <button v-else class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
+      <div
+        v-else-if="props.domainId.trim() !== 'Core:Text' && !isVoiceDomain"
+        class="cp-composer__hint"
+      >
+        {{ t("no_composer_available") }}
+      </div>
+      <button v-else-if="!isVoiceDomain" class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
         {{ props.sending ? `${t('send')}…` : t("send") }}
       </button>
     </div>
@@ -533,6 +555,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
         {{ sys.label }}
       </button>
     </div>
+    </div>
+      </div>
     </div>
   </section>
 </template>
@@ -836,6 +860,34 @@ function selectSystemMention(type: "everyone" | "here"): void {
 .cp-composer__collapsed .cp-composer__send {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* 展开区高度过渡：0fr↔1fr + 裁剪层，展开/折叠平滑不跳变 */
+.cp-composer__expander {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 180ms var(--cp-ease),
+    opacity 150ms var(--cp-ease);
+}
+
+.cp-composer__expander[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.cp-composer__expandedClip {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 语音域编辑器面板 */
+.cp-composer__voice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
 }
 
 .cp-composer__expanded {

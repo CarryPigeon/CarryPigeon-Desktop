@@ -64,6 +64,12 @@ export type ChatSessionRuntimeDeps = {
   scope: ChatRuntimeScopePort;
   readStateReporter: ChatReadStateReporterPort;
   onWsEvent: (env: ChatEventEnvelope) => void;
+  /**
+   * 列出生效通知级别非 all 的频道 id（mentions_only / muted）。
+   *
+   * 供连接 runtime 装配偏好感知补拉调度器（服务端会过滤该类频道的消息事件）。
+   */
+  listNonAllNotificationChannels: () => string[];
 };
 
 /**
@@ -98,6 +104,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     scope,
     readStateReporter,
     onWsEvent,
+    listNonAllNotificationChannels,
   } = deps;
   const sessionState = createRoomSessionStatePort({
     channelsRef,
@@ -126,6 +133,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     messageFlow,
     scope,
     onWsEvent,
+    listNonAllNotificationChannels,
   });
 
   // 频道切换、读状态推进属于“当前频道视图动作”，和底层连接生命周期拆开装配。

@@ -6,7 +6,6 @@
 
 import { proxyRefs, type ShallowUnwrapRef } from "vue";
 import type { ComputedRef, Ref } from "vue";
-import type { QuickSwitcherItem } from "@/features/chat/presentation/patchbay/state/quickSwitcherTypes";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 
@@ -100,21 +99,6 @@ type PatchbayChannelDialogsRawModel = {
  * Patchbay 页面频道弹窗 section model。
  */
 export type PatchbayChannelDialogsModel = ShallowUnwrapRef<PatchbayChannelDialogsRawModel>;
-
-type PatchbayQuickSwitcherRawModel = {
-  open: RefLike<boolean>;
-  query: RefLike<string>;
-  activeIndex: RefLike<number>;
-  items: RefLike<readonly QuickSwitcherItem[]>;
-  setOpen(open: boolean): void;
-  setQuery(query: string): void;
-  setActiveIndex(index: number): void;
-  handleSelect(item: QuickSwitcherItem): void;
-};
-/**
- * Patchbay 页面快速切换器 section model。
- */
-export type PatchbayQuickSwitcherModel = ShallowUnwrapRef<PatchbayQuickSwitcherRawModel>;
 
 type CreatePatchbayServerRailSectionDeps = {
   racks: RefLike<readonly { serverSocket: string; name: string }[]>;
@@ -281,32 +265,5 @@ export function createPatchbayChannelDialogsSection(deps: CreatePatchbayChannelD
     openCreateFriendPrivateChatDialog: deps.openCreateFriendPrivateChatDialog,
     handleChannelCreated: deps.handleChannelCreated,
     handleChannelDeleted: deps.handleChannelDeleted,
-  });
-}
-
-type CreatePatchbayQuickSwitcherSectionDeps = {
-  open: RefLike<boolean>;
-  query: RefLike<string>;
-  activeIndex: RefLike<number>;
-  items: RefLike<readonly QuickSwitcherItem[]>;
-  setOpen(open: boolean): void;
-  setQuery(query: string): void;
-  setActiveIndex(index: number): void;
-  handleSelect(item: QuickSwitcherItem): void;
-};
-
-/**
- * 创建快速切换器 section model。
- */
-export function createPatchbayQuickSwitcherSection(deps: CreatePatchbayQuickSwitcherSectionDeps): PatchbayQuickSwitcherModel {
-  return proxyRefs({
-    open: deps.open,
-    query: deps.query,
-    activeIndex: deps.activeIndex,
-    items: deps.items,
-    setOpen: deps.setOpen,
-    setQuery: deps.setQuery,
-    setActiveIndex: deps.setActiveIndex,
-    handleSelect: deps.handleSelect,
   });
 }

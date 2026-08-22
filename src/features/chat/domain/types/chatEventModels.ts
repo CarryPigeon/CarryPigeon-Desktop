@@ -243,4 +243,17 @@ export type ChatEventsConnectOptions = {
   wsUrlOverride?: string;
   onResumeFailed?: (reason: string) => void;
   onAuthError?: (reason: string) => void;
+  /**
+   * 连接持续失败（连续多次未能完成认证）时回调一次。
+   *
+   * 语义：上层应据此启动降级（如 HTTP polling）；
+   * 同一段“失败期”内只触发一次，认证成功后重置。
+   */
+  onConnectionLost?: () => void;
+  /**
+   * 处于 lost 态的连接重新认证成功时回调一次。
+   *
+   * 语义：上层应据此停止降级（如停止 polling）。
+   */
+  onConnectionRestored?: () => void;
 };

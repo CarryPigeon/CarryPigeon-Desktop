@@ -3,12 +3,6 @@
     "private": true,
     "version": "0.4.0",
     "type": "module",
-    "pnpm": {
-        "onlyBuiltDependencies": [
-            "@parcel/watcher",
-            "esbuild"
-        ]
-    },
     "scripts": {
         "dev": "vite",
         "vendor:build": "vite build --config src/features/plugins/vite.vendor.config.ts",

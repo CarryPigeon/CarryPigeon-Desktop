@@ -11,7 +11,6 @@ import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { useLoginWizard } from "../composables/useLoginWizard";
 import { useLoginEmailAuth } from "../composables/useLoginEmailAuth";
 import { useLoginPasswordAuth } from "../composables/useLoginPasswordAuth";
-import { useLoginHotkeys } from "../composables/useLoginHotkeys";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
@@ -86,8 +85,6 @@ function switchAuthMethod(method: "email" | "password"): void {
   clearEmailBanner();
   clearPasswordBanner();
 }
-
-useLoginHotkeys(router);
 </script>
 
 <template>

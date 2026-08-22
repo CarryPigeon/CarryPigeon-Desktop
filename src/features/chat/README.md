@@ -75,7 +75,6 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
   - `message-flow/message/presentation/components/`：消息时间线共享组件与未知 domain 降级卡，统一由 message 子域持有。
   - `composables/useSignalViewport`：消息面板滚动/分页/已读上报编排。
   - `composables/usePatchbayLifecycle`：主页面启动与全局监听器生命周期。
-  - `composables/useQuickSwitcher`：快速切换候选构建与选中动作分发。
   - `composables/useMessageContextMenu`：消息右键菜单状态与动作分发。
   - `composables/useChannelSettingsMenu`：频道设置菜单坐标与显隐编排。
   - `composables/useChannelNavigation`：频道详情类页面路由跳转与 query 组装。
@@ -87,7 +86,7 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
   - `presentation/patchbay/page/usePatchbayPageModel`：作为 MainPage 的页面装配根，负责把 workspace、子域 capability、导航、浮层、快捷键、生命周期和 layout model 组装成最终页面模型。
   - `presentation/patchbay/page/patchbayPageSections`：承载 Patchbay 各局部 section 的局部模型类型与构造器，避免页面装配根再次膨胀成样板聚合点。
   - `presentation/patchbay/view-models/useChannelRailModel` / `useMembersRailModel` / `useChatCenterModel`：把 layout 组件所需的 store 读取与交互动作下沉成 view-model；这些模型优先消费 room-session/message-flow/governance capability 创建的局部视图，而不是直接触碰原始 store 字段。
-  - `presentation/patchbay/interactions/usePatchbayHotkeys`：主窗口全局快捷键与浮层收拢逻辑。
+  - `presentation/patchbay/interactions/usePatchbayHotkeys`：主窗口 Esc 关闭浮层的收拢逻辑。
   - `presentation/patchbay/navigation/usePluginNavigation`：插件中心入口与安装提示跳转编排。
   - `presentation/patchbay/page/usePluginHostBridge`：只负责 host bridge 注入/卸载生命周期，不再混入 domain registry 只读视图查询。
   - `presentation/patchbay/interactions/asyncTaskRunner`：页面交互层统一异步异常兜底 helper。

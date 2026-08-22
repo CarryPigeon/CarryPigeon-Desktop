@@ -30,7 +30,7 @@ export function createMessageMapper(deps: MessageModelDeps) {
   function mapWireMessage(serverSocket: string, m: ChatMessageRecord): ChatMessage {
     const mid = String(m.id ?? "").trim() || `msg_${Date.now()}`;
     const uid = String(m.userId ?? "").trim();
-    const fromName = String(m.sender?.nickname ?? "").trim() || (uid ? `u:${uid.slice(-6)}` : "Unknown");
+    const fromName = String(m.sender?.nickname ?? "").trim() || (uid ? `用户 ${uid}` : "未知用户");
     const fromAvatarUrl = (m.sender?.avatar ?? "").trim() || undefined;
     const timeMs = Number(m.sentTime ?? 0) || Date.now();
     const domainLabel = String(m.domain ?? "").trim() || "Unknown:Domain";
@@ -54,7 +54,7 @@ export function createMessageMapper(deps: MessageModelDeps) {
     const replyTo = m.replyTo
       ? {
           messageId: String(m.replyTo.messageId ?? "").trim(),
-          senderName: String(m.replyTo.senderName ?? "").trim() || String(m.sender?.nickname ?? "Unknown"),
+          senderName: String(m.replyTo.senderName ?? "").trim() || String(m.sender?.nickname ?? "未知用户"),
           preview: String(m.replyTo.preview ?? "").trim(),
           createdAt: Number(m.replyTo.createdAt ?? 0) || 0,
           unavailable: Boolean(m.replyTo.unavailable),
@@ -62,7 +62,7 @@ export function createMessageMapper(deps: MessageModelDeps) {
       : replyToId
         ? {
             messageId: replyToId,
-            senderName: "Unknown",
+            senderName: "未知用户",
             preview: "Original message unavailable",
             createdAt: 0,
             unavailable: true,

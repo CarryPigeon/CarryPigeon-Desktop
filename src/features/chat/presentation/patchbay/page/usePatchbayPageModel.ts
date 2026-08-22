@@ -27,14 +27,14 @@ import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance
 import type { RoomSessionCapabilities } from "@/features/chat/room-session/api-types";
 import { useChannelNavigation } from "../navigation/useChannelNavigation";
 import { useSignalViewport } from "../interactions/useSignalViewport";
+import { useChannelInfoDialog } from "../interactions/useChannelInfoDialog";
+import { isSameUserId } from "@/features/chat/shared-kernel/userId";
 import { usePatchbayLifecycle } from "./usePatchbayLifecycle";
-import { useQuickSwitcher } from "../interactions/useQuickSwitcher";
 import { useMessageContextMenu } from "../interactions/useMessageContextMenu";
 import { useChannelSettingsMenu } from "../interactions/useChannelSettingsMenu";
 import { useChannelDialogs } from "../interactions/useChannelDialogs";
 import { createAsyncTaskRunner } from "../interactions/asyncTaskRunner";
 import { usePatchbayHotkeys } from "../interactions/usePatchbayHotkeys";
-import type { ShortcutBinding } from "../interactions/usePatchbayHotkeys";
 import { usePluginNavigation } from "../navigation/usePluginNavigation";
 import { usePatchbayWorkspace } from "./usePatchbayWorkspace";
 import { useChannelRailModel } from "../view-models/useChannelRailModel";
@@ -64,13 +64,11 @@ import {
   createPatchbayChannelSettingsMenuSection,
   createPatchbayChatViewportSection,
   createPatchbayMessageContextMenuSection,
-  createPatchbayQuickSwitcherSection,
   createPatchbayServerRailSection,
   type PatchbayChannelDialogsModel,
   type PatchbayChannelSettingsMenuModel,
   type PatchbayChatViewportModel,
   type PatchbayMessageContextMenuModel,
-  type PatchbayQuickSwitcherModel,
   type PatchbayServerRailModel,
 } from "./patchbayPageSections";
 
@@ -104,7 +102,8 @@ type PatchbayPageRawModel = {
   messageContextMenu: PatchbayMessageContextMenuModel;
   channelSettingsMenu: PatchbayChannelSettingsMenuModel;
   channelDialogs: PatchbayChannelDialogsModel;
-  quickSwitcher: PatchbayQuickSwitcherModel;
+  /** 频道信息应用内弹窗。 */
+  channelInfoDialog: ReturnType<typeof useChannelInfoDialog>;
   channels: ComputedRef<readonly ChannelSummary[]>;
   linkPreview: Ref<ChatLinkPreview | null>;
   fetchLinkPreview(url: string): Promise<void>;
@@ -118,12 +117,6 @@ type PatchbayPageRawModel = {
   connectionToastLabel: ComputedRef<string>;
   /** 连接状态悬浮窗操作按钮标签。 */
   connectionToastActionLabel: ComputedRef<string>;
-  /** 快捷键帮助面板可见性。 */
-  shortcutHelpOpen: Ref<boolean>;
-  /** 关闭快捷键帮助面板。 */
-  closeShortcutHelp: () => void;
-  /** 快捷键绑定列表。 */
-  bindings: ShortcutBinding[];
   /** 频道右键菜单相关状态。 */
   channelContextMenu: {
     open: Ref<boolean>;
@@ -167,13 +160,15 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const messageTimelineSnapshot = useObservedCapabilitySnapshot(currentChannelMessageFlow);
   const {
     findChannelById,
-    openChannelInfo,
     openChannelMembers,
     openJoinApplications,
     openChannelBans,
   } = useChannelNavigation({
     allChannels: computed(() => roomDirectorySnapshot.value.allChannels),
   });
+
+  // 频道信息应用内弹窗（频道列表 ⓘ / 右键菜单共用入口）。
+  const channelInfoDialog = useChannelInfoDialog({ findChannelById });
   const flashMessage = ref<string>("");
   const linkPreview = ref<ChatLinkPreview | null>(null);
   const rightRailOpen = ref(false);
@@ -234,7 +229,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     serverInfo,
     serverRacks,
     missingRequiredCount,
-    quickSwitcherPlugins,
     domainRegistryView,
     handleSwitchServer,
     bootstrapCurrentWorkspace,
@@ -265,14 +259,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     }
   }
 
-  function handleQuickSwitcherRouteSelect(path: string): void {
-    void router.push(path);
-  }
-
-  function handleQuickSwitcherPluginSelect(pluginId: string): void {
-    void router.push({ path: "/plugins", query: { focus_plugin_id: pluginId } });
-  }
-
   function handleOpenServers(): void {
     void router.push("/servers");
   }
@@ -291,14 +277,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
 
   function handleOpenRequiredSetup(): void {
     void router.push("/required-setup");
-  }
-
-  function handleQuickSwitcherServerSelect(serverSocket: string): void {
-    runServerSwitch(serverSocket);
-  }
-
-  function handleQuickSwitcherChannelDiscoverFocus(channelName: string): void {
-    roomDirectory.focusDiscoverChannel(channelName);
   }
 
   const {
@@ -396,7 +374,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       }
     },
     openChannelInfo: (channelId) => {
-      router.push(`/channel-info?cid=${encodeURIComponent(channelId)}`);
+      channelInfoDialog.openChannelInfo(channelId);
     },
     markChannelRead: (channelId) => {
       // 本地将频道未读角标归零，不依赖服务端接受标记已读（避免已读游标卡死时红点残留）。
@@ -437,7 +415,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openPlugins: goPlugins,
     openRequiredSetup: handleOpenRequiredSetup,
     openCreateMenu: openCreateChatMenu,
-    openChannelInfo,
+    openChannelInfo: (channelId: string) => channelInfoDialog.openChannelInfo(channelId),
     openServerInfo: handleOpenServers,
     openServerManager: handleOpenServerManager,
     openFileManager: handleOpenFileManager,
@@ -456,10 +434,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const membersRail = useMembersRailModel({
     members: roomGovernance.currentChannel.members,
   });
-
-  function handleReplyShortcut(messageId: string): void {
-    currentChannelMessageFlow.beginReply(messageId);
-  }
 
   /**
    * 置顶消息。
@@ -656,7 +630,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     retryConnection: retryChatConnection,
     domainRegistryView,
     onLoadMoreMessages: handleLoadMoreMessages,
-    onReplyShortcut: handleReplyShortcut,
     onMessageContextMenu: handleMessageContextMenu,
     onForwardMessage: async (mid, req) => {
       if (IS_STORE_MOCK) {
@@ -676,6 +649,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     linkPreview,
     fetchLinkPreview,
     dismissLinkPreview,
+    resolveSenderName: (uid: string) => {
+      const member = membersSnapshot.value.find((m) => isSameUserId(m.id, uid));
+      return member?.name ?? "";
+    },
     chatApi: IS_STORE_MOCK ? undefined : httpChatApiPort,
     serverSocket: computed(() => socket.value),
     getAccessToken: async (s: string) => (await ensureValidAccessToken(s))?.trim() || undefined,
@@ -706,91 +683,19 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     chatCenter.connectionPillState === "offline" ? t("retry") : "",
   );
 
-  const {
-    quickSwitcherOpen,
-    quickSwitcherQuery,
-    quickSwitcherActiveIndex,
-    qsItems,
-    setQuickOpen,
-    setQuickQuery,
-    setQuickActiveIndex,
-    handleQuickSelect,
-    openQuickSwitcher,
-    closeQuickSwitcher,
-  } = useQuickSwitcher({
-    serverRacks,
-    allChannels: computed(() => roomDirectorySnapshot.value.allChannels),
-    plugins: quickSwitcherPlugins,
-    findChannelById,
-    onRouteSelect: handleQuickSwitcherRouteSelect,
-    onServerSelect: handleQuickSwitcherServerSelect,
-    onChannelSelect: currentSession.selectChannel,
-    onChannelDiscoverFocus: handleQuickSwitcherChannelDiscoverFocus,
-    onModuleSelect: handleQuickSwitcherPluginSelect,
-    onAsyncError: logAsyncError,
-  });
-
-  /** 快捷键帮助面板可见性。 */
-  const shortcutHelpOpen = ref(false);
-
-  function openShortcutHelp(): void {
-    shortcutHelpOpen.value = true;
-  }
-
-  function closeShortcutHelp(): void {
-    shortcutHelpOpen.value = false;
-  }
-
-  /**
-   * 切换到上一个可见频道。
-   */
-  function previousChannel(): void {
-    const channels = roomDirectorySnapshot.value.visibleChannels;
-    const currentId = currentSessionSnapshot.value.currentChannelId;
-    if (!channels.length || !currentId) return;
-    const idx = channels.findIndex((c) => c.id === currentId);
-    if (idx > 0) {
-      void currentSession.selectChannel(channels[idx - 1].id);
-    }
-  }
-
-  /**
-   * 切换到下一个可见频道。
-   */
-  function nextChannel(): void {
-    const channels = roomDirectorySnapshot.value.visibleChannels;
-    const currentId = currentSessionSnapshot.value.currentChannelId;
-    if (!channels.length || !currentId) return;
-    const idx = channels.findIndex((c) => c.id === currentId);
-    if (idx >= 0 && idx < channels.length - 1) {
-      void currentSession.selectChannel(channels[idx + 1].id);
-    }
-  }
-
-  const { onKeydown, bindings } = usePatchbayHotkeys({
-    quickSwitcherOpen,
+  const { onKeydown } = usePatchbayHotkeys({
     menuOpen,
     showChannelMenu,
     showCreateChatMenu,
     showCreateChannel,
     showCreateFriendPrivateChat,
     showDeleteChannel,
-    closeQuickSwitcher,
-    openQuickSwitcher,
     closeMenu,
     closeChannelMenu,
     closeCreateChatMenu,
     setShowCreateChannel,
     setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
-    goPlugins,
-    openSettings: handleOpenSettings,
-    openSearchPanel: () => chatCenter.openSearchPanel(),
-    openShortcutHelp,
-    closeShortcutHelp,
-    shortcutHelpOpen,
-    previousChannel,
-    nextChannel,
   });
 
   usePatchbayLifecycle({
@@ -889,17 +794,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleChannelDeleted,
   });
 
-  const quickSwitcher = createPatchbayQuickSwitcherSection({
-    open: quickSwitcherOpen,
-    query: quickSwitcherQuery,
-    activeIndex: quickSwitcherActiveIndex,
-    items: qsItems,
-    setOpen: setQuickOpen,
-    setQuery: setQuickQuery,
-    setActiveIndex: setQuickActiveIndex,
-    handleSelect: handleQuickSelect,
-  });
-
   const channels = computed(() => roomDirectorySnapshot.value.allChannels as readonly ChannelSummary[]);
 
   const rawModel: PatchbayPageRawModel = {
@@ -913,7 +807,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     messageContextMenu,
     channelSettingsMenu,
     channelDialogs,
-    quickSwitcher,
+    channelInfoDialog,
     linkPreview,
     fetchLinkPreview,
     dismissLinkPreview,
@@ -922,9 +816,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     toggleRightRail,
     connectionToastLabel,
     connectionToastActionLabel,
-    shortcutHelpOpen,
-    closeShortcutHelp,
-    bindings,
     channelContextMenu: {
       open: channelContextMenu.menuOpen,
       x: channelContextMenu.menuX,

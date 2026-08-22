@@ -14,11 +14,11 @@ import { usePatchbayPageModel } from "@/features/chat/presentation/patchbay/page
 import ChannelContextMenu from "@/features/chat/presentation/patchbay/components/menus/ChannelContextMenu.vue";
 import MessageContextMenu from "@/features/chat/presentation/patchbay/components/menus/MessageContextMenu.vue";
 import CreateChatMenu from "@/features/chat/presentation/patchbay/components/menus/CreateChatMenu.vue";
-import QuickSwitcher from "@/features/chat/presentation/patchbay/components/overlay/QuickSwitcher.vue";
 import ConnectionToast from "@/features/chat/presentation/patchbay/components/overlay/ConnectionToast.vue";
 import CreateChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateChannelDialog.vue";
 import CreateFriendPrivateChatDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateFriendPrivateChatDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
+import ChannelInfoDialog from "@/features/chat/presentation/channel-info/ChannelInfoDialog.vue";
 import "@/features/chat/public/styles";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
@@ -283,9 +283,6 @@ onBeforeUnmount(() => {
         :on-message-context-menu="page.chatViewport.handleMessageContextMenu"
         :on-more-click="page.chatViewport.handleMoreClick"
         :on-install-hint="page.chatViewport.handleInstallHint"
-        :shortcut-help-visible="page.shortcutHelpOpen"
-        :shortcut-bindings="page.bindings"
-        :on-close-shortcut-help="page.closeShortcutHelp"
       />
 
       <template v-if="page.rightRailOpen">
@@ -305,17 +302,6 @@ onBeforeUnmount(() => {
 
         <RightRailHost :model="page.membersRail" />
       </template>
-
-      <QuickSwitcher
-        :open="page.quickSwitcher.open"
-        :query="page.quickSwitcher.query"
-        :items="page.quickSwitcher.items"
-        :active-index="page.quickSwitcher.activeIndex"
-        @update:open="page.quickSwitcher.setOpen"
-        @update:query="page.quickSwitcher.setQuery"
-        @update:activeIndex="page.quickSwitcher.setActiveIndex"
-        @select="page.quickSwitcher.handleSelect"
-      />
 
       <ChannelContextMenu
         :open="page.channelContextMenu.open.value"
@@ -379,6 +365,15 @@ onBeforeUnmount(() => {
         :channel-name="page.channelDialogs.deleteChannelName"
         @update:visible="page.channelDialogs.setShowDeleteChannel($event)"
         @deleted="page.channelDialogs.handleChannelDeleted"
+      />
+
+      <!-- 区块：频道信息弹窗（频道列表 ⓘ / 右键菜单入口） -->
+      <ChannelInfoDialog
+        :visible="page.channelInfoDialog.visible"
+        :channel-id="page.channelInfoDialog.channelId"
+        :channel-name="page.channelInfoDialog.channelName"
+        :channel-brief="page.channelInfoDialog.channelBrief"
+        @update:visible="page.channelInfoDialog.close"
       />
 
       <ConnectionToast

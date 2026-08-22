@@ -27,6 +27,19 @@ type ChannelMetaDraft = {
   brief: string;
 };
 
+type RefLike<T> = Ref<T> | ComputedRef<T>;
+
+/**
+ * 非路由场景（应用内弹窗）的频道来源覆盖。
+ *
+ * 提供时优先于 route query，用于在 Dialog 中复用页面编排逻辑。
+ */
+export type ChannelInfoSourceOverride = {
+  id: string;
+  name?: string;
+  brief?: string;
+};
+
 /**
  * 频道信息页模型依赖。
  */
@@ -37,6 +50,10 @@ export type ChannelInfoPageDeps = {
   saveChannelAnnouncement(channelId: string, content: string): Promise<UpdateChannelAnnouncementOutcome>;
   resolveMayEditChannelMeta(channelId: string): Promise<boolean>;
   openPatchbayForChannel(channel: ChatChannel | null): Promise<ChannelSelectionOutcome | null> | ChannelSelectionOutcome | null;
+  /**
+   * 频道来源覆盖（弹窗模式）；缺省时从 route query 解析。
+   */
+  channelOverride?: RefLike<ChannelInfoSourceOverride | null>;
 };
 
 /**
@@ -116,15 +133,28 @@ function createDefaultChannelInfoPageDeps(router: Router): ChannelInfoPageDeps {
 /**
  * 创建频道信息页视图模型。
  *
- * @param deps - 页面动作依赖；默认连接到 chat 子域 API。
+ * @param deps - 页面动作依赖（Partial，缺省项回落到默认实现）；默认连接到 chat 子域 API。
  * @returns 频道信息页状态与动作。
  */
 export function useChannelInfoPage(
-  deps?: ChannelInfoPageDeps,
+  deps?: Partial<ChannelInfoPageDeps>,
 ): ChannelInfoPageModel {
   const router = useRouter();
-  const pageDeps = deps ?? createDefaultChannelInfoPageDeps(router);
-  const { channelId, requestedChannelName, requestedChannelBrief } = useChannelInfoPageRoute();
+  // 合并语义：调用方可只传覆盖项（如 channelOverride），其余动作回落到默认实现。
+  const pageDeps: ChannelInfoPageDeps = { ...createDefaultChannelInfoPageDeps(router), ...deps };
+  const routeCtx = useChannelInfoPageRoute();
+
+  // 频道来源：弹窗模式用 channelOverride，路由模式用 route query。
+  const channelIdOverride = computed(() => pageDeps.channelOverride?.value?.id ?? "");
+  const channelId = computed(() => (pageDeps.channelOverride ? channelIdOverride.value : routeCtx.channelId.value));
+  const requestedChannelName = computed(() => {
+    if (pageDeps.channelOverride) return pageDeps.channelOverride.value?.name ?? "";
+    return routeCtx.requestedChannelName.value;
+  });
+  const requestedChannelBrief = computed(() => {
+    if (pageDeps.channelOverride) return pageDeps.channelOverride.value?.brief ?? "";
+    return routeCtx.requestedChannelBrief.value;
+  });
   const directorySnapshot = useObservedCapabilitySnapshot(pageDeps.directory);
 
   const channel = computed(() => {

@@ -242,8 +242,8 @@ function escapeRegex(s: string): string {
 
 <style scoped lang="scss">
 .cp-searchPanel {
-  border-bottom: 1px solid var(--cp-border-color, #e0e0e0);
-  background: var(--cp-bg-secondary, #fafafa);
+  border-bottom: 1px solid var(--cp-border);
+  background: var(--cp-panel);
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
@@ -256,20 +256,45 @@ function escapeRegex(s: string): string {
   display: flex;
   align-items: center;
   gap: 8px;
+
+  /* 搜索输入框适配深色主题（覆盖 TDesign 默认浅色） */
+  :deep(.t-input) {
+    background: var(--cp-panel-muted);
+    border-color: var(--cp-border);
+  }
+
+  :deep(.t-input__wrap) {
+    background: transparent;
+  }
+
+  :deep(.t-input .t-input__inner) {
+    color: var(--cp-text);
+    caret-color: var(--cp-text);
+  }
+
+  :deep(.t-input::placeholder),
+  :deep(.t-input .t-input__inner::placeholder) {
+    color: var(--cp-text-muted);
+  }
 }
 
 .cp-searchPanel__close {
   border: none;
   background: transparent;
   font-size: 20px;
+  color: var(--cp-text-muted);
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
+
+  &:hover {
+    color: var(--cp-text);
+  }
 }
 
 .cp-searchPanel__state {
   font-size: 13px;
-  color: var(--cp-text-secondary, #888);
+  color: var(--cp-text-muted);
   padding: 4px 0;
 }
 
@@ -288,20 +313,20 @@ function escapeRegex(s: string): string {
 }
 
 .cp-searchPanel__state--empty {
-  color: var(--cp-text-secondary, #888);
+  color: var(--cp-text-muted);
 }
 
 .cp-searchPanel__retry {
   background: none;
-  border: 1px solid var(--cp-primary, #5865f2);
-  color: var(--cp-primary, #5865f2);
+  border: 1px solid var(--cp-accent, #5865f2);
+  color: var(--cp-accent, #5865f2);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 12px;
   cursor: pointer;
 
   &:hover {
-    background: color-mix(in oklab, var(--cp-primary) 10%, transparent);
+    background: color-mix(in oklab, var(--cp-accent) 10%, transparent);
   }
 }
 
@@ -327,22 +352,22 @@ function escapeRegex(s: string): string {
   outline: none;
 
   &:focus-visible {
-    outline: 2px solid var(--cp-primary, #5865f2);
+    outline: 2px solid var(--cp-accent, #5865f2);
     outline-offset: -2px;
   }
 
   &:hover {
-    background: color-mix(in oklab, var(--cp-primary) 8%, transparent);
+    background: color-mix(in oklab, var(--cp-accent) 8%, transparent);
   }
 }
 
 .cp-searchPanel__result--active {
-  background: color-mix(in oklab, var(--cp-primary) 12%, transparent);
+  background: color-mix(in oklab, var(--cp-accent) 12%, transparent);
 }
 
 .cp-searchPanel__resultSender {
   font-weight: 600;
-  color: var(--cp-text-primary, #222);
+  color: var(--cp-text);
 }
 
 .cp-searchPanel__resultChannel {
@@ -353,7 +378,7 @@ function escapeRegex(s: string): string {
 }
 
 .cp-searchPanel__resultPreview {
-  color: var(--cp-text-secondary, #888);
+  color: var(--cp-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

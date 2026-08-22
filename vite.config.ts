@@ -71,7 +71,9 @@ export default defineConfig(({ command }) => {
         : undefined,
       watch: {
         // 3. tell vite to ignore watching `src-tauri`
-        ignored: ["**/src-tauri/**"],
+        // 根 Cargo.toml 定义了 workspace,target 产物在仓库根部;
+        // cargo 链接时会锁住 target 下的 exe,监听它会触发 EBUSY 崩溃。
+        ignored: ["**/src-tauri/**", "**/target/**"],
       },
       // 浏览器预览联调：把同 origin 的 `/api` 转到 CarryPigeon-Server，避开受保护接口 OPTIONS 预检 500。
       proxy: {

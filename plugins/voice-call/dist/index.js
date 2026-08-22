@@ -1489,7 +1489,7 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 		onMounted(() => {
 			try {
 				unlistenIncoming = onVoiceCallEvent("voice_call:incoming", (w) => {
-					onIncomingCall({
+					const session = {
 						sessionId: w.session_id,
 						kind: w.call_kind || "direct",
 						state: "ringing",
@@ -1504,7 +1504,8 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 							noiseSuppression: false,
 							echoCancellation: false
 						}
-					});
+					};
+					onIncomingCall(session);
 				});
 			} catch {}
 			try {
@@ -1525,10 +1526,12 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 			videoCall.hangup();
 		});
 		function startCall(targetUserId, roomId) {
-			return startDirectCall(targetUserId || props.targetUserId || "", roomId);
+			const uid = targetUserId || props.targetUserId || "";
+			return startDirectCall(uid, roomId);
 		}
 		async function startVideoCall(targetUserId, roomId) {
-			await startDirectCall(targetUserId || props.targetUserId || "", roomId);
+			const uid = targetUserId || props.targetUserId || "";
+			await startDirectCall(uid, roomId);
 			setTimeout(() => {
 				videoCall.startCall();
 			}, 1e3);
