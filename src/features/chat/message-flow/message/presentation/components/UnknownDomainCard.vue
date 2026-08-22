@@ -28,8 +28,8 @@ const { t } = useI18n();
   <div class="cp-unpatched">
     <div class="cp-unpatched__top">
       <div class="cp-unpatched__title">
-        <div class="cp-unpatched__titleEn">{{ props.title || "UNPATCHED SIGNAL" }}</div>
         <div class="cp-unpatched__titleZh">{{ t("unpatched_signal") }}</div>
+        <div class="cp-unpatched__titleEn">{{ props.title || "UNPATCHED SIGNAL" }}</div>
       </div>
       <div class="cp-unpatched__tags">
         <MonoTag :value="props.domainId" title="domain" :copyable="true" />
@@ -48,7 +48,13 @@ const { t } = useI18n();
     </div>
 
     <div class="cp-unpatched__actions">
-      <button class="cp-unpatched__btn primary" type="button" @click="emit('install')">
+      <!-- 说明：该消息的消息域由未安装的插件提供，安装后才能渲染完整内容（降级引导）。 -->
+      <button
+        class="cp-unpatched__btn primary"
+        type="button"
+        :title="t('install_module_to_view')"
+        @click="emit('install')"
+      >
         {{ t("install_module_to_view") }}
       </button>
     </div>
@@ -82,13 +88,16 @@ const { t } = useI18n();
   font-family: var(--cp-font-display);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text);
+  font-size: 11px;
+  color: var(--cp-text-muted);
 }
 
+/* 中文主标题（统一中文文案后为主行） */
 .cp-unpatched__titleZh {
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.06em;
+  font-size: 13px;
+  color: var(--cp-text);
 }
 
 .cp-unpatched__tags {

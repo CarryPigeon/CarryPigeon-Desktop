@@ -26,6 +26,28 @@ import type { ChatWsEventWire } from "../protocol/chatWireEvents";
 const logger = createLogger("wsChatEvents");
 
 /**
+ * 心跳间隔（毫秒）。
+ */
+const PING_INTERVAL_MS = 30_000;
+
+/**
+ * 判定半开链路所需的无入站帧时长（毫秒）。
+ *
+ * 约 2.5 个心跳周期；健康链路每 30s 至少收到一次 pong。
+ */
+const PONG_DEAD_TIMEOUT_MS = 75_000;
+
+/**
+ * 触发半开判定所需的“发出 ping 却无任何入站帧”的最少次数。
+ */
+const PING_DEAD_THRESHOLD = 2;
+
+/**
+ * 连续多少次“未能完成认证即断开”后视为连接丢失（触发降级回调）。
+ */
+const CONNECTION_LOST_THRESHOLD = 3;
+
+/**
  * 服务端事件 envelope（`type=event`）。
  */
 export type WsEventEnvelope = {
@@ -92,6 +114,18 @@ export type ChatWsConnectOptions = {
    * 当服务端拒绝 `auth/reauth`（例如 token 过期）时回调。
    */
   onAuthError?: (reason: string) => void;
+  /**
+   * 连接持续失败（连续多次未能完成认证即断开）时回调一次。
+   *
+   * 语义：上层应据此启动降级（如 HTTP polling）；同一段失败期内只触发一次。
+   */
+  onConnectionLost?: () => void;
+  /**
+   * 处于 lost 态的连接重新认证成功时回调一次。
+   *
+   * 语义：上层应据此停止降级（如停止 polling）。
+   */
+  onConnectionRestored?: () => void;
 };
 
 /**
@@ -201,6 +235,20 @@ export function connectChatWs(
   let reconnectTimer: number | null = null;
   let reconnectAttempt = 0;
   let closedByUser = false;
+  /** 当前连接是否已完成过认证（auth.ok / reauth.ok）。 */
+  let hasAuthenticated = false;
+  /** 连续“未完成认证即断开”的次数（用于判定连接丢失并触发降级回调）。 */
+  let consecutiveConnectFailures = 0;
+  /**
+   * 是否已通知上层“连接丢失”。
+   *
+   * 同一段失败期内只通知一次；重新认证成功后复位并通知恢复。
+   */
+  let connectionLostNotified = false;
+  /** 最近一次收到入站帧的时间戳（毫秒），用于半开链路判活。 */
+  let lastInboundAt = 0;
+  /** 自最近一次入站帧以来已发出但未获任何回应的 ping 次数。 */
+  let pingsSinceInbound = 0;
 
   /**
    * 停止心跳定时器。
@@ -225,19 +273,61 @@ export function connectChatWs(
   }
 
   /**
-   * 启动 WS 心跳：每 30 秒发送一次 `ping`。
+   * 启动 WS 心跳：每 30 秒发送一次 `ping`，并用 pong 判活检测半开链路。
+   *
+   * 判活规则：连续 ≥ `PING_DEAD_THRESHOLD` 个 ping 未获得任何入站帧，
+   * 且距最近入站帧超过 `PONG_DEAD_TIMEOUT_MS`，即主动关闭连接
+   * （close 事件会负责清理与退避重连），避免睡眠唤醒/断网后的死链路静默。
    *
    * @returns 无返回值。
    */
   function startPing(): void {
     stopPing();
+    lastInboundAt = Date.now();
+    pingsSinceInbound = 0;
     pingTimer = window.setInterval(() => {
+      pingsSinceInbound += 1;
       try {
         ws?.send(JSON.stringify({ type: "ping" }));
       } catch {
         // 忽略发送失败；close 事件会负责清理与重连。
       }
-    }, 30_000);
+      const idleMs = Date.now() - lastInboundAt;
+      if (pingsSinceInbound >= PING_DEAD_THRESHOLD && idleMs > PONG_DEAD_TIMEOUT_MS) {
+        logger.warn("Action: chat_ws_ping_timeout_detected", {
+          wsUrl,
+          pingsSinceInbound,
+          idleMs,
+        });
+        try {
+          ws?.close();
+        } catch {
+          // 忽略关闭异常；close 事件随后触发重连。
+        }
+      }
+    }, PING_INTERVAL_MS);
+  }
+
+  /**
+   * 标记当前连接已完成认证，并按需通知“连接恢复”。
+   *
+   * @returns 无返回值。
+   */
+  function markAuthenticated(): void {
+    hasAuthenticated = true;
+    consecutiveConnectFailures = 0;
+    if (connectionLostNotified) {
+      connectionLostNotified = false;
+      logger.info("Action: chat_ws_connection_restored", { wsUrl });
+      try {
+        options?.onConnectionRestored?.();
+      } catch (error) {
+        logger.warn("Action: chat_ws_connection_restored_callback_failed", {
+          wsUrl,
+          error: String(error),
+        });
+      }
+    }
   }
 
   /**
@@ -274,6 +364,9 @@ export function connectChatWs(
   function handleMessage(evt: MessageEvent): void {
     const raw = String(evt.data ?? "");
     if (!raw) return;
+    // 任何入站帧（含 pong）都证明链路存活，重置半开判活窗口。
+    lastInboundAt = Date.now();
+    pingsSinceInbound = 0;
     let parsed: WsInbound | null = null;
     try {
       parsed = JSON.parse(raw) as WsInbound;
@@ -327,11 +420,26 @@ export function connectChatWs(
       return;
     }
 
-    if (parsed && typeof parsed === "object" && typeof (parsed as WsCommandErr).error === "object") {
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as WsCommandErr).error === "object" &&
+      (parsed as WsCommandErr).error !== null
+    ) {
       const e = parsed as WsCommandErr;
       logger.warn("Action: chat_ws_command_failed", { type: e.type, id: e.id ?? "", reason: e.error?.reason ?? "" });
       if (e.type === "auth.err" || e.type === "reauth.err") {
         const reason = String(e.error?.reason ?? "").trim() || "unauthorized";
+        if (e.type === "auth.err" && !hasAuthenticated) {
+          // 首次认证失败：主动关闭当前连接，让退避重连用（可能已更新的）token 重新认证，
+          // 避免在一条未注册的链路上静默保活、永远收不到事件。
+          logger.warn("Action: chat_ws_auth_failed_closing_socket", { wsUrl, reason });
+          try {
+            ws?.close();
+          } catch {
+            // 忽略关闭异常；close 事件随后触发重连。
+          }
+        }
         options?.onAuthError?.(reason);
       }
       return;
@@ -339,6 +447,10 @@ export function connectChatWs(
 
     const ok = parsed as WsCommandOk;
     logger.debug("Action: chat_ws_message_received", { type: ok.type, id: ok.id ?? "" });
+
+    if (ok.type === "auth.ok" || ok.type === "reauth.ok") {
+      markAuthenticated();
+    }
 
     // 兜底恢复 `server_id`：服务端在 `auth.ok` 帧中回显 `data.server_id`。
     // 当 `GET /api/server` 因某条路径被跳过或失败时，这里作为恢复作用域隔离的备用来源；
@@ -403,7 +515,27 @@ export function connectChatWs(
     };
     closeHandler = () => {
       stopPing();
-      logger.warn("Action: chat_ws_connection_closed", { wsUrl });
+      logger.warn("Action: chat_ws_connection_closed", { wsUrl, authenticated: hasAuthenticated });
+      if (!hasAuthenticated) {
+        // 本轮连接从未完成认证即断开：计入连续失败，达到阈值时通知上层降级。
+        consecutiveConnectFailures += 1;
+        if (consecutiveConnectFailures >= CONNECTION_LOST_THRESHOLD && !connectionLostNotified) {
+          connectionLostNotified = true;
+          logger.warn("Action: chat_ws_connection_lost", {
+            wsUrl,
+            consecutiveConnectFailures,
+          });
+          try {
+            options?.onConnectionLost?.();
+          } catch (error) {
+            logger.warn("Action: chat_ws_connection_lost_callback_failed", {
+              wsUrl,
+              error: String(error),
+            });
+          }
+        }
+      }
+      hasAuthenticated = false;
       scheduleReconnect();
     };
     errorHandler = () => {

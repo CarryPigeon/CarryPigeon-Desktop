@@ -436,13 +436,13 @@
   line-height: 1.45;
 }
 
-/* 频道端口点（使用 highlight 颜色） */
+/* 频道端口点：颜色由行内 `--cp-channel-port` 决定（系统频道与普通频道区分） */
 .cp-channel__port {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: var(--cp-highlight);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-highlight) 14%, transparent);
+  background: var(--cp-channel-port, var(--cp-highlight));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-channel-port, var(--cp-highlight)) 14%, transparent);
 }
 
 /* 频道名称（单行省略） */
@@ -562,16 +562,32 @@
   transform: translateY(0);
 }
 
-/* 频道行：信息快捷入口 */
+/* 频道行：信息快捷入口（悬停显示 ⓘ 图标） */
 .cp-channelRow__info {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--cp-text-muted);
   border-radius: 999px;
-  padding: 7px 10px;
-  font-size: 12px;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 14px;
   cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease), color var(--cp-fast) var(--cp-ease);
+  opacity: 0;
+  transition:
+    transform var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease),
+    opacity var(--cp-fast) var(--cp-ease);
+}
+
+/* 悬停/聚焦频道行时显示信息按钮 */
+.cp-channelRow:hover .cp-channelRow__info,
+.cp-channelRow__info:focus-visible,
+.cp-channelRow[data-active="true"] .cp-channelRow__info {
+  opacity: 1;
 }
 
 /* 频道行：信息按钮悬停态 */
@@ -689,7 +705,7 @@
 /* 消息行网格（avatar / strip / body） */
 .cp-msg {
   display: grid;
-  grid-template-columns: 36px 2px 1fr;
+  grid-template-columns: 44px 2px 1fr;
   grid-template-areas: "avatar strip body";
   gap: 12px;
   align-items: start;
@@ -698,7 +714,7 @@
 
 /* 消息行：mine 时翻转布局（右对齐） */
 .cp-msg[data-mine="true"] {
-  grid-template-columns: 1fr 2px 36px;
+  grid-template-columns: 1fr 2px 44px;
   grid-template-areas: "body strip avatar";
 }
 
@@ -745,6 +761,11 @@
   align-items: flex-end;
 }
 
+/* 消息行：mine 时 meta 行整体靠右（昵称/时间/消息类型跟随气泡右对齐） */
+.cp-msg[data-mine="true"] .cp-msg__meta {
+  justify-content: flex-end;
+}
+
 /* 消息 meta 行（from/time/domain/more） */
 .cp-msg__meta {
   display: flex;
@@ -788,20 +809,28 @@
   background: rgba(148, 163, 184, 0.5);
 }
 
-/* 单条消息的“更多”按钮（打开上下文菜单） */
+/* 单条消息的“更多”按钮（打开上下文菜单）：跟随 domain 标签内联展示，悬停行时可见 */
 .cp-msg__more {
-  margin-left: auto;
   border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text-muted);
   border-radius: 10px;
   padding: 4px 8px;
   cursor: pointer;
+  opacity: 0;
   transition:
     transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
+    color var(--cp-fast) var(--cp-ease),
+    opacity var(--cp-fast) var(--cp-ease);
+}
+
+/* 悬停/聚焦消息行时显示“更多”按钮 */
+.cp-msg:hover .cp-msg__more,
+.cp-msg:focus-within .cp-msg__more,
+.cp-msg__more:focus-visible {
+  opacity: 1;
 }
 
 /* “更多”按钮：悬停态 */
@@ -821,16 +850,15 @@
   transform: translateY(0);
 }
 
-/* 核心文本气泡 */
+/* 核心文本气泡：接收侧弱化背景（仅保留极淡底色），mine 保留强调色 */
 .cp-bubble {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
+  border: 1px solid transparent;
+  background: color-mix(in oklab, var(--cp-panel) 42%, transparent);
   border-radius: 16px;
   padding: 12px;
   color: color-mix(in oklab, var(--cp-text) 90%, transparent);
   font-size: 13px;
   line-height: 1.5;
-  box-shadow: var(--cp-shadow-soft);
   max-width: min(74ch, 100%);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -839,11 +867,10 @@
 
 /* 插件渲染气泡（外壳同核心气泡；内部 UI 由插件定义） */
 .cp-pluginBubble {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
+  border: 1px solid transparent;
+  background: color-mix(in oklab, var(--cp-panel) 42%, transparent);
   border-radius: 16px;
   padding: 10px;
-  box-shadow: var(--cp-shadow-soft);
   max-width: min(74ch, 100%);
 }
 

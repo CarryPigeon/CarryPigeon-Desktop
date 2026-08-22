@@ -19,7 +19,6 @@ import MonoTag from "@/shared/ui/MonoTag.vue";
 import { useLoginConnection } from "@/features/account/auth-flow/presentation/composables/useLoginConnection";
 import { useLoginEmailAuth } from "@/features/account/auth-flow/presentation/composables/useLoginEmailAuth";
 import { useLoginPasswordAuth } from "@/features/account/auth-flow/presentation/composables/useLoginPasswordAuth";
-import { useLoginHotkeys } from "@/features/account/auth-flow/presentation/composables/useLoginHotkeys";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 
 const router = useRouter();
@@ -66,8 +65,6 @@ function switchAuthMethod(method: "email" | "password"): void {
   clearEmailBanner();
   clearPasswordBanner();
 }
-
-useLoginHotkeys(router);
 </script>
 
 <template>

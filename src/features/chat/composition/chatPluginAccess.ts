@@ -24,14 +24,6 @@ export type ChatPluginAccessArgs = {
 };
 
 /**
- * quick switcher 消费的插件摘要项。
- */
-export type ChatPluginQuickSwitcherEntry = {
-  pluginId: string;
-  name: string;
-};
-
-/**
  * chat 对插件 workspace 的局部读取/刷新访问层。
  *
  * 这个对象是摘要访问层，不是完整的 plugins capability：
@@ -39,7 +31,6 @@ export type ChatPluginQuickSwitcherEntry = {
  * - 不暴露安装、启用、切版本等插件管理动作。
  */
 export type ChatPluginAccess = {
-  quickSwitcherModules: ComputedRef<readonly ChatPluginQuickSwitcherEntry[]>;
   requiredPluginIds: ComputedRef<readonly string[]>;
   missingRequiredCount: ComputedRef<number>;
   hasMissingRequiredPlugins: ComputedRef<boolean>;
@@ -58,12 +49,6 @@ export function createChatPluginAccess(args: ChatPluginAccessArgs): ChatPluginAc
   const snapshot = computed(() => capabilities.getSnapshot());
 
   const requiredPluginIds = computed(() => snapshot.value.requiredIds);
-  const quickSwitcherModules = computed<readonly ChatPluginQuickSwitcherEntry[]>(() =>
-    snapshot.value.catalog.map((plugin) => ({
-      pluginId: plugin.pluginId,
-      name: plugin.name,
-    })),
-  );
   const missingRequiredCount = computed(() => {
     let missing = 0;
     for (const pluginId of requiredPluginIds.value) {
@@ -75,7 +60,6 @@ export function createChatPluginAccess(args: ChatPluginAccessArgs): ChatPluginAc
   });
 
   return {
-    quickSwitcherModules,
     requiredPluginIds,
     missingRequiredCount,
     hasMissingRequiredPlugins: computed(() => missingRequiredCount.value > 0),

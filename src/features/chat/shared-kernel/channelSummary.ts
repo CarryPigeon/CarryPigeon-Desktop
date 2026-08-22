@@ -21,4 +21,10 @@ export type ChannelSummary = {
   categoryId?: string;
   categoryName?: string;
   order?: number;
+  /**
+   * 频道类型（来自服务端 `type` 字段，如 `public` / `system`）。
+   *
+   * 用途：频道列表端口点按是否系统频道区分颜色等展示差异。
+   */
+  channelType?: string;
 };

@@ -247,7 +247,11 @@ onMounted(() => {
                 :aria-label="`${c.name}${c.joined && c.unread > 0 ? `, ${c.unread} ${t('unread')}` : ''}${!c.joined ? `, ${t('channels_not_joined')}` : ''}`"
                 @click="props.model.selectChannel(c.id)"
               >
-                <span class="cp-channel__port" aria-hidden="true"></span>
+                <span
+                  class="cp-channel__port"
+                  aria-hidden="true"
+                  :style="{ '--cp-channel-port': c.channelType === 'system' ? 'var(--cp-warn)' : 'var(--cp-highlight)' }"
+                ></span>
                 <span class="cp-channelRow__meta">
                   <span class="cp-channel__name">
                     {{ c.name }}
@@ -270,7 +274,15 @@ onMounted(() => {
                 >
                   {{ c.joinRequested ? t("channel_join_request_sent") : t("apply_join") }}
                 </button>
-                <button class="cp-channelRow__info" type="button" @click="props.model.openChannelInfo(c.id)">{{ t("channel_info") }}</button>
+                <button
+                  class="cp-channelRow__info"
+                  type="button"
+                  :title="t('channel_info')"
+                  :aria-label="t('channel_info')"
+                  @click.stop="props.model.openChannelInfo(c.id)"
+                >
+                  <t-icon name="info-circle" />
+                </button>
               </div>
             </article>
           </template>

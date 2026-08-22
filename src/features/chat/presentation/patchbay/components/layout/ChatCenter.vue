@@ -22,6 +22,7 @@ import { toolbarActions, bindOverlayMount } from "@/features/chat/presentation/p
 import ForwardChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardChannelDialog.vue";
 import ForwardDetailDialog from "@/features/chat/presentation/patchbay/components/dialogs/ForwardDetailDialog.vue";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
+import { isSameUserId } from "@/features/chat/shared-kernel/userId";
 import SkeletonBlock from "@/shared/ui/SkeletonBlock.vue";
 const ImageLightbox = defineAsyncComponent({
   loader: () => import("@/features/chat/message-flow/message/presentation/components/ImageLightbox.vue"),
@@ -35,8 +36,6 @@ import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import SkeletonMessageList from "@/shared/ui/SkeletonMessageList.vue";
 import SearchPanel from "@/features/chat/presentation/patchbay/components/search/SearchPanel.vue";
 import PinListBar from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
-import ShortcutHelp from "@/features/chat/presentation/patchbay/components/help/ShortcutHelp.vue";
-import type { ShortcutBinding } from "@/features/chat/presentation/patchbay/interactions/usePatchbayHotkeys";
 import { useVirtualizer } from '@tanstack/vue-virtual';
 
 type VirtualMessageItem = ChatMessage;
@@ -90,18 +89,6 @@ const props = defineProps<{
    */
   onInstallHint: (pluginId: string | undefined) => void;
   channels: readonly ChannelSummary[];
-  /**
-   * 快捷键帮助面板可见性。
-   */
-  shortcutHelpVisible?: boolean;
-  /**
-   * 快捷键绑定列表（供帮助面板展示）。
-   */
-  shortcutBindings?: ShortcutBinding[];
-  /**
-   * 关闭快捷键帮助面板。
-   */
-  onCloseShortcutHelp?: () => void;
   /**
    * 成员栏是否已固定打开。
    */
@@ -399,7 +386,7 @@ function getReplyText(m: VirtualMessageItem): string {
   >
     <header class="cp-topConsole">
       <div class="cp-topConsole__left">
-        <div class="cp-topConsole__title">{{ t("messages_title") }}</div>
+        <div class="cp-topConsole__title">{{ props.model.currentChannelName || t("messages_title") }}</div>
       </div>
       <div class="cp-topConsole__right">
         <PluginToolbarSlot :actions="toolbarActions" :chat-context="chatContext" />
@@ -516,14 +503,13 @@ function getReplyText(m: VirtualMessageItem): string {
               class="cp-msg"
               :data-message-id="virtualListItems[vr.index].m.id"
               :data-highlighted="virtualListItems[vr.index].m.id === props.model.highlightedMessageId"
-              :data-mine="virtualListItems[vr.index].m.from.id === props.model.currentUserId"
+              :data-mine="isSameUserId(virtualListItems[vr.index].m.from.id, props.model.currentUserId)"
               :data-group-start="virtualListItems[vr.index].isGroupStart"
               :data-mentioned="props.model.isMentioned(virtualListItems[vr.index].m)"
               tabindex="0"
               role="article"
               :aria-label="`message ${virtualListItems[vr.index].m.domain.label} from ${virtualListItems[vr.index].m.from.name}`"
               @contextmenu="!virtualListItems[vr.index].m.recalledAt && props.onMessageContextMenu($event, virtualListItems[vr.index].m.id)"
-              @keydown="props.model.handleMessageKeydown($event, virtualListItems[vr.index].m.id)"
             >
               <!-- 区块：多选复选框 -->
               <div v-if="props.model.multiSelectMode" class="cp-msg__checkbox">
@@ -540,7 +526,7 @@ function getReplyText(m: VirtualMessageItem): string {
                   :username="virtualListItems[vr.index].m.from.name"
                   trigger="hover"
                 >
-                  <AvatarBadge :name="virtualListItems[vr.index].m.from.name" :avatar-url="virtualListItems[vr.index].m.from.avatarUrl" :size="28" />
+                  <AvatarBadge :name="virtualListItems[vr.index].m.from.name" :avatar-url="virtualListItems[vr.index].m.from.avatarUrl" :size="36" />
                 </UserProfilePopover>
               </div>
               <!-- 区块：domain 色条列 -->
@@ -649,12 +635,6 @@ function getReplyText(m: VirtualMessageItem): string {
         @close="closeLightbox"
       />
     </ErrorBoundary>
-
-    <ShortcutHelp
-      :visible="!!props.shortcutHelpVisible"
-      :bindings="props.shortcutBindings || []"
-      @close="props.onCloseShortcutHelp?.()"
-    />
   </section>
   </ErrorBoundary>
 </template>

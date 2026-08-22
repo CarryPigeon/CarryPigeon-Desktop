@@ -121,7 +121,6 @@ type ChatCenterRawModel = {
   handleFileUploadError(error: string): void;
   handleSend(payload?: ComposerSubmitPayload): void;
   safeLoadMore(): Promise<void>;
-  handleMessageKeydown(e: KeyboardEvent, messageId: string): void;
   handleMentionQuery(query: string): Promise<void>;
   handleSelectMention(mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void;
   handleMentionMenuClose(): void;
@@ -168,7 +167,6 @@ export type UseChatCenterModelDeps = {
   retryConnection(): Promise<ServerWorkspaceConnectionOutcome>;
   domainRegistryView: RefLike<unknown>;
   onLoadMoreMessages(): void | Promise<void>;
-  onReplyShortcut(messageId: string): void;
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
   onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
   selectChannel(channelId: string): Promise<void>;
@@ -180,6 +178,12 @@ export type UseChatCenterModelDeps = {
   linkPreview?: Ref<ChatLinkPreview | null | undefined>;
   fetchLinkPreview?: (url: string) => Promise<void>;
   dismissLinkPreview?: () => void;
+  /**
+   * 成员名解析兜底：消息发送者名缺失（形如 `u:123` / `用户 123`）时按 uid 查成员昵称。
+   *
+   * 说明：可选；未提供时保持消息原始发送者名。
+   */
+  resolveSenderName?: (uid: string) => string;
 };
 
 /**
@@ -212,6 +216,24 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     return out;
   });
 
+/** 发送者名兜底形态：mapper 在昵称缺失时会生成 `u:123456` / `用户 123456` 这类占位名。 */
+const FALLBACK_SENDER_NAME_RE = /^(?:u:|用户\s?)/i;
+
+/**
+ * 对兜底形态的发送者名做成员目录解析；解析失败时原样返回消息对象。
+ *
+ * @param m - 原始消息。
+ * @returns 名字已解析（或无需解析）的消息；需要替换时返回浅拷贝，不改写 store 内对象。
+ */
+function withResolvedSenderName(m: ChatMessage): ChatMessage {
+  const resolve = deps.resolveSenderName;
+  if (!resolve) return m;
+  if (!FALLBACK_SENDER_NAME_RE.test(m.from.name)) return m;
+  const name = resolve(m.from.id).trim();
+  if (!name || name === m.from.name) return m;
+  return { ...m, from: { ...m.from, name } };
+}
+
   const messageRows = computed<MessageRow[]>(() => {
     const list = messageTimelineSnapshot.value.currentMessages;
     const lastReadTime = currentSessionSnapshot.value.lastReadTimeMs;
@@ -219,7 +241,8 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     const rows: MessageRow[] = [];
 
     for (let idx = 0; idx < list.length; idx += 1) {
-      const m = list[idx];
+      const raw = list[idx];
+      const m = withResolvedSenderName(raw);
       const prev = idx > 0 ? list[idx - 1] : null;
       const sameSender = prev ? prev.from.id === m.from.id : false;
       const closeInTime = prev ? Math.abs(m.timeMs - prev.timeMs) < 1000 * 90 : false;
@@ -617,25 +640,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     deps.messageComposer.setDraft(restored);
   }, { immediate: true });
 
-  function handleMessageKeydown(e: KeyboardEvent, messageId: string): void {
-    const k = e.key.toLowerCase();
-    if (!e.metaKey && !e.ctrlKey && !e.altKey && k === "r") {
-      e.preventDefault();
-      deps.onReplyShortcut(messageId);
-      return;
-    }
-
-    const openContext = (e.shiftKey && e.key === "F10") || e.key === "ContextMenu";
-    if (!openContext) return;
-
-    e.preventDefault();
-    const target = e.currentTarget as HTMLElement | null;
-    const rect = target?.getBoundingClientRect();
-    const x = Math.trunc((rect?.left ?? 0) + 20);
-    const y = Math.trunc((rect?.top ?? 0) + 20);
-    deps.onMessageContextMenu(new MouseEvent("contextmenu", { bubbles: true, clientX: x, clientY: y }), messageId);
-  }
-
   const rawModel: ChatCenterRawModel = {
     connectionDetail: computed(() => deps.connectionDetail.value),
     connectionPillState: computed(() => deps.connectionPillState.value),
@@ -683,7 +687,6 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     handleFileUploadError,
     handleSend,
     safeLoadMore,
-    handleMessageKeydown,
     handleMentionQuery,
     handleSelectMention,
     handleMentionMenuClose,

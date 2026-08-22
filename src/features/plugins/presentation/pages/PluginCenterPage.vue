@@ -376,7 +376,6 @@ onBeforeUnmount(handleBeforeUnmount);
  * 插件中心全局快捷键。
  *
  * - `Esc`：关闭详情抽屉
- * - `Ctrl/Cmd+,`：打开设置页
  *
  * @param e - 键盘事件。
  */
@@ -384,13 +383,7 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   if (e.key === "Escape" && drawerOpen.value) {
     e.preventDefault();
     closeDetail();
-    return;
   }
-
-  const meta = e.metaKey || e.ctrlKey;
-  if (!meta || e.key !== ",") return;
-  e.preventDefault();
-  void router.push("/settings");
 }
 </script>
 

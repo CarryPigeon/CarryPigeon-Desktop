@@ -70,8 +70,18 @@ export function getAvailableMessageDomains(serverSocket: string): AvailablePlugi
     version: "1.0.0",
   };
 
+  // 内置语音域：与 Core:Text 同级出现在 composer 域选择器（录制 UI 作为该域的编辑器）。
+  const coreVoice: AvailablePluginMessageDomain = {
+    id: "Core:Voice",
+    label: "Core:Voice",
+    colorVar: "--cp-domain-core",
+    pluginIdHint: "core.voice",
+    version: "1.0.0",
+  };
+
   const unique = new Map<string, AvailablePluginMessageDomain>();
   unique.set(core.id, core);
+  unique.set(coreVoice.id, coreVoice);
 
   for (const plugin of catalog) {
     const installed = install[plugin.pluginId];

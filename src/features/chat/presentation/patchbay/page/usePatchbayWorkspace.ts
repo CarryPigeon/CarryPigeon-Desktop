@@ -50,7 +50,6 @@ export type PatchbayWorkspaceModel = {
   } | null>;
   serverRacks: typeof chatServerRacks;
   missingRequiredCount: ComputedRef<number>;
-  quickSwitcherPlugins: ComputedRef<readonly { pluginId: string; name: string }[]>;
   domainRegistryView: ComputedRef<ReturnType<typeof getChatDomainRegistryView>>;
   handleSwitchServer(serverSocket: string): Promise<ChatWorkspaceSwitchOutcome>;
   bootstrapCurrentWorkspace(): Promise<ChatWorkspaceBootstrapOutcome>;
@@ -133,7 +132,6 @@ export function usePatchbayWorkspace(deps: UsePatchbayWorkspaceDeps): PatchbayWo
     serverInfo,
     serverRacks: chatServerRacks,
     missingRequiredCount: pluginAccess.missingRequiredCount,
-    quickSwitcherPlugins: computed(() => pluginAccess.quickSwitcherModules.value),
     domainRegistryView,
     handleSwitchServer(serverSocket: string): Promise<ChatWorkspaceSwitchOutcome> {
       return workspaceCoordinator.switchWorkspace(serverSocket);

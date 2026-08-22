@@ -9,6 +9,7 @@ export { RoomSessionCatalogApplicationService } from "./domain/usecases/roomSess
 export { RoomSessionViewApplicationService } from "./domain/usecases/roomSessionViewService";
 export { RoomSessionConnectionApplicationService } from "./domain/usecases/roomSessionConnectionService";
 export { createPollingFallback } from "./domain/services/pollingFallback";
+export { createPreferenceCatchUpScheduler } from "./domain/services/preferenceCatchUpScheduler";
 export { createReadStateReporter } from "./domain/services/readStateReporter";
 export { createReadStateEventRouter } from "./domain/event-handlers/readStateEventRouter";
 export { createSessionWsManager } from "./domain/services/wsManager";

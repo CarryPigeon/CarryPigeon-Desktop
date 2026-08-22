@@ -5,6 +5,7 @@
  */
 
 import { getCurrentChatUserId } from "@/features/chat/composition/chatAccountSession";
+import { useChannelMuteStore } from "@/features/chat/presentation/patchbay/view-models/useChannelMuteStore";
 import { createMessageTimelineStatePort } from "@/features/chat/message-flow/presentation/runtime/messageFlowStatePorts";
 import { emitChannelProjectionChanged } from "@/features/chat/presentation/shared/windowMessageEvents";
 import { createChatEventRouter } from "@/features/chat/composition/createChatEventRouter";
@@ -162,6 +163,15 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     lastReadMidByChannel,
   });
   /**
+   * 频道通知级别数据源（模块级单例 store）：
+   * 供偏好感知补拉调度器确定“服务端会过滤消息事件”的频道集合。
+   */
+  const channelMuteStore = useChannelMuteStore();
+  const listNonAllNotificationChannels = (): string[] =>
+    [...channelMuteStore.channelLevels.value.entries()]
+      .filter(([, level]) => level !== "all")
+      .map(([cid]) => cid);
+  /**
    * 第五步：创建 WS 事件总路由器。
    *
    * 它把跨子域事件分发给：
@@ -220,6 +230,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     scope: sessionSharedContext.scope,
     readStateReporter: sessionSharedContext.readStateReporter,
     onWsEvent,
+    listNonAllNotificationChannels,
   });
 
   return {

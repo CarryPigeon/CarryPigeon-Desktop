@@ -18,6 +18,7 @@ import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
 import {
   createPollingFallback,
+  createPreferenceCatchUpScheduler,
   createResumeFailedCatchUp,
   createSessionWsManager,
   RoomSessionConnectionApplicationService,
@@ -50,9 +51,17 @@ export type ChatSessionConnectionRuntimeDeps = {
   messageFlow: ChatMessageFlowRuntimePort;
   scope: ChatRuntimeScopePort;
   onWsEvent: (env: ChatEventEnvelope) => void;
+  /**
+   * 列出生效通知级别非 all 的频道 id（mentions_only / muted）。
+   *
+   * 服务端 realtime 会按通知偏好过滤该类频道的 message.created 事件，
+   * 客户端据此集合做低频补拉兜底。
+   */
+  listNonAllNotificationChannels: () => string[];
 };
 
 const POLL_INTERVAL_MS = 8000;
+const PREFERENCE_CATCH_UP_INTERVAL_MS = 20000;
 const CATCH_UP_PREFETCH_LIMIT = 5;
 
 /**
@@ -70,6 +79,7 @@ export function createChatSessionConnectionRuntime(
     messageFlow,
     scope,
     onWsEvent,
+    listNonAllNotificationChannels,
   } = deps;
 
   const wsManager = createSessionWsManager(events);
@@ -83,9 +93,22 @@ export function createChatSessionConnectionRuntime(
     refreshChannelLatestPage: messageFlow.refreshChannelLatestPage,
   });
 
+  /**
+   * 偏好感知补拉：服务端会按通知偏好过滤 mentions_only/muted 频道的
+   * message.created 事件，客户端对该类频道低频补拉保持时间线与未读新鲜。
+   */
+  const preferenceCatchUp = createPreferenceCatchUpScheduler({
+    intervalMs: PREFERENCE_CATCH_UP_INTERVAL_MS,
+    getActiveServerSocket: scope.getActiveServerSocket,
+    getActiveScopeVersion: scope.getActiveScopeVersion,
+    listNonAllChannels: listNonAllNotificationChannels,
+    refreshChannelLatestPage: messageFlow.refreshChannelLatestPage,
+  });
+
   function teardownConnectionLifecycle(): void {
     wsManager.close();
     polling.stop();
+    preferenceCatchUp.stop();
     connectionApplicationService.teardownSessionHooks();
   }
 
@@ -123,6 +146,7 @@ export function createChatSessionConnectionRuntime(
     isRealtimeAvailable: isChatRealtimeAvailable,
     wsManager,
     polling,
+    preferenceCatchUp,
     stopPolling: () => {
       polling.stop();
     },

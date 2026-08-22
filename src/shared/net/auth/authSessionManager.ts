@@ -215,8 +215,9 @@ export function startAuthSessionAutoRefresh(serverSocket: string): AutoRefreshHa
 
     const id = window.setTimeout(async () => {
       autoRefreshTimers.delete(socket);
-      const next = await ensureValidAuthSession(socket);
-      if (next) emitSession(socket, next);
+      // 仅在真正轮换出新 token 时由 ensureValidAuthSession 内部广播 session；
+      // 刷新失败时不再把过期 token 广播给 WS 触发无意义的 reauth.err。
+      await ensureValidAuthSession(socket);
       scheduleNext();
     }, delayMs);
 
