@@ -1,6 +1,8 @@
 # cargo audit 配置
-# 项目仅使用 SQLite，sqlx-mysql 中的 rsa 漏洞无实际触发路径且无上游修复，故忽略。
+# - RUSTSEC-2023-0071：项目仅使用 SQLite，sqlx-mysql 中的 rsa 漏洞无实际触发路径且无上游修复。
+# - RUSTSEC-2026-0235：rust_decimal 仍可选依赖已停更的 rkyv 0.7；本应用不反序列化不可信 rkyv 归档。
 [advisories]
 ignore = [
   "RUSTSEC-2023-0071", # Marvin Attack: potential key recovery through timing sidechannels (rsa -> sqlx-mysql)
+  "RUSTSEC-2026-0235", # rkyv 0.7.46 via rust_decimal optional feature; 0.7 unsupported, no 0.8 upgrade path
 ]
