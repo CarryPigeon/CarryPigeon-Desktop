@@ -332,7 +332,10 @@ impl WebRtcPeerManager {
         // 先取出句柄并释放 map 锁，避免跨 await 持锁阻塞其他会话操作。
         let handle = {
             let conns = self.connections.lock().await;
-            conns.get(session_id).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+            conns
+                .get(session_id)
+                .context("VOICE_CALL_SESSION_NOT_FOUND")?
+                .clone()
         };
 
         let desc =
@@ -358,7 +361,10 @@ impl WebRtcPeerManager {
     ) -> anyhow::Result<()> {
         let handle = {
             let conns = self.connections.lock().await;
-            conns.get(session_id).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+            conns
+                .get(session_id)
+                .context("VOICE_CALL_SESSION_NOT_FOUND")?
+                .clone()
         };
 
         let candidate: webrtc::ice_transport::ice_candidate::RTCIceCandidateInit =
@@ -408,7 +414,10 @@ impl WebRtcPeerManager {
         // 取出句柄后立即释放 map 锁，避免跨 await 持锁（会串行阻塞所有会话）。
         let handle = {
             let conns = self.connections.lock().await;
-            conns.get(session_id).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+            conns
+                .get(session_id)
+                .context("VOICE_CALL_SESSION_NOT_FOUND")?
+                .clone()
         };
 
         use webrtc::rtp::packet::Packet;
@@ -625,7 +634,10 @@ impl WebRtcPeerManager {
         let key = Self::conn_key(session_id, participant_id);
         let handle = {
             let conns = self.connections.lock().await;
-            conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+            conns
+                .get(&key)
+                .context("VOICE_CALL_SESSION_NOT_FOUND")?
+                .clone()
         };
 
         let desc =
@@ -652,7 +664,10 @@ impl WebRtcPeerManager {
         let key = Self::conn_key(session_id, participant_id);
         let handle = {
             let conns = self.connections.lock().await;
-            conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+            conns
+                .get(&key)
+                .context("VOICE_CALL_SESSION_NOT_FOUND")?
+                .clone()
         };
 
         let candidate: webrtc::ice_transport::ice_candidate::RTCIceCandidateInit =
@@ -705,7 +720,10 @@ impl WebRtcPeerManager {
         let key = Self::conn_key(session_id, participant_id);
         let handle = {
             let conns = self.connections.lock().await;
-            conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+            conns
+                .get(&key)
+                .context("VOICE_CALL_SESSION_NOT_FOUND")?
+                .clone()
         };
 
         let seq = handle.seq.fetch_add(1, Ordering::Relaxed);

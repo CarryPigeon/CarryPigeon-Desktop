@@ -47,7 +47,7 @@ fn is_disallowed_ip(ip: IpAddr) -> bool {
 }
 
 /// 校验抓取目标：仅允许 http(s)，host 非空；返回归一化的 host:port 供 DNS 解析。
-fn validate_preview_target(raw_url: &str) -> Result<(reqwest::Url, String), String> {
+fn validate_preview_target(raw_url: &str) -> CommandResult<(reqwest::Url, String)> {
     let parsed = reqwest::Url::parse(raw_url.trim())
         .map_err(|e| format!("[LINK_PREVIEW_URL_INVALID] invalid url: {e}"))?;
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
@@ -65,15 +65,13 @@ fn validate_preview_target(raw_url: &str) -> Result<(reqwest::Url, String), Stri
 }
 
 /// 解析目标 host，并确保全部解析结果均为可公网访问的地址（防内网探测）。
-async fn ensure_public_host(host_port: &str) -> Result<Vec<SocketAddr>, String> {
+async fn ensure_public_host(host_port: &str) -> CommandResult<Vec<SocketAddr>> {
     let addrs: Vec<SocketAddr> = tokio::net::lookup_host(host_port)
         .await
         .map_err(|e| format!("[LINK_PREVIEW_HOST_RESOLVE_FAILED] dns resolution failed: {e}"))?
         .collect();
     if addrs.is_empty() {
-        return Err(
-            "[LINK_PREVIEW_HOST_RESOLVE_FAILED] host resolved to no addresses".to_string(),
-        );
+        return Err("[LINK_PREVIEW_HOST_RESOLVE_FAILED] host resolved to no addresses".to_string());
     }
     for addr in &addrs {
         if is_disallowed_ip(addr.ip()) {
@@ -228,9 +226,7 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
                 e,
             )
         })?;
-        if body.len() >= MAX_PREVIEW_BYTES
-            || body.len() + chunk.len() > MAX_PREVIEW_BYTES
-        {
+        if body.len() >= MAX_PREVIEW_BYTES || body.len() + chunk.len() > MAX_PREVIEW_BYTES {
             truncated = true;
             break;
         }

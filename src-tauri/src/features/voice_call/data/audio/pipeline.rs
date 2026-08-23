@@ -258,7 +258,10 @@ impl AudioPipeline {
         self.participant_buffers
             .lock()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?
-            .insert(participant_id.to_string(), std::sync::Mutex::new(VecDeque::new()));
+            .insert(
+                participant_id.to_string(),
+                std::sync::Mutex::new(VecDeque::new()),
+            );
         info!(action = "app_voice_call_participant_registered", participant_id = %participant_id);
         Ok(())
     }

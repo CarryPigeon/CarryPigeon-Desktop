@@ -346,7 +346,7 @@ pub async fn chat_cache_load_all() -> CommandResult<HashMap<String, String>> {
             Err(err) => {
                 decrypt_failed += 1;
                 tracing::warn!(
-                    action = "chat_cache_decrypt_failed",
+                    action = "db_chat_cache_decrypt_failed",
                     key = %key,
                     error = %err
                 );
@@ -355,7 +355,7 @@ pub async fn chat_cache_load_all() -> CommandResult<HashMap<String, String>> {
     }
     if decrypt_failed > 0 {
         tracing::warn!(
-            action = "chat_cache_decrypt_failed_summary",
+            action = "db_chat_cache_decrypt_failed_summary",
             failed = decrypt_failed,
             total = rows.len()
         );
@@ -823,8 +823,8 @@ mod tests {
     #[test]
     fn decrypt_rejects_invalid_nonce_length() {
         let key = [7u8; 32];
-        let err = decrypt_value(&key, "00", "00")
-            .expect_err("short nonce must fail before AES panic");
+        let err =
+            decrypt_value(&key, "00", "00").expect_err("short nonce must fail before AES panic");
         assert!(
             err.to_string().contains("nonce length"),
             "unexpected error: {err}"

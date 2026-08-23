@@ -19,16 +19,23 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
 
     // 1. 隐藏主窗口（可选）
     if hide_window && let Some(main_window) = app.get_webview_window("main") {
-        main_window
-            .hide()
-            .map_err(|e| to_command_error("SCREENSHOT_HIDE_WINDOW_FAIL", "error.screenshot_hide_window_fail", e))?;
+        main_window.hide().map_err(|e| {
+            to_command_error(
+                "SCREENSHOT_HIDE_WINDOW_FAIL",
+                "error.screenshot_hide_window_fail",
+                e,
+            )
+        })?;
 
         // 轮询等待窗口完全隐藏（最多 100ms）
         for _ in 0..20 {
-            if !main_window
-                .is_visible()
-                .map_err(|e| to_command_error("SCREENSHOT_VISIBLE_FAIL", "error.screenshot_visible_fail", e))?
-            {
+            if !main_window.is_visible().map_err(|e| {
+                to_command_error(
+                    "SCREENSHOT_VISIBLE_FAIL",
+                    "error.screenshot_visible_fail",
+                    e,
+                )
+            })? {
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
@@ -45,15 +52,24 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
         .skip_taskbar(true)
         .title("")
         .build()
-        .map_err(|e| to_command_error("SCREENSHOT_OVERLAY_FAIL", "error.screenshot_overlay_fail", e))?;
+        .map_err(|e| {
+            to_command_error(
+                "SCREENSHOT_OVERLAY_FAIL",
+                "error.screenshot_overlay_fail",
+                e,
+            )
+        })?;
 
     let _ = window.set_focus();
 
     // 3. 截取所有显示器
-    let app_data = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| to_command_error("SCREENSHOT_APP_DATA_FAIL", "error.screenshot_app_data_fail", e))?;
+    let app_data = app.path().app_data_dir().map_err(|e| {
+        to_command_error(
+            "SCREENSHOT_APP_DATA_FAIL",
+            "error.screenshot_app_data_fail",
+            e,
+        )
+    })?;
     let screenshot_dir = app_data.join("temp-screenshots");
 
     let captures = match capture_all_screens(&screenshot_dir) {
@@ -64,16 +80,19 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
             if hide_window && let Some(main_window) = app.get_webview_window("main") {
                 let _ = main_window.show();
             }
-            return Err(to_command_error("SCREENSHOT_CAPTURE_FAIL", "error.screenshot_capture_fail", e));
+            return Err(to_command_error(
+                "SCREENSHOT_CAPTURE_FAIL",
+                "error.screenshot_capture_fail",
+                e,
+            ));
         }
     };
 
     // 4. 缓存到托管状态
     if let Some(state) = app.try_state::<ScreenshotCaptureState>() {
-        let mut guard = state
-            .0
-            .lock()
-            .map_err(|e| to_command_error("SCREENSHOT_LOCK_FAIL", "error.screenshot_lock_fail", e))?;
+        let mut guard = state.0.lock().map_err(|e| {
+            to_command_error("SCREENSHOT_LOCK_FAIL", "error.screenshot_lock_fail", e)
+        })?;
         *guard = Some(captures);
     } else {
         app.manage(ScreenshotCaptureState(Mutex::new(Some(captures))));
@@ -92,15 +111,17 @@ pub async fn start_screenshot(app: AppHandle, hide_window: Option<bool>) -> Comm
 #[tauri::command]
 pub async fn get_screenshot_data(app: AppHandle) -> CommandResult<Vec<ScreenCapture>> {
     if let Some(state) = app.try_state::<ScreenshotCaptureState>() {
-        let mut guard = state
-            .0
-            .lock()
-            .map_err(|e| to_command_error("SCREENSHOT_LOCK_FAIL", "error.screenshot_lock_fail", e))?;
+        let mut guard = state.0.lock().map_err(|e| {
+            to_command_error("SCREENSHOT_LOCK_FAIL", "error.screenshot_lock_fail", e)
+        })?;
         if let Some(data) = guard.take() {
             return Ok(data);
         }
     }
-    Err(command_error("SCREENSHOT_NO_DATA", "error.screenshot_no_data"))
+    Err(command_error(
+        "SCREENSHOT_NO_DATA",
+        "error.screenshot_no_data",
+    ))
 }
 
 /// 完成截图：保存图片 → 通知主窗口 → 关闭遮罩 → 显示主窗口。
@@ -109,10 +130,13 @@ pub async fn finish_screenshot(app: AppHandle, data: Vec<u8>) -> CommandResult<S
     tracing::info!(action = "app_screenshot_finish", size = data.len());
 
     // 1. 保存到临时目录
-    let app_data = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| to_command_error("SCREENSHOT_APP_DATA_FAIL", "error.screenshot_app_data_fail", e))?;
+    let app_data = app.path().app_data_dir().map_err(|e| {
+        to_command_error(
+            "SCREENSHOT_APP_DATA_FAIL",
+            "error.screenshot_app_data_fail",
+            e,
+        )
+    })?;
     let screenshot_dir = app_data.join("screenshots");
     std::fs::create_dir_all(&screenshot_dir)
         .map_err(|e| to_command_error("SCREENSHOT_DIR_FAIL", "error.screenshot_dir_fail", e))?;
@@ -131,9 +155,13 @@ pub async fn finish_screenshot(app: AppHandle, data: Vec<u8>) -> CommandResult<S
 
     // 3. 显示主窗口
     if let Some(main_window) = app.get_webview_window("main") {
-        main_window
-            .show()
-            .map_err(|e| to_command_error("SCREENSHOT_SHOW_WINDOW_FAIL", "error.screenshot_show_window_fail", e))?;
+        main_window.show().map_err(|e| {
+            to_command_error(
+                "SCREENSHOT_SHOW_WINDOW_FAIL",
+                "error.screenshot_show_window_fail",
+                e,
+            )
+        })?;
         let _ = main_window.set_focus();
     }
 
@@ -159,9 +187,13 @@ pub async fn cancel_screenshot(app: AppHandle) -> CommandResult<()> {
     }
 
     if let Some(main_window) = app.get_webview_window("main") {
-        main_window
-            .show()
-            .map_err(|e| to_command_error("SCREENSHOT_SHOW_WINDOW_FAIL", "error.screenshot_show_window_fail", e))?;
+        main_window.show().map_err(|e| {
+            to_command_error(
+                "SCREENSHOT_SHOW_WINDOW_FAIL",
+                "error.screenshot_show_window_fail",
+                e,
+            )
+        })?;
         let _ = main_window.set_focus();
     }
 

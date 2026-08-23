@@ -58,9 +58,8 @@ pub async fn copy_emoji(
     uid: String,
     name: String,
 ) -> CommandResult<EmojiEntry> {
-    let entry =
-        repository::copy_emoji(&app_handle, &source_id, &uid, &name)
-            .map_err(|e| to_command_error("EMOJI_COPY_FAILED", "error.emoji_copy_failed", e))?;
+    let entry = repository::copy_emoji(&app_handle, &source_id, &uid, &name)
+        .map_err(|e| to_command_error("EMOJI_COPY_FAILED", "error.emoji_copy_failed", e))?;
     tracing::info!(action = "app_emoji_copied", source = %source_id, new_id = %entry.id, uid = %uid);
     Ok(entry)
 }

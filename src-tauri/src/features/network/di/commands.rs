@@ -169,12 +169,28 @@ pub async fn download_file(
 
     // 安全约束：下载 URL 必须与当前服务器同源，防止把 Bearer token
     // 投递到任意第三方主机（也封掉一个任意 URL 下载出口）。
-    let expected_origin = crate::shared::net::origin::to_http_origin(&server_socket)
-        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?;
-    let target = reqwest::Url::parse(&url)
-        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?;
-    let base = reqwest::Url::parse(&expected_origin)
-        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?;
+    let expected_origin =
+        crate::shared::net::origin::to_http_origin(&server_socket).map_err(|e| {
+            to_command_error(
+                "DOWNLOAD_REQUEST_FAILED",
+                "error.download_request_failed",
+                e,
+            )
+        })?;
+    let target = reqwest::Url::parse(&url).map_err(|e| {
+        to_command_error(
+            "DOWNLOAD_REQUEST_FAILED",
+            "error.download_request_failed",
+            e,
+        )
+    })?;
+    let base = reqwest::Url::parse(&expected_origin).map_err(|e| {
+        to_command_error(
+            "DOWNLOAD_REQUEST_FAILED",
+            "error.download_request_failed",
+            e,
+        )
+    })?;
     let same_origin = target.scheme() == base.scheme()
         && target.host_str() == base.host_str()
         && target.port_or_known_default() == base.port_or_known_default();

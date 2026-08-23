@@ -61,7 +61,7 @@ impl VoiceCallInner {
         }
     }
 
-    async fn get_pipeline(self: &Arc<Self>) -> Result<Arc<AudioPipeline>, String> {
+    async fn get_pipeline(self: &Arc<Self>) -> CommandResult<Arc<AudioPipeline>> {
         let mut guard = self.audio_pipeline.lock().await;
         if guard.is_none() {
             let pipeline = AudioPipeline::new()
@@ -985,8 +985,15 @@ async fn global_signaling_listener(
 
     loop {
         // 代际检查：非当前代际的监听器立即让位退出。
-        if inner.listener_generation.load(std::sync::atomic::Ordering::SeqCst) != generation {
-            tracing::info!(action = "app_voice_call_signaling_listener_superseded", generation);
+        if inner
+            .listener_generation
+            .load(std::sync::atomic::Ordering::SeqCst)
+            != generation
+        {
+            tracing::info!(
+                action = "app_voice_call_signaling_listener_superseded",
+                generation
+            );
             return;
         }
 
@@ -1012,7 +1019,10 @@ async fn global_signaling_listener(
                     }
                 },
                 None => {
-                    tracing::info!(action = "app_voice_call_signaling_client_removed", generation);
+                    tracing::info!(
+                        action = "app_voice_call_signaling_client_removed",
+                        generation
+                    );
                     break;
                 }
             }

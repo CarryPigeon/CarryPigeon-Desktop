@@ -18,9 +18,7 @@ pub(crate) fn emoji_magic_matches(data: &[u8], ext: &str) -> bool {
         "png" | "apng" => data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
         "jpg" | "jpeg" => data.len() >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF,
         "gif" => data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a"),
-        "webp" => {
-            data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP"
-        }
+        "webp" => data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP",
         "avif" => {
             data.len() >= 12
                 && &data[4..8] == b"ftyp"

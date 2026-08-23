@@ -77,7 +77,7 @@ export async function httpListFiles(serverSocket: string, accessToken: string, q
     return Array.isArray(res?.items) ? res.items.map(mapFileRecordWire) : [];
   } catch (error) {
     if (isMissingFileLibraryEndpoint(error)) {
-      logger.warn("Action: files_list_endpoint_missing", { path });
+      logger.warn("Action: api_files_list_endpoint_missing", { path });
       return [];
     }
     throw error;
@@ -115,7 +115,7 @@ export async function httpListUploaders(serverSocket: string, accessToken: strin
     return Array.isArray(res?.items) ? res.items : [];
   } catch (error) {
     if (isMissingFileLibraryEndpoint(error)) {
-      logger.warn("Action: files_uploaders_endpoint_missing", {});
+      logger.warn("Action: api_files_uploaders_endpoint_missing", {});
       return [];
     }
     throw error;

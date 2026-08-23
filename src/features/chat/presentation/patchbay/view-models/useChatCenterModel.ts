@@ -290,7 +290,7 @@ function scheduleForwardAuthorProfileFetch(uids: string[]): void {
         if (mutated) fetchedUserNames.value = new Map(next);
       })
       .catch((err) => {
-        logger.warn("chat_forward_author_profile_fetch_failed", { count: batch.length, error: String(err) });
+        logger.warn("Action: chat_forward_author_profile_fetch_failed", { count: batch.length, error: String(err) });
       });
   }, 200);
 }

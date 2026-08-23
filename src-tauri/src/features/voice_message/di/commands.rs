@@ -27,11 +27,20 @@ pub async fn start_voice_recording(
     recorder_state: State<'_, VoiceRecorderState>,
 ) -> CommandResult<()> {
     let temp_dir = std::env::temp_dir().join("carrypigeon-voice");
-    let recorder = VoiceRecorder::start(temp_dir)
-        .map_err(|e| to_command_error("VOICE_RECORDING_START_FAILED", "error.voice_recording_start_failed", e))?;
-    *recorder_state.0.lock()
-        .map_err(|e| to_command_error("VOICE_RECORDING_LOCK_FAILED", "error.voice_recording_lock_failed", e))? =
-        Some(recorder);
+    let recorder = VoiceRecorder::start(temp_dir).map_err(|e| {
+        to_command_error(
+            "VOICE_RECORDING_START_FAILED",
+            "error.voice_recording_start_failed",
+            e,
+        )
+    })?;
+    *recorder_state.0.lock().map_err(|e| {
+        to_command_error(
+            "VOICE_RECORDING_LOCK_FAILED",
+            "error.voice_recording_lock_failed",
+            e,
+        )
+    })? = Some(recorder);
     tracing::info!(action = "app_voice_message_recording_started");
     Ok(())
 }
@@ -41,13 +50,26 @@ pub async fn start_voice_recording(
 pub async fn stop_voice_recording(
     recorder_state: State<'_, VoiceRecorderState>,
 ) -> CommandResult<VoiceRecordingResult> {
-    let mut guard = recorder_state.0.lock()
-        .map_err(|e| to_command_error("VOICE_RECORDING_LOCK_FAILED", "error.voice_recording_lock_failed", e))?;
-    let mut recorder = guard.take().ok_or_else(|| {
-        command_error("VOICE_RECORDING_NOT_ACTIVE", "error.voice_recording_not_active")
+    let mut guard = recorder_state.0.lock().map_err(|e| {
+        to_command_error(
+            "VOICE_RECORDING_LOCK_FAILED",
+            "error.voice_recording_lock_failed",
+            e,
+        )
     })?;
-    let result = recorder.stop()
-        .map_err(|e| to_command_error("VOICE_RECORDING_STOP_FAILED", "error.voice_recording_stop_failed", e))?;
+    let mut recorder = guard.take().ok_or_else(|| {
+        command_error(
+            "VOICE_RECORDING_NOT_ACTIVE",
+            "error.voice_recording_not_active",
+        )
+    })?;
+    let result = recorder.stop().map_err(|e| {
+        to_command_error(
+            "VOICE_RECORDING_STOP_FAILED",
+            "error.voice_recording_stop_failed",
+            e,
+        )
+    })?;
     let recording: VoiceRecordingResult = result.into();
     tracing::info!(
         action = "app_voice_message_recording_stopped",
@@ -74,7 +96,7 @@ fn allowed_read_roots() -> Vec<std::path::PathBuf> {
 }
 
 /// 校验待读取路径落在白名单根目录内，返回 canonical 化后的路径。
-fn ensure_path_allowed(path: &str) -> Result<std::path::PathBuf, String> {
+fn ensure_path_allowed(path: &str) -> CommandResult<std::path::PathBuf> {
     let canonical = std::fs::canonicalize(path)
         .map_err(|e| format!("[FILE_PATH_INVALID] failed to resolve path: {e}"))?;
     let allowed = allowed_read_roots()
@@ -94,8 +116,9 @@ fn ensure_path_allowed(path: &str) -> Result<std::path::PathBuf, String> {
 #[tauri::command]
 pub async fn read_file_base64(path: String) -> CommandResult<String> {
     let path = ensure_path_allowed(&path)?;
-    let data = std::fs::read(&path)
-        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
+    let data = std::fs::read(&path).map_err(|e| {
+        to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e)
+    })?;
     Ok(base64_encode(&data))
 }
 
@@ -127,9 +150,9 @@ pub async fn read_file_base64_chunk(
     let length = length.min(MAX_CHUNK_SIZE);
 
     let path = ensure_path_allowed(&path)?;
-    let mut file = tokio::fs::File::open(&path)
-        .await
-        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
+    let mut file = tokio::fs::File::open(&path).await.map_err(|e| {
+        to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e)
+    })?;
     let total_bytes = file
         .metadata()
         .await
@@ -145,15 +168,14 @@ pub async fn read_file_base64_chunk(
         });
     }
 
-    file.seek(SeekFrom::Start(offset))
-        .await
-        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
+    file.seek(SeekFrom::Start(offset)).await.map_err(|e| {
+        to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e)
+    })?;
 
     let mut buf = vec![0u8; length as usize];
-    let read_bytes = file
-        .read(&mut buf)
-        .await
-        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
+    let read_bytes = file.read(&mut buf).await.map_err(|e| {
+        to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e)
+    })?;
     buf.truncate(read_bytes);
 
     let eof = offset.saturating_add(read_bytes as u64) >= total_bytes;
@@ -217,9 +239,7 @@ mod tests {
 
     /// 在白名单根目录（carrypigeon-voice）下构造测试文件。
     fn allowed_test_dir(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir()
-            .join("carrypigeon-voice")
-            .join(name);
+        let dir = std::env::temp_dir().join("carrypigeon-voice").join(name);
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

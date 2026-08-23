@@ -85,7 +85,10 @@ mod tests {
 
     #[test]
     fn allows_known_and_prefixed_labels() {
-        assert_eq!(normalize_info_window_label("user-info").unwrap(), "user-info");
+        assert_eq!(
+            normalize_info_window_label("user-info").unwrap(),
+            "user-info"
+        );
         assert_eq!(
             normalize_info_window_label("info-help").unwrap(),
             "info-help"

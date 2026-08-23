@@ -28,18 +28,18 @@ pub struct ScreenCapture {
 }
 
 /// 截取所有显示器的画面，保存 PNG 文件到 `save_dir`。
-pub fn capture_all_screens(save_dir: &Path) -> Result<Vec<ScreenCapture>, String> {
+pub fn capture_all_screens(save_dir: &Path) -> anyhow::Result<Vec<ScreenCapture>> {
     std::fs::create_dir_all(save_dir)
-        .map_err(|e| format!("capture_all_screens create save_dir failed: {e:?}"))?;
+        .map_err(|e| anyhow::anyhow!("capture_all_screens create save_dir failed: {e:?}"))?;
 
-    let monitors =
-        Monitor::all().map_err(|e| format!("capture_all_screens monitor list failed: {e:?}"))?;
+    let monitors = Monitor::all()
+        .map_err(|e| anyhow::anyhow!("capture_all_screens monitor list failed: {e:?}"))?;
 
     let mut captures = Vec::new();
     for monitor in &monitors {
         let image = monitor
             .capture_image()
-            .map_err(|e| format!("capture_all_screens capture_image failed: {e:?}"))?;
+            .map_err(|e| anyhow::anyhow!("capture_all_screens capture_image failed: {e:?}"))?;
 
         let width = image.width();
         let height = image.height();
@@ -49,32 +49,32 @@ pub fn capture_all_screens(save_dir: &Path) -> Result<Vec<ScreenCapture>, String
         let file_path = save_dir.join(&filename);
         image
             .save(&file_path)
-            .map_err(|e| format!("capture_all_screens save png failed: {e:?}"))?;
+            .map_err(|e| anyhow::anyhow!("capture_all_screens save png failed: {e:?}"))?;
 
         // 同时保留 base64 编码（向后兼容）
         let mut png_bytes = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut png_bytes);
         image
             .write_to(&mut cursor, image::ImageFormat::Png)
-            .map_err(|e| format!("capture_all_screens png encode failed: {e:?}"))?;
+            .map_err(|e| anyhow::anyhow!("capture_all_screens png encode failed: {e:?}"))?;
 
         let data_base64 = use_base64_encode(&png_bytes);
 
         captures.push(ScreenCapture {
             monitor_id: monitor
                 .id()
-                .map_err(|e| format!("monitor id failed: {e:?}"))?,
+                .map_err(|e| anyhow::anyhow!("monitor id failed: {e:?}"))?,
             width,
             height,
             x: monitor
                 .x()
-                .map_err(|e| format!("monitor x failed: {e:?}"))?,
+                .map_err(|e| anyhow::anyhow!("monitor x failed: {e:?}"))?,
             y: monitor
                 .y()
-                .map_err(|e| format!("monitor y failed: {e:?}"))?,
+                .map_err(|e| anyhow::anyhow!("monitor y failed: {e:?}"))?,
             scale_factor: monitor
                 .scale_factor()
-                .map_err(|e| format!("monitor scale_factor failed: {e:?}"))?
+                .map_err(|e| anyhow::anyhow!("monitor scale_factor failed: {e:?}"))?
                 as f64,
             data_base64,
             file_path: Some(file_path.to_string_lossy().to_string()),
