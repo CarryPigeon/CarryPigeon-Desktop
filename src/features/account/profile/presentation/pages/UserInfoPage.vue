@@ -12,7 +12,7 @@ import { getAccountCapabilities } from "@/features/account/api";
 import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
-import { getUserMutationPort } from "@/features/account/profile/di/user.di";
+import { getProfileCapabilities } from "@/features/account/profile/api";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { createLogger } from "@/shared/utils/logger";
 import { toast } from "@/shared/utils/toast";
@@ -211,8 +211,11 @@ async function handleBackgroundFileChange(e: Event) {
       toast.error(t("profile_not_connected"));
       return;
     }
-    const mutationPort = getUserMutationPort(serverSocket);
-    const backgroundUrl = await mutationPort.updateUserBackgroundImage(accessToken, file);
+    const backgroundUrl = await getProfileCapabilities().updateUserBackgroundImage(
+      serverSocket,
+      accessToken,
+      file,
+    );
     draft.backgroundUrl = backgroundUrl;
     currentUserCapabilities.applyLocalProfilePatch({
       username: draft.username.trim(),

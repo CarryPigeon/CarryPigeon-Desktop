@@ -30,6 +30,7 @@ public/plugins/
 *.sln
 *.sw?
 /target/
+/src-tauri/Cargo.lock
 /database.carrypigeon
 
 /src-tauri/config

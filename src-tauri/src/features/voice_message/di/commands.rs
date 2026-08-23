@@ -14,7 +14,7 @@ use tauri::State;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::features::voice_message::recorder::{RecordingResult, VoiceRecorder};
-use crate::shared::error::CommandResult;
+use crate::shared::error::{CommandResult, command_error, to_command_error};
 
 /// Tauri 托管的录制器状态。
 pub struct VoiceRecorderState(pub Mutex<Option<VoiceRecorder>>);
@@ -27,8 +27,11 @@ pub async fn start_voice_recording(
     recorder_state: State<'_, VoiceRecorderState>,
 ) -> CommandResult<()> {
     let temp_dir = std::env::temp_dir().join("carrypigeon-voice");
-    let recorder = VoiceRecorder::start(temp_dir).map_err(|e| e.to_string())?;
-    *recorder_state.0.lock().map_err(|e| e.to_string())? = Some(recorder);
+    let recorder = VoiceRecorder::start(temp_dir)
+        .map_err(|e| to_command_error("VOICE_RECORDING_START_FAILED", "error.voice_recording_start_failed", e))?;
+    *recorder_state.0.lock()
+        .map_err(|e| to_command_error("VOICE_RECORDING_LOCK_FAILED", "error.voice_recording_lock_failed", e))? =
+        Some(recorder);
     tracing::info!(action = "app_voice_message_recording_started");
     Ok(())
 }
@@ -38,9 +41,13 @@ pub async fn start_voice_recording(
 pub async fn stop_voice_recording(
     recorder_state: State<'_, VoiceRecorderState>,
 ) -> CommandResult<VoiceRecordingResult> {
-    let mut guard = recorder_state.0.lock().map_err(|e| e.to_string())?;
-    let mut recorder = guard.take().ok_or("No active recording")?;
-    let result = recorder.stop().map_err(|e| e.to_string())?;
+    let mut guard = recorder_state.0.lock()
+        .map_err(|e| to_command_error("VOICE_RECORDING_LOCK_FAILED", "error.voice_recording_lock_failed", e))?;
+    let mut recorder = guard.take().ok_or_else(|| {
+        command_error("VOICE_RECORDING_NOT_ACTIVE", "error.voice_recording_not_active")
+    })?;
+    let result = recorder.stop()
+        .map_err(|e| to_command_error("VOICE_RECORDING_STOP_FAILED", "error.voice_recording_stop_failed", e))?;
     let recording: VoiceRecordingResult = result.into();
     tracing::info!(
         action = "app_voice_message_recording_stopped",
@@ -50,15 +57,50 @@ pub async fn stop_voice_recording(
     Ok(recording)
 }
 
+/// 允许通过 read_file_base64* 读取的根目录白名单。
+///
+/// 说明：
+/// - 语音录制 WAV：`%TEMP%/carrypigeon-voice`；
+/// - 托管下载文件：`<app_data_dir>/temp_files`；
+/// - 截图产物 PNG：`<app_data_dir>/screenshots`。
+/// 白名单外一律拒绝，防止渲染层被攻破后借该命令回读任意用户文件。
+fn allowed_read_roots() -> Vec<std::path::PathBuf> {
+    let mut roots = vec![std::env::temp_dir().join("carrypigeon-voice")];
+    if let Ok(app_dir) = crate::shared::app_data_dir::get_app_data_dir() {
+        roots.push(app_dir.join("temp_files"));
+        roots.push(app_dir.join("screenshots"));
+    }
+    roots
+}
+
+/// 校验待读取路径落在白名单根目录内，返回 canonical 化后的路径。
+fn ensure_path_allowed(path: &str) -> Result<std::path::PathBuf, String> {
+    let canonical = std::fs::canonicalize(path)
+        .map_err(|e| format!("[FILE_PATH_INVALID] failed to resolve path: {e}"))?;
+    let allowed = allowed_read_roots()
+        .into_iter()
+        .filter_map(|root| std::fs::canonicalize(&root).ok())
+        .any(|root| canonical.starts_with(&root));
+    if allowed {
+        Ok(canonical)
+    } else {
+        Err("[FILE_PATH_FORBIDDEN] path is outside allowed read roots".to_string())
+    }
+}
+
 /// 读取文件内容并以 Base64 字符串返回（供前端下载/上传）。
+///
+/// 安全约束：仅允许读取白名单目录（语音录制 / temp_files / screenshots）内的文件。
 #[tauri::command]
 pub async fn read_file_base64(path: String) -> CommandResult<String> {
-    let data = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let path = ensure_path_allowed(&path)?;
+    let data = std::fs::read(&path)
+        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
     Ok(base64_encode(&data))
 }
 
 /// 分块读取文件并返回 Base64 编码片段的响应。
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct FileBase64ChunkResponse {
     /// Base64 编码的文件片段。
     pub chunk: String,
@@ -73,6 +115,8 @@ pub struct FileBase64ChunkResponse {
 /// 分块读取文件内容并以 Base64 字符串返回。
 ///
 /// 用于避免大文件一次性读入前端内存；前端可循环调用拼接为 Blob。
+///
+/// 安全约束：仅允许读取白名单目录（语音录制 / temp_files / screenshots）内的文件。
 #[tauri::command]
 pub async fn read_file_base64_chunk(
     path: String,
@@ -82,13 +126,14 @@ pub async fn read_file_base64_chunk(
     const MAX_CHUNK_SIZE: u64 = 256 * 1024;
     let length = length.min(MAX_CHUNK_SIZE);
 
+    let path = ensure_path_allowed(&path)?;
     let mut file = tokio::fs::File::open(&path)
         .await
-        .map_err(|e| format!("Failed to open file: {}", e))?;
+        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
     let total_bytes = file
         .metadata()
         .await
-        .map_err(|e| format!("Failed to read file metadata: {}", e))?
+        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?
         .len();
 
     if offset > total_bytes {
@@ -102,13 +147,13 @@ pub async fn read_file_base64_chunk(
 
     file.seek(SeekFrom::Start(offset))
         .await
-        .map_err(|e| format!("Failed to seek file: {}", e))?;
+        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
 
     let mut buf = vec![0u8; length as usize];
     let read_bytes = file
         .read(&mut buf)
         .await
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+        .map_err(|e| to_command_error("VOICE_FILE_READ_FAILED", "error.voice_file_read_failed", e))?;
     buf.truncate(read_bytes);
 
     let eof = offset.saturating_add(read_bytes as u64) >= total_bytes;
@@ -170,11 +215,19 @@ fn base64_encode(data: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn read_file_base64_chunk_reads_partial_and_eof() {
-        let dir = std::env::temp_dir().join("cp-test-read-chunk");
+    /// 在白名单根目录（carrypigeon-voice）下构造测试文件。
+    fn allowed_test_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir()
+            .join("carrypigeon-voice")
+            .join(name);
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[tokio::test]
+    async fn read_file_base64_chunk_reads_partial_and_eof() {
+        let dir = allowed_test_dir("cp-test-read-chunk");
         let path = dir.join("sample.bin");
         std::fs::write(&path, b"hello world").unwrap();
 
@@ -194,13 +247,13 @@ mod tests {
         assert_eq!(res2.read_bytes, 5);
         assert!(res2.eof);
         assert_eq!(res2.chunk, base64_encode(b"world"));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
     async fn read_file_base64_chunk_offset_beyond_eof_returns_empty() {
-        let dir = std::env::temp_dir().join("cp-test-read-chunk-empty");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = allowed_test_dir("cp-test-read-chunk-empty");
         let path = dir.join("empty.bin");
         std::fs::write(&path, b"x").unwrap();
 
@@ -211,5 +264,51 @@ mod tests {
         assert_eq!(res.read_bytes, 0);
         assert!(res.eof);
         assert!(res.chunk.is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn read_file_base64_chunk_rejects_path_outside_allowlist() {
+        // 白名单外的临时目录必须被拒绝。
+        let dir = std::env::temp_dir().join("cp-test-read-chunk-forbidden");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("secret.bin");
+        std::fs::write(&path, b"secret").unwrap();
+
+        let err = read_file_base64_chunk(path.to_string_lossy().into_owned(), 0, 4)
+            .await
+            .unwrap_err();
+        assert!(
+            err.contains("[FILE_PATH_FORBIDDEN]"),
+            "unexpected error: {err}"
+        );
+
+        let err2 = read_file_base64(path.to_string_lossy().into_owned())
+            .await
+            .unwrap_err();
+        assert!(
+            err2.contains("[FILE_PATH_FORBIDDEN]"),
+            "unexpected error: {err2}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn read_file_base64_rejects_nonexistent_path() {
+        let dir = allowed_test_dir("cp-test-read-chunk-missing");
+        let path = dir.join("no-such-file.bin");
+
+        let err = read_file_base64_chunk(path.to_string_lossy().into_owned(), 0, 4)
+            .await
+            .unwrap_err();
+        assert!(
+            err.contains("[FILE_PATH_INVALID]"),
+            "unexpected error: {err}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

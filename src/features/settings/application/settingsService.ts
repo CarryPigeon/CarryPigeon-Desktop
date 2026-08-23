@@ -10,6 +10,7 @@ import type { AppAccent, AppSettings, AppTheme } from "../domain/types/SettingsT
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { invokeTauri, safeInvokeTauri } from "@/shared/tauri/invokeClient";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
+import { invalidateNotificationSettingsCache } from "@/shared/config/notificationSettingsCache";
 
 export type GeneralPreferenceKey = "auto_login" | "auto_launch" | "close_to_tray" | "check_for_updates";
 
@@ -126,6 +127,9 @@ export async function readBusinessPreferences(): Promise<BusinessPreferencesSnap
 
 export async function updateBusinessPreference(key: BusinessPreferenceKey, value: boolean): Promise<void> {
   await updateConfigBool(key, value);
+  if (key === "global_dnd" || key === "desktop_notifications") {
+    invalidateNotificationSettingsCache();
+  }
 }
 
 export async function exportSettingsEnvelope(): Promise<string> {
@@ -134,10 +138,12 @@ export async function exportSettingsEnvelope(): Promise<string> {
 
 export async function importSettingsEnvelope(raw: string): Promise<void> {
   await invokeTauri<void>(TAURI_COMMANDS.settingsImportSettings, { raw });
+  invalidateNotificationSettingsCache();
 }
 
 export async function resetSettingsEnvelope(): Promise<void> {
   await invokeTauri<void>(TAURI_COMMANDS.settingsResetSettings);
+  invalidateNotificationSettingsCache();
 }
 
 export async function readServerPort(): Promise<number> {

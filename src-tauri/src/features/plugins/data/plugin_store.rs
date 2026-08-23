@@ -38,7 +38,7 @@ use api::{
 use download::download_plugin_zip_bytes;
 use hash::{eq_hash_hex, sha256_hex};
 use origin::to_http_origin;
-use paths::{base_plugins_dir, manifest_file_path, plugin_root_dir, plugin_version_dir};
+use paths::{base_plugins_dir, manifest_file_path, plugin_root_dir, plugin_version_dir, safe_join};
 use state::{
     PluginCurrent, PluginStateFile, build_installed_state, read_current, write_current,
     write_state_file,
@@ -101,7 +101,7 @@ pub async fn list_installed(
 ) -> anyhow::Result<Vec<InstalledPluginState>> {
     let origin = to_http_origin(server_socket)?;
     let server_id = fetch_server_id(&origin, tls_policy, tls_fingerprint).await?;
-    let base = base_plugins_dir()?.join(&server_id);
+    let base = safe_join(&base_plugins_dir()?, &[server_id.to_string()])?;
 
     let mut out: Vec<InstalledPluginState> = vec![];
     let mut rd = match tokio::fs::read_dir(&base).await {

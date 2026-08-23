@@ -153,7 +153,19 @@ function mentionClass(mention: MessageMention): string {
 }
 
 function openLink(url: string): void {
-  window.open(url, "_blank", "noopener,noreferrer");
+  // 安全约束：链接预览 URL 来自服务端消息数据（可能被恶意构造），
+  // 仅允许 http/https，拒绝 file:/自定义协议等任意 scheme。
+  const trimmed = String(url ?? "").trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return;
+  }
+  window.open(parsed.toString(), "_blank", "noopener,noreferrer");
 }
 </script>
 

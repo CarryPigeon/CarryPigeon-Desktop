@@ -23,6 +23,26 @@ export interface BookmarkEntry {
   bookmarkedAt: number;
 }
 
+function isBookmarkEntry(item: unknown): item is BookmarkEntry {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as BookmarkEntry).messageId === "string" &&
+    typeof (item as BookmarkEntry).channelId === "string"
+  );
+}
+
+function toLegacyEntry(messageId: string, bookmarkedAt: number): BookmarkEntry {
+  return {
+    messageId,
+    channelId: "",
+    channelName: "",
+    contentPreview: "",
+    senderName: "",
+    bookmarkedAt,
+  };
+}
+
 /**
  * 从 localStorage 读取所有收藏。
  */
@@ -32,13 +52,7 @@ export function loadBookmarks(): BookmarkEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item: unknown): item is BookmarkEntry =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as BookmarkEntry).messageId === "string" &&
-        typeof (item as BookmarkEntry).channelId === "string",
-    );
+    return parsed.filter(isBookmarkEntry);
   } catch {
     return [];
   }
@@ -84,7 +98,26 @@ export function isBookmarked(messageId: string): boolean {
 }
 
 /**
- * 从旧格式（纯 messageId 字符串数组）迁移到新格式。
+ * 添加多条收藏（按 messageId 去重，保留已有条目）。
+ */
+export function addBookmarks(entries: BookmarkEntry[]): BookmarkEntry[] {
+  migrateLegacyBookmarks();
+  const bookmarks = loadBookmarks();
+  const seen = new Set(bookmarks.map((b) => b.messageId));
+  const next = [...bookmarks];
+  for (const entry of entries) {
+    if (!entry.messageId || seen.has(entry.messageId)) continue;
+    seen.add(entry.messageId);
+    next.unshift(entry);
+  }
+  if (next.length !== bookmarks.length) {
+    saveBookmarks(next);
+  }
+  return next;
+}
+
+/**
+ * 从旧格式（纯 messageId 字符串数组，或字符串与对象混合数组）迁移到新格式。
  * 在首次运行时自动完成。
  */
 export function migrateLegacyBookmarks(): void {
@@ -92,18 +125,26 @@ export function migrateLegacyBookmarks(): void {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-    const isLegacy = parsed.length > 0 && typeof parsed[0] === "string";
-    if (!isLegacy) return;
-    // Legacy format: ["msgId1", "msgId2", ...]
-    const migrated: BookmarkEntry[] = (parsed as string[]).map((mid) => ({
-      messageId: mid,
-      channelId: "",
-      channelName: "",
-      contentPreview: "",
-      senderName: "",
-      bookmarkedAt: Date.now(),
-    }));
+    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    const hasLegacy = parsed.some((item) => typeof item === "string");
+    if (!hasLegacy) return;
+
+    const now = Date.now();
+    const seen = new Set<string>();
+    const migrated: BookmarkEntry[] = [];
+    for (const item of parsed) {
+      if (typeof item === "string") {
+        const messageId = item.trim();
+        if (!messageId || seen.has(messageId)) continue;
+        seen.add(messageId);
+        migrated.push(toLegacyEntry(messageId, now));
+        continue;
+      }
+      if (isBookmarkEntry(item) && !seen.has(item.messageId)) {
+        seen.add(item.messageId);
+        migrated.push(item);
+      }
+    }
     saveBookmarks(migrated);
   } catch {
     // Ignore migration errors

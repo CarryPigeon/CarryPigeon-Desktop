@@ -100,7 +100,7 @@ async function handleDownload(): Promise<void> {
   try {
     const socket = getActiveChatServerSocket();
     const token = readAuthToken(socket) || "";
-    currentTaskId.value = await downloadFile(downloadUrl.value, token);
+    currentTaskId.value = await downloadFile(downloadUrl.value, token, socket);
   } catch (e) {
     createLogger("FileRefMessageBubble").error("Action: chat_file_download_failed", { url: downloadUrl.value, error: String(e) });
   }
@@ -111,7 +111,7 @@ async function handleResume(): Promise<void> {
   try {
     const socket = getActiveChatServerSocket();
     const token = readAuthToken(socket) || "";
-    currentTaskId.value = await resumeDownload(currentTaskId.value, downloadUrl.value, token);
+    currentTaskId.value = await resumeDownload(currentTaskId.value, downloadUrl.value, token, socket);
   } catch (e) {
     createLogger("FileRefMessageBubble").error("Action: chat_file_resume_failed", { url: downloadUrl.value, error: String(e) });
   }

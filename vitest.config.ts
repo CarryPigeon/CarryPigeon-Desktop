@@ -12,6 +12,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    setupFiles: ["./src/test/setupLocalStorage.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     exclude: ["node_modules", "src-tauri", "dist"],
     coverage: {

@@ -10,7 +10,6 @@
  */
 import { invokeTauri, isTauriRuntimeAvailable } from "@/shared/tauri";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
-import SHA256 from "crypto-js/sha256";
 import type { DbExecResult, DbQueryResult, DbStatement, DbValue } from "./types";
 import { getServerScopeKey } from "@/shared/serverIdentity";
 import { NO_SERVER_KEY } from "@/shared/serverKey";
@@ -148,10 +147,22 @@ export const tauriDbClient = createDbClient(SYSTEM_DB_KEY);
  * @param serverSocket - 服务器 Socket 地址。
  * @returns 命名空间化的 DB key。
  */
-export function serverDbKey(serverSocket: string): string {
+const serverDbKeyCache = new Map<string, string>();
+
+async function sha256Hex(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function serverDbKey(serverSocket: string): Promise<string> {
   const normalized = getServerScopeKey(serverSocket) || serverSocket.trim() || NO_SERVER_KEY;
-  const hash = SHA256(normalized).toString();
-  return `server_${hash}`;
+  const cached = serverDbKeyCache.get(normalized);
+  if (cached) return cached;
+  const hash = await sha256Hex(normalized);
+  const key = `server_${hash}`;
+  serverDbKeyCache.set(normalized, key);
+  return key;
 }
 
 /**
@@ -160,8 +171,8 @@ export function serverDbKey(serverSocket: string): string {
  * @param serverSocket - 服务器 Socket 地址。
  * @returns 缓存的 DbClient。
  */
-export function getServerDbClient(serverSocket: string): DbClient {
-  const key = serverDbKey(serverSocket);
+export async function getServerDbClient(serverSocket: string): Promise<DbClient> {
+  const key = await serverDbKey(serverSocket);
   const existing = serverDbCache.get(key);
   if (existing) return existing;
   const client = createDbClient(key);
@@ -187,7 +198,7 @@ export async function ensureSystemDb(): Promise<DbClient> {
  * @returns 已初始化的 server DbClient。
  */
 export async function ensureServerDb(serverSocket: string): Promise<DbClient> {
-  const client = getServerDbClient(serverSocket);
+  const client = await getServerDbClient(serverSocket);
   await client.init(undefined, "server");
   return client;
 }
@@ -199,7 +210,7 @@ export async function ensureServerDb(serverSocket: string): Promise<DbClient> {
  * @returns 无返回值。
  */
 export async function closeServerDb(serverSocket: string): Promise<void> {
-  const key = serverDbKey(serverSocket);
+  const key = await serverDbKey(serverSocket);
   const client = serverDbCache.get(key) ?? createDbClient(key);
   await client.close();
   serverDbCache.delete(key);
@@ -212,7 +223,7 @@ export async function closeServerDb(serverSocket: string): Promise<void> {
  * @returns 无返回值。
  */
 export async function removeServerDb(serverSocket: string): Promise<void> {
-  const key = serverDbKey(serverSocket);
+  const key = await serverDbKey(serverSocket);
   const client = serverDbCache.get(key) ?? createDbClient(key);
   await client.remove();
   serverDbCache.delete(key);

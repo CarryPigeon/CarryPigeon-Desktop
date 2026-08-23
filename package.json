@@ -3,6 +3,9 @@
     "private": true,
     "version": "0.4.0",
     "type": "module",
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
         "dev": "vite",
         "vendor:build": "vite build --config src/features/plugins/vite.vendor.config.ts",
@@ -29,7 +32,6 @@
         "@tauri-apps/api": "^2.11.1",
         "@tauri-apps/plugin-notification": "^2.3.3",
         "@tauri-apps/plugin-opener": "^2.5.4",
-        "crypto-js": "^4.2.0",
         "emoji-picker-element": "^1.29.1",
         "tdesign-vue-next": "^1.20.3",
         "vue": "^3.5.40"
@@ -38,7 +40,6 @@
         "@popperjs/core": "^2.11.8",
         "@tauri-apps/cli": "^2.11.4",
         "@tdesign-vue-next/auto-import-resolver": "^0.1.7",
-        "@types/crypto-js": "^4.2.2",
         "@types/node": "^26.1.1",
         "@vitejs/plugin-vue": "^6.0.8",
         "@vitest/coverage-v8": "^4.1.10",

@@ -74,6 +74,20 @@ pub async fn open_temp_file(
         ));
     }
 
+    // 安全约束：canonicalize 后必须仍位于 base_dir 内，
+    // 防止历史/被篡改的 DB 记录把 base_dir 外的任意文件交给系统程序打开。
+    let canonical_base = std::fs::canonicalize(temp_files.base_dir())
+        .map_err(|e| to_command_error("TEMP_FILE_OPEN_FAILED", "error.temp_file_open_failed", e))?;
+    if !std::fs::canonicalize(file_path)
+        .map(|p| p.starts_with(&canonical_base))
+        .unwrap_or(false)
+    {
+        return Err(command_error(
+            "TEMP_FILE_PATH_OUTSIDE_BASE",
+            "error.temp_file_path_outside_base",
+        ));
+    }
+
     // Use the already-registered tauri_plugin_opener
     app.opener()
         .open_path(file_path, None::<&str>)

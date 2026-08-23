@@ -1,7 +1,13 @@
 //! network｜链接预览抓取。
 //!
 //! 通过 HTTP GET 获取目标网页，提取 title、description、Open Graph 标签。
-//! 超时 5s，响应体限制 512KB。
+//! 安全约束：
+//! - 仅允许 http(s) 协议；
+//! - 目标 host 解析出的 IP 不得位于回环/私网/链路本地等保留段（防 SSRF）；
+//! - 不跟随重定向；
+//! - 响应体流式读取，硬上限 512KB（超限即停止拉取）。
+
+use std::net::{IpAddr, SocketAddr};
 
 use serde::Serialize;
 
@@ -16,6 +22,72 @@ pub struct LinkPreviewDto {
     pub favicon_url: Option<String>,
     pub site_name: Option<String>,
 }
+
+/// 判断 IP 是否属于禁止抓取的地址段（回环/私网/链路本地/未指定/ULA 等）。
+fn is_disallowed_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+        }
+        IpAddr::V6(v6) => {
+            // IPv4-mapped IPv6（::ffff:a.b.c.d）按 IPv4 规则判断。
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return is_disallowed_ip(IpAddr::V4(v4));
+            }
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || (v6.segments()[0] & 0xfe00) == 0xfc00 // ULA fc00::/7
+                || (v6.segments()[0] & 0xffc0) == 0xfe80 // link-local fe80::/10
+        }
+    }
+}
+
+/// 校验抓取目标：仅允许 http(s)，host 非空；返回归一化的 host:port 供 DNS 解析。
+fn validate_preview_target(raw_url: &str) -> Result<(reqwest::Url, String), String> {
+    let parsed = reqwest::Url::parse(raw_url.trim())
+        .map_err(|e| format!("[LINK_PREVIEW_URL_INVALID] invalid url: {e}"))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err(format!(
+            "[LINK_PREVIEW_SCHEME_REJECTED] scheme must be http(s), got: {}",
+            parsed.scheme()
+        ));
+    }
+    let host = parsed.host_str().unwrap_or_default().trim().to_string();
+    if host.is_empty() {
+        return Err("[LINK_PREVIEW_URL_INVALID] missing host".to_string());
+    }
+    let port = parsed.port_or_known_default().unwrap_or(80);
+    Ok((parsed, format!("{host}:{port}")))
+}
+
+/// 解析目标 host，并确保全部解析结果均为可公网访问的地址（防内网探测）。
+async fn ensure_public_host(host_port: &str) -> Result<Vec<SocketAddr>, String> {
+    let addrs: Vec<SocketAddr> = tokio::net::lookup_host(host_port)
+        .await
+        .map_err(|e| format!("[LINK_PREVIEW_HOST_RESOLVE_FAILED] dns resolution failed: {e}"))?
+        .collect();
+    if addrs.is_empty() {
+        return Err(
+            "[LINK_PREVIEW_HOST_RESOLVE_FAILED] host resolved to no addresses".to_string(),
+        );
+    }
+    for addr in &addrs {
+        if is_disallowed_ip(addr.ip()) {
+            return Err(format!(
+                "[LINK_PREVIEW_TARGET_FORBIDDEN] target address {} is not allowed",
+                addr.ip()
+            ));
+        }
+    }
+    Ok(addrs)
+}
+
+/// 响应体硬上限：512KB。
+const MAX_PREVIEW_BYTES: usize = 512 * 1024;
 
 /// 从 HTML 文本提取 meta 标签内容。
 fn extract_meta(html: &str, name: &str) -> Option<String> {
@@ -100,9 +172,15 @@ fn truncate(s: &str, max: usize) -> String {
 /// 获取链接预览信息。
 #[tauri::command]
 pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
+    // 安全校验：scheme 白名单 + 目标 IP 不得位于内网/保留段。
+    let (_parsed, host_port) = validate_preview_target(&url)?;
+    ensure_public_host(&host_port).await?;
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .user_agent("Mozilla/5.0 (compatible; CarryPigeon/1.0)")
+        // 不跟随重定向：防止公网入口借 302 把抓取引回内网（SSRF 绕过）。
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| {
             to_command_error(
@@ -137,15 +215,35 @@ pub async fn fetch_link_preview(url: String) -> CommandResult<LinkPreviewDto> {
         });
     }
 
-    // Read up to 512KB
-    let bytes = resp.bytes().await.map_err(|e| {
-        to_command_error(
-            "LINK_PREVIEW_READ_BODY_FAILED",
-            "error.link_preview_read_body_failed",
-            e,
-        )
-    })?;
-    let html = String::from_utf8_lossy(&bytes[..bytes.len().min(512 * 1024)]);
+    // 流式读取响应体，达到硬上限即停止拉取（真实生效的 512KB 截断）。
+    use futures_util::StreamExt;
+    let mut body: Vec<u8> = Vec::with_capacity(64 * 1024);
+    let mut truncated = false;
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| {
+            to_command_error(
+                "LINK_PREVIEW_READ_BODY_FAILED",
+                "error.link_preview_read_body_failed",
+                e,
+            )
+        })?;
+        if body.len() >= MAX_PREVIEW_BYTES
+            || body.len() + chunk.len() > MAX_PREVIEW_BYTES
+        {
+            truncated = true;
+            break;
+        }
+        body.extend_from_slice(&chunk);
+    }
+    if truncated {
+        tracing::debug!(
+            action = "network_link_preview_body_truncated",
+            url = %url,
+            limit_bytes = MAX_PREVIEW_BYTES,
+        );
+    }
+    let html = String::from_utf8_lossy(&body);
 
     let title = extract_title(&html).map(|s| truncate(&s, 200));
     let description = extract_meta(&html, "description").map(|s| truncate(&s, 500));
@@ -287,5 +385,56 @@ mod tests {
         let html = r#"<link rel="icon" href="/favicon.ico">"#;
         let p = r#"<link\s+[^>]*rel\s*=\s*["']icon["'][^>]*href\s*=\s*["']([^"']*)["']"#;
         assert_eq!(regex_match(p, html), Some("/favicon.ico".to_string()));
+    }
+
+    #[test]
+    fn disallowed_ip_rejects_private_and_loopback() {
+        assert!(is_disallowed_ip("127.0.0.1".parse().unwrap()));
+        assert!(is_disallowed_ip("10.0.0.5".parse().unwrap()));
+        assert!(is_disallowed_ip("192.168.1.1".parse().unwrap()));
+        assert!(is_disallowed_ip("172.16.0.9".parse().unwrap()));
+        assert!(is_disallowed_ip("169.254.169.254".parse().unwrap()));
+        assert!(is_disallowed_ip("0.0.0.0".parse().unwrap()));
+        assert!(is_disallowed_ip("::1".parse().unwrap()));
+        assert!(is_disallowed_ip("fe80::1".parse().unwrap()));
+        assert!(is_disallowed_ip("fd00::1".parse().unwrap()));
+        // IPv4-mapped IPv6 同样按 IPv4 规则拒绝。
+        assert!(is_disallowed_ip("::ffff:192.168.1.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn public_ips_are_allowed() {
+        assert!(!is_disallowed_ip("8.8.8.8".parse().unwrap()));
+        assert!(!is_disallowed_ip("1.1.1.1".parse().unwrap()));
+        assert!(!is_disallowed_ip("2606:4700::1111".parse().unwrap()));
+        // 172.32.x.x 属于公网段（私网是 172.16/12，即 172.16-172.31）。
+        assert!(!is_disallowed_ip("172.32.0.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn validate_target_rejects_non_http_schemes() {
+        for url in ["file:///C:/x", "ftp://example.com/a", "javascript:alert(1)"] {
+            let err = validate_preview_target(url).unwrap_err();
+            assert!(
+                err.contains("[LINK_PREVIEW_SCHEME_REJECTED]"),
+                "unexpected error for {url}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_target_rejects_garbage_and_accepts_https() {
+        assert!(
+            validate_preview_target("not a url!!")
+                .unwrap_err()
+                .contains("[LINK_PREVIEW_URL_INVALID]")
+        );
+
+        let (parsed, host_port) = validate_preview_target("https://example.com/a").unwrap();
+        assert_eq!(parsed.scheme(), "https");
+        assert_eq!(host_port, "example.com:443");
+
+        let (_, http_port) = validate_preview_target("http://example.com:8080/x").unwrap();
+        assert_eq!(http_port, "example.com:8080");
     }
 }

@@ -38,6 +38,11 @@ import {
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatApiPort } from "@/features/chat/domain/ports/chatApiPort";
 import type { PinSummary } from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
+import {
+  collectUnresolvedForwardAuthorUids,
+  withResolvedForwardAuthorNames,
+} from "./forwardAuthorNames";
+import { addBookmarks } from "@/features/chat/message-flow/bookmark/storage/localBookmarkStorage";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChatConnectionPillStateView = "connected" | "reconnecting" | "offline";
@@ -184,6 +189,12 @@ export type UseChatCenterModelDeps = {
    * 说明：可选；未提供时保持消息原始发送者名。
    */
   resolveSenderName?: (uid: string) => string;
+  /**
+   * 批量补拉用户昵称（转发条目作者可能不在当前频道成员目录内）。
+   *
+   * 说明：可选；入参为去重后的 uid 列表，返回 uid → nickname 映射（缺失项可省略）。
+   */
+  fetchUserNames?: (uids: string[]) => Promise<Record<string, string>>;
 };
 
 /**
@@ -234,6 +245,56 @@ function withResolvedSenderName(m: ChatMessage): ChatMessage {
   return { ...m, from: { ...m.from, name } };
 }
 
+/** 已补拉的用户昵称缓存（uid → nickname）；重赋值新 Map 以触发响应式更新。 */
+const fetchedUserNames = ref(new Map<string, string>());
+/** 已发起过补拉的 uid（含失败），避免重复请求。 */
+const requestedProfileUids = new Set<string>();
+/** 待补拉 uid 累积队列（debounce 合并成单次批量请求）。 */
+const pendingFetchUids: string[] = [];
+let profileFetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 转发条目作者名解析：成员目录 → 已补拉档案缓存；均未命中返回空串（UI 回退显示 uid）。
+ */
+function resolveForwardAuthorName(uid: string): string {
+  const memberName = deps.resolveSenderName?.(uid)?.trim() ?? "";
+  if (memberName) return memberName;
+  return fetchedUserNames.value.get(uid) ?? "";
+}
+
+/**
+ * 调度补拉缺失昵称的转发条目作者：去重、debounce 合并为一次批量请求；失败不重试。
+ */
+function scheduleForwardAuthorProfileFetch(uids: string[]): void {
+  const fetchNames = deps.fetchUserNames;
+  if (!fetchNames) return;
+  const fresh = uids.filter((uid) => !requestedProfileUids.has(uid));
+  if (fresh.length === 0) return;
+  for (const uid of fresh) requestedProfileUids.add(uid);
+  pendingFetchUids.push(...fresh);
+  if (profileFetchTimer) clearTimeout(profileFetchTimer);
+  profileFetchTimer = setTimeout(() => {
+    profileFetchTimer = null;
+    const batch = [...new Set(pendingFetchUids.splice(0))];
+    if (batch.length === 0) return;
+    void fetchNames(batch)
+      .then((names) => {
+        const next = fetchedUserNames.value;
+        let mutated = false;
+        for (const [uid, name] of Object.entries(names ?? {})) {
+          const trimmed = String(name ?? "").trim();
+          if (!trimmed || next.has(uid)) continue;
+          next.set(uid, trimmed);
+          mutated = true;
+        }
+        if (mutated) fetchedUserNames.value = new Map(next);
+      })
+      .catch((err) => {
+        logger.warn("chat_forward_author_profile_fetch_failed", { count: batch.length, error: String(err) });
+      });
+  }, 200);
+}
+
   const messageRows = computed<MessageRow[]>(() => {
     const list = messageTimelineSnapshot.value.currentMessages;
     const lastReadTime = currentSessionSnapshot.value.lastReadTimeMs;
@@ -242,7 +303,7 @@ function withResolvedSenderName(m: ChatMessage): ChatMessage {
 
     for (let idx = 0; idx < list.length; idx += 1) {
       const raw = list[idx];
-      const m = withResolvedSenderName(raw);
+      const m = withResolvedForwardAuthorNames(withResolvedSenderName(raw), resolveForwardAuthorName);
       const prev = idx > 0 ? list[idx - 1] : null;
       const sameSender = prev ? prev.from.id === m.from.id : false;
       const closeInTime = prev ? Math.abs(m.timeMs - prev.timeMs) < 1000 * 90 : false;
@@ -254,6 +315,15 @@ function withResolvedSenderName(m: ChatMessage): ChatMessage {
 
     return rows;
   });
+
+// 转发条目作者名补拉调度：行投影变化后收集缺失昵称的 uid 并 debounce 批量请求。
+watch(messageRows, (rows) => {
+  const missing = collectUnresolvedForwardAuthorUids(
+    rows.map((row) => row.m),
+    (uid) => Boolean(resolveForwardAuthorName(uid)),
+  );
+  if (missing.length > 0) scheduleForwardAuthorProfileFetch(missing);
+}, { immediate: true });
 
   const replyPreview = computed<{ title: string; snippet: string }>(() => {
     const draft = messageComposerSnapshot.value.replyDraft;
@@ -541,9 +611,22 @@ function withResolvedSenderName(m: ChatMessage): ChatMessage {
   function handleBatchBookmark(): void {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    const existing: string[] = JSON.parse(localStorage.getItem("cp_bookmarks") ?? "[]");
-    const set = new Set([...existing, ...ids]);
-    localStorage.setItem("cp_bookmarks", JSON.stringify([...set]));
+    const cid = currentSessionSnapshot.value.currentChannelId;
+    const channelName = String(deps.currentChannelName.value ?? "");
+    const lookup = cid ? deps.lookupChannel(cid) : null;
+    addBookmarks(
+      ids.map((messageId) => {
+        const msg = lookup?.findMessageById(messageId);
+        return {
+          messageId,
+          channelId: cid ?? "",
+          channelName,
+          contentPreview: msg ? (msg.kind === "core_text" ? msg.text : msg.preview) : "",
+          senderName: msg?.from?.name ?? "",
+          bookmarkedAt: Date.now(),
+        };
+      }),
+    );
     clearSelection();
   }
 
@@ -577,6 +660,7 @@ function withResolvedSenderName(m: ChatMessage): ChatMessage {
 
   onBeforeUnmount(() => {
     if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+    if (profileFetchTimer) clearTimeout(profileFetchTimer);
   });
 
   function handleCancelReply(): void {

@@ -80,18 +80,22 @@ export function registerTrayHoverBridge(): (() => void) | null {
   if (!isTauriRuntimeAvailable() || IS_MOCK_ENABLED) return null;
 
   const unlisteners: (() => void)[] = [];
+  let hoverGeneration = 0;
 
   void (async () => {
     const chat = getChatCapabilities();
 
     const unlistenHover = await safeListen<{ x: number; y: number }>("tray-hover-settled", async (event) => {
+      const generation = ++hoverGeneration;
       const previews = chat.getUnreadMessagePreviews(4);
       if (previews.length === 0) return;
+      if (generation !== hoverGeneration) return;
 
       const data = encodeURIComponent(JSON.stringify(previews));
       const pos = event.payload;
 
       try {
+        if (generation !== hoverGeneration) return;
         await invokeTauri<void>(TAURI_COMMANDS.openPopoverWindow, {
           query: `window=tray-notification-popover&data=${data}`,
           x: pos.x,
@@ -100,8 +104,10 @@ export function registerTrayHoverBridge(): (() => void) | null {
           height: Math.min(previews.length * 64 + 40, 320),
         });
       } catch (err) {
+        if (generation !== hoverGeneration) return;
         logger.warn("Action: chat_tray_hover_popover_open_failed", { error: String(err) });
       }
+      if (generation !== hoverGeneration) return;
     });
     unlisteners.push(unlistenHover);
 

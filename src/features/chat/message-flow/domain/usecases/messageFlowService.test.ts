@@ -49,6 +49,14 @@ function makeMockDeps(overrides: Record<string, unknown> = {}): MessageFlowAppli
       appendMessageIfMissing: vi.fn(),
       listMessages: vi.fn().mockReturnValue([]),
       replaceMessage: vi.fn(),
+      replaceTimeline: vi.fn(),
+      writeNextCursor: vi.fn(),
+      writeHasMore: vi.fn(),
+      writeSearchState: vi.fn(),
+      readNextCursor: vi.fn().mockReturnValue(""),
+      readHasMore: vi.fn().mockReturnValue(false),
+      isLoadingMore: vi.fn().mockReturnValue(false),
+      setLoadingMore: vi.fn(),
     },
     composerState: {
       readSelectedDomainId: vi.fn().mockReturnValue("Core:Text"),
@@ -289,6 +297,76 @@ describe("MessageFlowApplicationService", () => {
       const result = await svc.sendComposerMessage();
       expect(result.ok).toBe(false);
       expect((result as any).error?.code).toBe("plugin_composer_required");
+    });
+  });
+
+  describe("replaceTimelineMerged", () => {
+    it("re-reads the timeline after merge so concurrent arrivals are kept", async () => {
+      const existing = [makeMessage({ id: "msg-old", text: "old" })];
+      const live = makeMessage({ id: "msg-live", text: "live" });
+      let listCalls = 0;
+      const deps = makeMockDeps({
+        timelineState: {
+          readCurrentChannelId: vi.fn().mockReturnValue("ch1"),
+          listMessages: vi.fn(() => {
+            listCalls += 1;
+            return listCalls === 1 ? existing : [...existing, live];
+          }),
+          replaceTimeline: vi.fn(),
+          writeNextCursor: vi.fn(),
+          writeHasMore: vi.fn(),
+          readNextCursor: vi.fn().mockReturnValue(""),
+          readHasMore: vi.fn().mockReturnValue(false),
+        },
+        mergeMessages: vi.fn(async (left: ChatMessage[], right: ChatMessage[]) => [...left, ...right]),
+        api: {
+          listChannelMessages: vi.fn().mockResolvedValue({
+            items: [{ id: "msg-page", cid: "ch1", uid: "u1", sender: { uid: "u1", nickname: "Alice" }, domain: "Core:Text", data: { text: "page" }, send_time: Date.now() }],
+            nextCursor: null,
+            hasMore: false,
+          }),
+        },
+      });
+      const svc = new MessageFlowApplicationService(deps);
+      await svc.refreshChannelLatestPage("ch1");
+      expect(deps.mergeMessages).toHaveBeenCalledTimes(2);
+      expect(deps.timelineState.replaceTimeline).toHaveBeenCalledWith(
+        "ch1",
+        expect.arrayContaining([
+          expect.objectContaining({ id: "msg-old" }),
+          expect.objectContaining({ id: "msg-live" }),
+        ]),
+      );
+    });
+  });
+
+  describe("searchCurrentChannel", () => {
+    it("drops stale search results when a newer query is in flight", async () => {
+      let resolveFirst: ((value: { items: unknown[] }) => void) | undefined;
+      const first = new Promise<{ items: unknown[] }>((resolve) => {
+        resolveFirst = resolve;
+      });
+      const searchChannelMessages = vi
+        .fn()
+        .mockImplementationOnce(() => first)
+        .mockResolvedValueOnce({ items: [] });
+      const writeSearchState = vi.fn();
+      const deps = makeMockDeps({
+        api: { searchChannelMessages },
+        timelineState: {
+          readCurrentChannelId: vi.fn().mockReturnValue("ch1"),
+          writeSearchState,
+          listMessages: vi.fn().mockReturnValue([]),
+        },
+      });
+      const svc = new MessageFlowApplicationService(deps);
+      const stale = svc.searchCurrentChannel("alpha");
+      const latest = svc.searchCurrentChannel("beta");
+      resolveFirst?.({ items: [{ id: "stale" }] });
+      await Promise.all([stale, latest]);
+      const writes = writeSearchState.mock.calls.map((call) => call[0] as { query: string; loading: boolean; results: unknown[] });
+      expect(writes.some((state) => state.query === "alpha" && !state.loading && state.results.length > 0)).toBe(false);
+      expect(writes.some((state) => state.query === "beta" && !state.loading)).toBe(true);
     });
   });
 });

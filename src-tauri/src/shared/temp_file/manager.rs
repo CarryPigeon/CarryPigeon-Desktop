@@ -108,12 +108,37 @@ impl TempFileManager {
         self.base_dir.join("downloads")
     }
 
-    fn part_path(&self, id: &str) -> PathBuf {
-        self.downloads_dir().join(format!("{id}.part"))
+    /// 校验临时文件 id：仅允许字母数字、连字符与下划线，长度 1..=64。
+    ///
+    /// 安全约束：id 会被直接拼入文件路径（`{id}.part` / `{id}.{ext}`），
+    /// 必须拒绝路径分隔符、盘符与 `..` 等穿越片段（id 来自前端命令入参）。
+    pub(crate) fn ensure_valid_id(id: &str) -> anyhow::Result<()> {
+        let valid = !id.is_empty()
+            && id.len() <= 64
+            && id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if valid {
+            Ok(())
+        } else {
+            anyhow::bail!(
+                "Invalid temp file id: only alphanumeric, hyphen, and underscore are allowed (max 64 chars)"
+            )
+        }
     }
 
-    fn final_path(&self, id: &str, ext: &str) -> PathBuf {
-        self.downloads_dir().join(format!("{id}.{ext}"))
+    /// 计算下载 .part 文件路径（含 id 合法性校验）。
+    ///
+    /// 说明：公开给 crate 内其他模块复用（如下载命令的断点续传分支），
+    /// 避免各处手工拼接 `{id}.part` 绕过校验。
+    pub fn part_path(&self, id: &str) -> anyhow::Result<PathBuf> {
+        Self::ensure_valid_id(id)?;
+        Ok(self.downloads_dir().join(format!("{id}.part")))
+    }
+
+    fn final_path(&self, id: &str, ext: &str) -> anyhow::Result<PathBuf> {
+        Self::ensure_valid_id(id)?;
+        Ok(self.downloads_dir().join(format!("{id}.{ext}")))
     }
 
     fn now() -> i64 {
@@ -138,7 +163,7 @@ impl TempFileManager {
         total_size: u64,
     ) -> anyhow::Result<(tokio::fs::File, u64)> {
         let now = Self::now();
-        let part = self.part_path(id);
+        let part = self.part_path(id)?;
 
         let sql = "INSERT INTO temp_files (id, namespace, file_path, url, mime_type, total_size, downloaded, state, created_at, accessed_at) VALUES ($1, 'downloads', $2, $3, $4, $5, 0, 'downloading', $6, $6) ON CONFLICT(id) DO UPDATE SET state='downloading', accessed_at=$6";
         self.db
@@ -195,8 +220,8 @@ impl TempFileManager {
 
     /// 标记下载完成：原子重命名 .part → 最终文件，更新 SQLite state=Complete。
     pub async fn mark_complete(&self, id: &str, ext: &str) -> anyhow::Result<String> {
-        let part = self.part_path(id);
-        let final_path = self.final_path(id, ext);
+        let part = self.part_path(id)?;
+        let final_path = self.final_path(id, ext)?;
 
         tokio::fs::rename(&part, &final_path)
             .await

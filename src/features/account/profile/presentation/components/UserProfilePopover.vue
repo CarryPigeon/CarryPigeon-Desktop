@@ -146,10 +146,10 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { toast } from "@/shared/utils/toast";
 import { createLogger } from "@/shared/utils/logger";
-import { getUserUsecase, getUserMutationPort } from "@/features/account/profile/di/user.di";
+import { getProfileCapabilities } from "@/features/account/profile/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
-import { currentUser } from "@/features/account/current-user/presentation/store/userData";
 import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
+import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 
 import type { UserPublic } from "@/features/account/profile/domain/types/UserTypes";
@@ -169,6 +169,7 @@ const { t } = useI18n();
 const logger = createLogger("userProfilePopover");
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 const currentUserCapabilities = getCurrentUserCapabilities();
+const currentUser = useObservedCapabilitySnapshot(currentUserCapabilities);
 
 // Refs
 const triggerRef = ref<HTMLElement | null>(null);
@@ -185,7 +186,7 @@ const profile = ref<UserPublic | null>(null);
 const copiedEmail = ref(false);
 const copiedUid = ref(false);
 const isCurrentUser = computed(() => {
-  const currentUid = currentUser.id;
+  const currentUid = currentUser.value.id;
   return String(currentUid) === String(props.userId);
 });
 const canEdit = computed(() => {
@@ -201,13 +202,13 @@ const resolvedAvatarUrl = computed(() => {
   // 当前用户优先使用全局快照中的头像（可能已通过 applyLocalProfilePatch 更新），
   // 再回退到从 API 拉取的 profile.avatar，避免 mock 模式下上传后不刷新。
   const url = props.avatarUrl
-    ?? (isCurrentUser.value ? currentUser.avatarUrl : undefined)
+    ?? (isCurrentUser.value ? currentUser.value.avatarUrl : undefined)
     ?? profile.value?.avatar;
   return url || "https://picsum.photos/80/80?grayscale";
 });
 const resolvedBackgroundUrl = computed(() => {
   return props.backgroundUrl
-    ?? (isCurrentUser.value ? currentUser.backgroundUrl : undefined)
+    ?? (isCurrentUser.value ? currentUser.value.backgroundUrl : undefined)
     ?? profile.value?.backgroundUrl;
 });
 
@@ -215,11 +216,14 @@ const resolvedBackgroundUrl = computed(() => {
 let popperInstance: ReturnType<typeof createPopper> | null = null;
 let hoverLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 let hoverEnterTimer: ReturnType<typeof setTimeout> | null = null;
+let profileLoadSeq = 0;
 
 // Load profile
 async function loadProfile() {
+  const seq = ++profileLoadSeq;
   if (props.username !== undefined && props.email !== undefined && props.bio !== undefined) {
     // All info provided via props, no need to fetch
+    if (seq !== profileLoadSeq) return;
     profile.value = {
       uid: props.userId,
       nickname: props.username || "",
@@ -241,17 +245,20 @@ async function loadProfile() {
     if (!serverSocket || !accessToken) {
       throw new Error("Not connected to server");
     }
-    const usecase = getUserUsecase(serverSocket);
-    const result = await usecase.execute(accessToken, props.userId);
+    const result = await getProfileCapabilities().getUser(serverSocket, accessToken, props.userId);
+    if (seq !== profileLoadSeq) return;
     profile.value = result;
     error.value = null;
   } catch (e) {
+    if (seq !== profileLoadSeq) return;
     logger.error("Action: auth_profile_load_failed", {
       error: String(e),
     });
     error.value = t("load_failed");
   } finally {
-    loading.value = false;
+    if (seq === profileLoadSeq) {
+      loading.value = false;
+    }
   }
 }
 
@@ -524,8 +531,11 @@ async function handleFileChange(e: Event) {
       return;
     }
 
-    const mutationPort = getUserMutationPort(serverSocket);
-    const backgroundUrl = await mutationPort.updateUserBackgroundImage(accessToken, file);
+    const backgroundUrl = await getProfileCapabilities().updateUserBackgroundImage(
+      serverSocket,
+      accessToken,
+      file,
+    );
 
     if (profile.value) {
       profile.value = {

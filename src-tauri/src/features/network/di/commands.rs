@@ -160,11 +160,31 @@ fn http_client() -> &'static reqwest::Client {
 pub async fn download_file(
     app: AppHandle,
     temp_files: State<'_, TempFileManager>,
+    server_socket: String,
     url: String,
     token: String,
     task_id: String,
 ) -> CommandResult<DownloadResult> {
     use futures_util::StreamExt;
+
+    // 安全约束：下载 URL 必须与当前服务器同源，防止把 Bearer token
+    // 投递到任意第三方主机（也封掉一个任意 URL 下载出口）。
+    let expected_origin = crate::shared::net::origin::to_http_origin(&server_socket)
+        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?;
+    let target = reqwest::Url::parse(&url)
+        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?;
+    let base = reqwest::Url::parse(&expected_origin)
+        .map_err(|e| to_command_error("DOWNLOAD_REQUEST_FAILED", "error.download_request_failed", e))?;
+    let same_origin = target.scheme() == base.scheme()
+        && target.host_str() == base.host_str()
+        && target.port_or_known_default() == base.port_or_known_default();
+    if !same_origin {
+        return Err(to_command_error(
+            "DOWNLOAD_URL_CROSS_ORIGIN",
+            "error.download_url_cross_origin",
+            anyhow::anyhow!("download url is cross-origin: {url}"),
+        ));
+    }
 
     let client = http_client();
 
@@ -233,11 +253,10 @@ pub async fn download_file(
                 url = %url,
                 resume_from
             );
-            let part_path = temp_files
-                .base_dir()
-                .join("downloads")
-                .join(format!("{task_id}.part"));
-            let _ = tokio::fs::remove_file(&part_path).await;
+            // 经 manager 统一构造（含 id 校验），避免手工拼接绕过净化。
+            if let Ok(part_path) = temp_files.part_path(task_id.as_str()) {
+                let _ = tokio::fs::remove_file(&part_path).await;
+            }
             response
         }
         _ => response
@@ -277,17 +296,19 @@ pub async fn download_file(
         })?;
     // 如果服务端不支持 Range，从 0 截断。
     if resume_from > 0 && !resumed && existing > 0 {
-        // 重新打开并截断
+        // 重新打开并截断（路径同样经 manager 校验构造）。
+        let part_path = temp_files.part_path(&task_id).map_err(|e| {
+            to_command_error(
+                "TEMP_FILE_TRUNCATE_FAILED",
+                "error.temp_file_create_failed",
+                e,
+            )
+        })?;
         file = tokio::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(
-                temp_files
-                    .base_dir()
-                    .join("downloads")
-                    .join(format!("{task_id}.part")),
-            )
+            .open(part_path)
             .await
             .map_err(|e| {
                 to_command_error(

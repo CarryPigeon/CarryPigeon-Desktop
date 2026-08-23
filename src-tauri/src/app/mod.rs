@@ -411,9 +411,10 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::settings::di::commands::update_config_bool,
             crate::features::settings::di::commands::update_config_u32,
             crate::features::settings::di::commands::update_config_string,
-            // plugins legacy debug commands
-            crate::features::plugins::di::commands::load_plugin,
-            crate::features::plugins::di::commands::list_plugins,
+            // 说明：legacy wasm 调试命令 `load_plugin`/`list_plugins` 已从生产注册中移除。
+            // 该链路（任意 URL 下载 + sha256 可选跳过 + manifest.name 未净化 + wasmtime 执行）
+            // 无任何前端调用方，保留注册会构成可被恶意网页/插件内容触达的攻击面。
+            // 开发态如需调试请在本地临时恢复注册，不要提交。
             // plugins
             crate::features::plugins::di::commands::plugins_list_installed,
             crate::features::plugins::di::commands::plugins_get_installed_state,

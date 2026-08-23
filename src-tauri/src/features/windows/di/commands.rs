@@ -91,6 +91,14 @@ pub async fn open_info_window(
     info_window::open_info_window_impl(app, label, title, query, width, height)
         .await
         .map_err(|err| {
+            let message = err.to_string();
+            if message.contains("window label") {
+                return to_command_error(
+                    "WINDOW_LABEL_FORBIDDEN",
+                    "error.window_label_forbidden",
+                    err,
+                );
+            }
             to_command_error(
                 "WINDOW_INFO_OPEN_FAILED",
                 "error.window_info_open_failed",

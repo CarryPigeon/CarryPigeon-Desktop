@@ -8,6 +8,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { useI18n } from "vue-i18n";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
+import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message/domain/messageModels";
 import { NotificationBell } from "@/features/notifications/components";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
@@ -193,7 +194,6 @@ let dragCounter = 0;
 
 /** 合并转发详情弹窗状态。 */
 const forwardDetailVisible = ref(false);
-type ForwardedMessageEntry = { messageId: string; channelId: string; userId: string; preview: string; sentTime: number };
 const forwardDetailData = ref<{
   fromName: string;
   forwardedMessages: ForwardedMessageEntry[];
@@ -430,7 +430,7 @@ function getReplyText(m: VirtualMessageItem): string {
       v-if="props.model.searchPanelOpen"
       :visible="props.model.searchPanelOpen"
       :loading="props.model.searchState.loading"
-      :error="props.model.searchState.error || null"
+      :error="props.model.searchState.error ? t(props.model.searchState.error) : null"
       :results="props.model.searchState.results"
       :active-index="searchActiveIndex"
       :query="props.model.searchState.query"

@@ -5,14 +5,7 @@
  */
 
 import { useI18n } from "vue-i18n";
-
-type ForwardedMessageEntry = {
-  messageId: string;
-  channelId: string;
-  userId: string;
-  preview: string;
-  sentTime: number;
-};
+import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message/domain/messageModels";
 
 const props = defineProps<{
   visible: boolean;
@@ -61,7 +54,7 @@ function handleClose(): void {
           class="cp-forwardDetail__msg"
         >
           <div class="cp-forwardDetail__msgMeta">
-            <span class="cp-forwardDetail__msgAuthor">{{ fm.userId }}</span>
+            <span class="cp-forwardDetail__msgAuthor">{{ fm.authorName || fm.userId }}</span>
             <span class="cp-forwardDetail__msgTime">{{ fmtTime(fm.sentTime) }}</span>
           </div>
           <div class="cp-forwardDetail__msgPreview">

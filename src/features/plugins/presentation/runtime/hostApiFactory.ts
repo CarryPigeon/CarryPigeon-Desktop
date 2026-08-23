@@ -62,16 +62,12 @@ export function createPluginNetworkApi(serverSocket: string): NonNullable<Plugin
  * - `storage` 始终注入；`network` 仅当 `permissions` 包含 "network" 时注入；
  * - `invoke` / `onEvent` 分别由 "invoke" / "events" 权限门控，且命令/事件均以
  *   白名单前缀（目前固定为 "voice_call:"）约束，杜绝越权调用；
- * - `mountOverlay` / `registerToolbarAction` 由 "ui" 权限 + 宿主 UI 桥共同门控。
+ * - `mountOverlay` / `registerToolbarAction` 由 "ui" 权限 + 宿主 UI 桥共同门控；
+ * - `sendMessage` 由 "messages:send" 权限门控（默认拒绝）：以当前用户身份发言
+ *   属高危能力，零权限/未申请该权限的插件不得获得。
  *
- * 注：`sendMessage` 依赖宿主运行时桥（非纯数据），无法仅凭 serverSocket/pluginId 构造，
- * 故由调用方（domainRegistryContext）传入。
- *
- * @param serverSocket 当前 server socket。
- * @param pluginId 插件标识。
- * @param permissions 当前插件被授予的权限列表。
- * @param uiBridge 宿主 chat UI 桥（提供 mountOverlay / registerToolbarAction）。
- * @param sendMessage 宿主消息发送能力（来自宿主运行时桥）。
+ * 注：`sendMessage` 的实际实现依赖宿主运行时桥（非纯数据），
+ * 由调用方（domainRegistryContext）传入。
  */
 export function createHostApi(
   serverSocket: string,
@@ -80,10 +76,19 @@ export function createHostApi(
   uiBridge?: PluginUiBridge,
   sendMessage?: (payload: PluginComposerPayload) => Promise<void>,
 ): PluginContext["host"] {
+  const canSendMessages = permissions.includes("messages:send");
   const host: PluginContext["host"] = {
-    sendMessage: sendMessage ?? (async () => {
-      throw new Error(`plugin ${pluginId} host.sendMessage not provided`);
-    }),
+    sendMessage: async (payload) => {
+      if (!canSendMessages) {
+        throw new Error(
+          `[PLUGIN_PERMISSION_DENIED] plugin ${pluginId} lacks "messages:send" permission`,
+        );
+      }
+      if (!sendMessage) {
+        throw new Error(`plugin ${pluginId} host.sendMessage not provided`);
+      }
+      await sendMessage(payload);
+    },
     storage: createPluginStorageApi(serverSocket, pluginId),
     network: permissions.includes("network") ? createPluginNetworkApi(serverSocket) : undefined,
   };

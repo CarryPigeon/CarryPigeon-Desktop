@@ -7,7 +7,13 @@
     "permissions": [
         "core:default",
         "core:window:default",
-        "opener:default",
+        {
+            "identifier": "opener:allow-open-url",
+            "allow": [
+                { "url": "https://github.com/ShirasawaTopaz/carrypigeon-desktop/releases/latest" },
+                { "url": "https://github.com/ShirasawaTopaz/carrypigeon-desktop/releases/*" }
+            ]
+        },
         "core:tray:default",
         "core:menu:default",
         "core:window:allow-set-size",

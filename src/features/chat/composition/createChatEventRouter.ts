@@ -22,8 +22,11 @@ import { createMessageEventRouter } from "@/features/chat/message-flow/internal"
 import { createReadStateEventRouter } from "@/features/chat/room-session/internal";
 import { createChatGovernanceEventRouter } from "./createChatGovernanceEventRouter";
 import { createNotificationOnNewMessageHandler } from "@/app/bootstrap/trayIntegration";
-import { invokeTauri } from "@/shared/tauri/invokeClient";
-import { TAURI_COMMANDS } from "@/shared/tauri/commands";
+import {
+  getCachedDesktopNotificationsEnabled,
+  getCachedGlobalDndEnabled,
+  preloadNotificationSettingsCache,
+} from "@/shared/config/notificationSettingsCache";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -69,11 +72,11 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     emitChannelProjectionChanged: deps.emitChannelProjectionChanged,
   });
 
+  void preloadNotificationSettingsCache();
+
   const handleNewMessage = createNotificationOnNewMessageHandler({
-    getGlobalDndEnabled: () =>
-      invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key: "global_dnd" }),
-    getDesktopNotificationsEnabled: () =>
-      invokeTauri<boolean>(TAURI_COMMANDS.settingsGetConfigBool, { key: "desktop_notifications" }),
+    getGlobalDndEnabled: getCachedGlobalDndEnabled,
+    getDesktopNotificationsEnabled: getCachedDesktopNotificationsEnabled,
     getCurrentChannelId: deps.timelineState.readCurrentChannelId,
     getCurrentUserId: deps.getCurrentUserId,
     getChannelNotificationPreference: async () => "all",

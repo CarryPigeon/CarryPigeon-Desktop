@@ -13,6 +13,13 @@ use std::{
 use anyhow::Context;
 use zip::ZipArchive;
 
+/// 单条目解压上限（64MB）：防止头部声明超大 size 触发巨额分配。
+const MAX_ENTRY_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
+/// 全包解压总量上限（256MB）：防止 zip 炸弹灌满磁盘/内存。
+const MAX_TOTAL_UNCOMPRESSED_BYTES: u64 = 256 * 1024 * 1024;
+/// 压缩比上限：declared/compressed 超过该值且体积可观时判定为炸弹。
+const MAX_COMPRESSION_RATIO: u64 = 200;
+
 fn normalize_zip_name(raw: &str) -> String {
     raw.replace('\\', "/").trim_start_matches('/').to_string()
 }
@@ -185,6 +192,7 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
 
         // 判断 zip 是否把所有内容包在单一根目录下（常见打包方式）。
         let mut names: Vec<String> = vec![];
+        let mut total_uncompressed: u64 = 0;
         for i in 0..archive.len() {
             let f = archive.by_index(i)?;
             if f.is_dir() {
@@ -193,6 +201,29 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
             let normalized = normalize_zip_name(f.name());
             if normalized.is_empty() {
                 continue;
+            }
+            // zip 炸弹防护：声明大小 / 压缩比 / 总量三重校验（基于 central directory）。
+            let declared = f.size();
+            let compressed = f.compressed_size();
+            if declared > MAX_ENTRY_UNCOMPRESSED_BYTES {
+                return Err(anyhow::anyhow!(
+                    "Zip entry exceeds size limit: {} ({} bytes)",
+                    normalized,
+                    declared
+                ));
+            }
+            if compressed > 0 && declared / compressed > MAX_COMPRESSION_RATIO && declared > 1024 * 1024
+            {
+                return Err(anyhow::anyhow!(
+                    "Zip entry compression ratio too high (possible zip bomb): {}",
+                    normalized
+                ));
+            }
+            total_uncompressed += declared;
+            if total_uncompressed > MAX_TOTAL_UNCOMPRESSED_BYTES {
+                return Err(anyhow::anyhow!(
+                    "Zip total uncompressed size exceeds limit ({MAX_TOTAL_UNCOMPRESSED_BYTES} bytes)"
+                ));
             }
             names.push(normalized);
         }
@@ -249,8 +280,19 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
                 std::fs::create_dir_all(parent)?;
             }
             let mut out = std::fs::File::create(&out_path)?;
-            let mut buf = Vec::with_capacity(file.size() as usize);
-            file.read_to_end(&mut buf)?;
+            // 按声明大小预分配，但钳制到单条目上限；实际读取用 take 再兜底一次
+            // （声明值可被伪造，不能只信头部）。
+            let declared = file.size();
+            let mut buf =
+                Vec::with_capacity(declared.min(MAX_ENTRY_UNCOMPRESSED_BYTES) as usize);
+            let mut limited = (&mut file).take(MAX_ENTRY_UNCOMPRESSED_BYTES + 1);
+            limited.read_to_end(&mut buf)?;
+            if buf.len() as u64 > MAX_ENTRY_UNCOMPRESSED_BYTES {
+                return Err(anyhow::anyhow!(
+                    "Zip entry exceeds size limit while reading: {}",
+                    final_name
+                ));
+            }
             std::io::Write::write_all(&mut out, &buf)?;
         }
         Ok(())
@@ -321,7 +363,9 @@ mod tests {
                 link.display(),
                 target.display()
             );
-            let status = std::process::Command::new("pwsh")
+            // 使用 Windows 必有的 Windows PowerShell（5.1 同样支持创建 Junction）；
+            // 不依赖 pwsh 7 是否安装。
+            let status = std::process::Command::new("powershell")
                 .args(["-NoProfile", "-Command", &command])
                 .status()
                 .expect("run junction command");

@@ -112,6 +112,12 @@ function cleanupTimer(): void {
 
 onUnmounted(() => {
   cleanupTimer();
+  if (state.value === "recording") {
+    state.value = "idle";
+    void invoke(TAURI_COMMANDS.stopVoiceRecording).catch(() => {
+      // 卸载时尽力停止录音，避免输入设备占用泄漏
+    });
+  }
 });
 </script>
 

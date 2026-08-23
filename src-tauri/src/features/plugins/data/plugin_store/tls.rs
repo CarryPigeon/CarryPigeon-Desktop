@@ -91,7 +91,10 @@ async fn verify_https_fingerprint(origin: &str, expected_sha256: &str) -> anyhow
 }
 
 fn build_reqwest_client(policy: TlsPolicy) -> anyhow::Result<reqwest::Client> {
-    let mut builder = reqwest::Client::builder();
+    let mut builder = reqwest::Client::builder()
+        // 插件商店 API/下载不跟随重定向：防止“同源”入口借 302 把请求
+        // 引向任意第三方主机，绕过同源下载与插件 fetch 的边界。
+        .redirect(reqwest::redirect::Policy::none());
     if policy != TlsPolicy::Strict {
         builder = builder
             .danger_accept_invalid_certs(true)
@@ -110,7 +113,8 @@ pub(super) async fn build_server_client(
     tls_fingerprint: Option<&str>,
 ) -> anyhow::Result<reqwest::Client> {
     if !origin.trim().starts_with("https://") {
-        return Ok(reqwest::Client::new());
+        // 明文通道同样禁用重定向，保持与加密通道一致的边界。
+        return build_reqwest_client(TlsPolicy::Strict);
     }
     let policy = parse_tls_policy(tls_policy);
     if policy == TlsPolicy::TrustFingerprint {
