@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { useI18n } from "vue-i18n";
 import { safeListen } from "@/shared/tauri/events";
 import { getScreenshotData, finishScreenshot, cancelScreenshot } from "../../data/screenshotCommands";
 import AnnotationToolbar from "./tools/AnnotationToolbar.vue";
@@ -7,6 +8,7 @@ import type { ScreenCapture } from "../../api-types";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("screenshot");
+const { t } = useI18n();
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -53,13 +55,15 @@ let isComposing = false;
 let penPoints: { x: number; y: number }[] = [];
 let dataReadyUnlisten: (() => void) | null = null;
 let dataReadyTimeout: ReturnType<typeof setTimeout> | null = null;
+let raceTimeout: ReturnType<typeof setTimeout> | null = null;
+let blurTimeout: ReturnType<typeof setTimeout> | null = null;
 let escKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
 async function initOverlay(data: ScreenCapture[]) {
   captures.value = data;
 
   if (data.length === 0) {
-    error.value = "No screen captures available";
+    error.value = t("screenshot_no_captures");
     loading.value = false;
     return;
   }
@@ -88,13 +92,14 @@ async function initOverlay(data: ScreenCapture[]) {
 
   const ctx = canvasRef.value?.getContext("2d");
   if (!ctx) {
-    error.value = "Canvas not available";
+    error.value = t("screenshot_canvas_unavailable");
     return;
   }
 
   fitCanvas(ctx);
   renderBackground(ctx);
-  ctx.drawImage(bgCanvas!, offsetX, offsetY, virtualW * scale, virtualH * scale);
+  if (!bgCanvas) return;
+  ctx.drawImage(bgCanvas, offsetX, offsetY, virtualW * scale, virtualH * scale);
   drawCaptureBorder(ctx);
   baseImageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -102,7 +107,8 @@ async function initOverlay(data: ScreenCapture[]) {
     const c = canvasRef.value?.getContext("2d");
     if (!c) return;
     renderBackground(c);
-    c.drawImage(bgCanvas!, offsetX, offsetY, virtualW * scale, virtualH * scale);
+    if (!bgCanvas) return;
+    c.drawImage(bgCanvas, offsetX, offsetY, virtualW * scale, virtualH * scale);
     drawCaptureBorder(c);
   };
 
@@ -166,24 +172,32 @@ onMounted(async () => {
   try {
     const data = await Promise.race([
       getScreenshotData(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("getScreenshotData timed out after 15s")), 15000),
-      ),
+      new Promise<never>((_, reject) => {
+        raceTimeout = setTimeout(() => reject(new Error("getScreenshotData timed out after 15s")), 15000);
+      }),
     ]);
+    if (raceTimeout) {
+      clearTimeout(raceTimeout);
+      raceTimeout = null;
+    }
     await initOverlay(data);
   } catch (_e) {
+    if (raceTimeout) {
+      clearTimeout(raceTimeout);
+      raceTimeout = null;
+    }
     // 数据尚未就绪（遮罩窗口先于截图打开），监听事件等待
     let timedOut = false;
     dataReadyTimeout = setTimeout(() => {
       timedOut = true;
       dataReadyUnlisten?.();
       dataReadyUnlisten = null;
-      error.value = "Screenshot data not ready";
+      error.value = t("screenshot_data_not_ready");
       loading.value = false;
     }, 15000);
 
     dataReadyUnlisten = await safeListen("screenshot-data-ready", async () => {
-      clearTimeout(dataReadyTimeout!);
+      if (dataReadyTimeout) clearTimeout(dataReadyTimeout);
       if (timedOut) return;
       dataReadyUnlisten?.();
       dataReadyUnlisten = null;
@@ -200,7 +214,8 @@ onMounted(async () => {
 
 function fitCanvas(ctx: CanvasRenderingContext2D) {
   const cvs = ctx.canvas;
-  const parent = cvs.parentElement!;
+  const parent = cvs.parentElement;
+  if (!parent) return;
   cvs.width = parent.clientWidth;
   cvs.height = parent.clientHeight;
 
@@ -225,7 +240,9 @@ function drawCaptureBorder(ctx: CanvasRenderingContext2D) {
 }
 
 function getVirtualCoords(e: MouseEvent): { vx: number; vy: number } | null {
-  const rect = canvasRef.value!.getBoundingClientRect();
+  const canvas = canvasRef.value;
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left - offsetX) / scale;
   const my = (e.clientY - rect.top - offsetY) / scale;
   if (mx < 0 || my < 0 || mx > virtualW || my > virtualH) return null;
@@ -401,7 +418,9 @@ function showTextInput(vx: number, vy: number, cvx: number, cvy: number) {
     confirmText(input.value, cvx, cvy);
   };
   const onBlur = () => {
-    setTimeout(() => {
+    if (blurTimeout) clearTimeout(blurTimeout);
+    blurTimeout = setTimeout(() => {
+      blurTimeout = null;
       if (isComposing) return;
       confirmText(input.value, cvx, cvy);
     }, 0);
@@ -493,7 +512,7 @@ function renderMosaicPreview(
     const tvx = (v: number) => (v - virtualX) * scale + offsetX;
     const tvy = (v: number) => (v - virtualY) * scale + offsetY;
 
-    const imgData = new Uint8ClampedArray(baseImageData!.data);
+    const imgData = new Uint8ClampedArray(baseImageData.data);
     const iw = ctx.canvas.width;
     const ih = ctx.canvas.height;
     const svx = (tvx(minX));
@@ -691,7 +710,11 @@ async function handleConfirm() {
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = nativeW;
   exportCanvas.height = nativeH;
-  const exportCtx = exportCanvas.getContext("2d")!;
+  const exportCtx = exportCanvas.getContext("2d");
+  if (!exportCtx) {
+    error.value = t("screenshot_export_failed");
+    return;
+  }
 
   // 以原生分辨率绘制背景
   exportCtx.drawImage(
@@ -705,7 +728,7 @@ async function handleConfirm() {
 
   const blob = await new Promise<Blob | null>((resolve) => exportCanvas.toBlob(resolve, "image/png"));
   if (!blob) {
-    error.value = "Failed to export image";
+    error.value = t("screenshot_export_failed");
     return;
   }
 
@@ -858,6 +881,8 @@ function handleWidthChange(width: number) {
 
 onBeforeUnmount(() => {
   if (dataReadyTimeout) clearTimeout(dataReadyTimeout);
+  if (raceTimeout) clearTimeout(raceTimeout);
+  if (blurTimeout) clearTimeout(blurTimeout);
   dataReadyUnlisten?.();
   if (escKeyHandler) document.removeEventListener("keydown", escKeyHandler);
   cleanupTextInput();
@@ -865,6 +890,10 @@ onBeforeUnmount(() => {
 });
 
 function cleanupTextInput() {
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
   textInputCleanup?.();
   textInputCleanup = null;
   textInput?.remove();
@@ -874,7 +903,7 @@ function cleanupTextInput() {
 
 <template>
   <div class="cp-screenshot-overlay">
-    <div v-if="loading" class="cp-screenshot-overlay__loading">Loading screenshots...</div>
+    <div v-if="loading" class="cp-screenshot-overlay__loading">{{ t("screenshot_loading") }}</div>
     <div v-else-if="error" class="cp-screenshot-overlay__error">{{ error }}</div>
     <template v-else>
       <div class="cp-screenshot-overlay__body">

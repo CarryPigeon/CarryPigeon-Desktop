@@ -270,7 +270,9 @@ mod tests {
                 link.display(),
                 target.display()
             );
-            let status = std::process::Command::new("pwsh")
+            // 使用 Windows 必有的 Windows PowerShell（5.1 同样支持创建 Junction）；
+            // 不依赖 pwsh 7 是否安装。
+            let status = std::process::Command::new("powershell")
                 .args(["-NoProfile", "-Command", &command])
                 .status()
                 .expect("run junction command");

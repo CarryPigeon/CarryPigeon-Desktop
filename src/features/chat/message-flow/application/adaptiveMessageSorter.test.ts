@@ -186,6 +186,33 @@ describe('adaptiveMessageSorter', () => {
     expect(sorted.map((m) => m.id)).toEqual(['a', 'b', 'c']);
   });
 
+  it('falls back to main thread when worker times out', async () => {
+    vi.useFakeTimers();
+    const postMessage = vi.fn();
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    const mockWorker = {
+      postMessage,
+      addEventListener,
+      removeEventListener,
+    } as unknown as Worker;
+
+    const createWorker = vi.fn(() => mockWorker);
+    const sorter = createAdaptiveMessageSorter({ threshold: 2, createWorker, timeoutMs: 50 });
+
+    const messages = [
+      { id: 'b', timeMs: 200 },
+      { id: 'a', timeMs: 100 },
+      { id: 'c', timeMs: 200 },
+    ] as any;
+
+    const promise = sorter.sort(messages);
+    await vi.advanceTimersByTimeAsync(50);
+    const sorted = await promise;
+    expect(sorted.map((m) => m.id)).toEqual(['a', 'b', 'c']);
+    vi.useRealTimers();
+  });
+
   it('terminates the cached worker', () => {
     const terminate = vi.fn();
     const mockWorker = {

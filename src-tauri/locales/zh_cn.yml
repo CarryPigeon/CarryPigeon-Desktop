@@ -31,6 +31,39 @@ error.network_api_request_failed: "API请求失败"
 error.download_request_failed: "下载请求失败"
 error.download_http_error: "下载HTTP错误"
 error.download_stream_error: "下载流错误"
+error.download_url_cross_origin: "下载地址与当前服务器不同源，已拒绝"
+
+# screenshot
+error.screenshot_hide_window_fail: "隐藏主窗口失败"
+error.screenshot_visible_fail: "查询窗口可见性失败"
+error.screenshot_overlay_fail: "打开截图遮罩失败"
+error.screenshot_app_data_fail: "获取应用数据目录失败"
+error.screenshot_capture_fail: "截取屏幕失败"
+error.screenshot_lock_fail: "截图缓存锁定失败"
+error.screenshot_no_data: "没有可用的截图数据"
+error.screenshot_dir_fail: "创建截图目录失败"
+error.screenshot_save_fail: "保存截图失败"
+error.screenshot_show_window_fail: "显示主窗口失败"
+error.screenshot_event_fail: "发送截图完成事件失败"
+
+# emoji
+error.emoji_save_failed: "保存表情失败"
+error.emoji_delete_failed: "删除表情失败"
+error.emoji_copy_failed: "复制表情失败"
+error.emoji_dir_failed: "表情目录不可用"
+error.emoji_write_failed: "写入表情临时文件失败"
+error.emoji_not_found: "表情不存在"
+error.emoji_magic_invalid: "表情文件内容与扩展名不匹配"
+
+# voice message
+error.voice_recording_start_failed: "开始录音失败"
+error.voice_recording_stop_failed: "停止录音失败"
+error.voice_recording_lock_failed: "录音状态锁定失败"
+error.voice_recording_not_active: "当前没有进行中的录音"
+error.voice_file_read_failed: "读取语音文件失败"
+
+# window
+error.window_label_forbidden: "窗口标识不在允许列表中"
 
 # plugins
 error.plugins_load_failed: "插件加载失败"
@@ -108,6 +141,7 @@ error.temp_file_cleanup_failed: "临时文件清理失败"
 error.temp_file_remove_failed: "临时文件删除失败"
 error.temp_file_not_found: "临时文件未找到"
 error.temp_file_open_failed: "临时文件打开失败"
+error.temp_file_path_outside_base: "临时文件路径越界，已拒绝打开"
 error.temp_file_invalid_operation: "无效操作：必须提供from_path或to_path"
 
 # network scope

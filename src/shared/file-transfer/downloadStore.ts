@@ -59,8 +59,8 @@ export function destroyProgressListener(): void {
   progressUnlisten = null;
 }
 
-export async function downloadFile(url: string, token: string): Promise<string> {
-  return startDownload(url, token);
+export async function downloadFile(url: string, token: string, serverSocket: string): Promise<string> {
+  return startDownload(url, token, serverSocket);
 }
 
 /**
@@ -70,16 +70,16 @@ export async function downloadFile(url: string, token: string): Promise<string> 
  * 命令即触发 `Range: bytes={N}-` 请求；服务端若支持则返 206 续传，
  * 不支持则降级为全新下载。
  */
-export async function resumeDownload(taskId: string, url: string, token: string): Promise<string> {
+export async function resumeDownload(taskId: string, url: string, token: string, serverSocket: string): Promise<string> {
   const task = downloadTasks.get(taskId);
   if (task) {
     task.status = "downloading";
     task.error = undefined;
   }
-  return startDownload(url, token, taskId);
+  return startDownload(url, token, serverSocket, taskId);
 }
 
-async function startDownload(url: string, token: string, reuseTaskId?: string): Promise<string> {
+async function startDownload(url: string, token: string, serverSocket: string, reuseTaskId?: string): Promise<string> {
   const taskId = reuseTaskId ?? generateTaskId();
   let task = downloadTasks.get(taskId);
   if (!task) {
@@ -103,6 +103,7 @@ async function startDownload(url: string, token: string, reuseTaskId?: string): 
     await ensureProgressListener();
 
     const result = await invokeTauri<DownloadResult>(TAURI_COMMANDS.downloadFile, {
+      serverSocket,
       url,
       token,
       taskId,

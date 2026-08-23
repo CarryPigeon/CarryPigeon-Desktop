@@ -145,13 +145,18 @@ function toWsOrigin(httpOrigin: string): string {
  * 归一化服务端返回的 WS URL override。
  *
  * 支持输入：
- * - `wss://host/api/ws`（服务端返回）
- * - `https://host/api/ws`（尽力转换为 wss）
+ * - `wss://host/api/ws`（服务端返回，且必须与登录 origin 同主机）
+ * - `https://host/api/ws`（尽力转换为 wss，同样要求同主机）
  * - `/api/ws`（相对路径，基于 socket 推导出的 origin 拼接）
  *
+ * 安全约束：
+ * - 明文 `ws:` / `http:` 一律拒绝（access_token 会明文上网）；
+ * - 绝对地址必须与登录推导的 origin 同主机（含端口），防止被入侵的服务器
+ *   把 token 与事件流重定向到第三方收集端点。
+ *
  * @param raw - 原始 override 字符串。
- * @param wsOrigin - 推导出的 ws(s) origin（用于拼接相对路径）。
- * @returns 归一化后的 ws(s) URL；非法时返回空字符串。
+ * @param wsOrigin - 推导出的 ws(s) origin（用于拼接相对路径与同主机校验）。
+ * @returns 归一化后的 ws(s) URL；非法时返回空字符串（调用方回退默认 origin）。
  */
 function normalizeWsUrlOverride(raw: string, wsOrigin: string): string {
   const v = String(raw ?? "").trim();
@@ -159,16 +164,16 @@ function normalizeWsUrlOverride(raw: string, wsOrigin: string): string {
   if (v.startsWith("/")) return `${wsOrigin}${v}`;
   try {
     const u = new URL(v);
-    if (u.protocol === "wss:" || u.protocol === "ws:") return u.toString();
+    // 明文协议拒绝；https 提升为 wss。
+    if (u.protocol === "http:") return "";
     if (u.protocol === "https:") {
       u.protocol = "wss:";
-      return u.toString();
     }
-    if (u.protocol === "http:") {
-      u.protocol = "ws:";
-      return u.toString();
-    }
-    return "";
+    if (u.protocol !== "wss:") return "";
+    // 同主机校验（host 含端口，忽略大小写）。
+    const base = new URL(wsOrigin);
+    if (u.host.toLowerCase() !== base.host.toLowerCase()) return "";
+    return u.toString();
   } catch {
     return "";
   }

@@ -2,18 +2,99 @@ use anyhow::Context;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::features::voice_call::domain::model::{AnswerData, OfferData};
 
+/// RTP 音频时钟步进：48kHz 下每 20ms 帧 +960 采样（RFC 3550）。
+const RTP_TIMESTAMP_STEP: u64 = 960;
+
+#[derive(Clone)]
 pub struct PeerConnectionHandle {
     pub session_id: String,
     pub connection: Arc<webrtc::peer_connection::RTCPeerConnection>,
     pub local_track: Arc<webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP>,
     pub ice_state_tx: tokio::sync::watch::Sender<String>,
-    pub seq: AtomicU64,
+    pub seq: Arc<AtomicU64>,
+    /// RTP 时间戳时钟：按 48kHz 采样数单调递增（修复墙钟毫秒截断）。
+    pub timestamp: Arc<AtomicU64>,
+    /// 每连接唯一的随机 SSRC（RFC 3550 禁止 0，且多路场景需可区分源）。
+    pub ssrc: u32,
+}
+
+/// 生成随机 SSRC；失败时以时间熵兜底，保证非 0。
+fn random_ssrc() -> u32 {
+    let mut bytes = [0u8; 4];
+    if getrandom::fill(&mut bytes).is_err() {
+        bytes.copy_from_slice(
+            &SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos()
+                .to_be_bytes(),
+        );
+    }
+    let value = u32::from_be_bytes(bytes);
+    if value == 0 { 1 } else { value }
+}
+
+/// 安装 ICE 候选回调，返回接收端供调用方收集候选 JSON。
+fn install_candidate_collector(
+    pc: &webrtc::peer_connection::RTCPeerConnection,
+) -> tokio::sync::mpsc::Receiver<String> {
+    let (candidate_tx, candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
+    pc.on_ice_candidate(Box::new(move |candidate| {
+        if let Some(c) = candidate
+            && let Ok(json) = serde_json::to_string(&c)
+        {
+            let _ = candidate_tx.try_send(json);
+        }
+        Box::pin(async {})
+    }));
+    candidate_rx
+}
+
+/// 收集初始 ICE 候选。
+///
+/// 说明：不再使用固定 500ms 截断——以 1.5s 无新候选为空闲判据，
+/// 且必须等到 gathering complete 或触及 5s 硬上限才返回，
+/// 避免弱网下候选被静默丢弃导致呼叫建立失败。
+async fn gather_initial_candidates(
+    pc: &webrtc::peer_connection::RTCPeerConnection,
+    mut candidate_rx: tokio::sync::mpsc::Receiver<String>,
+) -> Vec<String> {
+    const IDLE_WINDOW: Duration = Duration::from_millis(1500);
+    const HARD_DEADLINE: Duration = Duration::from_secs(5);
+    let started = Instant::now();
+
+    let mut candidates = Vec::new();
+    loop {
+        match tokio::time::timeout(IDLE_WINDOW, candidate_rx.recv()).await {
+            Ok(Some(candidate)) => {
+                candidates.push(candidate);
+                continue;
+            }
+            Ok(None) => break, // 通道关闭
+            Err(_) => {}       // 本轮空闲窗口到期，进入状态判定
+        }
+
+        if pc.ice_gathering_state()
+            == webrtc::ice_transport::ice_gathering_state::RTCIceGatheringState::Complete
+        {
+            // 排空残余候选后结束
+            while let Ok(candidate) = candidate_rx.try_recv() {
+                candidates.push(candidate);
+            }
+            break;
+        }
+        if started.elapsed() >= HARD_DEADLINE {
+            warn!(action = "app_voice_call_ice_gathering_deadline_reached");
+            break;
+        }
+    }
+    candidates
 }
 
 pub struct WebRtcPeerManager {
@@ -35,13 +116,6 @@ impl WebRtcPeerManager {
             stun_server: "stun:stun.l.google.com:19302".to_string(),
             turn_server: None,
         }
-    }
-
-    fn rtp_timestamp() -> u32 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u32
     }
 
     fn build_api() -> anyhow::Result<webrtc::api::API> {
@@ -124,16 +198,7 @@ impl WebRtcPeerManager {
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: add track")?;
 
         // Collect ICE candidates
-        let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
-
-        pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c)
-            {
-                let _ = candidate_tx.try_send(json);
-            }
-            Box::pin(async {})
-        }));
+        let mut candidate_rx = install_candidate_collector(&pc);
 
         // ICE connection state watcher
         let (ice_state_tx, _) = tokio::sync::watch::channel("new".to_string());
@@ -154,20 +219,17 @@ impl WebRtcPeerManager {
             .await
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: set_local_description")?;
 
-        // Gather initial ICE candidates
-        let mut candidates = Vec::new();
-        while let Ok(Some(c)) =
-            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
-        {
-            candidates.push(c);
-        }
+        // Gather initial ICE candidates（持续到 complete / 空闲超时）
+        let candidates = gather_initial_candidates(&pc, candidate_rx).await;
 
         let handle = PeerConnectionHandle {
             session_id: session_id.to_string(),
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
-            seq: AtomicU64::new(0),
+            seq: Arc::new(AtomicU64::new(0)),
+            timestamp: Arc::new(AtomicU64::new(random_ssrc() as u64)),
+            ssrc: random_ssrc(),
         };
 
         self.connections
@@ -206,15 +268,7 @@ impl WebRtcPeerManager {
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: add track")?;
 
         // Collect ICE candidates
-        let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
-        pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c)
-            {
-                let _ = candidate_tx.try_send(json);
-            }
-            Box::pin(async {})
-        }));
+        let mut candidate_rx = install_candidate_collector(&pc);
 
         let (ice_state_tx, _) = tokio::sync::watch::channel("new".to_string());
         let ice_tx_clone = ice_state_tx.clone();
@@ -245,20 +299,17 @@ impl WebRtcPeerManager {
             .await
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: set_local_description")?;
 
-        // Gather initial candidates
-        let mut candidates = Vec::new();
-        while let Ok(Some(c)) =
-            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
-        {
-            candidates.push(c);
-        }
+        // Gather initial candidates（持续到 complete / 空闲超时）
+        let candidates = gather_initial_candidates(&pc, candidate_rx).await;
 
         let handle = PeerConnectionHandle {
             session_id: session_id.to_string(),
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
-            seq: AtomicU64::new(0),
+            seq: Arc::new(AtomicU64::new(0)),
+            timestamp: Arc::new(AtomicU64::new(random_ssrc() as u64)),
+            ssrc: random_ssrc(),
         };
 
         self.connections
@@ -278,10 +329,11 @@ impl WebRtcPeerManager {
         session_id: &str,
         answer_sdp: &str,
     ) -> anyhow::Result<()> {
-        let conns = self.connections.lock().await;
-        let handle = conns
-            .get(session_id)
-            .context("VOICE_CALL_SESSION_NOT_FOUND")?;
+        // 先取出句柄并释放 map 锁，避免跨 await 持锁阻塞其他会话操作。
+        let handle = {
+            let conns = self.connections.lock().await;
+            conns.get(session_id).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+        };
 
         let desc =
             webrtc::peer_connection::sdp::session_description::RTCSessionDescription::answer(
@@ -304,10 +356,10 @@ impl WebRtcPeerManager {
         session_id: &str,
         candidate_json: &str,
     ) -> anyhow::Result<()> {
-        let conns = self.connections.lock().await;
-        let handle = conns
-            .get(session_id)
-            .context("VOICE_CALL_SESSION_NOT_FOUND")?;
+        let handle = {
+            let conns = self.connections.lock().await;
+            conns.get(session_id).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+        };
 
         let candidate: webrtc::ice_transport::ice_candidate::RTCIceCandidateInit =
             serde_json::from_str(candidate_json)
@@ -353,14 +405,19 @@ impl WebRtcPeerManager {
 
     /// Send encoded Opus audio data through the local track
     pub async fn send_audio(&self, session_id: &str, data: &[u8]) -> anyhow::Result<()> {
-        let conns = self.connections.lock().await;
-        let handle = conns
-            .get(session_id)
-            .context("VOICE_CALL_SESSION_NOT_FOUND")?;
+        // 取出句柄后立即释放 map 锁，避免跨 await 持锁（会串行阻塞所有会话）。
+        let handle = {
+            let conns = self.connections.lock().await;
+            conns.get(session_id).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+        };
 
         use webrtc::rtp::packet::Packet;
 
         let seq = handle.seq.fetch_add(1, Ordering::Relaxed);
+        // RTP 时钟：按 48kHz 采样数递增；SSRC 为每连接随机值。
+        let timestamp = handle
+            .timestamp
+            .fetch_add(RTP_TIMESTAMP_STEP, Ordering::Relaxed) as u32;
         let pkt = Packet {
             header: webrtc::rtp::header::Header {
                 version: 2,
@@ -369,8 +426,8 @@ impl WebRtcPeerManager {
                 marker: false,
                 payload_type: 111,
                 sequence_number: seq as u16,
-                timestamp: Self::rtp_timestamp(),
-                ssrc: 0,
+                timestamp,
+                ssrc: handle.ssrc,
                 csrc: vec![],
                 extension_profile: 0,
                 extensions: vec![],
@@ -447,15 +504,7 @@ impl WebRtcPeerManager {
             .await
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: add track")?;
 
-        let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
-        pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c)
-            {
-                let _ = candidate_tx.try_send(json);
-            }
-            Box::pin(async {})
-        }));
+        let mut candidate_rx = install_candidate_collector(&pc);
 
         let (ice_state_tx, _) = tokio::sync::watch::channel("new".to_string());
         let ice_tx_clone = ice_state_tx.clone();
@@ -474,19 +523,16 @@ impl WebRtcPeerManager {
             .await
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: set_local_description")?;
 
-        let mut candidates = Vec::new();
-        while let Ok(Some(c)) =
-            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
-        {
-            candidates.push(c);
-        }
+        let candidates = gather_initial_candidates(&pc, candidate_rx).await;
 
         let handle = PeerConnectionHandle {
             session_id: key.clone(),
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
-            seq: AtomicU64::new(0),
+            seq: Arc::new(AtomicU64::new(0)),
+            timestamp: Arc::new(AtomicU64::new(random_ssrc() as u64)),
+            ssrc: random_ssrc(),
         };
 
         self.connections.lock().await.insert(key, handle);
@@ -521,15 +567,7 @@ impl WebRtcPeerManager {
             .await
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: add track")?;
 
-        let (candidate_tx, mut candidate_rx) = tokio::sync::mpsc::channel::<String>(128);
-        pc.on_ice_candidate(Box::new(move |candidate| {
-            if let Some(c) = candidate
-                && let Ok(json) = serde_json::to_string(&c)
-            {
-                let _ = candidate_tx.try_send(json);
-            }
-            Box::pin(async {})
-        }));
+        let mut candidate_rx = install_candidate_collector(&pc);
 
         let (ice_state_tx, _) = tokio::sync::watch::channel("new".to_string());
         let ice_tx_clone = ice_state_tx.clone();
@@ -558,19 +596,16 @@ impl WebRtcPeerManager {
             .await
             .context("VOICE_CALL_PEER_CONNECTION_FAILED: set_local_description")?;
 
-        let mut candidates = Vec::new();
-        while let Ok(Some(c)) =
-            tokio::time::timeout(std::time::Duration::from_millis(500), candidate_rx.recv()).await
-        {
-            candidates.push(c);
-        }
+        let candidates = gather_initial_candidates(&pc, candidate_rx).await;
 
         let handle = PeerConnectionHandle {
             session_id: key.clone(),
             connection: Arc::new(pc),
             local_track: track,
             ice_state_tx,
-            seq: AtomicU64::new(0),
+            seq: Arc::new(AtomicU64::new(0)),
+            timestamp: Arc::new(AtomicU64::new(random_ssrc() as u64)),
+            ssrc: random_ssrc(),
         };
 
         self.connections.lock().await.insert(key, handle);
@@ -588,8 +623,10 @@ impl WebRtcPeerManager {
         answer_sdp: &str,
     ) -> anyhow::Result<()> {
         let key = Self::conn_key(session_id, participant_id);
-        let conns = self.connections.lock().await;
-        let handle = conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?;
+        let handle = {
+            let conns = self.connections.lock().await;
+            conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+        };
 
         let desc =
             webrtc::peer_connection::sdp::session_description::RTCSessionDescription::answer(
@@ -613,8 +650,10 @@ impl WebRtcPeerManager {
         candidate_json: &str,
     ) -> anyhow::Result<()> {
         let key = Self::conn_key(session_id, participant_id);
-        let conns = self.connections.lock().await;
-        let handle = conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?;
+        let handle = {
+            let conns = self.connections.lock().await;
+            conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+        };
 
         let candidate: webrtc::ice_transport::ice_candidate::RTCIceCandidateInit =
             serde_json::from_str(candidate_json)
@@ -664,10 +703,15 @@ impl WebRtcPeerManager {
         data: &[u8],
     ) -> anyhow::Result<()> {
         let key = Self::conn_key(session_id, participant_id);
-        let conns = self.connections.lock().await;
-        let handle = conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?;
+        let handle = {
+            let conns = self.connections.lock().await;
+            conns.get(&key).context("VOICE_CALL_SESSION_NOT_FOUND")?.clone()
+        };
 
         let seq = handle.seq.fetch_add(1, Ordering::Relaxed);
+        let timestamp = handle
+            .timestamp
+            .fetch_add(RTP_TIMESTAMP_STEP, Ordering::Relaxed) as u32;
         let pkt = webrtc::rtp::packet::Packet {
             header: webrtc::rtp::header::Header {
                 version: 2,
@@ -676,8 +720,8 @@ impl WebRtcPeerManager {
                 marker: false,
                 payload_type: 111,
                 sequence_number: seq as u16,
-                timestamp: Self::rtp_timestamp(),
-                ssrc: 0,
+                timestamp,
+                ssrc: handle.ssrc,
                 csrc: vec![],
                 extension_profile: 0,
                 extensions: vec![],

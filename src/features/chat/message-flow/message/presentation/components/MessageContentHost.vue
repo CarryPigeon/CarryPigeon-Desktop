@@ -20,7 +20,7 @@ import {
   resolveMessageRenderModel,
   type MessageRendererRegistry,
 } from "@/features/chat/message-flow/message/domain/messageRendererResolver";
-import type { RenderableChatMessage } from "@/features/chat/message-flow/message/domain/messageModels";
+import type { ForwardedMessageEntry, RenderableChatMessage } from "@/features/chat/message-flow/message/domain/messageModels";
 import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
 import MergedForwardBubble from "./MergedForwardBubble.vue";
 import FileRefMessageBubble from "./FileRefMessageBubble.vue";
@@ -63,7 +63,7 @@ const emit = defineEmits<{
   /**
    * 查看合并转发消息详情。
    */
-  (event: "viewForwardDetail", payload: { fromName: string; forwardedMessages: Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }>; comment?: string }): void;
+  (event: "viewForwardDetail", payload: { fromName: string; forwardedMessages: ForwardedMessageEntry[]; comment?: string }): void;
   /**
    * 发送失败后重试。
    */
@@ -138,7 +138,7 @@ const mergedForwardData = computed(() => {
   if (!isMergedForward.value) return null;
   return {
     fromName: props.message.from.name,
-    forwardedMessages: props.message.forwardedMessages as Array<{ messageId: string; channelId: string; userId: string; preview: string; sentTime: number }>,
+    forwardedMessages: props.message.forwardedMessages as ForwardedMessageEntry[],
     comment: props.message.kind === "core_text" ? props.message.text : undefined,
   };
 });

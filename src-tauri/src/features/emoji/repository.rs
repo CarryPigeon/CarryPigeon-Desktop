@@ -12,6 +12,24 @@ use uuid::Uuid;
 
 use crate::features::emoji::domain::types::{EmojiEntry, EmojiIndex};
 
+/// 校验文件魔数与声明扩展名是否匹配，避免把任意字节当图片保存。
+pub(crate) fn emoji_magic_matches(data: &[u8], ext: &str) -> bool {
+    match ext {
+        "png" | "apng" => data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+        "jpg" | "jpeg" => data.len() >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF,
+        "gif" => data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a"),
+        "webp" => {
+            data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP"
+        }
+        "avif" => {
+            data.len() >= 12
+                && &data[4..8] == b"ftyp"
+                && data.windows(4).any(|w| w == b"avif" || w == b"avis")
+        }
+        _ => false,
+    }
+}
+
 pub fn emoji_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
     let dir = app_handle
         .path()
@@ -131,7 +149,12 @@ pub fn add_emoji(
     let ext = source_path
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("png");
+        .unwrap_or("png")
+        .to_ascii_lowercase();
+    let bytes = fs::read(source_path).context("read emoji source")?;
+    if !emoji_magic_matches(&bytes, &ext) {
+        return Err(anyhow::anyhow!("EMOJI_MAGIC_INVALID"));
+    }
     let dest = imgs.join(format!("{}.{}", id, ext));
 
     let animated = is_animated_image(source_path);
@@ -235,4 +258,30 @@ pub fn copy_emoji(
     save_index(app_handle, &index)?;
 
     Ok(entry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::emoji_magic_matches;
+
+    #[test]
+    fn accepts_known_image_headers() {
+        assert!(emoji_magic_matches(
+            &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+            "png"
+        ));
+        assert!(emoji_magic_matches(&[0xFF, 0xD8, 0xFF, 0xE0], "jpg"));
+        assert!(emoji_magic_matches(b"GIF89a....", "gif"));
+        let mut webp = vec![0u8; 12];
+        webp[0..4].copy_from_slice(b"RIFF");
+        webp[8..12].copy_from_slice(b"WEBP");
+        assert!(emoji_magic_matches(&webp, "webp"));
+    }
+
+    #[test]
+    fn rejects_mismatched_or_unknown_payloads() {
+        assert!(!emoji_magic_matches(b"not-an-image", "png"));
+        assert!(!emoji_magic_matches(&[0x89, 0x50, 0x4E, 0x47], "jpg"));
+        assert!(!emoji_magic_matches(&[0xFF, 0xD8, 0xFF], "bin"));
+    }
 }

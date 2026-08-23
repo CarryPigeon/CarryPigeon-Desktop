@@ -77,7 +77,10 @@ async fn verify_https_fingerprint(url: &str, expected_sha256: &str) -> anyhow::R
 }
 
 fn build_reqwest_client(policy: ApiHttpTlsPolicy) -> anyhow::Result<reqwest::Client> {
-    let mut builder = reqwest::Client::builder().timeout(API_REQUEST_TIMEOUT);
+    let mut builder = reqwest::Client::builder()
+        .timeout(API_REQUEST_TIMEOUT)
+        // API 请求不跟随重定向：服务端 API 不应重定向，且防止借 302 绕过同源/TLS 边界。
+        .redirect(reqwest::redirect::Policy::none());
     if policy != ApiHttpTlsPolicy::Strict {
         builder = builder
             .danger_accept_invalid_certs(true)

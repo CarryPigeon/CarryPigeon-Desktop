@@ -51,17 +51,6 @@ fn emit_tcp_state(
     });
 }
 
-fn emit_legacy_tcp_chunk(
-    event_sink: &Arc<dyn TcpEventSink>,
-    server_socket: &str,
-    payload: Vec<u8>,
-) {
-    event_sink.emit_message(TcpMessageEvent {
-        server_socket: server_socket.to_string(),
-        payload,
-    });
-}
-
 fn emit_tcp_frame_payload(
     event_sink: &Arc<dyn TcpEventSink>,
     server_socket: &str,
@@ -186,9 +175,7 @@ impl TcpServiceReal {
 
         let task = tokio::spawn(async move {
             // Netty frame：2 字节无符号短整型长度前缀（大端），后跟 `length` 字节载荷。
-            //
-            // 注意：为向后兼容仍会发出原始 `tcp-message` 事件；
-            // 推荐使用 `tcp-frame` 事件，它会发出已拆包后的 payload。
+            // 前端只消费 `tcp-frame`（已拆包 payload）。
             let mut acc: Vec<u8> = Vec::new();
             let mut buffer = vec![0; 4096];
             loop {
@@ -209,13 +196,7 @@ impl TcpServiceReal {
                         return;
                     }
                     Ok(n) => {
-                        let chunk = buffer[..n].to_vec();
-
-                        // Legacy: emit raw TCP chunk.
-                        emit_legacy_tcp_chunk(&event_sink, &server_socket, chunk.clone());
-
-                        // New: deframe and emit payload frames.
-                        acc.extend_from_slice(&chunk);
+                        acc.extend_from_slice(&buffer[..n]);
                         if acc.len() > TCP_ACCUMULATOR_MAX_BYTES {
                             tracing::warn!(
                                 action = "network_tcp_frame_accumulator_overflow",

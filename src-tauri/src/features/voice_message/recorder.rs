@@ -180,43 +180,53 @@ impl VoiceRecorder {
             .lock()
             .map_err(|e| std::io::Error::other(format!("Lock error: {}", e)))?;
 
-        let num_samples = samples.len() as u32;
-        let bytes_per_sample: u16 = 2; // 16-bit
-        let byte_rate = SAMPLE_RATE * CHANNELS as u32 * bytes_per_sample as u32;
-        let block_align = CHANNELS * bytes_per_sample;
-        let data_size = num_samples * bytes_per_sample as u32;
+        let bytes_per_sample: u64 = 2; // 16-bit
+        let byte_rate = SAMPLE_RATE as u64 * CHANNELS as u64 * bytes_per_sample;
+        let block_align = (CHANNELS as u64 * bytes_per_sample) as u16;
+        // 用 u64 计算大小，超过 u32 上限时报错而不是静默回绕产出损坏文件。
+        let data_size = (samples.len() as u64)
+            .checked_mul(bytes_per_sample)
+            .ok_or_else(|| std::io::Error::other("WAV too large: data size overflow"))?;
+        if data_size > u32::MAX as u64 {
+            return Err(std::io::Error::other(format!(
+                "WAV too large: data size {} exceeds u32 WAV limit",
+                data_size
+            )));
+        }
+        let data_size = data_size as u32;
         // RIFF header (12) + fmt chunk (24) + data chunk header (8) + data
-        let file_size = 44; // Standard PCM WAV header size
+        const HEADER_SIZE: u64 = 44; // Standard PCM WAV header size
 
-        let mut file = File::create(path)?;
+        let mut file = std::io::BufWriter::new(File::create(path)?);
 
         // RIFF header
         file.write_all(b"RIFF")?;
-        file.write_all(&(file_size + data_size - 8).to_le_bytes())?; // File size - 8
+        file.write_all(&((HEADER_SIZE + data_size as u64 - 8) as u32).to_le_bytes())?; // File size - 8
         file.write_all(b"WAVE")?;
 
         // fmt chunk
         file.write_all(b"fmt ")?;
         file.write_all(&16u32.to_le_bytes())?; // Chunk size
         file.write_all(&1u16.to_le_bytes())?; // Audio format: PCM
-        file.write_all(&CHANNELS.to_le_bytes())?;
+        file.write_all(&(CHANNELS as u16).to_le_bytes())?;
         file.write_all(&SAMPLE_RATE.to_le_bytes())?;
         file.write_all(&byte_rate.to_le_bytes())?;
         file.write_all(&block_align.to_le_bytes())?;
-        file.write_all(&(bytes_per_sample * 8).to_le_bytes())?; // Bits per sample
+        file.write_all(&((bytes_per_sample * 8) as u16).to_le_bytes())?; // Bits per sample
 
         // data chunk
         file.write_all(b"data")?;
         file.write_all(&data_size.to_le_bytes())?;
 
-        // Write PCM samples (f32 -> i16)
+        // Write PCM samples (f32 -> i16)，经 BufWriter 批量落盘
         for &sample in samples.iter() {
             let clamped = sample.clamp(-1.0, 1.0);
             let int_sample = (clamped * 32767.0) as i16;
             file.write_all(&int_sample.to_le_bytes())?;
         }
+        drop(file); // 先 flush/drop BufWriter，再读取最终文件长度
 
-        let size = file.metadata()?.len();
+        let size = std::fs::metadata(path)?.len();
         Ok(size)
     }
 }

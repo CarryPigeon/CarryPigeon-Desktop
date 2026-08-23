@@ -120,7 +120,7 @@ describe("ScreenshotOverlay", () => {
     mocks.getScreenshotData.mockReturnValue(new Promise(() => {}));
     const wrapper = mount(ScreenshotOverlay);
     expect(wrapper.find(".cp-screenshot-overlay__loading").exists()).toBe(true);
-    expect(wrapper.text()).toContain("Loading screenshots...");
+    expect(wrapper.text()).toContain("screenshot_loading");
   });
 
   it("renders error when captures array is empty", async () => {
@@ -128,7 +128,7 @@ describe("ScreenshotOverlay", () => {
     const wrapper = mount(ScreenshotOverlay);
     await flushPromises();
     expect(wrapper.find(".cp-screenshot-overlay__error").exists()).toBe(true);
-    expect(wrapper.text()).toContain("No screen captures available");
+    expect(wrapper.text()).toContain("screenshot_no_captures");
   });
 
   it("stays in loading state when getScreenshotData throws (waiting for data-ready event)", async () => {
@@ -136,7 +136,7 @@ describe("ScreenshotOverlay", () => {
     const wrapper = mount(ScreenshotOverlay);
     await flushPromises();
     expect(wrapper.find(".cp-screenshot-overlay__loading").exists()).toBe(true);
-    expect(wrapper.text()).toContain("Loading screenshots...");
+    expect(wrapper.text()).toContain("screenshot_loading");
   });
 
   it("renders canvas and controls when captures are loaded", async () => {

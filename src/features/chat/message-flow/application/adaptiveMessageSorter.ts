@@ -12,6 +12,7 @@ import {
 } from "./messageSort.logic";
 
 export const DEFAULT_WORKER_SORT_THRESHOLD = 2000;
+export const DEFAULT_WORKER_SORT_TIMEOUT_MS = 3000;
 
 export type AdaptiveMessageSorterOptions = {
   /**
@@ -22,10 +23,15 @@ export type AdaptiveMessageSorterOptions = {
    * Worker 工厂，便于测试注入 mock。
    */
   createWorker?: () => Worker;
+  /**
+   * Worker 排序超时（毫秒），超时后回退主线程。
+   */
+  timeoutMs?: number;
 };
 
 export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptions) {
   const threshold = options?.threshold ?? DEFAULT_WORKER_SORT_THRESHOLD;
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_WORKER_SORT_TIMEOUT_MS;
   const hasCustomWorker = !!options?.createWorker;
   const createWorker =
     options?.createWorker ??
@@ -76,13 +82,24 @@ export function createAdaptiveMessageSorter(options?: AdaptiveMessageSorterOptio
           resolve(sortOnMainThread(messages));
         }
 
+        function handleTimeout() {
+          cleanup();
+          resolve(sortOnMainThread(messages));
+        }
+
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
         function cleanup() {
+          if (timeoutHandle !== undefined) {
+            clearTimeout(timeoutHandle);
+            timeoutHandle = undefined;
+          }
           w.removeEventListener("message", handleMessage);
           w.removeEventListener("error", handleError);
         }
 
         w.addEventListener("message", handleMessage);
         w.addEventListener("error", handleError);
+        timeoutHandle = setTimeout(handleTimeout, timeoutMs);
         w.postMessage({ id: requestId, stubs } satisfies MessageSortRequest);
       } catch {
         // createWorker() 抛出或其他同步失败：清理缓存并回退到主线程。

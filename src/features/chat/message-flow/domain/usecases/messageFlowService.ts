@@ -71,7 +71,32 @@ type LatestPage = {
  * - 所有写入都通过命名 state port 完成。
  */
 export class MessageFlowApplicationService {
+  private searchSeq = 0;
+
   constructor(private readonly deps: MessageFlowApplicationServiceDeps) {}
+
+  /**
+   * Worker 合并完成后覆盖前再读一次时间线，避免合并期间到达的新消息被冲掉。
+   *
+   * @param replaceExisting - true 时以 incoming 覆盖旧时间线（仅保留合并期间新到达的消息）。
+   */
+  private async replaceTimelineMerged(
+    channelId: string,
+    incoming: ChatMessage[],
+    replaceExisting = false,
+  ): Promise<void> {
+    const existing = [...this.deps.timelineState.listMessages(channelId)];
+    const beforeIds = new Set(existing.map((message) => message.id));
+    const base = replaceExisting ? [] : existing;
+    const merged = await this.deps.mergeMessages(base, incoming);
+    const latest = [...this.deps.timelineState.listMessages(channelId)];
+    const arrivedDuringMerge = latest.filter((message) => !beforeIds.has(message.id));
+    const final =
+      arrivedDuringMerge.length > 0
+        ? await this.deps.mergeMessages(merged, arrivedDuringMerge)
+        : merged;
+    this.deps.timelineState.replaceTimeline(channelId, final);
+  }
 
   /**
    * 进入回复态，并清空上一次动作错误。
@@ -503,6 +528,7 @@ export class MessageFlowApplicationService {
    */
   async searchCurrentChannel(query: string): Promise<void> {
     const q = String(query ?? "").trim();
+    const seq = ++this.searchSeq;
     if (!q) {
       this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
       return;
@@ -511,6 +537,7 @@ export class MessageFlowApplicationService {
     if (!cid) return;
     this.deps.timelineState.writeSearchState({ query: q, loading: true, error: "", results: [] });
     const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    if (seq !== this.searchSeq) return;
     if (!socket || !token) {
       this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results: [] });
       return;
@@ -519,6 +546,7 @@ export class MessageFlowApplicationService {
     const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
     try {
       const page = await this.deps.api.searchChannelMessages(socket, token, cid, { q, limit: 30 });
+      if (seq !== this.searchSeq) return;
       if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
       const results: MessageSearchResult[] = page.items.map((item) => {
         const message = this.deps.mapWireMessage(socket, item);
@@ -529,8 +557,9 @@ export class MessageFlowApplicationService {
       });
       this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "", results });
     } catch {
+      if (seq !== this.searchSeq) return;
       if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
-      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "Search failed.", results: [] });
+      this.deps.timelineState.writeSearchState({ query: q, loading: false, error: "search_failed", results: [] });
     }
   }
 
@@ -580,7 +609,7 @@ export class MessageFlowApplicationService {
   async loadChannelMessages(cid: string): Promise<void> {
     const page = await this.fetchLatestPage(cid);
     if (!page) return;
-    this.deps.timelineState.replaceTimeline(page.channelId, await this.deps.mergeMessages([], page.mapped));
+    await this.replaceTimelineMerged(page.channelId, page.mapped, true);
     this.deps.timelineState.writeNextCursor(page.channelId, page.nextCursor);
     this.deps.timelineState.writeHasMore(page.channelId, page.hasMore && Boolean(page.nextCursor));
   }
@@ -596,8 +625,7 @@ export class MessageFlowApplicationService {
   async refreshChannelLatestPage(cid: string): Promise<void> {
     const page = await this.fetchLatestPage(cid);
     if (!page) return;
-    const existing = [...this.deps.timelineState.listMessages(page.channelId)];
-    this.deps.timelineState.replaceTimeline(page.channelId, await this.deps.mergeMessages(existing, page.mapped));
+    await this.replaceTimelineMerged(page.channelId, page.mapped);
 
     if (!this.deps.timelineState.readNextCursor(page.channelId) && !this.deps.timelineState.readHasMore(page.channelId)) {
       this.deps.timelineState.writeNextCursor(page.channelId, page.nextCursor);
@@ -633,8 +661,7 @@ export class MessageFlowApplicationService {
       const mapped: ChatMessage[] = [];
       for (const message of items) mapped.push(this.deps.mapWireMessage(socket, message));
 
-      const existing = [...this.deps.timelineState.listMessages(channelId)];
-      this.deps.timelineState.replaceTimeline(channelId, await this.deps.mergeMessages(existing, mapped));
+      await this.replaceTimelineMerged(channelId, mapped);
 
       const nextCursor = String(res.nextCursor ?? "").trim();
       const hasMore = Boolean(res.hasMore);

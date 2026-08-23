@@ -59,6 +59,7 @@ import { useServerRailModel } from "../view-models/useServerRailModel";
 import { useChannelContextMenu, type ChannelContextAction } from "../interactions/useChannelContextMenu";
 import { currentServerSocket } from "@/features/server-connection/api";
 import { readAuthToken } from "@/shared/utils/localState";
+import { getAccountCapabilities } from "@/features/account/api";
 import {
   createPatchbayChannelDialogsSection,
   createPatchbayChannelSettingsMenuSection,
@@ -652,6 +653,25 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     resolveSenderName: (uid: string) => {
       const member = membersSnapshot.value.find((m) => isSameUserId(m.id, uid));
       return member?.name ?? "";
+    },
+    fetchUserNames: async (uids: string[]) => {
+      const s = socket.value;
+      if (!s) return {};
+      const token = (await ensureValidAccessToken(s))?.trim();
+      if (!token) return {};
+      try {
+        const users = await getAccountCapabilities().forServer(s).listUsers(token, uids);
+        const names: Record<string, string> = {};
+        for (const user of users ?? []) {
+          const nickname = String(user?.nickname ?? "").trim();
+          const uid = String(user?.uid ?? "").trim();
+          if (nickname && uid) names[uid] = nickname;
+        }
+        return names;
+      } catch (error) {
+        logger.warn("Action: chat_forward_author_profile_fetch_failed", { count: uids.length, error: String(error) });
+        return {};
+      }
     },
     chatApi: IS_STORE_MOCK ? undefined : httpChatApiPort,
     serverSocket: computed(() => socket.value),

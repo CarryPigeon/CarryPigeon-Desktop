@@ -19,6 +19,7 @@ import {
   updateCurrentUserEmail,
   updateCurrentUserProfile,
 } from "./application/profileService";
+import { getUserMutationPort } from "./di/user.di";
 import type { UpdateUserProfileInput, UserPublic } from "./domain/types/UserTypes";
 import type { UpdateUserEmailOutcome, UpdateUserProfileOutcome } from "./application/profileMutationOutcome";
 
@@ -28,6 +29,7 @@ export type ProfileCapabilities = {
   listUsers(serverSocket: string, accessToken: string, ids: string[]): Promise<UserPublic[]>;
   updateUserEmail(serverSocket: string, email: string, code: string): Promise<UpdateUserEmailOutcome>;
   updateUserProfile(serverSocket: string, input: UpdateUserProfileInput): Promise<UpdateUserProfileOutcome>;
+  updateUserBackgroundImage(serverSocket: string, accessToken: string, file: File): Promise<string>;
   supportsMutation(): boolean;
   isProfileError(error: unknown): boolean;
   isMutationUnsupportedError(error: unknown): boolean;
@@ -53,6 +55,9 @@ export function createProfileCapabilities(): ProfileCapabilities {
     },
     updateUserProfile(serverSocket: string, input: UpdateUserProfileInput): Promise<UpdateUserProfileOutcome> {
       return updateCurrentUserProfile(serverSocket, input);
+    },
+    updateUserBackgroundImage(serverSocket: string, accessToken: string, file: File): Promise<string> {
+      return getUserMutationPort(serverSocket).updateUserBackgroundImage(accessToken, file);
     },
     supportsMutation: supportsProfileMutationCapability,
     isProfileError,

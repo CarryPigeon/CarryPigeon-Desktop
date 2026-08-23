@@ -12,7 +12,7 @@ import { emit } from "@tauri-apps/api/event";
 import { createLogger } from "@/shared/utils/logger";
 import type { UnreadMessagePreview } from "@/features/chat/public/api-types";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const logger = createLogger("TrayNotificationPopover");
 
@@ -37,7 +37,8 @@ function formatTime(ms: number): string {
   if (diff < 60000) return t("time_just_now");
   if (diff < 3600000) return t("time_minutes_ago", { n: Math.floor(diff / 60000) });
   if (diff < 86400000) return t("time_hours_ago", { n: Math.floor(diff / 3600000) });
-  return new Date(ms).toLocaleDateString("zh-CN", {
+  const dateLocale = String(locale.value).startsWith("zh") ? "zh-CN" : "en-US";
+  return new Date(ms).toLocaleDateString(dateLocale, {
     month: "short",
     day: "numeric",
   });

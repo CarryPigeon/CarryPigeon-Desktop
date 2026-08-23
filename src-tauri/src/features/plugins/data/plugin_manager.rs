@@ -86,6 +86,12 @@ impl PluginManager {
             .map_err(|e| anyhow::anyhow!("Failed to create backend module from wasm bytes: {e}"))?;
 
         let mut store: Store<String> = Store::new(&self.engine, plugin_name.to_string());
+        // 资源限制：Engine 已开启 consume_fuel，这里注入预算。
+        // 失控/死循环插件会因燃料耗尽而 trap，不会永久占死 tokio worker。
+        // 注：wasmtime::Error 即 anyhow::Error（未实现 StdError），用 map_err 而非 .context()。
+        store
+            .set_fuel(PLUGIN_FUEL_BUDGET)
+            .map_err(|e| anyhow::anyhow!("Failed to set wasm fuel budget: {e}"))?;
         let linker = Linker::new(&self.engine);
 
         let backend_instance = linker
@@ -313,9 +319,15 @@ fn eq_hash_hex(a: &str, b: &str) -> bool {
 
 pub static PLUGINMANAGER: OnceLock<PluginManager> = OnceLock::new();
 
+/// 插件后端 start 的燃料预算（约 200 亿条 wasm 指令基线）。
+/// 失控/死循环插件会因燃料耗尽而 trap，不会永久占死 tokio worker。
+const PLUGIN_FUEL_BUDGET: u64 = 20_000_000_000;
+
 fn create_plugin_manager() -> anyhow::Result<PluginManager> {
     let mut config = wasmtime::Config::new();
     config.wasm_component_model(true);
+    // 开启燃料计量（配合 run_backend_start 中的预算注入）。
+    config.consume_fuel(true);
     let engine = Engine::new(&config)
         .map_err(|e| anyhow::anyhow!("Failed to create Wasmtime engine: {e}"))?;
     PluginManager::new(engine, PathBuf::from("./plugin_cache"))

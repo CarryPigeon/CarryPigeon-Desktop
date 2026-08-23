@@ -158,11 +158,15 @@ function handleClearSelection(): void {
 
 async function handleDownload(file: FileRecord): Promise<void> {
   const socket = readActiveFileServerSocket();
-  const token = readAuthToken(socket || "") || "";
-  const url = buildFileDownloadUrl(socket || "", file.shareKey);
+  if (!socket) {
+    logger.error("Action: api_file_download_failed", { error: "missing_server_socket" });
+    return;
+  }
+  const token = readAuthToken(socket) || "";
+  const url = buildFileDownloadUrl(socket, file.shareKey);
   if (url) {
     try {
-      await downloadFile(url, token);
+      await downloadFile(url, token, socket);
       logger.info("Action: api_file_download_completed", { fileId: file.id });
     } catch (e) {
       logger.error("Action: api_file_download_failed", { error: String(e) });

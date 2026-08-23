@@ -31,6 +31,39 @@ error.network_api_request_failed: "API request failed"
 error.download_request_failed: "Download request failed"
 error.download_http_error: "Download HTTP error"
 error.download_stream_error: "Download stream error"
+error.download_url_cross_origin: "Download URL is not same-origin with the current server"
+
+# screenshot
+error.screenshot_hide_window_fail: "Failed to hide the main window"
+error.screenshot_visible_fail: "Failed to query window visibility"
+error.screenshot_overlay_fail: "Failed to open the screenshot overlay"
+error.screenshot_app_data_fail: "Failed to resolve the app data directory"
+error.screenshot_capture_fail: "Failed to capture the screen"
+error.screenshot_lock_fail: "Failed to lock screenshot cache"
+error.screenshot_no_data: "No screenshot data is available"
+error.screenshot_dir_fail: "Failed to create the screenshot directory"
+error.screenshot_save_fail: "Failed to save the screenshot"
+error.screenshot_show_window_fail: "Failed to show the main window"
+error.screenshot_event_fail: "Failed to emit the screenshot completed event"
+
+# emoji
+error.emoji_save_failed: "Failed to save emoji"
+error.emoji_delete_failed: "Failed to delete emoji"
+error.emoji_copy_failed: "Failed to copy emoji"
+error.emoji_dir_failed: "Emoji directory is unavailable"
+error.emoji_write_failed: "Failed to write the emoji temp file"
+error.emoji_not_found: "Emoji not found"
+error.emoji_magic_invalid: "Emoji file content does not match its extension"
+
+# voice message
+error.voice_recording_start_failed: "Failed to start voice recording"
+error.voice_recording_stop_failed: "Failed to stop voice recording"
+error.voice_recording_lock_failed: "Failed to lock voice recorder state"
+error.voice_recording_not_active: "No active voice recording"
+error.voice_file_read_failed: "Failed to read the voice file"
+
+# window
+error.window_label_forbidden: "Window label is not allowed"
 
 # plugins
 error.plugins_load_failed: "Failed to load plugin"
@@ -108,6 +141,7 @@ error.temp_file_cleanup_failed: "Failed to cleanup temp files"
 error.temp_file_remove_failed: "Failed to remove temp file"
 error.temp_file_not_found: "Temp file not found"
 error.temp_file_open_failed: "Failed to open temp file"
+error.temp_file_path_outside_base: "Temp file path escapes the managed directory; opening was denied"
 error.temp_file_invalid_operation: "Invalid operation: must provide from_path or to_path"
 
 # network scope

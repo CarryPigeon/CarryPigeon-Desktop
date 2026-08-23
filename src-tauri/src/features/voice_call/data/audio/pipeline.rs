@@ -2,7 +2,7 @@ use anyhow::Context;
 use cpal::Stream;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use opus_wave::{Application, Channels, OpusDecoder, OpusEncoder, SampleRate};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Mutex as TokioMutex;
@@ -11,13 +11,32 @@ use tracing::{info, warn};
 const FRAME_SIZE: usize = 960; // 20ms at 48kHz
 const MAX_PACKET: usize = 4000;
 
+/// 单方向排队包数上限（约 5 秒音频）。
+/// 超限时丢弃最旧包，防止消费端停摆导致内存无界增长。
+const MAX_QUEUED_PACKETS: usize = 250;
+
+/// 共享的编码包 FIFO 队列。
+///
+/// 说明：使用 std::sync::Mutex 而非 TokioMutex——该锁会在 cpal 实时音频
+/// 回调线程中获取，回调内绝不允许阻塞在 TokioMutex 的信号量上。
+type PacketQueue = std::sync::Mutex<VecDeque<Vec<u8>>>;
+
+fn push_packet(queue: &PacketQueue, packet: Vec<u8>) {
+    if let Ok(mut q) = queue.lock() {
+        if q.len() >= MAX_QUEUED_PACKETS {
+            q.pop_front(); // 丢最旧，保持 FIFO 语义与有界内存
+        }
+        q.push_back(packet);
+    }
+}
+
 pub struct AudioPipeline {
-    pub encoder: Arc<TokioMutex<OpusEncoder>>,
-    pub decoder: Arc<TokioMutex<OpusDecoder>>,
+    pub encoder: Arc<std::sync::Mutex<OpusEncoder>>,
+    pub decoder: Arc<std::sync::Mutex<OpusDecoder>>,
     pub capture_stream: TokioMutex<Option<Stream>>,
     pub playback_stream: TokioMutex<Option<Stream>>,
-    pub encoded_out: Arc<TokioMutex<Vec<Vec<u8>>>>,
-    pub encoded_in: Arc<TokioMutex<Vec<Vec<u8>>>>,
+    pub encoded_out: Arc<PacketQueue>,
+    pub encoded_in: Arc<PacketQueue>,
     pub muted: Arc<AtomicBool>,
     pub noise_suppression: Arc<AtomicBool>,
     capture_leftover: Arc<std::sync::Mutex<Vec<f32>>>,
@@ -25,7 +44,7 @@ pub struct AudioPipeline {
     // Conference multi-participant fields
     pub conference_mode: Arc<AtomicBool>,
     participant_decoders: Arc<std::sync::Mutex<HashMap<String, OpusDecoder>>>,
-    participant_buffers: Arc<std::sync::Mutex<HashMap<String, Vec<Vec<u8>>>>>,
+    participant_buffers: Arc<std::sync::Mutex<HashMap<String, PacketQueue>>>,
 }
 
 impl AudioPipeline {
@@ -37,12 +56,12 @@ impl AudioPipeline {
             .context("VOICE_CALL_AUDIO_DECODE_FAILED")?;
 
         Ok(Self {
-            encoder: Arc::new(TokioMutex::new(encoder)),
-            decoder: Arc::new(TokioMutex::new(decoder)),
+            encoder: Arc::new(std::sync::Mutex::new(encoder)),
+            decoder: Arc::new(std::sync::Mutex::new(decoder)),
             capture_stream: TokioMutex::new(None),
             playback_stream: TokioMutex::new(None),
-            encoded_out: Arc::new(TokioMutex::new(Vec::new())),
-            encoded_in: Arc::new(TokioMutex::new(Vec::new())),
+            encoded_out: Arc::new(std::sync::Mutex::new(VecDeque::new())),
+            encoded_in: Arc::new(std::sync::Mutex::new(VecDeque::new())),
             muted: Arc::new(AtomicBool::new(false)),
             noise_suppression: Arc::new(AtomicBool::new(false)),
             capture_leftover: Arc::new(std::sync::Mutex::new(Vec::new())),
@@ -107,7 +126,9 @@ impl AudioPipeline {
             .context("VOICE_CALL_AUDIO_CAPTURE_FAILED: play")?;
 
         *self.capture_stream.lock().await = Some(stream);
-        self.encoded_out.lock().await.clear();
+        if let Ok(mut q) = self.encoded_out.lock() {
+            q.clear();
+        }
         if let Ok(mut leftover) = self.capture_leftover.lock() {
             leftover.clear();
         }
@@ -167,7 +188,9 @@ impl AudioPipeline {
             .context("VOICE_CALL_AUDIO_PLAYBACK_FAILED: play")?;
 
         *self.playback_stream.lock().await = Some(stream);
-        self.encoded_in.lock().await.clear();
+        if let Ok(mut q) = self.encoded_in.lock() {
+            q.clear();
+        }
         info!(action = "app_voice_call_playback_started");
         Ok(())
     }
@@ -186,12 +209,17 @@ impl AudioPipeline {
         Ok(())
     }
 
+    /// 取走全部已编码的采集包（FIFO：最早优先）。
     pub async fn take_encoded_packets(&self) -> Vec<Vec<u8>> {
-        std::mem::take(&mut *self.encoded_out.lock().await)
+        match self.encoded_out.lock() {
+            Ok(mut q) => q.drain(..).collect(),
+            Err(_) => Vec::new(),
+        }
     }
 
+    /// 将远端编码包放入播放队列尾部（FIFO 入队）。
     pub async fn push_encoded_packet(&self, packet: Vec<u8>) {
-        self.encoded_in.lock().await.push(packet);
+        push_packet(&self.encoded_in, packet);
     }
 
     pub fn set_mute(&self, muted: bool) {
@@ -230,7 +258,7 @@ impl AudioPipeline {
         self.participant_buffers
             .lock()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?
-            .insert(participant_id.to_string(), Vec::new());
+            .insert(participant_id.to_string(), std::sync::Mutex::new(VecDeque::new()));
         info!(action = "app_voice_call_participant_registered", participant_id = %participant_id);
         Ok(())
     }
@@ -238,8 +266,12 @@ impl AudioPipeline {
     pub fn push_participant_packet(&self, participant_id: &str, packet: Vec<u8>) {
         if let Ok(mut buffers) = self.participant_buffers.lock()
             && let Some(buf) = buffers.get_mut(participant_id)
+            && let Ok(mut q) = buf.lock()
         {
-            buf.push(packet);
+            if q.len() >= MAX_QUEUED_PACKETS {
+                q.pop_front(); // 有界化：丢最旧
+            }
+            q.push_back(packet);
         }
     }
 
@@ -260,41 +292,42 @@ fn process_capture(
     data: &[f32],
     muted: &AtomicBool,
     noise_suppression: &AtomicBool,
-    encoder: &TokioMutex<OpusEncoder>,
-    output: &TokioMutex<Vec<Vec<u8>>>,
+    encoder: &std::sync::Mutex<OpusEncoder>,
+    output: &PacketQueue,
     leftover: &std::sync::Mutex<Vec<f32>>,
 ) {
     let is_muted = muted.load(Ordering::Relaxed);
     let is_ns = noise_suppression.load(Ordering::Relaxed);
 
-    let raw: Vec<f32> = if is_muted {
-        vec![0.0f32; data.len()]
-    } else if is_ns {
-        apply_noise_gate(data)
-    } else {
-        data.to_vec()
-    };
-
-    // Combine partial samples from previous callback
+    // Combine partial samples from previous callback（避免常规路径的整段复制）
     let mut buf = match leftover.lock() {
         Ok(b) => b,
         Err(_) => return,
     };
-    buf.extend_from_slice(&raw);
+    if is_muted {
+        let new_len = buf.len() + data.len();
+        buf.resize(new_len, 0.0f32);
+    } else if is_ns {
+        buf.extend_from_slice(&apply_noise_gate(data));
+    } else {
+        buf.extend_from_slice(data);
+    }
     let samples = std::mem::take(&mut *buf);
     drop(buf);
 
-    let mut enc = encoder.blocking_lock();
-    let mut out = output.blocking_lock();
+    let mut enc = match encoder.lock() {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    // 复用同一块编码暂存缓冲，减少每帧堆分配。
+    let mut packet_buf = vec![0u8; MAX_PACKET];
 
     let mut pos = 0;
     while pos + FRAME_SIZE <= samples.len() {
         let chunk = &samples[pos..pos + FRAME_SIZE];
-        let mut packet = vec![0u8; MAX_PACKET];
-        match enc.encode_float(chunk, FRAME_SIZE as i32, &mut packet, MAX_PACKET as i32) {
+        match enc.encode_float(chunk, FRAME_SIZE as i32, &mut packet_buf, MAX_PACKET as i32) {
             Ok(len) => {
-                packet.truncate(len as usize);
-                out.push(packet);
+                push_packet(output, packet_buf[..len as usize].to_vec());
             }
             Err(e) => {
                 warn!(action = "app_voice_call_encode_failed", error = %e);
@@ -315,11 +348,11 @@ fn process_capture(
 /// In conference mode, mixes audio from all registered participants.
 fn process_playback(
     data: &mut [f32],
-    decoder: &TokioMutex<OpusDecoder>,
-    encoded_in: &TokioMutex<Vec<Vec<u8>>>,
+    decoder: &std::sync::Mutex<OpusDecoder>,
+    encoded_in: &PacketQueue,
     conference_mode: &AtomicBool,
     participant_decoders: &std::sync::Mutex<HashMap<String, OpusDecoder>>,
-    participant_buffers: &std::sync::Mutex<HashMap<String, Vec<Vec<u8>>>>,
+    participant_buffers: &std::sync::Mutex<HashMap<String, PacketQueue>>,
 ) {
     if conference_mode.load(Ordering::Relaxed) {
         process_playback_multi(data, participant_decoders, participant_buffers);
@@ -330,16 +363,30 @@ fn process_playback(
 
 fn process_playback_single(
     data: &mut [f32],
-    decoder: &TokioMutex<OpusDecoder>,
-    encoded_in: &TokioMutex<Vec<Vec<u8>>>,
+    decoder: &std::sync::Mutex<OpusDecoder>,
+    encoded_in: &PacketQueue,
 ) {
     let samples = data.len();
     let mut offset = 0;
-    let mut dec = decoder.blocking_lock();
-    let mut buf = encoded_in.blocking_lock();
+    // FIFO：从队列头部取最早的包（修复此前 pop() 取最新包导致的乱序）。
+    let mut buf = match encoded_in.lock() {
+        Ok(b) => b,
+        Err(_) => {
+            data.fill(0.0);
+            return;
+        }
+    };
+    let mut dec = match decoder.lock() {
+        Ok(d) => d,
+        Err(_) => {
+            drop(buf);
+            data.fill(0.0);
+            return;
+        }
+    };
 
     while offset + FRAME_SIZE <= samples {
-        if let Some(packet) = buf.pop() {
+        if let Some(packet) = buf.pop_front() {
             match dec.decode_float(
                 Some(&packet),
                 &mut data[offset..offset + FRAME_SIZE],
@@ -367,7 +414,7 @@ fn process_playback_single(
 fn process_playback_multi(
     data: &mut [f32],
     participant_decoders: &std::sync::Mutex<HashMap<String, OpusDecoder>>,
-    participant_buffers: &std::sync::Mutex<HashMap<String, Vec<Vec<u8>>>>,
+    participant_buffers: &std::sync::Mutex<HashMap<String, PacketQueue>>,
 ) {
     let samples = data.len();
     data.fill(0.0); // start with silence
@@ -376,13 +423,18 @@ fn process_playback_multi(
         && let Ok(mut buffers) = participant_buffers.lock()
     {
         let mut mixed = vec![0.0f32; samples];
+        // 复用解码帧缓冲，避免每帧分配。
+        let mut frame = vec![0.0f32; FRAME_SIZE];
 
         for (pid, buf) in buffers.iter_mut() {
             if let Some(dec) = decoders.get_mut(pid) {
+                // 内层队列锁：仅在拿到锁时消费该参与者。
+                let Ok(mut queue) = buf.lock() else { continue };
                 let mut offset = 0;
                 while offset + FRAME_SIZE <= samples {
-                    if let Some(packet) = buf.pop() {
-                        let mut frame = vec![0.0f32; FRAME_SIZE];
+                    // FIFO：取最早包（与单聊路径一致）。
+                    if let Some(packet) = queue.pop_front() {
+                        frame.fill(0.0);
                         if dec
                             .decode_float(Some(&packet), &mut frame, FRAME_SIZE as i32, false)
                             .is_ok()
@@ -396,7 +448,9 @@ fn process_playback_multi(
                 }
             } else {
                 // Decoder missing — drain buffer
-                buf.clear();
+                if let Ok(mut q) = buf.lock() {
+                    q.clear();
+                }
             }
         }
 

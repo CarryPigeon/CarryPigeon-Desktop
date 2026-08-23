@@ -28,6 +28,10 @@ pub struct VoiceCallInner {
     audio_pipeline: Mutex<Option<Arc<AudioPipeline>>>,
     local_user_id: Mutex<Option<String>>,
     local_display_name: Mutex<Option<String>>,
+    /// 信令监听器代际计数：每次 connect_signaling 递增。
+    /// 监听循环持有自己的代际值，代际不一致时自动退出，
+    /// 防止重复 connect 产生多个并发监听器竞争消费同一消息流。
+    listener_generation: std::sync::atomic::AtomicU64,
 }
 
 impl VoiceCallInner {
@@ -53,6 +57,7 @@ impl VoiceCallInner {
             audio_pipeline: Mutex::new(None),
             local_user_id: Mutex::new(None),
             local_display_name: Mutex::new(None),
+            listener_generation: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -929,6 +934,16 @@ pub async fn connect_signaling(
     *inner.local_user_id.lock().await = Some(user_id);
     *inner.local_display_name.lock().await = Some(display_name);
 
+    // 重复 connect 防护：先真正断开旧信令（关闭 WS、退出旧监听器），
+    // 再递增代际使任何残留的旧监听循环自行退出。
+    if let Some(old) = inner.signaling.lock().await.take() {
+        old.disconnect().await;
+    }
+    let generation = inner
+        .listener_generation
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        + 1;
+
     let client = SignalingClient::new();
     client
         .connect(&ws_url, &access_token)
@@ -940,10 +955,10 @@ pub async fn connect_signaling(
     // Initialize WebRTC peer manager
     *inner.webrtc.lock().await = Some(WebRtcPeerManager::new());
 
-    // Spawn the global signaling message listener
+    // Spawn the global signaling message listener（携带本次代际）
     let inner_clone = inner.clone();
     tokio::spawn(async move {
-        global_signaling_listener(inner_clone, app_handle).await;
+        global_signaling_listener(inner_clone, app_handle, generation).await;
     });
 
     Ok(())
@@ -953,41 +968,53 @@ pub async fn connect_signaling(
 
 /// Main signaling message dispatch loop. Receives all messages from the
 /// signaling WebSocket and dispatches them to the appropriate handler.
-async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri::AppHandle) {
-    let mut disconnect_count: u32 = 0;
-    const MAX_DISCONNECT_COUNT: u32 = 5;
+///
+/// 退出条件（任一满足即 break 并执行清理）：
+/// - 代际不一致（新的 connect_signaling 已启动，本循环过期）；
+/// - `recv()` 返回 `Err`（未连接或 WS 读通道已结束）；
+/// - 信令客户端被移除。
+///
+/// 注意：`recv()` 的 `Ok(None)` 仅表示"暂无新消息"，**不再**作为断连依据
+/// （修复此前静默 ~300ms 即拆除全部通话的缺陷）。
+async fn global_signaling_listener(
+    inner: Arc<VoiceCallInner>,
+    app_handle: tauri::AppHandle,
+    generation: u64,
+) {
+    const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
     loop {
+        // 代际检查：非当前代际的监听器立即让位退出。
+        if inner.listener_generation.load(std::sync::atomic::Ordering::SeqCst) != generation {
+            tracing::info!(action = "app_voice_call_signaling_listener_superseded", generation);
+            return;
+        }
+
         let msg = {
             let sig_guard = inner.signaling.lock().await;
             match sig_guard.as_ref() {
                 Some(client) => match client.recv().await {
-                    Ok(Some(m)) => {
-                        disconnect_count = 0;
-                        m
-                    }
+                    Ok(Some(m)) => m,
+                    // 暂无消息：连接正常，稍后重试。
                     Ok(None) => {
                         drop(sig_guard);
-                        disconnect_count += 1;
-                        if disconnect_count >= MAX_DISCONNECT_COUNT {
-                            tracing::warn!(action = "app_voice_call_signaling_dead");
-                            break;
-                        }
-                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        tokio::time::sleep(IDLE_POLL_INTERVAL).await;
                         continue;
                     }
-                    Err(_) => {
+                    Err(e) => {
                         drop(sig_guard);
-                        disconnect_count += 1;
-                        if disconnect_count >= MAX_DISCONNECT_COUNT {
-                            tracing::warn!(action = "app_voice_call_signaling_dead");
-                            break;
-                        }
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                        continue;
+                        tracing::warn!(
+                            action = "app_voice_call_signaling_ended",
+                            generation,
+                            error = %e
+                        );
+                        break;
                     }
                 },
-                None => break,
+                None => {
+                    tracing::info!(action = "app_voice_call_signaling_client_removed", generation);
+                    break;
+                }
             }
         };
 
@@ -1164,7 +1191,14 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
                     }
                 };
                 if initiator_id.is_empty() {
-                    return; // session not found, skip
+                    // 修复：此处位于监听循环的 match 分支内，
+                    // 必须 continue 跳过本条消息而不是 return 整个监听器
+                    // （否则一条指向不存在会话的消息即可杀死全部后续信令处理）。
+                    tracing::warn!(
+                        action = "app_voice_call_conference_join_session_missing",
+                        session_id = %session_id,
+                    );
+                    continue;
                 }
 
                 // Register joiner in audio pipeline
@@ -1495,8 +1529,34 @@ async fn global_signaling_listener(inner: Arc<VoiceCallInner>, app_handle: tauri
 
 /// Periodically sends encoded Opus packets from the audio pipeline
 /// through the WebRTC peer connection.
+///
+/// 退出条件：全局拆除（pipeline/webrtc 为 None）或会话不再活跃
+/// （挂断后连续约 1 秒检测不到活动会话），修复此前每 20ms 空转泄漏任务的问题。
 async fn audio_send_loop(inner: Arc<VoiceCallInner>, session_id: &str) {
+    const MAX_SESSION_MISSES: u32 = 50; // 50 × 20ms ≈ 1s
+    let mut session_misses: u32 = 0;
+
     loop {
+        // 会话级退出检查：会话被移除或已 Ended 即计数，连续超限则退出。
+        let session_active = match inner.sessions.try_lock() {
+            Ok(sessions) => sessions
+                .get(session_id)
+                .is_some_and(|s| s.state != CallState::Ended),
+            Err(_) => true, // 锁繁忙时保守视为仍活跃
+        };
+        if !session_active {
+            session_misses += 1;
+            if session_misses >= MAX_SESSION_MISSES {
+                tracing::info!(
+                    action = "app_voice_call_audio_send_loop_session_ended",
+                    session_id = %session_id,
+                );
+                return;
+            }
+        } else {
+            session_misses = 0;
+        }
+
         let packets = {
             let pipeline_guard = inner.audio_pipeline.lock().await;
             match pipeline_guard.as_ref() {
@@ -1523,8 +1583,31 @@ async fn audio_send_loop(inner: Arc<VoiceCallInner>, session_id: &str) {
 }
 
 /// Conference variant: sends captured audio to all connected participants.
+/// 退出条件与 [`audio_send_loop`] 相同。
 async fn audio_send_loop_conference(inner: Arc<VoiceCallInner>, session_id: &str) {
+    const MAX_SESSION_MISSES: u32 = 50; // 50 × 20ms ≈ 1s
+    let mut session_misses: u32 = 0;
+
     loop {
+        let session_active = match inner.sessions.try_lock() {
+            Ok(sessions) => sessions
+                .get(session_id)
+                .is_some_and(|s| s.state != CallState::Ended),
+            Err(_) => true,
+        };
+        if !session_active {
+            session_misses += 1;
+            if session_misses >= MAX_SESSION_MISSES {
+                tracing::info!(
+                    action = "app_voice_call_audio_send_loop_session_ended",
+                    session_id = %session_id,
+                );
+                return;
+            }
+        } else {
+            session_misses = 0;
+        }
+
         let packets = {
             let pipeline_guard = inner.audio_pipeline.lock().await;
             match pipeline_guard.as_ref() {

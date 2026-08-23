@@ -51,6 +51,14 @@ impl TempFileManager {
         let mut freed = 0u64;
 
         for rec in records {
+            // 防御性校验：历史 DB 记录中的 id 若不合法（可能含穿越片段），
+            // 不触碰任何文件路径，仅删除 DB 记录，避免脏记录永久堆积。
+            if Self::ensure_valid_id(&rec.id).is_err() {
+                tracing::warn!(action = "db_temp_file_cleanup_invalid_id_skipped", id = %rec.id);
+                let _ = self.delete_record(&rec.id).await;
+                removed += 1;
+                continue;
+            }
             // 删除文件
             let path = std::path::Path::new(&rec.file_path);
             if path.exists() {
@@ -59,7 +67,8 @@ impl TempFileManager {
                 }
                 let _ = tokio::fs::remove_file(path).await;
             }
-            // 删除 .part 文件（如果 file_path 指向最终文件，.part 可能已不存在）
+            // 删除 .part 文件（如果 file_path 指向最终文件，.part 可能已不存在）。
+            // id 已通过上方校验，此处拼接是安全的。
             let part_path = self
                 .base_dir()
                 .join("downloads")
