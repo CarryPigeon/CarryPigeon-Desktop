@@ -11,6 +11,7 @@ import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
 import { getAccountCapabilities } from "@/features/account/api";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
+import { readAuthToken } from "@/shared/utils/localState";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("mention-inbox-panel");
@@ -47,7 +48,7 @@ async function resolveSenders(ids: string[]): Promise<void> {
   if (missing.length === 0) return;
   const socket = getActiveChatServerSocket().trim();
   if (!socket) return;
-  const token = (await ensureValidAccessToken(socket)).trim();
+  const token = (await ensureValidAccessToken(socket)).trim() || readAuthToken(socket).trim();
   if (!token) return;
   try {
     const users = await getAccountCapabilities().forServer(socket).listUsers(token, missing);

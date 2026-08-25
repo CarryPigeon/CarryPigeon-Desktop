@@ -76,9 +76,15 @@ async function handleSearch(): Promise<void> {
   }
 
   const socket = getActiveChatServerSocket();
-  if (!socket) return;
-  const token = (await ensureValidAccessToken(socket)).trim();
-  if (!token) return;
+  if (!socket) {
+    searchHint.value = t("contacts_search_need_signin");
+    return;
+  }
+  const token = (await ensureValidAccessToken(socket)).trim() || readAuthToken(socket).trim();
+  if (!token) {
+    searchHint.value = t("contacts_search_need_signin");
+    return;
+  }
 
   searching.value = true;
   searchResults.value = [];
@@ -115,7 +121,7 @@ onBeforeUnmount(() => {
 async function handleStartChat(user: UserPublic): Promise<void> {
   const socket = getActiveChatServerSocket();
   if (!socket) return;
-  const token = (await ensureValidAccessToken(socket)).trim();
+  const token = (await ensureValidAccessToken(socket)).trim() || readAuthToken(socket).trim();
   if (!token) return;
   try {
     const outcome = await getRoomGovernanceCapabilities().createChannel(

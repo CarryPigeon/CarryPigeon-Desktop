@@ -10,6 +10,7 @@ import { getAccountCapabilities } from "@/features/account/api";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
+import { readAuthToken } from "@/shared/utils/localState";
 import { isSnowflakeId } from "@/shared/utils/snowflakeId";
 
 const props = defineProps<{
@@ -45,7 +46,9 @@ async function handleCreate(): Promise<void> {
   error.value = "";
   try {
     const socket = getActiveChatServerSocket().trim();
-    const token = socket ? (await ensureValidAccessToken(socket)).trim() : "";
+    const token = socket
+      ? (await ensureValidAccessToken(socket)).trim() || readAuthToken(socket).trim()
+      : "";
     if (!socket || !token) {
       error.value = t("channel_create_failed");
       return;
