@@ -219,7 +219,7 @@ onMounted(() => {
         >
           {{ t("channels_discover") }}
         </button>
-        <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateMenu($event)" :title="t('create_chat')">+</button>
+        <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateMenu()" :title="t('create_channel')">+</button>
       </div>
       <!-- 区块：搜索输入框 -->
       <t-input

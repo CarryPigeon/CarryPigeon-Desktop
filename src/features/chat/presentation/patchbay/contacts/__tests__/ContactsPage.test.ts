@@ -26,16 +26,6 @@ vi.mock("@/features/account/api", () => ({
   getAccountCapabilities: vi.fn(() => ({ forServer: vi.fn() })),
 }));
 
-vi.mock("@/features/chat/room-governance/api", () => ({
-  getRoomGovernanceCapabilities: vi.fn(() => ({ createChannel: vi.fn() })),
-}));
-
-vi.mock("@/features/chat/room-session/api", () => ({
-  getRoomSessionCapabilities: vi.fn(() => ({
-    currentChannel: { selectChannel: vi.fn() },
-  })),
-}));
-
 vi.mock("@/shared/net/auth/authSessionManager", () => ({
   ensureValidAccessToken: vi.fn(() => Promise.resolve("")),
 }));

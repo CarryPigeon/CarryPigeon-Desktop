@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ContactsPage.vue
- * @description 联系人管理页面：搜索用户、查看资料、发起私聊。
+ * @description 联系人管理页面：按用户 ID 查找公开资料。
  */
 
 import { ref, onBeforeUnmount } from "vue";
@@ -10,8 +10,6 @@ import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { readAuthToken } from "@/shared/utils/localState";
 import { getAccountCapabilities } from "@/features/account/api";
-import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
-import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { createLogger } from "@/shared/utils/logger";
 import { debounceAsync } from "@/shared/utils/rateLimit";
@@ -117,36 +115,12 @@ onBeforeUnmount(() => {
   debouncedSearch.cancel();
 });
 
-// 发起私聊
-async function handleStartChat(user: UserPublic): Promise<void> {
-  const socket = getActiveChatServerSocket();
-  if (!socket) return;
-  const token = (await ensureValidAccessToken(socket)).trim() || readAuthToken(socket).trim();
-  if (!token) return;
-  try {
-    const outcome = await getRoomGovernanceCapabilities().createChannel(
-      user.nickname || user.uid,
-      `Direct chat with ${user.nickname || user.uid}`,
-    );
-    if (!outcome.ok) {
-      logger.error("Action: chat_contacts_create_chat_failed", { error: outcome.error.message });
-      return;
-    }
-    await getRoomSessionCapabilities().currentChannel.selectChannel(outcome.channel.id);
-    await router.push("/chat");
-    logger.info("Action: chat_contacts_private_chat_created", { channelId: outcome.channel.id, targetUid: user.uid });
-  } catch (e) {
-    logger.error("Action: chat_contacts_create_chat_failed", { error: String(e) });
-  }
-}
-
 // 查看用户资料
 function handleViewProfile(uid: string): void {
   router.push({ path: "/user-info-popover", query: { uid } });
 }
 
-// 点击任意位置快速启动私聊（直接使用 CreateFriendPrivateChatDialog 兼容方案）
-function handleQuickChat(): void {
+function handleBackToChat(): void {
   router.push("/chat");
 }
 
@@ -237,14 +211,6 @@ loadCurrentUser();
               <button
                 class="cp-contacts__action-btn"
                 type="button"
-                :title="t('contacts_start_chat')"
-                @click="handleStartChat(user)"
-              >
-                {{ t("contacts_chat") }}
-              </button>
-              <button
-                class="cp-contacts__action-btn cp-contacts__action-btn--secondary"
-                type="button"
                 :title="t('contacts_view_profile')"
                 @click="handleViewProfile(user.uid)"
               >
@@ -258,7 +224,7 @@ loadCurrentUser();
           :description="t('contacts_empty_hint')"
         >
           <template #action>
-            <button class="cp-contacts__action-btn" type="button" @click="handleQuickChat">
+            <button class="cp-contacts__action-btn" type="button" @click="handleBackToChat">
               {{ t("contacts_go_chat") }}
             </button>
           </template>

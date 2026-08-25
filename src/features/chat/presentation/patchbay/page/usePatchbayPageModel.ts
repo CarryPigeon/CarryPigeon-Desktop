@@ -321,21 +321,13 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   } = useChannelSettingsMenu();
 
   const {
-    showCreateChatMenu,
-    createChatMenuX,
-    createChatMenuY,
     showCreateChannel,
-    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
-    openCreateChatMenu,
-    closeCreateChatMenu,
     setShowCreateChannel,
-    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
     openCreateChannelDialog,
-    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     openDeleteChannelDialog,
     handleChannelDeleted,
@@ -427,7 +419,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     missingRequiredCount,
     openPlugins: goPlugins,
     openRequiredSetup: handleOpenRequiredSetup,
-    openCreateMenu: openCreateChatMenu,
+    openCreateMenu: openCreateChannelDialog,
     openChannelInfo: (channelId: string) => channelInfoDialog.openChannelInfo(channelId),
     openServerInfo: handleOpenServers,
     openServerManager: handleOpenServerManager,
@@ -718,15 +710,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const { onKeydown } = usePatchbayHotkeys({
     menuOpen,
     showChannelMenu,
-    showCreateChatMenu,
     showCreateChannel,
-    showCreateFriendPrivateChat,
     showDeleteChannel,
     closeMenu,
     closeChannelMenu,
-    closeCreateChatMenu,
     setShowCreateChannel,
-    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
   });
 
@@ -808,21 +796,14 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   });
 
   const channelDialogs = createPatchbayChannelDialogsSection({
-    showCreateChatMenu,
-    createChatMenuX,
-    createChatMenuY,
     showCreateChannel,
-    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
     canDeleteCurrentChannel,
-    closeCreateChatMenu,
     setShowCreateChannel,
-    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
     openCreateChannelDialog,
-    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     handleChannelDeleted,
   });

@@ -46,7 +46,7 @@ type ChannelRailRawModel = {
   loadMoreDiscover(): Promise<void>;
   openPlugins(): void;
   openRequiredSetup(): void;
-  openCreateMenu(e: MouseEvent): void;
+  openCreateMenu(): void;
   openChannelInfo(channelId: string): void;
   openServerInfo(): void;
   openServerManager(): void;
@@ -74,7 +74,7 @@ export type UseChannelRailModelDeps = {
   missingRequiredCount: RefLike<number>;
   openPlugins(): void;
   openRequiredSetup(): void;
-  openCreateMenu(e: MouseEvent): void;
+  openCreateMenu(): void;
   openChannelInfo(channelId: string): void;
   openServerInfo?(): void;
   openServerManager(): void;
