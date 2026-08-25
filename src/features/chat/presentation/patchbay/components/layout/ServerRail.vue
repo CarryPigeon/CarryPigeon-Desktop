@@ -62,6 +62,10 @@ const emit = defineEmits<{
    * 打开设置页。
    */
   (e: "open-settings"): void;
+  /**
+   * 打开联系人页（按用户 ID 查找）。
+   */
+  (e: "open-contacts"): void;
   (e: "toggle-server-mute"): [];
   (e: "mute-server-for-duration", durationMs: number | undefined): void;
   (e: "unmute-server"): void;
@@ -161,6 +165,7 @@ function formatTime(epoch: number): string {
       </button>
     </div>
     <div class="cp-rail__foot">
+      <button class="cp-rail__btn" type="button" @click="emit('open-contacts')">{{ t("contacts_title") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
     </div>

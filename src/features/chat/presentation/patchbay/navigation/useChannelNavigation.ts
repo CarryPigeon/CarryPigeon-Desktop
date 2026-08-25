@@ -50,6 +50,10 @@ export type ChannelNavigation = {
    * 打开封禁管理页。
    */
   openChannelBans(channelId: string): void;
+  /**
+   * 打开审计日志页。
+   */
+  openChannelAuditLogs(channelId: string): void;
 };
 
 /**
@@ -154,11 +158,22 @@ export function useChannelNavigation(deps: UseChannelNavigationDeps): ChannelNav
     openChannelRoute(channelId, "/channel-bans", buildBaseChannelQuery);
   }
 
+  /**
+   * 打开频道审计日志页。
+   *
+   * @param channelId - 频道 id。
+   * @returns 无返回值。
+   */
+  function openChannelAuditLogs(channelId: string): void {
+    openChannelRoute(channelId, "/channel-audit-logs", buildBaseChannelQuery);
+  }
+
   return {
     findChannelById,
     openChannelInfo,
     openChannelMembers,
     openJoinApplications,
     openChannelBans,
+    openChannelAuditLogs,
   };
 }

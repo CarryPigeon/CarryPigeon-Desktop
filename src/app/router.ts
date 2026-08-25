@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { LoginPage, RegisterPage, RequiredSetupPage, UserInfoPage } from '@/features/account/routes';
-import { ChatMainPage, ChannelInfoPage, ChannelMembersPage, JoinApplicationsPage, ChannelBansPage } from '@/features/chat/public/routes';
+import { ChatMainPage, ChannelInfoPage, ChannelMembersPage, JoinApplicationsPage, ChannelBansPage, ChannelAuditLogsPage } from '@/features/chat/public/routes';
 import { PluginCenterPage, DomainCatalogPage, PluginDetailPage } from '@/features/plugins/routes';
 import { SettingsPage, EmojiManagePage } from '@/features/settings/routes';
 import { ServerManagerPage } from '@/features/server-connection/routes';
@@ -41,6 +41,7 @@ const router = createRouter({
     { path: '/channel-members', component: ChannelMembersPage, name: 'channel-members' },
     { path: '/channel-applications', component: JoinApplicationsPage, name: 'channel-applications' },
     { path: '/channel-bans', component: ChannelBansPage, name: 'channel-bans' },
+    { path: '/channel-audit-logs', component: ChannelAuditLogsPage, name: 'channel-audit-logs' },
     // 子窗口 / 弹窗路由 —— 用户触发时才加载
     { path: '/channel-info-popover', component: ChannelInfoPopoverView, name: 'channel-info-popover' },
     { path: '/user-info-popover', component: UserPopoverPage, name: 'user-info-popover' },

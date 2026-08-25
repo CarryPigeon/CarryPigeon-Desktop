@@ -9,7 +9,7 @@ import { useI18n } from "vue-i18n";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
 import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message/domain/messageModels";
-import { NotificationBell } from "@/features/notifications/components";
+import MentionInboxBell from "@/features/chat/mention-inbox/presentation/components/MentionInboxBell.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
@@ -420,7 +420,7 @@ function getReplyText(m: VirtualMessageItem): string {
         >
           <t-icon name="setting" />
         </button>
-        <NotificationBell />
+        <MentionInboxBell />
       </div>
     </header>
 

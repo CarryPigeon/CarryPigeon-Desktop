@@ -28,3 +28,7 @@ export const JoinApplicationsPage = () => import("../room-governance/presentatio
  * 频道封禁治理页面路由组件。
  */
 export const ChannelBansPage = () => import("../room-governance/presentation/pages/ChannelBansPage.vue");
+/**
+ * 频道审计日志页面路由组件。
+ */
+export const ChannelAuditLogsPage = () => import("../audit-logs/presentation/pages/ChannelAuditLogsPage.vue");
