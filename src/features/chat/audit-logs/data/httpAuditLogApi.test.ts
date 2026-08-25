@@ -23,7 +23,15 @@ describe("createHttpAuditLogApi", () => {
   it("maps domain query to snake_case querystring", async () => {
     requestJson.mockResolvedValueOnce({ items: [], has_more: false });
     const api = createHttpAuditLogApi();
-    await api.listAuditLogs("127.0.0.1:8080", "tok", { channelId: "11", limit: 50 });
-    expect(requestJson).toHaveBeenCalledWith("GET", "/audit_logs?limit=50&cid=11");
+    await api.listAuditLogs("127.0.0.1:8080", "tok", {
+      channelId: "11",
+      limit: 50,
+      actorUserId: "22",
+      action: "channel.update",
+    });
+    expect(requestJson).toHaveBeenCalledWith(
+      "GET",
+      "/audit_logs?limit=50&cid=11&actor_uid=22&action=channel.update",
+    );
   });
 });

@@ -22,8 +22,14 @@ vi.mock("@/features/account/api", () => ({
   getAccountCapabilities: vi.fn(() => ({ forServer: vi.fn() })),
 }));
 
-vi.mock("@/features/chat/data/chat-api/httpChatApiPort", () => ({
-  httpChatApiPort: { createChannel: vi.fn() },
+vi.mock("@/features/chat/room-governance/api", () => ({
+  getRoomGovernanceCapabilities: vi.fn(() => ({ createChannel: vi.fn() })),
+}));
+
+vi.mock("@/features/chat/room-session/api", () => ({
+  getRoomSessionCapabilities: vi.fn(() => ({
+    currentChannel: { selectChannel: vi.fn() },
+  })),
 }));
 
 vi.mock("@/shared/net/auth/authSessionManager", () => ({
@@ -84,5 +90,15 @@ describe("ContactsPage", () => {
     // @ts-expect-error process types are not included in the DOM-only tsconfig.
     process.off("unhandledRejection", handler);
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("shows uid-only hint instead of calling users search for nicknames", async () => {
+    const wrapper = mount(ContactsPage);
+    await flushPromises();
+    const input = wrapper.find(".cp-contacts__search-input");
+    await input.setValue("alice");
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    expect(wrapper.text()).toContain("contacts_search_need_uid");
   });
 });

@@ -10,10 +10,12 @@ import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { readAuthToken } from "@/shared/utils/localState";
 import { getAccountCapabilities } from "@/features/account/api";
-import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
+import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
+import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { createLogger } from "@/shared/utils/logger";
 import { debounceAsync } from "@/shared/utils/rateLimit";
+import { isSnowflakeId, parseSnowflakeIdList } from "@/shared/utils/snowflakeId";
 import type { UserPublic, CurrentUser } from "@/features/account/api-types";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import EmptyState from "@/shared/ui/EmptyState.vue";
@@ -27,6 +29,7 @@ const { t } = useI18n();
 const searchQuery = ref("");
 const searchResults = ref<UserPublic[]>([]);
 const searching = ref(false);
+const searchHint = ref("");
 const currentUser = ref<CurrentUser | null>(null);
 const loading = ref(true);
 
@@ -55,11 +58,22 @@ async function loadCurrentUser(): Promise<void> {
   }
 }
 
-// 搜索用户
+// 按雪花 UID 查找用户。服务端没有昵称搜索 HTTP。
 async function handleSearch(): Promise<void> {
   debouncedSearch.cancel();
-  const q = searchQuery.value.trim().toLowerCase();
-  if (!q) return;
+  const q = searchQuery.value.trim();
+  searchHint.value = "";
+  if (!q) {
+    searchResults.value = [];
+    return;
+  }
+
+  const ids = q.includes(",") ? parseSnowflakeIdList(q) : isSnowflakeId(q) ? [q] : [];
+  if (ids.length === 0) {
+    searchResults.value = [];
+    searchHint.value = t("contacts_search_need_uid");
+    return;
+  }
 
   const socket = getActiveChatServerSocket();
   if (!socket) return;
@@ -70,16 +84,14 @@ async function handleSearch(): Promise<void> {
   searchResults.value = [];
   try {
     const account = accountCapabilities.forServer(socket);
-    // 先尝试按 uid 搜索，然后按名称匹配
-    const users = await account.listUsers(token, [q]);
-    searchResults.value = users.filter(
-      (u) =>
-        (u.nickname?.toLowerCase().includes(q)) ||
-        (u.email?.toLowerCase().includes(q)) ||
-        u.uid.toLowerCase().includes(q),
-    );
+    const users = ids.length === 1
+      ? [await account.getUser(token, ids[0])]
+      : await account.listUsers(token, ids);
+    searchResults.value = users.filter((user) => Boolean(user?.uid));
+    if (searchResults.value.length === 0) searchHint.value = t("contacts_no_results");
   } catch (e) {
     logger.error("Action: chat_contacts_search_failed", { error: String(e) });
+    searchHint.value = t("contacts_no_results");
   } finally {
     searching.value = false;
   }
@@ -106,12 +118,17 @@ async function handleStartChat(user: UserPublic): Promise<void> {
   const token = (await ensureValidAccessToken(socket)).trim();
   if (!token) return;
   try {
-    const channel = await httpChatApiPort.createChannel(socket, token, {
-      name: user.nickname,
-      brief: `Direct chat with ${user.nickname}`,
-    });
+    const outcome = await getRoomGovernanceCapabilities().createChannel(
+      user.nickname || user.uid,
+      `Direct chat with ${user.nickname || user.uid}`,
+    );
+    if (!outcome.ok) {
+      logger.error("Action: chat_contacts_create_chat_failed", { error: outcome.error.message });
+      return;
+    }
+    await getRoomSessionCapabilities().currentChannel.selectChannel(outcome.channel.id);
     await router.push("/chat");
-    logger.info("Action: chat_contacts_private_chat_created", { channelId: channel.id, targetUid: user.uid });
+    logger.info("Action: chat_contacts_private_chat_created", { channelId: outcome.channel.id, targetUid: user.uid });
   } catch (e) {
     logger.error("Action: chat_contacts_create_chat_failed", { error: String(e) });
   }
@@ -189,6 +206,7 @@ loadCurrentUser();
           </div>
         </div>
         <div v-else-if="searching" class="cp-contacts__status">{{ t("searching") }}</div>
+        <div v-else-if="searchHint" class="cp-contacts__status">{{ searchHint }}</div>
         <div v-else-if="searchResults.length === 0 && searchQuery && !searching" class="cp-contacts__status">
           {{ t("contacts_no_results") }}
         </div>

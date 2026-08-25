@@ -14,9 +14,11 @@ export function createMockChannelDiscoveryApi(): ChannelDiscoveryApiPort {
   return {
     async discoverChannels(_serverSocket, _accessToken, query) {
       const needle = String(query.query ?? "").trim().toLowerCase();
+      const type = String(query.type ?? "").trim().toLowerCase();
       const items: ChannelDiscoverItem[] = [];
       for (const channel of getRoomSessionCapabilities().directory.getSnapshot().allChannels) {
         if (channel.joined) continue;
+        if (type && String(channel.channelType ?? "").toLowerCase() !== type) continue;
         if (needle && !channel.name.toLowerCase().includes(needle) && !channel.id.toLowerCase().includes(needle)) {
           continue;
         }

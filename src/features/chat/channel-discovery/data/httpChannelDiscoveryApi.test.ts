@@ -23,8 +23,8 @@ describe("createHttpChannelDiscoveryApi", () => {
       has_more: false,
     });
     const api = createHttpChannelDiscoveryApi();
-    const page = await api.discoverChannels("127.0.0.1:8080", "tok", { query: "gen", limit: 20 });
-    expect(requestJson).toHaveBeenCalledWith("GET", "/channels/discover?q=gen&limit=20");
+    const page = await api.discoverChannels("127.0.0.1:8080", "tok", { query: "gen", limit: 20, type: "public" });
+    expect(requestJson).toHaveBeenCalledWith("GET", "/channels/discover?q=gen&limit=20&type=public");
     expect(page.items[0]).toEqual(
       expect.objectContaining({ channelId: "11", name: "general", memberCount: 2, requiresApplication: false }),
     );

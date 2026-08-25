@@ -2,7 +2,7 @@
  * @fileoverview mention-inbox 领域端口。
  */
 
-import type { MentionInboxPage, MentionInboxQuery } from "./contracts";
+import type { MentionInboxItem, MentionInboxPage, MentionInboxQuery } from "./contracts";
 
 export type MentionInboxApiPort = {
   listMentions(serverSocket: string, accessToken: string, query: MentionInboxQuery): Promise<MentionInboxPage>;
@@ -12,12 +12,20 @@ export type MentionInboxApiPort = {
 
 export type MentionInboxStatePort = {
   replaceItems(items: MentionInboxPage["items"], nextCursor?: string, hasMore?: boolean): void;
+  appendItems(items: MentionInboxPage["items"], nextCursor?: string, hasMore?: boolean): void;
   setUnreadCount(count: number, hasMore: boolean): void;
   setLoading(loading: boolean): void;
   setError(error: string): void;
+  setUnreadOnly(value: boolean): void;
+  setChannelId(channelId: string): void;
   markLocalRead(mentionId: string): void;
   markAllLocalRead(): void;
-  findItem(mentionId: string): MentionInboxPage["items"][number] | null;
+  findItem(mentionId: string): MentionInboxItem | null;
+  readNextCursor(): string | undefined;
+  readHasMore(): boolean;
+  readLoading(): boolean;
+  readUnreadOnly(): boolean;
+  readChannelId(): string;
 };
 
 export type MentionInboxScopePort = {

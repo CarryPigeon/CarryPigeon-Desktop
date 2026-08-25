@@ -357,6 +357,7 @@ onBeforeUnmount(() => {
       <CreateFriendPrivateChatDialog
         :visible="page.channelDialogs.showCreateFriendPrivateChat"
         @update:visible="page.channelDialogs.setShowCreateFriendPrivateChat($event)"
+        @created="page.channelDialogs.handleChannelCreated"
       />
 
       <!-- 区块：删除频道弹窗（Delete Channel Dialog） -->

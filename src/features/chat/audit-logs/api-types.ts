@@ -5,6 +5,7 @@
 import type { AuditLogPage, AuditLogQuery } from "./domain/contracts";
 
 export type { AuditAction, AuditLogItem, AuditLogPage, AuditLogQuery } from "./domain/contracts";
+export { AuditActions } from "./domain/contracts";
 
 /**
  * 审计日志 capability。

@@ -18,10 +18,14 @@ const {
   itemCount,
   hasMore,
   loadingMore,
+  actionFilter,
+  actorFilter,
+  actionOptions,
   actionLabel,
   formatTime,
   formatDetails,
   loadMore,
+  applyFilters,
   goBack,
 } = useChannelAuditLogsPage();
 </script>
@@ -37,6 +41,25 @@ const {
     >
       <template #back-label>{{ t("back") }}</template>
       <template #loading>{{ t("loading") }}</template>
+      <template #actions>
+        <div class="cp-audit__filters">
+          <select v-model="actionFilter" class="cp-audit__select" :aria-label="t('audit_filter_action')">
+            <option value="">{{ t("audit_action_all") }}</option>
+            <option v-for="action in actionOptions" :key="action" :value="action">
+              {{ actionLabel(action) }}
+            </option>
+          </select>
+          <input
+            v-model="actorFilter"
+            class="cp-audit__input"
+            type="text"
+            :placeholder="t('audit_filter_actor_placeholder')"
+            :aria-label="t('audit_filter_actor')"
+            @keydown.enter="applyFilters"
+          />
+          <button class="cp-audit__apply" type="button" @click="applyFilters">{{ t("audit_filter_apply") }}</button>
+        </div>
+      </template>
       <template #default>
         <div v-if="items.length === 0" class="cp-audit__empty">{{ t("audit_logs_empty") }}</div>
         <article v-for="item in items" :key="item.auditId" class="cp-auditCard">
@@ -114,5 +137,36 @@ const {
   font-size: 12px;
   cursor: pointer;
   align-self: center;
+}
+
+.cp-audit__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cp-audit__select,
+.cp-audit__input {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel);
+  color: var(--cp-text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.cp-audit__input {
+  min-width: 140px;
+}
+
+.cp-audit__apply {
+  border: 1px solid var(--cp-accent);
+  background: var(--cp-accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
 }
 </style>

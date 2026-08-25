@@ -13,6 +13,7 @@ export type { ChannelDiscoverItem, ChannelDiscoverPage, ChannelDiscoverQuery };
  */
 export type ChannelDiscoverySnapshot = {
   query: string;
+  type: string;
   items: readonly ChannelDiscoverItem[];
   nextCursor?: string;
   hasMore: boolean;
@@ -26,6 +27,7 @@ export type ChannelDiscoverySnapshot = {
  */
 export type ChannelDiscoveryCapabilities = ReadableCapability<ChannelDiscoverySnapshot> & {
   search(query?: string): Promise<void>;
+  setType(type?: string): Promise<void>;
   loadMore(): Promise<void>;
   markJoinRequested(channelId: string): void;
 };

@@ -7,7 +7,8 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getAuditLogCapabilities } from "@/features/chat/audit-logs/api";
-import type { AuditLogItem, ChatAuditLogCapabilities } from "@/features/chat/audit-logs/api-types";
+import { AuditActions, type AuditLogItem, type ChatAuditLogCapabilities } from "@/features/chat/audit-logs/api-types";
+import { isSnowflakeId } from "@/shared/utils/snowflakeId";
 import { useGovernanceChannelPageRoute } from "@/features/chat/room-governance/presentation/page-support/useGovernanceChannelPageRoute";
 import { useGovernancePageState } from "@/features/chat/room-governance/presentation/page-support/useGovernancePageState";
 
@@ -34,6 +35,8 @@ export function useChannelAuditLogsPage(deps: ChannelAuditLogsPageDeps = createD
   const nextCursor = ref<string | undefined>(undefined);
   const hasMore = ref(false);
   const loadingMore = ref(false);
+  const actionFilter = ref("");
+  const actorFilter = ref("");
   const { isLoading, pageError, runPageLoad } = useGovernancePageState({
     channelId,
     onMissingChannel: () => {
@@ -73,14 +76,29 @@ export function useChannelAuditLogsPage(deps: ChannelAuditLogsPageDeps = createD
   }
 
   async function loadFirstPage(): Promise<void> {
+    const actorUserId = actorFilter.value.trim();
+    if (actorUserId && !isSnowflakeId(actorUserId)) {
+      pageError.value = t("audit_filter_actor_invalid");
+      return;
+    }
+    const action = actionFilter.value.trim();
     await runPageLoad(
-      (cid) => deps.auditLogs.listAuditLogs({ channelId: cid, limit: PAGE_LIMIT }),
+      (cid) => deps.auditLogs.listAuditLogs({
+        channelId: cid,
+        limit: PAGE_LIMIT,
+        ...(actorUserId ? { actorUserId } : {}),
+        ...(action ? { action } : {}),
+      }),
       (page) => {
         items.value = page.items;
         nextCursor.value = page.nextCursor;
         hasMore.value = Boolean(page.hasMore);
       },
     );
+  }
+
+  async function applyFilters(): Promise<void> {
+    await loadFirstPage();
   }
 
   async function loadMore(): Promise<void> {
@@ -92,6 +110,8 @@ export function useChannelAuditLogsPage(deps: ChannelAuditLogsPageDeps = createD
         channelId: cid,
         cursor: nextCursor.value,
         limit: PAGE_LIMIT,
+        ...(actorFilter.value.trim() ? { actorUserId: actorFilter.value.trim() } : {}),
+        ...(actionFilter.value.trim() ? { action: actionFilter.value.trim() } : {}),
       });
       items.value = [...items.value, ...page.items];
       nextCursor.value = page.nextCursor;
@@ -119,10 +139,14 @@ export function useChannelAuditLogsPage(deps: ChannelAuditLogsPageDeps = createD
     itemCount,
     hasMore,
     loadingMore,
+    actionFilter,
+    actorFilter,
+    actionOptions: AuditActions,
     actionLabel,
     formatTime,
     formatDetails,
     loadMore,
+    applyFilters,
     goBack,
   };
 }

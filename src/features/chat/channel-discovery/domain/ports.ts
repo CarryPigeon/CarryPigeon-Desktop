@@ -23,6 +23,8 @@ export type ChannelDiscoveryApiPort = {
 export type ChannelDiscoveryStatePort = {
   readQuery(): string;
   writeQuery(query: string): void;
+  readType(): string;
+  writeType(type: string): void;
   replacePage(page: ChannelDiscoverPage): void;
   appendPage(page: ChannelDiscoverPage): void;
   setLoading(loading: boolean): void;

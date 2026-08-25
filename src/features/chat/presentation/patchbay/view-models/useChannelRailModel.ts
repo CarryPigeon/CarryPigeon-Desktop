@@ -39,8 +39,10 @@ type ChannelRailRawModel = {
   discoverLoading: ComputedRef<boolean>;
   discoverError: ComputedRef<string>;
   discoverHasMore: ComputedRef<boolean>;
+  discoverType: ComputedRef<string>;
   setChannelSearch(value: string): void;
   setChannelTab(value: "joined" | "discover"): void;
+  setDiscoverType(value: string): Promise<void>;
   loadMoreDiscover(): Promise<void>;
   openPlugins(): void;
   openRequiredSetup(): void;
@@ -192,11 +194,15 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     discoverLoading: computed(() => discoverySnapshot.value.loading),
     discoverError: computed(() => discoverySnapshot.value.error),
     discoverHasMore: computed(() => discoverySnapshot.value.hasMore),
+    discoverType: computed(() => discoverySnapshot.value.type),
     setChannelSearch(value: string): void {
       deps.directory.setSearchQuery(value);
     },
     setChannelTab(value: "joined" | "discover"): void {
       deps.directory.setActiveTab(value);
+    },
+    async setDiscoverType(value: string): Promise<void> {
+      await discovery.setType(value);
     },
     async loadMoreDiscover(): Promise<void> {
       await discovery.loadMore();

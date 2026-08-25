@@ -10,6 +10,12 @@ import type { ChannelDiscoveryApiPort, ChannelDiscoveryScopePort, ChannelDiscove
 
 const logger = createLogger("channel-discovery");
 const DEFAULT_LIMIT = 20;
+const ALLOWED_TYPES = new Set(["public", "private", "system"]);
+
+function normalizeType(type?: string): string {
+  const next = String(type ?? "").trim().toLowerCase();
+  return ALLOWED_TYPES.has(next) ? next : "";
+}
 
 /**
  * 频道发现 application service 依赖。
@@ -34,7 +40,15 @@ export class ChannelDiscoveryApplicationService {
   async search(query?: string): Promise<void> {
     const nextQuery = query === undefined ? this.deps.state.readQuery() : String(query ?? "").trim();
     this.deps.state.writeQuery(nextQuery);
-    await this.loadPage({ query: nextQuery, limit: DEFAULT_LIMIT }, { append: false });
+    await this.loadPage(this.buildQuery(), { append: false });
+  }
+
+  /**
+   * 按频道类型筛选并重新拉取首页。
+   */
+  async setType(type?: string): Promise<void> {
+    this.deps.state.writeType(normalizeType(type));
+    await this.loadPage(this.buildQuery(), { append: false });
   }
 
   /**
@@ -44,10 +58,16 @@ export class ChannelDiscoveryApplicationService {
     if (this.deps.state.readLoading() || !this.deps.state.readHasMore()) return;
     const cursor = this.deps.state.readNextCursor();
     if (!cursor) return;
-    await this.loadPage(
-      { query: this.deps.state.readQuery(), cursor, limit: DEFAULT_LIMIT },
-      { append: true },
-    );
+    await this.loadPage({ ...this.buildQuery(), cursor }, { append: true });
+  }
+
+  private buildQuery(): ChannelDiscoverQuery {
+    const type = normalizeType(this.deps.state.readType());
+    return {
+      query: this.deps.state.readQuery(),
+      limit: DEFAULT_LIMIT,
+      ...(type ? { type } : {}),
+    };
   }
 
   /**

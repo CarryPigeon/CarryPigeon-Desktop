@@ -27,8 +27,12 @@ async function getSocketAndValidToken(): Promise<[string | null, string | null]>
  */
 export function createMentionInboxCapabilitySource(): MentionInboxCapabilities {
   const items = ref<MentionInboxItem[]>([]);
+  const nextCursor = ref<string | undefined>(undefined);
+  const hasMore = ref(false);
   const unreadCount = ref(0);
   const unreadHasMore = ref(false);
+  const unreadOnly = ref(false);
+  const channelId = ref("");
   const loading = ref(false);
   const error = ref("");
 
@@ -36,18 +40,31 @@ export function createMentionInboxCapabilitySource(): MentionInboxCapabilities {
     api: createMentionInboxApi(),
     scope: { getSocketAndValidToken },
     state: {
-      replaceItems: (next, _nextCursor, _hasMore) => {
+      replaceItems: (next, cursor, more) => {
         items.value = [...next];
+        nextCursor.value = cursor;
+        hasMore.value = Boolean(more);
       },
-      setUnreadCount: (count, hasMore) => {
+      appendItems: (next, cursor, more) => {
+        items.value = [...items.value, ...next];
+        nextCursor.value = cursor;
+        hasMore.value = Boolean(more);
+      },
+      setUnreadCount: (count, more) => {
         unreadCount.value = Math.max(0, Math.trunc(count));
-        unreadHasMore.value = hasMore;
+        unreadHasMore.value = more;
       },
       setLoading: (value) => {
         loading.value = value;
       },
       setError: (value) => {
         error.value = value;
+      },
+      setUnreadOnly: (value) => {
+        unreadOnly.value = value;
+      },
+      setChannelId: (value) => {
+        channelId.value = value;
       },
       markLocalRead: (mentionId) => {
         items.value = items.value.map((row) => (row.mentionId === mentionId ? { ...row, read: true } : row));
@@ -59,10 +76,15 @@ export function createMentionInboxCapabilitySource(): MentionInboxCapabilities {
         unreadHasMore.value = false;
       },
       findItem: (mentionId) => items.value.find((row) => row.mentionId === mentionId) ?? null,
+      readNextCursor: () => nextCursor.value,
+      readHasMore: () => hasMore.value,
+      readLoading: () => loading.value,
+      readUnreadOnly: () => unreadOnly.value,
+      readChannelId: () => channelId.value,
     },
     navigation: {
-      async selectChannel(channelId: string) {
-        await getRoomSessionCapabilities().currentChannel.selectChannel(channelId);
+      async selectChannel(id: string) {
+        await getRoomSessionCapabilities().currentChannel.selectChannel(id);
       },
     },
   });
@@ -72,6 +94,9 @@ export function createMentionInboxCapabilitySource(): MentionInboxCapabilities {
       items: clonePlainData(items.value),
       unreadCount: unreadCount.value,
       unreadHasMore: unreadHasMore.value,
+      unreadOnly: unreadOnly.value,
+      channelId: channelId.value,
+      hasMore: hasMore.value,
       loading: loading.value,
       error: error.value,
     };
@@ -81,6 +106,9 @@ export function createMentionInboxCapabilitySource(): MentionInboxCapabilities {
     getSnapshot,
     observeSnapshot: createWatchedSnapshotObserver(getSnapshot),
     refresh: () => service.refresh(),
+    loadMore: () => service.loadMore(),
+    setUnreadOnly: (value) => service.setUnreadOnly(value),
+    setChannelId: (id) => service.setChannelId(id),
     markRead: (mentionId) => service.markRead(mentionId),
     markAllRead: () => service.markAllRead(),
     openMention: (mentionId) => service.openMention(mentionId),

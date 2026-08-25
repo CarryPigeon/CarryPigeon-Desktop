@@ -229,6 +229,18 @@ onMounted(() => {
         clearable
         @update:model-value="props.model.setChannelSearch"
       />
+      <select
+        v-if="props.model.channelTab === 'discover'"
+        class="cp-channelSearch__type"
+        :value="props.model.discoverType"
+        :aria-label="t('channel_discover_type')"
+        @change="props.model.setDiscoverType(($event.target as HTMLSelectElement).value)"
+      >
+        <option value="">{{ t("channel_discover_type_all") }}</option>
+        <option value="public">{{ t("channel_discover_type_public") }}</option>
+        <option value="private">{{ t("channel_discover_type_private") }}</option>
+        <option value="system">{{ t("channel_discover_type_system") }}</option>
+      </select>
     </div>
 
     <!-- 区块：频道列表（joined/discover） -->
@@ -462,6 +474,17 @@ onMounted(() => {
   cursor: pointer;
   align-self: center;
   margin: 4px 0 8px;
+}
+
+.cp-channelSearch__type {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel);
+  color: var(--cp-text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
 }
 </style>
 

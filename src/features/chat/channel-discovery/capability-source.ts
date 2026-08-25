@@ -32,6 +32,7 @@ async function getSocketAndValidToken(): Promise<[string | null, string | null]>
  */
 export function createChannelDiscoveryCapabilitySource(): ChannelDiscoveryCapabilities {
   const query = ref("");
+  const type = ref("");
   const items = ref<ChannelDiscoverItem[]>([]);
   const nextCursor = ref<string | undefined>(undefined);
   const hasMore = ref(false);
@@ -46,6 +47,10 @@ export function createChannelDiscoveryCapabilitySource(): ChannelDiscoveryCapabi
       readQuery: () => query.value,
       writeQuery: (value) => {
         query.value = value;
+      },
+      readType: () => type.value,
+      writeType: (value) => {
+        type.value = value;
       },
       replacePage: (page: ChannelDiscoverPage) => {
         items.value = [...page.items];
@@ -77,6 +82,7 @@ export function createChannelDiscoveryCapabilitySource(): ChannelDiscoveryCapabi
   function getSnapshot(): ChannelDiscoverySnapshot {
     return {
       query: query.value,
+      type: type.value,
       items: clonePlainData(items.value),
       nextCursor: nextCursor.value,
       hasMore: hasMore.value,
@@ -92,6 +98,7 @@ export function createChannelDiscoveryCapabilitySource(): ChannelDiscoveryCapabi
     getSnapshot,
     observeSnapshot,
     search: (nextQuery) => service.search(nextQuery),
+    setType: (nextType) => service.setType(nextType),
     loadMore: () => service.loadMore(),
     markJoinRequested: (channelId) => service.markJoinRequested(channelId),
   };

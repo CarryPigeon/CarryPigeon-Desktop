@@ -7,6 +7,7 @@ import { ChannelDiscoveryApplicationService } from "./channelDiscoveryService";
 
 function createHarness() {
   let query = "";
+  let type = "";
   let items: ChannelDiscoverPage["items"] = [];
   let nextCursor: string | undefined;
   let hasMore = false;
@@ -29,6 +30,10 @@ function createHarness() {
       readQuery: () => query,
       writeQuery: (value) => {
         query = value;
+      },
+      readType: () => type,
+      writeType: (value) => {
+        type = value;
       },
       replacePage: (page) => {
         items = [...page.items];
@@ -54,7 +59,7 @@ function createHarness() {
       readLoading: () => loading,
     },
   });
-  return { service, api, snapshot: () => ({ query, items, nextCursor, hasMore, loading, error, joinRequestedIds }) };
+  return { service, api, snapshot: () => ({ query, type, items, nextCursor, hasMore, loading, error, joinRequestedIds }) };
 }
 
 describe("ChannelDiscoveryApplicationService", () => {
@@ -76,6 +81,13 @@ describe("ChannelDiscoveryApplicationService", () => {
     });
     await service.loadMore();
     expect(api.discoverChannels).toHaveBeenLastCalledWith("sock", "token", { query: "", cursor: "c2", limit: 20 });
+  });
+
+  it("setType_sendsPublicFilterAndReloads", async () => {
+    const { service, api, snapshot } = createHarness();
+    await service.setType("public");
+    expect(api.discoverChannels).toHaveBeenCalledWith("sock", "token", { query: "", limit: 20, type: "public" });
+    expect(snapshot().type).toBe("public");
   });
 
   it("markJoinRequested_recordsLocalId", async () => {
