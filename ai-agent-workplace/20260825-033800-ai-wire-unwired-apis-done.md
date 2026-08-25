@@ -2,6 +2,8 @@
 
 任务名称：wire-unwired-apis
 
+状态：done
+
 任务目标：
 把服务端已暴露、客户端 adapter 已写、但产品路径点不到的 5 条 HTTP 接到真实 UI：
 
@@ -51,3 +53,38 @@
 
 完成定义：
 产品路径可点到这 5 条 HTTP；任务单改为 `done`；已提交并开 PR。
+
+## 实际结果
+
+PR：https://github.com/ShirasawaTopaz/CarryPigeon-Desktop/pull/2
+分支：`cursor/wire-discover-mentions-audit-5d41`
+实现提交：`8037242` `feat(chat): wire discover, mentions inbox, and audit logs`
+
+### 产品入口
+
+1. Discover：频道栏「未加入频道」Tab；搜索框 placeholder「搜索公开频道」；debounce 后 `q=`；行内「申请加入」走现有 `applyJoin`。
+2. Mentions：聊天顶栏铃铛打开「提及」面板；`mention.created` 刷新收件箱；点击项只 `selectChannel`，不请求 `around_mid`。
+3. Audit logs：频道设置菜单「审计日志」→ `/channel-audit-logs?id=&name=`，按 `cid` 拉日志。
+
+### 验证记录
+
+自动化：
+- `pnpm run typecheck` 通过
+- 相关 vitest（discover / mentions / audit mapper+service+HTTP、event router、i18n localeKeys）通过
+- `scripts/check-feature-boundaries.sh` 通过
+
+真服浏览器（账号 `ui_alice_0825`，服务器 `http://127.0.0.1:8080`）：
+
+- `GET /api/channels/discover?limit=20`
+- `GET /api/channels/discover?q=room2&limit=20`
+- `GET /api/mentions?limit=50` 与 `unread_only=true`
+- `GET /api/audit_logs?limit=50&cid=1`
+
+UI：发现列表含未加入公开房间 +「申请加入」；搜索 `room2` 过滤正确；提及面板空态「暂无提及」；审计页空态「审计日志 (0) / 暂无审计日志」。
+
+### 未覆盖 / 残留风险
+
+- 未在 UI 上点「申请加入」做端到端成员变更（仍走原 governance）。
+- 当前账号提及收件箱为空，未用真实 mention 点单项/全部已读；PUT 路径由 usecase 单测覆盖。
+- `pnpm run lint` 全量（含 rust）未跑。
+- 服务端仓未改。
