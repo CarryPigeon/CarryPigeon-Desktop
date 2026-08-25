@@ -24,6 +24,21 @@ import {
   getRoomSessionCapabilities,
 } from "@/features/chat/room-session/api";
 import type { RoomSessionCapabilities } from "@/features/chat/room-session/api-types";
+import {
+  createAuditLogCapabilities,
+  getAuditLogCapabilities,
+} from "@/features/chat/audit-logs/api";
+import type { ChatAuditLogCapabilities } from "@/features/chat/audit-logs/api-types";
+import {
+  createChannelDiscoveryCapabilities,
+  getChannelDiscoveryCapabilities,
+} from "@/features/chat/channel-discovery/api";
+import type { ChannelDiscoveryCapabilities } from "@/features/chat/channel-discovery/api-types";
+import {
+  createMentionInboxCapabilities,
+  getMentionInboxCapabilities,
+} from "@/features/chat/mention-inbox/api";
+import type { MentionInboxCapabilities } from "@/features/chat/mention-inbox/api-types";
 
 // 只要任一 API 缺失必需字段/函数，typecheck 会在这里失败。
 /**
@@ -89,3 +104,27 @@ export const messageFlowComposerReadableContractCheck: ReadableCapability<
 export const governanceMembersReadableContractCheck: ReadableCapability<
   ReturnType<RoomGovernanceCapabilities["currentChannel"]["members"]["getSnapshot"]>
 > = roomGovernanceCapabilitiesContractCheck.currentChannel.members;
+
+/**
+ * 频道发现 capability 契约检查。
+ */
+export const channelDiscoveryCapabilitiesContractCheck: ChannelDiscoveryCapabilities = createChannelDiscoveryCapabilities();
+export const channelDiscoveryCapabilitiesAccessorCheck: ChannelDiscoveryCapabilities = getChannelDiscoveryCapabilities();
+export const channelDiscoveryReadableContractCheck: ReadableCapability<
+  ReturnType<ChannelDiscoveryCapabilities["getSnapshot"]>
+> = channelDiscoveryCapabilitiesContractCheck;
+
+/**
+ * 提及收件箱 capability 契约检查。
+ */
+export const mentionInboxCapabilitiesContractCheck: MentionInboxCapabilities = createMentionInboxCapabilities();
+export const mentionInboxCapabilitiesAccessorCheck: MentionInboxCapabilities = getMentionInboxCapabilities();
+export const mentionInboxReadableContractCheck: ReadableCapability<
+  ReturnType<MentionInboxCapabilities["getSnapshot"]>
+> = mentionInboxCapabilitiesContractCheck;
+
+/**
+ * 审计日志 capability 契约检查。
+ */
+export const auditLogCapabilitiesContractCheck: ChatAuditLogCapabilities = createAuditLogCapabilities();
+export const auditLogCapabilitiesAccessorCheck: ChatAuditLogCapabilities = getAuditLogCapabilities();

@@ -44,6 +44,10 @@ const emit = defineEmits<{
    */
   (e: "bans"): void;
   /**
+   * 打开审计日志页。
+   */
+  (e: "audit-logs"): void;
+  /**
    * 触发删除频道。
    */
   (e: "delete"): void;
@@ -111,6 +115,9 @@ onBeforeUnmount(handleBeforeUnmount);
       </button>
       <button class="cp-channelMenu__item" type="button" role="menuitem" @click="runAndClose(() => emit('bans'))">
         {{ t("channel_bans") }}
+      </button>
+      <button class="cp-channelMenu__item" type="button" role="menuitem" @click="runAndClose(() => emit('audit-logs'))">
+        {{ t("audit_logs") }}
       </button>
       <template v-if="props.showDelete !== false">
         <div class="cp-channelMenu__sep"></div>

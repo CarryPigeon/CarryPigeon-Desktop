@@ -4,7 +4,7 @@
  * 收敛 ChannelRail 所需的频道筛选、列表与交互动作，避免布局组件直接依赖 session/governance store。
  */
 
-import { computed, proxyRefs, type ComputedRef, type Ref, type ShallowUnwrapRef, type WritableComputedRef } from "vue";
+import { computed, onScopeDispose, proxyRefs, watch, type ComputedRef, type Ref, type ShallowUnwrapRef, type WritableComputedRef } from "vue";
 import type { ApplyJoinChannelOutcome } from "@/features/chat/room-governance/api-types";
 import type {
   ChannelSelectionOutcome,
@@ -18,6 +18,10 @@ import { createAsyncTaskRunner } from "@/features/chat/presentation/patchbay/int
 import type { AsyncErrorHandler } from "@/features/chat/presentation/patchbay/interactions/asyncTaskRunner";
 import { currentServerSocket } from "@/features/server-connection/api";
 import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
+import { getChannelDiscoveryCapabilities } from "@/features/chat/channel-discovery/api";
+import type { ChannelDiscoveryCapabilities } from "@/features/chat/channel-discovery/api-types";
+import { mapDiscoverItemsToChannelSummaries } from "@/features/chat/channel-discovery/domain/mappers";
+import { debounce } from "@/shared/utils/rateLimit";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 
@@ -32,8 +36,12 @@ type ChannelRailRawModel = {
   channelTab: WritableComputedRef<"joined" | "discover">;
   channels: ComputedRef<RoomSessionDirectorySnapshot["visibleChannels"]>;
   currentChannelId: ComputedRef<CurrentChannelSessionSnapshot["currentChannelId"]>;
+  discoverLoading: ComputedRef<boolean>;
+  discoverError: ComputedRef<string>;
+  discoverHasMore: ComputedRef<boolean>;
   setChannelSearch(value: string): void;
   setChannelTab(value: "joined" | "discover"): void;
+  loadMoreDiscover(): Promise<void>;
   openPlugins(): void;
   openRequiredSetup(): void;
   openCreateMenu(e: MouseEvent): void;
@@ -78,6 +86,8 @@ export type UseChannelRailModelDeps = {
   toggleChannelMute(channelId: string): Promise<void>;
   /** 打开频道右键菜单 */
   openChannelContextMenu(e: MouseEvent, channelId: string): void;
+  /** 频道发现 capability；缺省时使用子域单例。 */
+  discovery?: ChannelDiscoveryCapabilities;
 };
 
 /**
@@ -86,8 +96,37 @@ export type UseChannelRailModelDeps = {
 export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailModel {
   const directorySnapshot = useObservedCapabilitySnapshot(deps.directory);
   const currentSessionSnapshot = useObservedCapabilitySnapshot(deps.currentSession);
+  const discovery = deps.discovery ?? getChannelDiscoveryCapabilities();
+  const discoverySnapshot = useObservedCapabilitySnapshot(discovery);
   const runAsyncTask = createAsyncTaskRunner(deps.onAsyncError);
   const draftStorage = createLocalStorageDraftStorage(() => currentServerSocket.value ?? "");
+
+  const searchDiscover = debounce((query: string) => {
+    void discovery.search(query);
+  }, 300);
+
+  onScopeDispose(() => {
+    searchDiscover.cancel();
+  });
+
+  watch(
+    () => [directorySnapshot.value.activeTab, directorySnapshot.value.searchQuery] as const,
+    ([tab, query], previous) => {
+      if (tab !== "discover") {
+        searchDiscover.cancel();
+        return;
+      }
+      const previousTab = previous?.[0];
+      const previousQuery = previous?.[1];
+      if (tab !== previousTab) {
+        searchDiscover.cancel();
+        void discovery.search(query);
+        return;
+      }
+      if (query !== previousQuery) searchDiscover(query);
+    },
+    { immediate: true },
+  );
 
   /**
    * 从左侧频道栏点击切换频道。
@@ -113,6 +152,18 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     return promise;
   }
 
+  function applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome> {
+    const promise = deps.applyJoin(channelId);
+    runAsyncTask(
+      promise.then((outcome) => {
+        if (outcome.ok) discovery.markJoinRequested(channelId);
+        return outcome;
+      }),
+      "chat_apply_join_from_rail_failed",
+    );
+    return promise;
+  }
+
   const rawModel: ChannelRailRawModel = {
     socket: computed(() => deps.socket.value),
     serverId: computed(() => deps.serverId.value),
@@ -126,13 +177,29 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
       get: () => directorySnapshot.value.activeTab,
       set: deps.directory.setActiveTab,
     }),
-    channels: computed(() => directorySnapshot.value.visibleChannels),
+    channels: computed(() => {
+      if (directorySnapshot.value.activeTab !== "discover") {
+        return directorySnapshot.value.visibleChannels;
+      }
+      const joinedIds = new Set(directorySnapshot.value.allChannels.map((channel) => channel.id));
+      return mapDiscoverItemsToChannelSummaries(
+        discoverySnapshot.value.items,
+        joinedIds,
+        new Set(discoverySnapshot.value.joinRequestedIds),
+      );
+    }),
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
+    discoverLoading: computed(() => discoverySnapshot.value.loading),
+    discoverError: computed(() => discoverySnapshot.value.error),
+    discoverHasMore: computed(() => discoverySnapshot.value.hasMore),
     setChannelSearch(value: string): void {
       deps.directory.setSearchQuery(value);
     },
     setChannelTab(value: "joined" | "discover"): void {
       deps.directory.setActiveTab(value);
+    },
+    async loadMoreDiscover(): Promise<void> {
+      await discovery.loadMore();
     },
     openPlugins: deps.openPlugins,
     openRequiredSetup: deps.openRequiredSetup,
@@ -143,7 +210,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     openFileManager: deps.openFileManager,
     openSettings: deps.openSettings,
     selectChannel,
-    applyJoin: deps.applyJoin,
+    applyJoin,
     hasDraft(channelId: string): boolean {
       if (!channelId) return false;
       return draftStorage.readDraft(channelId) !== null;

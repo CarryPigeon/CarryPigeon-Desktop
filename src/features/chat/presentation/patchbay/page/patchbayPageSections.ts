@@ -69,6 +69,7 @@ type PatchbayChannelSettingsMenuRawModel = {
   openMembers(channelId: string): void;
   openJoinApplications(channelId: string): void;
   openChannelBans(channelId: string): void;
+  openAuditLogs(channelId: string): void;
   openDeleteChannelDialog(): void;
 };
 /**
@@ -202,6 +203,7 @@ type CreatePatchbayChannelSettingsMenuSectionDeps = {
   openMembers(channelId: string): void;
   openJoinApplications(channelId: string): void;
   openChannelBans(channelId: string): void;
+  openAuditLogs(channelId: string): void;
   openDeleteChannelDialog(): void;
 };
 
@@ -219,6 +221,7 @@ export function createPatchbayChannelSettingsMenuSection(
     openMembers: deps.openMembers,
     openJoinApplications: deps.openJoinApplications,
     openChannelBans: deps.openChannelBans,
+    openAuditLogs: deps.openAuditLogs,
     openDeleteChannelDialog: deps.openDeleteChannelDialog,
   });
 }

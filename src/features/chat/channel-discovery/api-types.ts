@@ -1,27 +1,31 @@
 /**
- * @fileoverview channel-discovery api types
- * @description 频道发现｜wire types。
+ * @fileoverview channel-discovery 公共类型入口。
+ * @description 只导出领域语义与 capability 契约，不导出 wire。
  */
 
-export type ChannelDiscoverItemWire = {
-  cid: string;
-  name: string;
-  brief?: string;
-  avatar?: string;
-  member_count: number;
-  requires_application: boolean;
-  type?: string;
+import type { ReadableCapability } from "@/shared/types/capabilities";
+import type { ChannelDiscoverItem, ChannelDiscoverPage, ChannelDiscoverQuery } from "./domain/contracts";
+
+export type { ChannelDiscoverItem, ChannelDiscoverPage, ChannelDiscoverQuery };
+
+/**
+ * 频道发现快照。
+ */
+export type ChannelDiscoverySnapshot = {
+  query: string;
+  items: readonly ChannelDiscoverItem[];
+  nextCursor?: string;
+  hasMore: boolean;
+  loading: boolean;
+  error: string;
+  joinRequestedIds: readonly string[];
 };
 
-export type ChannelDiscoverPageWire = {
-  items: ChannelDiscoverItemWire[];
-  next_cursor?: string;
-  has_more?: boolean;
-};
-
-export type ChannelDiscoverQueryWire = {
-  q?: string;
-  cursor?: string;
-  limit?: number;
-  type?: string;
+/**
+ * 频道发现 capability。
+ */
+export type ChannelDiscoveryCapabilities = ReadableCapability<ChannelDiscoverySnapshot> & {
+  search(query?: string): Promise<void>;
+  loadMore(): Promise<void>;
+  markJoinRequested(channelId: string): void;
 };

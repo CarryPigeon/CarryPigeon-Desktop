@@ -203,17 +203,44 @@ onMounted(() => {
     <div class="cp-channelSearch">
       <!-- 区块：Tabs（joined/discover） -->
       <div class="cp-channelTabs">
-        <!-- 服务端频道列表即成员频道；discover 需走 /channels/discover，暂不在此本地过滤 -->
+        <button
+          class="cp-channelTabs__btn"
+          type="button"
+          :data-active="props.model.channelTab === 'joined'"
+          @click="props.model.setChannelTab('joined')"
+        >
+          {{ t("channels_joined") }}
+        </button>
+        <button
+          class="cp-channelTabs__btn"
+          type="button"
+          :data-active="props.model.channelTab === 'discover'"
+          @click="props.model.setChannelTab('discover')"
+        >
+          {{ t("channels_discover") }}
+        </button>
         <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateMenu($event)" :title="t('create_chat')">+</button>
       </div>
       <!-- 区块：搜索输入框 -->
-      <t-input :model-value="props.model.channelSearch" :placeholder="t('channel_search_placeholder')" :aria-label="t('channel_search_placeholder')" clearable @update:model-value="props.model.setChannelSearch" />
+      <t-input
+        :model-value="props.model.channelSearch"
+        :placeholder="props.model.channelTab === 'discover' ? t('channel_discover_search_placeholder') : t('channel_search_placeholder')"
+        :aria-label="props.model.channelTab === 'discover' ? t('channel_discover_search_placeholder') : t('channel_search_placeholder')"
+        clearable
+        @update:model-value="props.model.setChannelSearch"
+      />
     </div>
 
     <!-- 区块：频道列表（joined/discover） -->
     <div class="cp-channelList" role="listbox" aria-label="channels">
       <!-- 区块：空状态 -->
-      <div v-if="props.model.channels.length === 0" class="cp-channelEmpty">
+      <div v-if="props.model.channelTab === 'discover' && props.model.discoverLoading && props.model.channels.length === 0" class="cp-channelEmpty">
+        {{ t("loading") }}
+      </div>
+      <div v-else-if="props.model.channelTab === 'discover' && props.model.discoverError && props.model.channels.length === 0" class="cp-channelEmpty">
+        {{ props.model.discoverError }}
+      </div>
+      <div v-else-if="props.model.channels.length === 0" class="cp-channelEmpty">
         {{ props.model.channelTab === "joined" ? t("channels_joined_empty") : t("channels_discover_empty") }}
       </div>
 
@@ -258,6 +285,7 @@ onMounted(() => {
                     <span v-if="props.model.isChannelMuted(c.id)" class="cp-channel__muted-icon" title="muted">🔇</span>
                   </span>
                   <span class="cp-channelRow__brief">{{ c.brief }}</span>
+                  <span v-if="c.memberCount != null" class="cp-channelRow__count">{{ t("channel_member_count", { n: c.memberCount }) }}</span>
                 </span>
                 <span v-if="props.model.hasDraft(c.id)" class="cp-channel__draft-indicator" :title="t('draft')">&#x270E;</span>
               </button>
@@ -288,6 +316,15 @@ onMounted(() => {
           </template>
         </template>
       </template>
+      <button
+        v-if="props.model.channelTab === 'discover' && props.model.discoverHasMore"
+        class="cp-channelList__more"
+        type="button"
+        :disabled="props.model.discoverLoading"
+        @click="props.model.loadMoreDiscover()"
+      >
+        {{ props.model.discoverLoading ? t("loading") : t("load_more") }}
+      </button>
     </div>
   </aside>
 </template>
@@ -406,6 +443,25 @@ onMounted(() => {
 .cp-serverMenu__item:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--cp-info) 40%, var(--cp-border));
   outline-offset: 2px;
+}
+
+.cp-channelRow__count {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--cp-text-muted);
+}
+
+.cp-channelList__more {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  align-self: center;
+  margin: 4px 0 8px;
 }
 </style>
 

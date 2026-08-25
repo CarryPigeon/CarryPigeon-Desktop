@@ -333,6 +333,7 @@ onBeforeUnmount(() => {
         @members="page.channelSettingsMenu.openMembers(page.chatCenter.currentChannelId)"
         @applications="page.channelSettingsMenu.openJoinApplications(page.chatCenter.currentChannelId)"
         @bans="page.channelSettingsMenu.openChannelBans(page.chatCenter.currentChannelId)"
+        @audit-logs="page.channelSettingsMenu.openAuditLogs(page.chatCenter.currentChannelId)"
         @delete="page.channelSettingsMenu.openDeleteChannelDialog"
       />
 
