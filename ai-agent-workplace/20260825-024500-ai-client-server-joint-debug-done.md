@@ -134,7 +134,7 @@ adapter 对照服务端 DTO/状态码。未改协议。
 - 文件/语音消息、around 跳转依赖服务端修复
 - 邮箱登录成功路径依赖可用 SMTP
 - Vite 浏览器预览跟随 MinIO 时仍可能受 CORS 限制；Tauri 原生下载已按 302 处理
-- 未在完整 Tauri 窗口点选 UI（本环境无桌面壳）；协议与单元测试已覆盖适配点
+- GUI：后续已在 Vite+Chrome 上用 computer-use 点通连接/登录/建群/发文本/改名，见 `ui-click-flow-evidence.md`；未跑完整 Tauri 壳窗口
 
 ## 知识沉淀 / 是否回写 docs
 

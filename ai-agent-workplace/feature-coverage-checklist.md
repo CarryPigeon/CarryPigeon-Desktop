@@ -4,7 +4,7 @@
 
 环境：HTTP `127.0.0.1:8080`，WS `ws://127.0.0.1:18080/api/ws`；本地覆盖打开 storage+mail（mail 发信仍 503）。双账号 + private 频道。
 
-汇总：pass=129 fail=3 blocked=3 total=135。无空白行。
+汇总：协议 pass=129 fail=3 blocked=3 total=135；GUI 点击流 pass=5。无空白行。
 
 失败三项均为服务端既有契约/实现问题，客户端无法在不改协议的前提下打通：`Core:File`/`Core:Voice` 运行时未注册；`around_mid` SQL 把 `<![CDATA[ > ]]>` 发给 MySQL。
 
@@ -190,3 +190,13 @@
 | --- | --- | --- | --- |
 | `I-react` | POST reactions (expect 404) | **pass** | HTTP 404; not_found |
 | `I-react-del` | DELETE reactions (expect 404) | **pass** | HTTP 404; not_found |
+
+## J. GUI 点击流（computer-use，非 curl）
+
+| ID | 能力 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| `J-connect` | 连接 8080 确认 CarryPigeonBackend、无必装插件 | **pass** | UI；见 `ui-click-flow-evidence.md` |
+| `J-login-password` | 用户名密码登录进入 /chat | **pass** | UI；`ui_alice_0825` |
+| `J-create-channel` | 新建群聊 UI联调频道 | **pass** | UI |
+| `J-send-text` | 发送 Core:Text | **pass** | UI；气泡可见 |
+| `J-rename-channel` | 频道信息编辑保存（PATCH 204） | **pass** | UI；标题变为 UI联调频道-已改名 |

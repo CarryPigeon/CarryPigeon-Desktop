@@ -119,3 +119,7 @@ B 在线收 A 的事件：**pass**：`message.created` / `recalled` / `pinned` /
 4. 邮件投递链路（JavaMail ↔ SMTP）。
 
 本轮均未做。
+
+## UI 点击流（computer-use，2026-08-25）
+
+Vite `:1420` × 真服。账号 `ui_alice_0825`。步骤 A–F（连接、用户名密码登录、新建群聊、发文本、PATCH 改名）**全部 pass**。未发现新的客户端 adapter 缺陷。细节与录像抽帧见 `ui-click-flow-evidence.md`。
