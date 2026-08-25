@@ -173,7 +173,8 @@ loadCurrentUser();
           </div>
           <div class="cp-contacts__card-info">
             <div class="cp-contacts__card-name">{{ currentUser.username || t("unknown") }}</div>
-            <div class="cp-contacts__card-detail">{{ currentUser.email || currentUser.id }}</div>
+            <div class="cp-contacts__card-detail">{{ currentUser.id }}</div>
+            <div v-if="currentUser.email" class="cp-contacts__card-detail">{{ currentUser.email }}</div>
           </div>
         </div>
       </section>
@@ -224,11 +225,12 @@ loadCurrentUser();
           >
             <div class="cp-contacts__item-avatar">
               <div class="cp-contacts__avatar-placeholder cp-contacts__avatar-placeholder--sm">
-                {{ user.nickname[0] || "?" }}
+                {{ user.nickname?.[0] || "?" }}
               </div>
             </div>
             <div class="cp-contacts__item-info">
-              <div class="cp-contacts__item-name">{{ user.nickname }}</div>
+              <div class="cp-contacts__item-name">{{ user.nickname || user.uid }}</div>
+              <div class="cp-contacts__item-email">{{ user.uid }}</div>
               <div v-if="user.email" class="cp-contacts__item-email">{{ user.email }}</div>
             </div>
             <div class="cp-contacts__item-actions">

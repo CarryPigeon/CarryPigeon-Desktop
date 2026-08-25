@@ -235,6 +235,7 @@ onBeforeUnmount(() => {
         @open-server-manager="page.serverRail.openServerManager"
         @open-plugins="page.serverRail.goPlugins"
         @open-settings="page.serverRail.handleOpenSettings"
+        @open-contacts="page.serverRail.handleOpenContacts"
         @toggle-server-mute="page.serverRail.toggleServerMute"
         @mute-server-for-duration="(durationMs) => page.serverRail.muteServerForDuration(durationMs)"
         @unmute-server="page.serverRail.unmuteServer"
