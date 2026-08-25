@@ -27,4 +27,8 @@ export type ChannelSummary = {
    * 用途：频道列表端口点按是否系统频道区分颜色等展示差异。
    */
   channelType?: string;
+  /**
+   * 发现列表中的成员数；已加入目录通常不填。
+   */
+  memberCount?: number;
 };

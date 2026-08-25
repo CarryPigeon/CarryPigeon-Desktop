@@ -20,6 +20,7 @@ import { createChatGovernanceRuntime } from "@/features/chat/room-governance/pre
 import { createChatSessionRuntime } from "@/features/chat/room-session/presentation/runtime/sessionRuntime";
 import { createChatSessionSharedContext } from "@/features/chat/room-session/presentation/runtime/sessionSharedContext";
 import { dedupeAsyncByKey } from "@/shared/utils/asyncDedupe";
+import { getMentionInboxCapabilities } from "@/features/chat/mention-inbox/api";
 
 type LoggerLike = {
   debug(message: string, payload?: Record<string, unknown>): void;
@@ -192,6 +193,9 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
       dedupeAsyncByKey(`refreshChannelLatestPage:${channelId}`, () => messageFlow.refreshChannelLatestPage(channelId)),
     refreshMembersRail: (channelId: string) =>
       dedupeAsyncByKey(`refreshMembersRail:${channelId}`, () => governance.refreshMembersRail(channelId)),
+    refreshMentionInbox: () => {
+      void getMentionInboxCapabilities().refresh();
+    },
     emitChannelProjectionChanged,
     mapWireMessage: messageFlow.mapWireMessage,
     compareMessages: messageFlow.compareMessages,

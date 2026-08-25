@@ -69,6 +69,7 @@ type PatchbayChannelSettingsMenuRawModel = {
   openMembers(channelId: string): void;
   openJoinApplications(channelId: string): void;
   openChannelBans(channelId: string): void;
+  openAuditLogs(channelId: string): void;
   openDeleteChannelDialog(): void;
 };
 /**
@@ -77,21 +78,14 @@ type PatchbayChannelSettingsMenuRawModel = {
 export type PatchbayChannelSettingsMenuModel = ShallowUnwrapRef<PatchbayChannelSettingsMenuRawModel>;
 
 type PatchbayChannelDialogsRawModel = {
-  showCreateChatMenu: RefLike<boolean>;
-  createChatMenuX: RefLike<number>;
-  createChatMenuY: RefLike<number>;
   showCreateChannel: RefLike<boolean>;
-  showCreateFriendPrivateChat: RefLike<boolean>;
   showDeleteChannel: RefLike<boolean>;
   deleteChannelId: RefLike<string>;
   deleteChannelName: RefLike<string>;
   canDeleteCurrentChannel: RefLike<boolean>;
-  closeCreateChatMenu(): void;
   setShowCreateChannel(visible: boolean): void;
-  setShowCreateFriendPrivateChat(visible: boolean): void;
   setShowDeleteChannel(visible: boolean): void;
   openCreateChannelDialog(): void;
-  openCreateFriendPrivateChatDialog(): void;
   handleChannelCreated(channel: { id: string; name: string }): void;
   handleChannelDeleted(): void;
 };
@@ -202,6 +196,7 @@ type CreatePatchbayChannelSettingsMenuSectionDeps = {
   openMembers(channelId: string): void;
   openJoinApplications(channelId: string): void;
   openChannelBans(channelId: string): void;
+  openAuditLogs(channelId: string): void;
   openDeleteChannelDialog(): void;
 };
 
@@ -219,26 +214,20 @@ export function createPatchbayChannelSettingsMenuSection(
     openMembers: deps.openMembers,
     openJoinApplications: deps.openJoinApplications,
     openChannelBans: deps.openChannelBans,
+    openAuditLogs: deps.openAuditLogs,
     openDeleteChannelDialog: deps.openDeleteChannelDialog,
   });
 }
 
 type CreatePatchbayChannelDialogsSectionDeps = {
-  showCreateChatMenu: RefLike<boolean>;
-  createChatMenuX: RefLike<number>;
-  createChatMenuY: RefLike<number>;
   showCreateChannel: RefLike<boolean>;
-  showCreateFriendPrivateChat: RefLike<boolean>;
   showDeleteChannel: RefLike<boolean>;
   deleteChannelId: RefLike<string>;
   deleteChannelName: RefLike<string>;
   canDeleteCurrentChannel: RefLike<boolean>;
-  closeCreateChatMenu(): void;
   setShowCreateChannel(visible: boolean): void;
-  setShowCreateFriendPrivateChat(visible: boolean): void;
   setShowDeleteChannel(visible: boolean): void;
   openCreateChannelDialog(): void;
-  openCreateFriendPrivateChatDialog(): void;
   handleChannelCreated(channel: { id: string; name: string }): void;
   handleChannelDeleted(): void;
 };
@@ -248,21 +237,14 @@ type CreatePatchbayChannelDialogsSectionDeps = {
  */
 export function createPatchbayChannelDialogsSection(deps: CreatePatchbayChannelDialogsSectionDeps): PatchbayChannelDialogsModel {
   return proxyRefs({
-    showCreateChatMenu: deps.showCreateChatMenu,
-    createChatMenuX: deps.createChatMenuX,
-    createChatMenuY: deps.createChatMenuY,
     showCreateChannel: deps.showCreateChannel,
-    showCreateFriendPrivateChat: deps.showCreateFriendPrivateChat,
     showDeleteChannel: deps.showDeleteChannel,
     deleteChannelId: deps.deleteChannelId,
     deleteChannelName: deps.deleteChannelName,
     canDeleteCurrentChannel: deps.canDeleteCurrentChannel,
-    closeCreateChatMenu: deps.closeCreateChatMenu,
     setShowCreateChannel: deps.setShowCreateChannel,
-    setShowCreateFriendPrivateChat: deps.setShowCreateFriendPrivateChat,
     setShowDeleteChannel: deps.setShowDeleteChannel,
     openCreateChannelDialog: deps.openCreateChannelDialog,
-    openCreateFriendPrivateChatDialog: deps.openCreateFriendPrivateChatDialog,
     handleChannelCreated: deps.handleChannelCreated,
     handleChannelDeleted: deps.handleChannelDeleted,
   });

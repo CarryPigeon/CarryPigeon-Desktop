@@ -55,6 +55,7 @@ export type ChatWsEventRouterDeps = {
   refreshChannels: () => Promise<void>;
   refreshChannelLatestPage: (cid: string) => Promise<void>;
   refreshMembersRail: (cid: string) => Promise<void>;
+  refreshMentionInbox: () => void | Promise<void>;
   emitChannelProjectionChanged: (cid: string, projection?: ChatChannelProjection) => void;
   mapWireMessage: (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
   compareMessages: (a: ChatMessage, b: ChatMessage) => number;
@@ -124,6 +125,7 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
           });
         mentionRefreshInFlight.set(cid, pending);
       }
+      void Promise.resolve(deps.refreshMentionInbox()).catch(() => undefined);
       return;
     }
 
