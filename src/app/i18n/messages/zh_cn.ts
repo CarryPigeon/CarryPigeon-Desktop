@@ -783,7 +783,6 @@ export const zh_cn = {
   contacts_view_profile: "查看资料",
   contacts_profile: "资料",
   contacts_empty_hint: "输入用户 ID 查找公开资料",
-  contacts_go_chat: "回到聊天",
   select_channel: "选择一个频道开始聊天",
   // 空状态
   no_messages: "暂无消息",

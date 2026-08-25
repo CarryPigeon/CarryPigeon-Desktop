@@ -781,7 +781,6 @@ export const en_us = {
   contacts_view_profile: "View Profile",
   contacts_profile: "Profile",
   contacts_empty_hint: "Look up a public profile by user ID",
-  contacts_go_chat: "Back to Chat",
   select_channel: "Select a channel to start chatting",
   // Empty states
   no_messages: "No messages yet",

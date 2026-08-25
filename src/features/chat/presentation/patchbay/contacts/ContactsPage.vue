@@ -120,10 +120,6 @@ function handleViewProfile(uid: string): void {
   router.push({ path: "/user-info-popover", query: { uid } });
 }
 
-function handleBackToChat(): void {
-  router.push("/chat");
-}
-
 loadCurrentUser();
 </script>
 
@@ -222,13 +218,7 @@ loadCurrentUser();
         <EmptyState
           v-else
           :description="t('contacts_empty_hint')"
-        >
-          <template #action>
-            <button class="cp-contacts__action-btn" type="button" @click="handleBackToChat">
-              {{ t("contacts_go_chat") }}
-            </button>
-          </template>
-        </EmptyState>
+        />
       </section>
     </ErrorBoundary>
   </main>
