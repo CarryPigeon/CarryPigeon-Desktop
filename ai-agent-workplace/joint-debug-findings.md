@@ -103,6 +103,14 @@ B 在线收 A 的事件：**pass**：`message.created` / `recalled` / `pinned` /
 
 用脚本打通，记缺口：邀请/接受邀请/所有权转移无 HTTP（`HttpRouteContractTests`）。不作为客户端调用失败。
 
+上线前对照（2026-08-25）：服务端 **53 条 HTTP 都有 adapter**，但有 5 条没接到产品路径，等于用户测不到：
+
+- `GET /api/channels/discover`（`createHttpChannelDiscoveryApi` 无 import）
+- `GET /api/audit_logs`（`createHttpAuditLogApi` 无 import）
+- `GET /api/mentions`、`PUT /api/mentions/{id}/read`、`PUT /api/mentions/read_state`（port 有，NotificationBell 不调用）
+
+另：「创建好友私聊」弹窗无 `@created` 处理；联系人搜索误用 `GET /api/users?ids=`。详见 `server-api-client-gap.md`。
+
 ## 建议后续（需另开确认，且属服务端）
 
 1. 修复 `findByChannelIdAfter` SQL（去掉未包 `<script>` 的 CDATA）。

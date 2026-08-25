@@ -12,3 +12,5 @@
 - `contract-matrix.md`
 - `feature-coverage-checklist.md`
 - `joint-debug-findings.md`
+- `server-api-client-gap.md`（上线前：服务端 53 条 HTTP 与客户端 adapter/UI 接线缺口）
+- `20260825-032000-ai-server-api-client-gap-done.md`
