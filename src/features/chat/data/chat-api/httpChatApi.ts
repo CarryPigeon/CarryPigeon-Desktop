@@ -103,9 +103,12 @@ export async function httpSendChannelMessage(
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const path = `/channels/${encodeURIComponent(channelId)}/messages`;
-  const key = String(idempotencyKey ?? "").trim();
+  // 服务端 send 读取 body `client_message_id`，不读取 `Idempotency-Key`。
+  // 调用方若只传幂等头，这里同步写入 body，避免重复消息。
+  const key = String(idempotencyKey ?? req.client_message_id ?? "").trim();
+  const body: ChatSendMessageWire = key ? { ...req, client_message_id: key } : req;
   const headers = key ? { "Idempotency-Key": key } : undefined;
-  return client.requestJsonWithHeaders<ChatMessageWire>("POST", path, req, headers);
+  return client.requestJsonWithHeaders<ChatMessageWire>("POST", path, body, headers);
 }
 
 /**
@@ -151,7 +154,17 @@ export async function httpPatchChannel(
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  return client.requestJson<ChatChannelWire>("PATCH", `/channels/${encodeURIComponent(channelId)}`, patch);
+  // 服务端成功返回 204；JSON 客户端会把空响应解析成 undefined。
+  // 治理层需要频道对象，因此在无 body 时再 GET 一次详情。
+  const next = await client.requestJson<ChatChannelWire | undefined>(
+    "PATCH",
+    `/channels/${encodeURIComponent(channelId)}`,
+    patch,
+  );
+  if (next && typeof next === "object" && String(next.cid ?? "").trim()) {
+    return next;
+  }
+  return httpGetChannel(serverSocket, accessToken, channelId);
 }
 
 export async function httpApplyJoinChannel(

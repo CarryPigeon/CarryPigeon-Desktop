@@ -13,15 +13,11 @@ type RefLike<T> = Ref<T> | ComputedRef<T>;
 export type UsePatchbayHotkeysDeps = {
   menuOpen: RefLike<boolean>;
   showChannelMenu: RefLike<boolean>;
-  showCreateChatMenu: RefLike<boolean>;
   showCreateChannel: RefLike<boolean>;
-  showCreateFriendPrivateChat: RefLike<boolean>;
   showDeleteChannel: RefLike<boolean>;
   closeMenu(): void;
   closeChannelMenu(): void;
-  closeCreateChatMenu(): void;
   setShowCreateChannel(visible: boolean): void;
-  setShowCreateFriendPrivateChat(visible: boolean): void;
   setShowDeleteChannel(visible: boolean): void;
 };
 
@@ -32,9 +28,7 @@ export function usePatchbayHotkeys(deps: UsePatchbayHotkeysDeps) {
   function closeTransientOverlays(): void {
     if (deps.menuOpen.value) deps.closeMenu();
     if (deps.showChannelMenu.value) deps.closeChannelMenu();
-    if (deps.showCreateChatMenu.value) deps.closeCreateChatMenu();
     if (deps.showCreateChannel.value) deps.setShowCreateChannel(false);
-    if (deps.showCreateFriendPrivateChat.value) deps.setShowCreateFriendPrivateChat(false);
     if (deps.showDeleteChannel.value) deps.setShowDeleteChannel(false);
   }
 

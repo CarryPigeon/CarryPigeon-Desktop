@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview ContactsPage.vue
- * @description 联系人管理页面：搜索用户、查看资料、发起私聊。
+ * @description 联系人管理页面：按用户 ID 查找公开资料。
  */
 
 import { ref, onBeforeUnmount } from "vue";
@@ -10,10 +10,10 @@ import { useI18n } from "vue-i18n";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { readAuthToken } from "@/shared/utils/localState";
 import { getAccountCapabilities } from "@/features/account/api";
-import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
 import { ensureValidAccessToken } from "@/shared/net/auth/authSessionManager";
 import { createLogger } from "@/shared/utils/logger";
 import { debounceAsync } from "@/shared/utils/rateLimit";
+import { isSnowflakeId, parseSnowflakeIdList } from "@/shared/utils/snowflakeId";
 import type { UserPublic, CurrentUser } from "@/features/account/api-types";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import EmptyState from "@/shared/ui/EmptyState.vue";
@@ -27,6 +27,7 @@ const { t } = useI18n();
 const searchQuery = ref("");
 const searchResults = ref<UserPublic[]>([]);
 const searching = ref(false);
+const searchHint = ref("");
 const currentUser = ref<CurrentUser | null>(null);
 const loading = ref(true);
 
@@ -55,31 +56,46 @@ async function loadCurrentUser(): Promise<void> {
   }
 }
 
-// 搜索用户
+// 按雪花 UID 查找用户。服务端没有昵称搜索 HTTP。
 async function handleSearch(): Promise<void> {
   debouncedSearch.cancel();
-  const q = searchQuery.value.trim().toLowerCase();
-  if (!q) return;
+  const q = searchQuery.value.trim();
+  searchHint.value = "";
+  if (!q) {
+    searchResults.value = [];
+    return;
+  }
+
+  const ids = q.includes(",") ? parseSnowflakeIdList(q) : isSnowflakeId(q) ? [q] : [];
+  if (ids.length === 0) {
+    searchResults.value = [];
+    searchHint.value = t("contacts_search_need_uid");
+    return;
+  }
 
   const socket = getActiveChatServerSocket();
-  if (!socket) return;
-  const token = (await ensureValidAccessToken(socket)).trim();
-  if (!token) return;
+  if (!socket) {
+    searchHint.value = t("contacts_search_need_signin");
+    return;
+  }
+  const token = (await ensureValidAccessToken(socket)).trim() || readAuthToken(socket).trim();
+  if (!token) {
+    searchHint.value = t("contacts_search_need_signin");
+    return;
+  }
 
   searching.value = true;
   searchResults.value = [];
   try {
     const account = accountCapabilities.forServer(socket);
-    // 先尝试按 uid 搜索，然后按名称匹配
-    const users = await account.listUsers(token, [q]);
-    searchResults.value = users.filter(
-      (u) =>
-        (u.nickname?.toLowerCase().includes(q)) ||
-        (u.email?.toLowerCase().includes(q)) ||
-        u.uid.toLowerCase().includes(q),
-    );
+    const users = ids.length === 1
+      ? [await account.getUser(token, ids[0])]
+      : await account.listUsers(token, ids);
+    searchResults.value = users.filter((user) => Boolean(user?.uid));
+    if (searchResults.value.length === 0) searchHint.value = t("contacts_no_results");
   } catch (e) {
     logger.error("Action: chat_contacts_search_failed", { error: String(e) });
+    searchHint.value = t("contacts_no_results");
   } finally {
     searching.value = false;
   }
@@ -99,32 +115,9 @@ onBeforeUnmount(() => {
   debouncedSearch.cancel();
 });
 
-// 发起私聊
-async function handleStartChat(user: UserPublic): Promise<void> {
-  const socket = getActiveChatServerSocket();
-  if (!socket) return;
-  const token = (await ensureValidAccessToken(socket)).trim();
-  if (!token) return;
-  try {
-    const channel = await httpChatApiPort.createChannel(socket, token, {
-      name: user.nickname,
-      brief: `Direct chat with ${user.nickname}`,
-    });
-    await router.push("/chat");
-    logger.info("Action: chat_contacts_private_chat_created", { channelId: channel.id, targetUid: user.uid });
-  } catch (e) {
-    logger.error("Action: chat_contacts_create_chat_failed", { error: String(e) });
-  }
-}
-
 // 查看用户资料
 function handleViewProfile(uid: string): void {
   router.push({ path: "/user-info-popover", query: { uid } });
-}
-
-// 点击任意位置快速启动私聊（直接使用 CreateFriendPrivateChatDialog 兼容方案）
-function handleQuickChat(): void {
-  router.push("/chat");
 }
 
 loadCurrentUser();
@@ -150,7 +143,8 @@ loadCurrentUser();
           </div>
           <div class="cp-contacts__card-info">
             <div class="cp-contacts__card-name">{{ currentUser.username || t("unknown") }}</div>
-            <div class="cp-contacts__card-detail">{{ currentUser.email || currentUser.id }}</div>
+            <div class="cp-contacts__card-detail">{{ currentUser.id }}</div>
+            <div v-if="currentUser.email" class="cp-contacts__card-detail">{{ currentUser.email }}</div>
           </div>
         </div>
       </section>
@@ -189,6 +183,7 @@ loadCurrentUser();
           </div>
         </div>
         <div v-else-if="searching" class="cp-contacts__status">{{ t("searching") }}</div>
+        <div v-else-if="searchHint" class="cp-contacts__status">{{ searchHint }}</div>
         <div v-else-if="searchResults.length === 0 && searchQuery && !searching" class="cp-contacts__status">
           {{ t("contacts_no_results") }}
         </div>
@@ -200,24 +195,17 @@ loadCurrentUser();
           >
             <div class="cp-contacts__item-avatar">
               <div class="cp-contacts__avatar-placeholder cp-contacts__avatar-placeholder--sm">
-                {{ user.nickname[0] || "?" }}
+                {{ user.nickname?.[0] || "?" }}
               </div>
             </div>
             <div class="cp-contacts__item-info">
-              <div class="cp-contacts__item-name">{{ user.nickname }}</div>
+              <div class="cp-contacts__item-name">{{ user.nickname || user.uid }}</div>
+              <div class="cp-contacts__item-email">{{ user.uid }}</div>
               <div v-if="user.email" class="cp-contacts__item-email">{{ user.email }}</div>
             </div>
             <div class="cp-contacts__item-actions">
               <button
                 class="cp-contacts__action-btn"
-                type="button"
-                :title="t('contacts_start_chat')"
-                @click="handleStartChat(user)"
-              >
-                {{ t("contacts_chat") }}
-              </button>
-              <button
-                class="cp-contacts__action-btn cp-contacts__action-btn--secondary"
                 type="button"
                 :title="t('contacts_view_profile')"
                 @click="handleViewProfile(user.uid)"
@@ -230,13 +218,7 @@ loadCurrentUser();
         <EmptyState
           v-else
           :description="t('contacts_empty_hint')"
-        >
-          <template #action>
-            <button class="cp-contacts__action-btn" type="button" @click="handleQuickChat">
-              {{ t("contacts_go_chat") }}
-            </button>
-          </template>
-        </EmptyState>
+        />
       </section>
     </ErrorBoundary>
   </main>

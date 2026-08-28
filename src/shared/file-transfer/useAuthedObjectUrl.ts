@@ -14,6 +14,7 @@ import { onUnmounted, ref, watch, type Ref } from "vue";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { readAuthToken } from "@/shared/utils/localState";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { fetchAuthedBinary } from "./fetchAuthedBinary";
 
 /**
  * 将受 Bearer 鉴权保护的资源 URL 转换为可直接绑定到原生媒体标签的 objectURL。
@@ -66,11 +67,7 @@ export function useAuthedObjectUrl(
         if (!token) token = readAuthToken(socket).trim();
       }
       if (reqId !== currentReqId) return;
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(u, { headers });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
+      const blob = await fetchAuthedBinary(u, token);
       if (reqId !== currentReqId) return;
       currentBlobUrl = URL.createObjectURL(blob);
       objectUrl.value = currentBlobUrl;

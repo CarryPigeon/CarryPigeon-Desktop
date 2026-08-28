@@ -23,6 +23,7 @@ import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import type { MessageFlowCapabilities, RecallChatMessageOutcome } from "@/features/chat/message-flow/api-types";
 import { getRoomGovernanceCapabilities } from "@/features/chat/room-governance/api";
 import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
+import { getChannelDiscoveryCapabilities } from "@/features/chat/channel-discovery/api";
 import type { RoomGovernanceCapabilities } from "@/features/chat/room-governance/api-types";
 import type { RoomSessionCapabilities } from "@/features/chat/room-session/api-types";
 import { useChannelNavigation } from "../navigation/useChannelNavigation";
@@ -164,12 +165,23 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openChannelMembers,
     openJoinApplications,
     openChannelBans,
+    openChannelAuditLogs,
   } = useChannelNavigation({
     allChannels: computed(() => roomDirectorySnapshot.value.allChannels),
   });
 
+  function findChannelByIdIncludingDiscover(channelId: string): { id: string; name?: string; brief?: string } | null {
+    const fromDirectory = findChannelById(channelId);
+    if (fromDirectory) return fromDirectory;
+    const discovered = getChannelDiscoveryCapabilities()
+      .getSnapshot()
+      .items.find((item) => item.channelId === channelId);
+    if (!discovered) return null;
+    return { id: discovered.channelId, name: discovered.name, brief: discovered.brief ?? "" };
+  }
+
   // 频道信息应用内弹窗（频道列表 ⓘ / 右键菜单共用入口）。
-  const channelInfoDialog = useChannelInfoDialog({ findChannelById });
+  const channelInfoDialog = useChannelInfoDialog({ findChannelById: findChannelByIdIncludingDiscover });
   const flashMessage = ref<string>("");
   const linkPreview = ref<ChatLinkPreview | null>(null);
   const rightRailOpen = ref(false);
@@ -309,21 +321,13 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   } = useChannelSettingsMenu();
 
   const {
-    showCreateChatMenu,
-    createChatMenuX,
-    createChatMenuY,
     showCreateChannel,
-    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
-    openCreateChatMenu,
-    closeCreateChatMenu,
     setShowCreateChannel,
-    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
     openCreateChannelDialog,
-    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     openDeleteChannelDialog,
     handleChannelDeleted,
@@ -415,7 +419,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     missingRequiredCount,
     openPlugins: goPlugins,
     openRequiredSetup: handleOpenRequiredSetup,
-    openCreateMenu: openCreateChatMenu,
+    openCreateMenu: openCreateChannelDialog,
     openChannelInfo: (channelId: string) => channelInfoDialog.openChannelInfo(channelId),
     openServerInfo: handleOpenServers,
     openServerManager: handleOpenServerManager,
@@ -706,15 +710,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   const { onKeydown } = usePatchbayHotkeys({
     menuOpen,
     showChannelMenu,
-    showCreateChatMenu,
     showCreateChannel,
-    showCreateFriendPrivateChat,
     showDeleteChannel,
     closeMenu,
     closeChannelMenu,
-    closeCreateChatMenu,
     setShowCreateChannel,
-    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
   });
 
@@ -791,25 +791,19 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openMembers: openChannelMembers,
     openJoinApplications,
     openChannelBans,
+    openAuditLogs: openChannelAuditLogs,
     openDeleteChannelDialog,
   });
 
   const channelDialogs = createPatchbayChannelDialogsSection({
-    showCreateChatMenu,
-    createChatMenuX,
-    createChatMenuY,
     showCreateChannel,
-    showCreateFriendPrivateChat,
     showDeleteChannel,
     deleteChannelId,
     deleteChannelName,
     canDeleteCurrentChannel,
-    closeCreateChatMenu,
     setShowCreateChannel,
-    setShowCreateFriendPrivateChat,
     setShowDeleteChannel,
     openCreateChannelDialog,
-    openCreateFriendPrivateChatDialog,
     handleChannelCreated,
     handleChannelDeleted,
   });

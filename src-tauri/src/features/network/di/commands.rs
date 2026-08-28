@@ -14,6 +14,7 @@ use crate::features::network::usecases::api_usecases::{self, ApiJsonRequest};
 use crate::features::network::usecases::tcp_usecases::TcpRegistryService;
 use crate::shared::error::{CommandResult, to_command_error};
 use crate::shared::temp_file::{DownloadResult, TempFileManager};
+use anyhow::anyhow;
 use tokio::io::AsyncWriteExt;
 
 #[tauri::command]
@@ -144,6 +145,8 @@ fn http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
+            // 不自动跟随：预签名 302 若带着 Bearer 会被 MinIO 拒绝。
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| {
                 tracing::error!(
@@ -243,13 +246,51 @@ pub async fn download_file(
         request = request.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
     }
 
-    let response = request.send().await.map_err(|e| {
+    let mut response = request.send().await.map_err(|e| {
         to_command_error(
             "DOWNLOAD_REQUEST_FAILED",
             "error.download_request_failed",
             e,
         )
     })?;
+
+    // 对象存储下载常返回 302 预签名 URL；第二跳不得携带 Bearer。
+    if response.status().is_redirection() {
+        let location = response
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| {
+                to_command_error(
+                    "DOWNLOAD_HTTP_ERROR",
+                    "error.download_http_error",
+                    anyhow!("download redirect is missing Location"),
+                )
+            })?;
+        let redirected = reqwest::Url::parse(&url)
+            .ok()
+            .and_then(|base| base.join(location).ok())
+            .or_else(|| reqwest::Url::parse(location).ok())
+            .ok_or_else(|| {
+                to_command_error(
+                    "DOWNLOAD_HTTP_ERROR",
+                    "error.download_http_error",
+                    anyhow!("download redirect location is invalid"),
+                )
+            })?;
+        tracing::info!(
+            action = "network_download_follow_presigned_redirect",
+            from = %url,
+            to = %redirected
+        );
+        response = client.get(redirected).send().await.map_err(|e| {
+            to_command_error(
+                "DOWNLOAD_REQUEST_FAILED",
+                "error.download_request_failed",
+                e,
+            )
+        })?;
+    }
 
     // 206 Partial Content 视为续传成功；200 视为服务端不支持 Range，需重新下载；
     // 其它状态码视为失败。

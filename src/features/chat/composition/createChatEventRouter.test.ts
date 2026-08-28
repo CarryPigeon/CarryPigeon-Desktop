@@ -33,6 +33,7 @@ function buildDeps(overrides?: Partial<ChatWsEventRouterDeps>): ChatWsEventRoute
     refreshChannels: vi.fn(async () => undefined),
     refreshChannelLatestPage: vi.fn(async () => undefined),
     refreshMembersRail: vi.fn(async () => undefined),
+    refreshMentionInbox: vi.fn(async () => undefined),
     emitChannelProjectionChanged: vi.fn(),
     mapWireMessage: vi.fn(),
     compareMessages: vi.fn(() => 0),
@@ -78,6 +79,16 @@ describe("createChatEventRouter mention.created 即时补拉", () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     expect(refreshChannelLatestPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("mention.created 触发提及收件箱刷新", async () => {
+    const refreshMentionInbox = vi.fn(async () => undefined);
+    const handleWsEvent = createChatEventRouter(buildDeps({ refreshMentionInbox }));
+
+    handleWsEvent(mentionCreatedEnvelope("c-9"));
+    await Promise.resolve();
+
+    expect(refreshMentionInbox).toHaveBeenCalledTimes(1);
   });
 
   it("缺少 channelId 的 mention 事件被安全忽略", () => {
