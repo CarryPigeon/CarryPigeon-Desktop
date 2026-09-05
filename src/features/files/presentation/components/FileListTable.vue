@@ -170,7 +170,7 @@ function formatTime(iso: string): string {
       @click.stop="closeContextMenu"
     >
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('preview', contextMenu.file)">
-        <t-icon name="view" /> {{ t("file_preview") }}
+        <t-icon name="browse" /> {{ t("file_preview") }}
       </div>
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('download', contextMenu.file)">
         <t-icon name="download" /> {{ t("download") }}

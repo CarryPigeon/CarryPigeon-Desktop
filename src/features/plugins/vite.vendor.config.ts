@@ -13,6 +13,13 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(projectRoot, "src") },
   },
+  define: {
+    // lib 模式不会像 app 构建那样自动替换 process.env.NODE_ENV；vue/tdesign 的
+    // esm-bundler 产物里存在大量裸引用，浏览器加载 vendor.mjs 时会直接抛出
+    // "process is not defined"，导致 release 构建白屏卡死。此处按生产环境内联，
+    // 让压缩器顺带裁掉 dev-only 分支。
+    "process.env.NODE_ENV": JSON.stringify("production"),
+  },
   build: {
     outDir: "public/vendor",
     emptyOutDir: true,

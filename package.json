@@ -8,7 +8,7 @@
     },
     "scripts": {
         "dev": "vite",
-        "vendor:build": "vite build --config src/features/plugins/vite.vendor.config.ts",
+        "vendor:build": "vite build --config src/features/plugins/vite.vendor.config.ts && node scripts/inline-vendor-node-env.mjs",
         "plugins:build:voice-call": "vite build --config plugins/voice-call/vite.config.ts",
         "plugins:dev:link": "node scripts/copy-plugin-dist.mjs",
         "predev": "pnpm run vendor:build && pnpm run plugins:build:voice-call && pnpm run plugins:dev:link",

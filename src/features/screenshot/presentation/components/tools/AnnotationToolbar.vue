@@ -21,7 +21,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const tools: Array<{ id: Tool; label: string; icon: string }> = [
-  { id: "select", label: t("annotation_tool_select"), icon: "arrow-up-right" },
+  { id: "select", label: t("annotation_tool_select"), icon: "cursor" },
   { id: "pen", label: t("annotation_tool_pen"), icon: "edit" },
   { id: "arrow", label: t("annotation_tool_arrow"), icon: "arrow-right" },
   { id: "rect", label: t("annotation_tool_rect"), icon: "rectangle" },
@@ -92,7 +92,7 @@ const presetWidths = [2, 4, 6, 10, 16];
         :aria-label="t('annotation_tool_undo')"
         @click="emit('undo')"
       >
-        <t-icon name="undo" />
+        <t-icon name="rollback" />
       </button>
     </div>
   </div>

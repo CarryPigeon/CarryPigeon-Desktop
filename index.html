@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/tauri.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
+    <!--
+      TDesign 组件样式：release 构建把 vue/tdesign-vue-next 外置为 /vendor/vendor.mjs（黑盒），
+      主包不会包含任何 tdesign 组件 CSS；vendor:build 会同步产出 public/vendor/vendor.css，
+      必须在此显式加载，否则 release 中 t-input 等组件会退化为浏览器默认样式，
+      与应用 UI 风格不协调。该 link 须位于 head 内、Vite 注入的应用样式之前，
+      保证 App.vue 的主题覆盖规则在级联中取胜（dev 下与 node_modules 链路加载的样式重复，无副作用）。
+    -->
+    <link rel="stylesheet" href="/vendor/vendor.css" />
     <script type="importmap">
       {
         "imports": {
@@ -19,6 +27,19 @@
   <body>
     <!-- 应用入口：Vite 通过 #app 挂载 Vue；此文件仅保留挂载点与极少量基础样式 -->
     <div id="app"></div>
+    <!--
+      TDesign 图标 sprite：<t-icon> 渲染 <svg><use href="#t-icon-*"></use></svg>，
+      组件挂载时会从 CDN（tdesign.gtimg.com）注入 sprite 脚本，但 release 下
+      Tauri CSP（script-src 'self'）会拦截该请求且桌面端可能离线，导致所有图标
+      （服务器 ⓘ、频道置顶/搜索/设置等圆形按钮）渲染为空圈。
+      此处改为加载随仓库分发的官方 sprite（public/icons/tdesign-icons-sprite.js，
+      取自 https://tdesign.gtimg.com/icon/0.4.3/fonts/index.js；注意不能放
+      public/vendor/ 下——vendor:build 会 emptyOutDir 清空该目录）。
+      经典脚本在 body 内同步执行，先于 head 中的 module 入口（Vue 挂载）完成
+      symbol 注入。dev 下若经浏览器访问，CDN 注入仍会发生，只是多出一份相同
+      symbol，无副作用。
+    -->
+    <script src="/icons/tdesign-icons-sprite.js"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
   <style>
