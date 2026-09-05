@@ -28,7 +28,7 @@
         "benchmark": "bash scripts/perf-benchmark.sh"
     },
     "dependencies": {
-        "@tanstack/vue-virtual": "^3.13.32",
+        "@tanstack/vue-virtual": "^3.13.36",
         "@tauri-apps/api": "^2.11.1",
         "@tauri-apps/plugin-notification": "^2.3.3",
         "@tauri-apps/plugin-opener": "^2.5.4",
