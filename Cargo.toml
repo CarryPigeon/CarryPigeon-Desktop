@@ -2,6 +2,13 @@
 members = ["src-tauri"]
 resolver = "2"
 
+[patch.crates-io]
+# 本地补丁：libspa-sys 0.8.0 的 build-dependencies 里 bindgen 0.69 在
+# clang >= 21 下会把 spa_pod_builder 等结构体生成为 opaque，导致 Linux
+# 构建失败。vendor 一份并把 bindgen 升到 0.72，其余内容与上游 0.8.0
+# 完全一致。上游修复后（pipewire-rs 发布适配新 bindgen 的版本）可移除。
+libspa-sys = { path = "src-tauri/patches/libspa-sys" }
+
 [profile.dev]
 # 以较小的步骤编译您的二进制文件（提高开发期增量编译体验）。
 incremental = true
