@@ -299,6 +299,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleSignalScroll,
     handleLoadMoreMessages,
     handleJumpToBottom,
+    notifyOwnMessageSent,
     maybeReportReadState,
     handleWindowFocus,
     handleVisibilityChange,
@@ -630,6 +631,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     currentUserId,
     currentUserRole,
     currentChannelName,
+    // 自己发送消息成功后：消息面板自动跳到最底部。
+    onOwnMessageSent: notifyOwnMessageSent,
     connectionDetail: chatConnectionDetail,
     connectionPillState: chatConnectionPillState,
     retryConnection: retryChatConnection,

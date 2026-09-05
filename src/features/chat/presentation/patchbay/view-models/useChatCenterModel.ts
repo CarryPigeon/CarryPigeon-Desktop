@@ -195,6 +195,12 @@ export type UseChatCenterModelDeps = {
    * 说明：可选；入参为去重后的 uid 列表，返回 uid → nickname 映射（缺失项可省略）。
    */
   fetchUserNames?: (uids: string[]) => Promise<Record<string, string>>;
+  /**
+   * 自己发送消息成功后的通知（用于消息面板自动跳到底部）。
+   *
+   * 说明：可选；仅在发送结果确认成功且用户仍停留在发送时频道后调用。
+   */
+  onOwnMessageSent?: () => void;
 };
 
 /**
@@ -693,9 +699,15 @@ watch(messageRows, (rows) => {
         // attachment share-keys appended to the draft are not lost).
         ? { domain: "", domainVersion: "", data: undefined, linkPreview: lp }
         : undefined;
+    // 记录发送时所在频道：发送期间用户可能切换频道，此时不应触发跳底。
+    const sentFromCid = currentSessionSnapshot.value.currentChannelId;
     void deps.messageComposer.sendMessage(mergedPayload).then((outcome) => {
       if (outcome.ok) {
         deps.dismissLinkPreview?.();
+        // 自己发送的消息：若仍停留在发送时的频道，则通知视口自动跳到最底部。
+        if (currentSessionSnapshot.value.currentChannelId === sentFromCid) {
+          deps.onOwnMessageSent?.();
+        }
         return;
       }
       deps.messageComposer.setActionError(outcome.error);
