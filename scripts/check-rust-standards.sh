@@ -54,7 +54,7 @@ while IFS= read -r file; do
   ' "$file"; then
     panic_prone_failed=1
   fi
-done < <(git ls-files "$TARGET_DIR" -- '*.rs')
+done < <(git ls-files -- "$TARGET_DIR" | grep '\.rs$')
 
 if [[ "$panic_prone_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ found forbidden patterns in Rust source"
@@ -97,7 +97,7 @@ while IFS= read -r file; do
   ' "$file"; then
     command_style_failed=1
   fi
-done < <(git ls-files "$TARGET_DIR" -- '*.rs')
+done < <(git ls-files -- "$TARGET_DIR" | grep '\.rs$')
 
 if [[ "$command_style_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ tauri command should use CommandResult<T>"
@@ -161,7 +161,7 @@ while IFS= read -r file; do
   ' "$file"; then
     action_style_failed=1
   fi
-done < <(git ls-files "$TARGET_DIR" -- '*.rs')
+done < <(git ls-files -- "$TARGET_DIR" | grep '\.rs$')
 
 if [[ "$action_style_failed" -ne 0 ]]; then
   echo "[check-rust-standards] ❌ tracing logs must include action field"
