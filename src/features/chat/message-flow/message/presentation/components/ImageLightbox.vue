@@ -13,6 +13,7 @@ import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { readAuthToken } from "@/shared/utils/localState";
+import { parseSafeHttpUrl } from "@/shared/utils/safeExternalUrl";
 import AuthedThumb from "./AuthedThumb.vue";
 
 const logger = createLogger("ImageLightbox");
@@ -177,9 +178,16 @@ async function downloadImage(): Promise<void> {
       error: String(err),
     });
     // 降级：通过 <a> 元素打开原始链接（不受弹窗拦截器限制）。
+    // 安全约束：回退打开前必须过协议白名单，拒绝 javascript: 等
+    // 危险 scheme（fetch 对其必然 reject 恰好落入本分支）。
     if (currentImage.value?.url) {
+      const parsed = parseSafeHttpUrl(currentImage.value.url);
+      if (!parsed) {
+        logger.warn("Action: chat_lightbox_download_fallback_blocked");
+        return;
+      }
       const a = document.createElement("a");
-      a.href = currentImage.value.url;
+      a.href = parsed.toString();
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       document.body.appendChild(a);
