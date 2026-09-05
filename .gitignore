@@ -38,6 +38,8 @@ public/plugins/
 .env
 
 # Local tool/runtime artifacts
+.tmp-crops/
+.tmp-fonttest/
 docs/superpowers/
 .superpowers/
 .worktrees/
