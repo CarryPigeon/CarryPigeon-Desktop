@@ -7,7 +7,6 @@ use sea_orm::{
     ConnectionTrait, Database, DatabaseBackend, Statement, StatementBuilder, TransactionTrait,
     Value,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -26,21 +25,23 @@ const CHAT_CACHE_MAX_ENTRIES: usize = 5;
 
 static CHAT_CACHE_DB: OnceLock<Mutex<Option<Arc<sea_orm::DatabaseConnection>>>> = OnceLock::new();
 static CHAT_CACHE_MASTER_KEY: OnceLock<Mutex<Option<[u8; 32]>>> = OnceLock::new();
+static ENSURE_KEYRING_STORE: std::sync::Once = std::sync::Once::new();
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatCachePutRequest {
-    pub key: String,
-    pub value: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatCacheRemoveRequest {
-    pub key: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatCacheRemoveManyRequest {
-    pub keys: Vec<String>,
+/// keyring-core 要求先设置默认凭证存储，否则 `Entry::new` 会返回 NoDefaultStore。
+/// Linux 上必须选 Secret Service（跨重启持久化）；keyutils 是会话级内核存储，
+/// 重启即失效，不能用于保存缓存主密钥。
+fn ensure_default_keyring_store() {
+    // 测试环境通常没有会话总线；跳过真实 Secret Service 初始化，
+    // Entry 相关失败路径按“条目不存在”处理（测试不依赖真实 keyring）。
+    if cfg!(test) {
+        return;
+    }
+    ENSURE_KEYRING_STORE.call_once(|| {
+        // 参数 true：Linux 上跳过 keyutils，使用 Secret Service。
+        if let Err(err) = keyring::use_native_store(true) {
+            tracing::warn!(action = "db_chat_cache_keyring_store_init_failed", error = %err);
+        }
+    });
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +160,7 @@ fn master_key(create_if_missing: bool) -> Result<Option<[u8; 32]>> {
     {
         return Ok(Some(key));
     }
+    ensure_default_keyring_store();
     let entry = match Entry::new(SERVICE, ACCOUNT) {
         Ok(entry) => entry,
         Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => {
@@ -203,6 +205,8 @@ fn is_missing_secure_storage_error_message(message: &str) -> bool {
     message.contains("not found")
         || message.contains("NoEntry")
         || message.contains("No matching entry found in secure storage")
+        // dbus-secret-service（libdbus 同步变体）的“条目不存在”措辞。
+        || message.contains("No matching credential")
         || message.contains("No default store has been set")
         || message.contains("cannot search or create entries")
 }
@@ -231,6 +235,7 @@ fn clear_master_key_cache() {
 
 fn forget_master_key() -> Result<()> {
     clear_master_key_cache();
+    ensure_default_keyring_store();
     let entry = match Entry::new(SERVICE, ACCOUNT) {
         Ok(entry) => entry,
         Err(err) if is_missing_secure_storage_error_message(&err.to_string()) => return Ok(()),
@@ -520,15 +525,19 @@ where
     Ok(())
 }
 
+/// 聊天缓存命令的 IPC 参数约束：
+/// 前端 `chatSecureCache.ts` 以平铺参数 invoke（`{key, value}` / `{key}` / `{keys}`），
+/// 命令签名必须保持平铺标量参数（与 `chat_cache_get` 一致），
+/// 包一层 `req: XxxRequest` 会导致 Tauri v2 参数反序列化失败、缓存写入全部丢失。
 #[tauri::command]
-pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
+pub async fn chat_cache_put(key: String, value: String) -> CommandResult<()> {
     ensure_schema().await.map_err(|e| {
         to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
     })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
-    let key = req.key.trim();
+    let key = key.trim();
     if key.is_empty() {
         return Err(command_error(
             "CHAT_CACHE_KEY_REQUIRED",
@@ -543,7 +552,7 @@ pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
             "error.chat_cache_key_failed",
         ));
     };
-    let (nonce_hex, value_hex) = encrypt_value(&key_bytes, &req.value).map_err(|e| {
+    let (nonce_hex, value_hex) = encrypt_value(&key_bytes, &value).map_err(|e| {
         to_command_error(
             "CHAT_CACHE_ENCRYPT_FAILED",
             "error.chat_cache_encrypt_failed",
@@ -586,14 +595,14 @@ pub async fn chat_cache_put(req: ChatCachePutRequest) -> CommandResult<()> {
 }
 
 #[tauri::command]
-pub async fn chat_cache_remove(req: ChatCacheRemoveRequest) -> CommandResult<()> {
+pub async fn chat_cache_remove(key: String) -> CommandResult<()> {
     ensure_schema().await.map_err(|e| {
         to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
     })?;
     let conn = db()
         .await
         .map_err(|e| to_command_error("CHAT_CACHE_DB_FAILED", "error.chat_cache_db_failed", e))?;
-    let key = req.key.trim();
+    let key = key.trim();
     if key.is_empty() {
         return Err(command_error(
             "CHAT_CACHE_KEY_REQUIRED",
@@ -615,7 +624,7 @@ pub async fn chat_cache_remove(req: ChatCacheRemoveRequest) -> CommandResult<()>
 }
 
 #[tauri::command]
-pub async fn chat_cache_remove_many(req: ChatCacheRemoveManyRequest) -> CommandResult<()> {
+pub async fn chat_cache_remove_many(keys: Vec<String>) -> CommandResult<()> {
     ensure_schema().await.map_err(|e| {
         to_command_error("CHAT_CACHE_INIT_FAILED", "error.chat_cache_init_failed", e)
     })?;
@@ -629,7 +638,7 @@ pub async fn chat_cache_remove_many(req: ChatCacheRemoveManyRequest) -> CommandR
             e,
         )
     })?;
-    for key in req.keys {
+    for key in keys {
         let key = key.trim().to_string();
         if key.is_empty() {
             continue;
@@ -724,10 +733,10 @@ mod tests {
         let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir);
 
         ensure_test_master_key();
-        chat_cache_put(ChatCachePutRequest {
-            key: "chat-cache-test-key".to_string(),
-            value: "secret message".to_string(),
-        })
+        chat_cache_put(
+            "chat-cache-test-key".to_string(),
+            "secret message".to_string(),
+        )
         .await
         .expect("put");
 
@@ -754,10 +763,10 @@ mod tests {
         let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
 
         ensure_test_master_key();
-        chat_cache_put(ChatCachePutRequest {
-            key: "chat-cache-missing-key-test".to_string(),
-            value: "secret message".to_string(),
-        })
+        chat_cache_put(
+            "chat-cache-missing-key-test".to_string(),
+            "secret message".to_string(),
+        )
         .await
         .expect("put");
 
@@ -767,10 +776,10 @@ mod tests {
         assert!(loaded.is_empty());
 
         ensure_test_master_key();
-        chat_cache_put(ChatCachePutRequest {
-            key: "chat-cache-missing-key-test".to_string(),
-            value: "secret message 2".to_string(),
-        })
+        chat_cache_put(
+            "chat-cache-missing-key-test".to_string(),
+            "secret message 2".to_string(),
+        )
         .await
         .expect("put after missing key");
 
@@ -794,10 +803,10 @@ mod tests {
         let _ = crate::shared::app_data_dir::init_app_data_dir(app_dir.clone());
 
         ensure_test_master_key();
-        chat_cache_put(ChatCachePutRequest {
-            key: "chat-cache-missing-key-get-test".to_string(),
-            value: "secret message".to_string(),
-        })
+        chat_cache_put(
+            "chat-cache-missing-key-get-test".to_string(),
+            "secret message".to_string(),
+        )
         .await
         .expect("put");
 
@@ -851,12 +860,9 @@ mod tests {
         ensure_test_master_key();
         // 插入 6 条（上限 5，目标保留 4），确保每条 updated_at 有差异。
         for i in 0..6 {
-            chat_cache_put(ChatCachePutRequest {
-                key: format!("chat-cache-prune-{i}"),
-                value: format!("value-{i}"),
-            })
-            .await
-            .expect("put");
+            chat_cache_put(format!("chat-cache-prune-{i}"), format!("value-{i}"))
+                .await
+                .expect("put");
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
 

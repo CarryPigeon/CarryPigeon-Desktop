@@ -174,7 +174,11 @@ function clearDataStatus(): void {
 }
 
 function normalizeImportTheme(raw: unknown): AppTheme | null {
-  return raw === "patchbay" || raw === "legacy" || raw === "light" ? raw : null;
+  // 兼容旧版本导出中的主题值：patchbay（品牌暗色）→ dark；legacy（经典浅色）→ light。
+  if (raw === "dark" || raw === "light") return raw;
+  if (raw === "patchbay") return "dark";
+  if (raw === "legacy") return "light";
+  return null;
 }
 
 function normalizeImportAccent(raw: unknown): AppAccent | null {
@@ -351,21 +355,12 @@ async function handleLogout(): Promise<void> {
                 <div class="cp-settings__seg">
                   <button
                     class="cp-settings__segBtn"
-                    :data-active="theme === 'patchbay'"
-                    data-testid="settings-theme-patchbay"
+                    :data-active="theme === 'dark'"
+                    data-testid="settings-theme-dark"
                     type="button"
-                    @click="pickTheme('patchbay')"
+                    @click="pickTheme('dark')"
                   >
-                    {{ t("patchbay") }}
-                  </button>
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="theme === 'legacy'"
-                    data-testid="settings-theme-legacy"
-                    type="button"
-                    @click="pickTheme('legacy')"
-                  >
-                    {{ t("settings_theme_legacy") }}
+                    {{ t("settings_theme_dark") }}
                   </button>
                   <button
                     class="cp-settings__segBtn"

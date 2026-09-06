@@ -66,12 +66,13 @@ serverConnectionCapabilities.scopeLifecycle.registerCleanupHandler(() => {
 
 // 首帧渲染前应用主题与强调色，尽量减少主题切换的“闪烁”。
 //
-// 兼容策略：旧用户可能仅持久化了 `data-theme=patchbay`（无 accent）。
-// - 若存储中没有 accent，则根据已存储的 theme 推断默认 accent：
-//   - `theme=patchbay` → `accent=patchbay`（沿用原本的视觉）
+// 兼容策略：旧用户可能仅持久化了旧版主题值（patchbay/legacy），
+// `getStoredTheme` 已按调色板迁移为 dark/light：
+// - 若存储中没有 accent，根据迁移后的主题推断默认强调色：
+//   - `theme=dark`（原 patchbay）→ `accent=patchbay`（沿用原本的视觉）
 //   - 其他 → `accent=default`（与新拆分后的默认强调色对齐）
-const initialTheme = getStoredTheme() ?? "patchbay";
-const initialAccent = getStoredAccent() ?? (initialTheme === "patchbay" ? "patchbay" : "default");
+const initialTheme = getStoredTheme() ?? "dark";
+const initialAccent = getStoredAccent() ?? (initialTheme === "dark" ? "patchbay" : "default");
 setTheme(initialTheme);
 setAccent(initialAccent);
 

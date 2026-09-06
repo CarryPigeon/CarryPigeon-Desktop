@@ -145,7 +145,7 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   color-scheme: light;
 }
 
-:root[data-theme="patchbay"] {
+:root[data-theme="dark"] {
   color-scheme: dark;
 
   /* 字体 */
@@ -226,7 +226,7 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 }
 
 /* 强调色（独立于主题）：patchbay 翡翠绿 + 天空蓝的品牌色组合。
-   可与任何 theme 组合（light/legacy/patchbay），让聊天等页面在用户偏好的背景下仍保留品牌识别色。 */
+   可与任何 theme 组合（亮色/暗色），让聊天等页面在用户偏好的背景下仍保留品牌识别色。 */
 :root[data-accent="patchbay"] {
   --cp-accent: #22c55e;
   --cp-accent-hover: #16a34a;
@@ -257,9 +257,9 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   --td-brand-color-focus: rgba(56, 189, 248, 0.28);
 }
 
-/* 兼容：旧用户仅设置 data-theme="patchbay" 时，沿用 patchbay 强调色。
+/* 兼容：暗色主题且未显式选择 default 强调色时，沿用 patchbay 品牌强调色。
    新逻辑下，用户独立设置 accent，可选 default/patchbay 来覆盖这里。 */
-:root[data-theme="patchbay"]:not([data-accent="default"]) {
+:root[data-theme="dark"]:not([data-accent="default"]) {
   --cp-accent: #22c55e;
   --cp-accent-hover: #16a34a;
   --cp-accent-soft: rgba(34, 197, 94, 0.16);
@@ -311,7 +311,7 @@ body {
   overflow: hidden;
 }
 
-/* 主题（Light）背景（暖纸 + 柔和光晕） */
+/* 主题（亮色模式）背景（暖纸 + 柔和光晕） */
 :root[data-theme="light"] body {
   background:
     radial-gradient(1200px 700px at 6% 4%, rgba(15, 118, 110, 0.22), transparent 60%),
@@ -321,8 +321,8 @@ body {
   background-attachment: fixed;
 }
 
-/* 主题（Patchbay）背景（石墨 + 网格） */
-:root[data-theme="patchbay"] body {
+/* 主题（暗色模式）背景（石墨 + 网格） */
+:root[data-theme="dark"] body {
   background:
     radial-gradient(900px 600px at 12% 0%, rgba(56, 189, 248, 0.10), transparent 60%),
     radial-gradient(1000px 760px at 92% 18%, rgba(34, 197, 94, 0.10), transparent 62%),
@@ -375,7 +375,7 @@ body::before {
   mix-blend-mode: multiply;
 }
 
-:root[data-theme="patchbay"] body::before {
+:root[data-theme="dark"] body::before {
   background-image:
     repeating-linear-gradient(
       0deg,
@@ -403,7 +403,7 @@ body::before {
   background: rgba(15, 118, 110, 0.22);
 }
 
-:root[data-theme="patchbay"] ::selection {
+:root[data-theme="dark"] ::selection {
   background: rgba(56, 189, 248, 0.28);
 }
 
@@ -637,17 +637,6 @@ select {
   &:focus {
     outline: none;
   }
-}
-
-/* TDesign 图标 sprite（public/icons/tdesign-icons-sprite.js 注入的 svg）：
-   Tauri 运行时注入 CSP nonce/hash 后浏览器会忽略其内联 style 属性，sprite 若回到
-   body 中会以默认 300x150 尺寸撑出窗口顶部空带；此规则用外部样式表兜底隐藏
-   （外部 CSS 不受 CSP 内联限制），保证无论注入位置如何都不产生布局空隙。 */
-svg.td-icons-sprite {
-  position: absolute;
-  width: 0;
-  height: 0;
-  visibility: hidden;
 }
 
 /* 滚动条（更适配桌面端） */

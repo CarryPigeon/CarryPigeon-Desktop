@@ -216,9 +216,9 @@ export const SETTINGS_TAXONOMY = {
 } as const;
 
 /**
- * settings 默认主题。
+ * settings 默认主题（暗色模式，延续原 patchbay 品牌暗色调色板）。
  */
-export const DEFAULT_APP_THEME: AppTheme = "patchbay";
+export const DEFAULT_APP_THEME: AppTheme = "dark";
 
 /**
  * settings 默认强调色。

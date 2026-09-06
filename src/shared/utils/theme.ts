@@ -14,7 +14,7 @@
  * - 默认主题在 `src/main.ts` 启动阶段设置。
  */
 
-export type AppTheme = "patchbay" | "legacy" | "light";
+export type AppTheme = "light" | "dark";
 export type AppAccent = "default" | "patchbay";
 
 import { readString, writeString } from "./localStore";
@@ -23,13 +23,17 @@ import { KEY_THEME, KEY_ACCENT } from "./storageKeys";
 /**
  * 从 `localStorage` 读取已持久化的主题。
  *
- * @returns 当存储值合法时返回 `"patchbay"` / `"legacy"` / `"light"`；否则返回 `null`。
+ * 兼容迁移：旧版本主题值按调色板归入新二值体系
+ * （`patchbay` 为品牌暗色 → `dark`；`legacy` 为经典浅色 → `light`）。
+ *
+ * @returns 当存储值合法时返回 `"light"` / `"dark"`；否则返回 `null`。
  */
 export function getStoredTheme(): AppTheme | null {
   const raw = readString(KEY_THEME).trim().toLowerCase();
-  if (raw === "patchbay") return "patchbay";
-  if (raw === "legacy") return "legacy";
   if (raw === "light") return "light";
+  if (raw === "dark") return "dark";
+  if (raw === "patchbay") return "dark";
+  if (raw === "legacy") return "light";
   return null;
 }
 
