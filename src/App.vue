@@ -639,6 +639,17 @@ select {
   }
 }
 
+/* TDesign 图标 sprite（public/icons/tdesign-icons-sprite.js 注入的 svg）：
+   Tauri 运行时注入 CSP nonce/hash 后浏览器会忽略其内联 style 属性，sprite 若回到
+   body 中会以默认 300x150 尺寸撑出窗口顶部空带；此规则用外部样式表兜底隐藏
+   （外部 CSS 不受 CSP 内联限制），保证无论注入位置如何都不产生布局空隙。 */
+svg.td-icons-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+}
+
 /* 滚动条（更适配桌面端） */
 * {
   scrollbar-width: thin;
