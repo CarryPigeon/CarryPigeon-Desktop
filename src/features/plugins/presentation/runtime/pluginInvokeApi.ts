@@ -4,6 +4,21 @@
  */
 
 import { invokeTauri } from "@/shared/tauri";
+import type { PluginScope } from "./pluginScope";
+
+/**
+ * 判断插件 scope 是否已销毁（已销毁时输出英文告警，含 pluginId）。
+ * 供 invoke 能力做 dispose 后的 no-op 防御。
+ */
+function warnIfScopeDisposed(scope: PluginScope | undefined, pluginId: string): boolean {
+  if (scope?.disposed) {
+    console.warn(
+      `[plugin-invoke-api] plugin "${pluginId}" scope is disposed; invoke is a no-op`,
+    );
+    return true;
+  }
+  return false;
+}
 
 /**
  * 创建受白名单约束的插件命令调用能力。
@@ -14,14 +29,20 @@ import { invokeTauri } from "@/shared/tauri";
  * @param serverSocket 当前 server socket（透传给 Rust 侧做隔离）。
  * @param pluginId 插件标识（用于错误日志定位）。
  * @param allowedPrefix 命令白名单前缀（如 "voice_call:"）。
+ * @param scope 可选的插件作用域：已销毁后调用变为 no-op（返回 null）并告警。
  * @returns 一个 (command, args?) => Promise<unknown> 的调用函数。
  */
 export function createPluginInvokeApi(
   serverSocket: string,
   pluginId: string,
   allowedPrefix: string,
+  scope?: PluginScope,
 ): (command: string, args?: Record<string, unknown>) => Promise<unknown> {
   return async (command: string, args?: Record<string, unknown>) => {
+    // scope 已销毁：调用直接 no-op，不触达底层 Tauri 命令
+    if (warnIfScopeDisposed(scope, pluginId)) {
+      return null;
+    }
     if (!command.startsWith(allowedPrefix)) {
       throw new Error(
         `plugin ${pluginId} invoke denied: command "${command}" not under "${allowedPrefix}"`,

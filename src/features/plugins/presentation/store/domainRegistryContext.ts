@@ -10,6 +10,7 @@ import type { PluginComposerPayload, PluginContext } from "@/features/plugins/do
 import type { LoadedPluginModule } from "@/features/plugins/presentation/runtime/pluginRuntime";
 import { createHostApi } from "@/features/plugins/presentation/runtime/hostApiFactory";
 import type { PluginUiBridge } from "@/features/plugins/presentation/runtime/pluginUiApi";
+import type { PluginScope } from "@/features/plugins/presentation/runtime/pluginScope";
 import { chatPluginUiBridge } from "@/features/chat/public/api";
 import { getCurrentPluginUserId } from "@/features/plugins/integration/accountSession";
 import type { DomainBinding, DomainRegistryHostBridge } from "@/features/plugins/contracts/domainRegistry";
@@ -22,10 +23,16 @@ export type DomainRegistryContextResolverDeps = {
   loadedById: Record<string, LoadedPluginModule>;
   bindingByDomain: Record<string, DomainBinding>;
   getHostBridge: () => DomainRegistryHostBridge | null;
+  /** 插件实例作用域解析：activate 前由注册表创建，供 host API 自动清理使用 */
+  resolvePluginScope: (pluginId: string, version: string) => PluginScope | null;
 };
 
 export function createDomainRegistryContextResolver(deps: DomainRegistryContextResolverDeps) {
-  function buildPluginContext(runtime: PluginRuntimeEntry, plugin: LoadedPluginModule): PluginContext {
+  function buildPluginContext(
+    runtime: PluginRuntimeEntry,
+    plugin: LoadedPluginModule,
+    scope?: PluginScope | null,
+  ): PluginContext {
     const socket = deps.serverKey === NO_SERVER_KEY ? "" : deps.serverKey;
     const cid = String(deps.getHostBridge()?.getCid() ?? "").trim();
     const uid = getCurrentPluginUserId();
@@ -53,7 +60,7 @@ export function createDomainRegistryContextResolver(deps: DomainRegistryContextR
     // 仅当插件具备 "ui" 权限时注入 chat UI 桥（mountOverlay / registerToolbarAction）。
     const uiBridge: PluginUiBridge | undefined = permissions.includes("ui") ? chatPluginUiBridge : undefined;
 
-    const host = createHostApi(socket, plugin.pluginId, permissions, uiBridge, sendMessage);
+    const host = createHostApi(socket, plugin.pluginId, permissions, uiBridge, sendMessage, scope ?? undefined);
 
     return {
       serverSocket: socket,
@@ -63,6 +70,8 @@ export function createDomainRegistryContextResolver(deps: DomainRegistryContextR
       cid,
       uid,
       lang,
+      // 注入插件级清理注册：scope dispose 时自动释放插件持有的资源
+      ...(scope ? { onDispose: (cb: () => void) => scope.onDispose(cb) } : {}),
       host,
     };
   }
@@ -74,7 +83,9 @@ export function createDomainRegistryContextResolver(deps: DomainRegistryContextR
     const runtime = deps.runtimeById[id] ?? null;
     const loaded = deps.loadedById[id] ?? null;
     if (!runtime || !loaded) return null;
-    return buildPluginContext(runtime, loaded);
+    // 已加载实例在查询时解析其当前 scope（可能因 disable 被销毁，此时返回 null 由调用方处理）
+    const scope = deps.resolvePluginScope(id, runtime.version);
+    return buildPluginContext(runtime, loaded, scope);
   }
 
   function getContextForDomain(domain: string): PluginContext | null {

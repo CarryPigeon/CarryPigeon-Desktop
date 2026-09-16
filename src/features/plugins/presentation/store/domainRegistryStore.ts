@@ -23,6 +23,13 @@ import {
   type LoadedPluginModule,
 } from "@/features/plugins/presentation/runtime/pluginRuntime";
 import { assertPluginRuntimeHostCompatible } from "@/features/plugins/domain/policies/pluginHostCompatibility";
+import { runInPluginScope, type PluginScope } from "@/features/plugins/presentation/runtime/pluginScope";
+import {
+  disposePluginScopesForPlugin,
+  disposeServerScopeTree,
+  getOrCreatePluginScope,
+  getPluginScope,
+} from "./pluginScopeRegistry";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 import {
   clearPluginRuntimeStateSyncListeners,
@@ -57,11 +64,13 @@ const stores = new Map<string, DomainRegistryStore>();
 let runtimeStarted = false;
 let stopRuntimeCleanup: (() => void) | null = null;
 
-async function disposeDomainRegistryStore(store: DomainRegistryStore): Promise<void> {
+async function disposeDomainRegistryStore(key: string, store: DomainRegistryStore): Promise<void> {
   for (const pluginId of Object.keys(store.loadedById)) {
     await store.disablePluginRuntime(pluginId);
   }
   store.setHostBridge(null);
+  // 销毁该服务器整棵 scope 树（级联清理全部插件实例子 scope）
+  await disposeServerScopeTree(key);
 }
 
 /**
@@ -80,7 +89,7 @@ export function startDomainRegistryRuntime(): void {
       const tasks: Promise<void>[] = [];
       for (const [key, store] of stores.entries()) {
         tasks.push(
-          disposeDomainRegistryStore(store).finally(() => {
+          disposeDomainRegistryStore(key, store).finally(() => {
             stores.delete(key);
           }),
         );
@@ -91,7 +100,7 @@ export function startDomainRegistryRuntime(): void {
     clearPluginRuntimeStateSyncListeners(event.key);
     const store = stores.get(event.key);
     if (!store) return;
-    await disposeDomainRegistryStore(store);
+    await disposeDomainRegistryStore(event.key, store);
     stores.delete(event.key);
   });
 }
@@ -108,7 +117,7 @@ export async function stopDomainRegistryRuntime(): Promise<void> {
   const tasks: Promise<void>[] = [];
   for (const [key, store] of stores.entries()) {
     tasks.push(
-      disposeDomainRegistryStore(store).finally(() => {
+      disposeDomainRegistryStore(key, store).finally(() => {
         stores.delete(key);
       }),
     );
@@ -154,6 +163,8 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     loadedById,
     bindingByDomain,
     getHostBridge: () => hostBridge,
+    resolvePluginScope: (pluginId, version) =>
+      getPluginScope({ serverId: key, pluginId, version }),
   });
 
   /**
@@ -199,7 +210,14 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     const runtime = await getRuntimeEntry(key, id);
     assertPluginRuntimeHostCompatible(runtime);
     const loaded = await loadFromRuntime(runtime);
-    const ctx = contextResolver.buildPluginContext(runtime, loaded);
+    // activate 前创建插件实例子 scope（挂在该 server 父 scope 下），
+    // 供 host API 自动清理与 PluginContext.onDispose 使用
+    const scope: PluginScope = getOrCreatePluginScope({
+      serverId: key,
+      pluginId: id,
+      version: runtime.version,
+    });
+    const ctx = contextResolver.buildPluginContext(runtime, loaded, scope);
 
     loadedById[id] = loaded;
     runtimeById[id] = runtime;
@@ -207,12 +225,15 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     registerPluginDomains(bindingByDomain, loaded);
 
     try {
-      if (loaded.activate) await Promise.resolve(loaded.activate(ctx));
+      // 在插件作用域内执行 activate，便于宿主工厂通过 getCurrentPluginScope 隐式获取
+      if (loaded.activate) await runInPluginScope(scope, () => Promise.resolve(loaded.activate?.(ctx)));
     } catch (e) {
       logger.error("Action: plugins_activate_failed", { key, pluginId: id, error: String(e) });
       unregisterPluginDomains(bindingByDomain, id);
       delete loadedById[id];
       delete runtimeById[id];
+      // activate 失败：销毁本次创建的子 scope，释放已注册的资源
+      await disposePluginScopesForPlugin(key, id);
       throw e;
     }
   }
@@ -227,6 +248,9 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     const id = pluginId.trim();
     if (!id) return;
     const loaded = loadedById[id] ?? null;
+    // 先销毁插件实例子 scope（触发插件注册的清理回调与 host API 失效），
+    // 再执行 store 状态移除与 deactivate，保证资源释放先于状态可见性变化
+    await disposePluginScopesForPlugin(key, id);
     unregisterPluginDomains(bindingByDomain, id);
     delete loadedById[id];
     delete runtimeById[id];

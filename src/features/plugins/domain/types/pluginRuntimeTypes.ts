@@ -77,6 +77,8 @@ export type PluginContext = {
   cid: string;
   uid: string;
   lang: string;
+  /** 注册插件级清理回调（scope dispose 时触发，用于自动释放插件持有的资源） */
+  onDispose?: (cb: () => void) => void;
   host: {
     sendMessage(payload: PluginComposerPayload): Promise<void>;
     storage: {

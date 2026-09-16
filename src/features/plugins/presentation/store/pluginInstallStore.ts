@@ -37,7 +37,8 @@ import type {
 import { toPluginCommandErrorInfo } from "@/features/plugins/application/pluginCommandOutcome";
 import { createLogger } from "@/shared/utils/logger";
 import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
-import type { PluginRuntimeOpsPort } from "@/features/plugins/domain/usecases/ApplyPluginRuntimeOps";
+import type { PluginRuntimeOpsPort, ApplyPluginRuntimeOps } from "@/features/plugins/domain/usecases/ApplyPluginRuntimeOps";
+import type { RuntimeOpsUsecase } from "./pluginInstallActionTypes";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 import { createPluginOperationHelpers } from "./pluginInstallOperationHelpers";
 import { createPluginInstallActions } from "./pluginInstallActions";
@@ -46,6 +47,7 @@ import { buildSensitivePermissionMessage, collectSensitivePermissionLabelsForVer
 import { usePluginCatalogStore } from "./pluginCatalogStore";
 import { usePluginRuntimeAccess } from "./pluginRuntimeAccess";
 import { registerPluginRuntimeStateSyncListener } from "./pluginRuntimeStateSync";
+import { disposePluginScopesForPlugin } from "./pluginScopeRegistry";
 
 type InstallStore = {
   installedById: Record<string, InstalledPluginState>;
@@ -71,6 +73,49 @@ const stores = new Map<string, InstallStore>();
 const runtimeSyncUnsubscribeByKey = new Map<string, () => void>();
 let runtimeStarted = false;
 let stopRuntimeCleanup: (() => void) | null = null;
+
+/**
+ * 为 `ApplyPluginRuntimeOps` 用例包装"移除插件实例前先销毁作用域"的逻辑。
+ *
+ * 说明：
+ * - disable / uninstall / switchVersion 会移除（或替换）插件实例，
+ *   在执行现有 Rust 命令与 store 状态更新之前先 `await scope.dispose()`，
+ *   让插件注册的清理回调（事件订阅、浮层、工具栏项等）先行释放；
+ * - 领域用例本身保持不变（不修改 domain/ 文件），包装仅存在于展示层；
+ * - dispose 幂等，后续 registry.disablePluginRuntime 内的再次销毁为 no-op。
+ *
+ * @param key - server key（归一化后的 serverSocket）。
+ * @param usecase - 原始用例实例。
+ * @returns 包装后的用例实例（结构类型，仅公开方法面）。
+ */
+function wrapRuntimeOpsWithScopePreDispose(
+  key: string,
+  usecase: ApplyPluginRuntimeOps,
+): RuntimeOpsUsecase {
+  return {
+    async updateToLatest(input) {
+      return usecase.updateToLatest(input);
+    },
+    async switchVersion(input) {
+      await disposePluginScopesForPlugin(key, input.pluginId);
+      return usecase.switchVersion(input);
+    },
+    async rollback(input) {
+      return usecase.rollback(input);
+    },
+    async enable(input) {
+      return usecase.enable(input);
+    },
+    async disable(input) {
+      await disposePluginScopesForPlugin(key, input.pluginId);
+      return usecase.disable(input);
+    },
+    async uninstall(input) {
+      await disposePluginScopesForPlugin(key, input.pluginId);
+      return usecase.uninstall(input);
+    },
+  };
+}
 
 /**
  * 启动 plugin-install 运行时（幂等）。
@@ -142,7 +187,10 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       return disableRuntime(pluginId);
     },
   };
-  const runtimeOpsUsecase = getApplyPluginRuntimeOpsUsecase(runtimeOps);
+  const runtimeOpsUsecase = wrapRuntimeOpsWithScopePreDispose(
+    key,
+    getApplyPluginRuntimeOpsUsecase(runtimeOps),
+  );
 
   /**
    * 失败后尽力回填当前插件安装状态（避免 UI 卡在陈旧态）。

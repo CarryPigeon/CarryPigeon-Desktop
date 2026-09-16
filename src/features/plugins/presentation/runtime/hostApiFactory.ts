@@ -10,6 +10,7 @@ import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { createPluginInvokeApi } from "./pluginInvokeApi";
 import { createPluginEventApi } from "./pluginEventApi";
 import { createPluginUiApi, type PluginUiBridge } from "./pluginUiApi";
+import type { PluginScope } from "./pluginScope";
 
 export type TauriFetchResponse = {
   ok: boolean;
@@ -19,16 +20,38 @@ export type TauriFetchResponse = {
 };
 
 /**
- * 创建“权限受控”的 storage API（Rust 侧按 server_id 隔离）。
+ * 判断插件 scope 是否已销毁（已销毁时输出英文告警，含 pluginId）。
+ * 供各 host API 方法做 dispose 后的 no-op 防御。
  */
-export function createPluginStorageApi(serverSocket: string, pluginId: string): PluginContext["host"]["storage"] {
+function warnIfScopeDisposed(scope: PluginScope | undefined, pluginId: string): boolean {
+  if (scope?.disposed) {
+    console.warn(
+      `[plugin-host-api] plugin "${pluginId}" scope is disposed; call is a no-op`,
+    );
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 创建“权限受控”的 storage API（Rust 侧按 server_id 隔离）。
+ *
+ * @param scope 可选的插件作用域：已销毁后读写变为 no-op 并告警。
+ */
+export function createPluginStorageApi(
+  serverSocket: string,
+  pluginId: string,
+  scope?: PluginScope,
+): PluginContext["host"]["storage"] {
   return {
     async get(key: string): Promise<unknown> {
+      if (warnIfScopeDisposed(scope, pluginId)) return null;
       const k = String(key ?? "").trim();
       if (!k) return null;
       return invokeTauri<unknown>(TAURI_COMMANDS.pluginsStorageGet, { serverSocket, pluginId, key: k, ...buildTauriTlsArgs(serverSocket) });
     },
     async set(key: string, value: unknown): Promise<void> {
+      if (warnIfScopeDisposed(scope, pluginId)) return;
       const k = String(key ?? "").trim();
       if (!k) return;
       await invokeTauri<void>(TAURI_COMMANDS.pluginsStorageSet, { serverSocket, pluginId, key: k, value, ...buildTauriTlsArgs(serverSocket) });
@@ -38,10 +61,18 @@ export function createPluginStorageApi(serverSocket: string, pluginId: string): 
 
 /**
  * 创建“权限受控”的 network API（Rust 侧强制同源）。
+ *
+ * @param scope 可选的插件作用域：已销毁后请求变为 no-op（返回 ok:false 空响应）并告警。
  */
-export function createPluginNetworkApi(serverSocket: string): NonNullable<PluginContext["host"]["network"]> {
+export function createPluginNetworkApi(
+  serverSocket: string,
+  scope?: PluginScope,
+): NonNullable<PluginContext["host"]["network"]> {
   return {
     async fetch(input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<TauriFetchResponse> {
+      if (warnIfScopeDisposed(scope, "unknown")) {
+        return { ok: false, status: 0, bodyText: "", headers: {} };
+      }
       const url = String(input ?? "").trim();
       const method = String(init?.method ?? "GET").trim() || "GET";
       const headers = (init?.headers ?? {}) as Record<string, string>;
@@ -64,7 +95,9 @@ export function createPluginNetworkApi(serverSocket: string): NonNullable<Plugin
  *   白名单前缀（目前固定为 "voice_call:"）约束，杜绝越权调用；
  * - `mountOverlay` / `registerToolbarAction` 由 "ui" 权限 + 宿主 UI 桥共同门控；
  * - `sendMessage` 由 "messages:send" 权限门控（默认拒绝）：以当前用户身份发言
- *   属高危能力，零权限/未申请该权限的插件不得获得。
+ *   属高危能力，零权限/未申请该权限的插件不得获得；
+ * - 传入 `scope` 后，各子工厂接入作用域自动清理，scope 销毁后方法变为
+ *   no-op 并告警（不改变权限门控语义，既有调用不传 scope 保持兼容）。
  *
  * 注：`sendMessage` 的实际实现依赖宿主运行时桥（非纯数据），
  * 由调用方（domainRegistryContext）传入。
@@ -75,10 +108,13 @@ export function createHostApi(
   permissions: string[],
   uiBridge?: PluginUiBridge,
   sendMessage?: (payload: PluginComposerPayload) => Promise<void>,
+  scope?: PluginScope,
 ): PluginContext["host"] {
   const canSendMessages = permissions.includes("messages:send");
   const host: PluginContext["host"] = {
     sendMessage: async (payload) => {
+      // scope 已销毁：静默丢弃发送请求（no-op 防御）
+      if (warnIfScopeDisposed(scope, pluginId)) return;
       if (!canSendMessages) {
         throw new Error(
           `[PLUGIN_PERMISSION_DENIED] plugin ${pluginId} lacks "messages:send" permission`,
@@ -89,17 +125,17 @@ export function createHostApi(
       }
       await sendMessage(payload);
     },
-    storage: createPluginStorageApi(serverSocket, pluginId),
-    network: permissions.includes("network") ? createPluginNetworkApi(serverSocket) : undefined,
+    storage: createPluginStorageApi(serverSocket, pluginId, scope),
+    network: permissions.includes("network") ? createPluginNetworkApi(serverSocket, scope) : undefined,
   };
   if (permissions.includes("invoke")) {
-    host.invoke = createPluginInvokeApi(serverSocket, pluginId, "voice_call:") as never;
+    host.invoke = createPluginInvokeApi(serverSocket, pluginId, "voice_call:", scope) as never;
   }
   if (permissions.includes("events")) {
-    host.onEvent = createPluginEventApi("voice_call:") as never;
+    host.onEvent = createPluginEventApi("voice_call:", scope, pluginId) as never;
   }
   if (permissions.includes("ui") && uiBridge) {
-    const ui = createPluginUiApi(uiBridge);
+    const ui = createPluginUiApi(uiBridge, scope, pluginId);
     host.mountOverlay = ui.mountOverlay as never;
     host.registerToolbarAction = ui.registerToolbarAction as never;
   }
