@@ -22,13 +22,6 @@ export type MessageDomainRef = {
   version?: string;
 };
 
-/** 消息回应 UI 摘要模型。 */
-export type MessageReactionSummary = {
-  emoji: string;
-  count: number;
-  reactedByMe: boolean;
-};
-
 /** 回复引用摘要模型。 */
 export type MessageReplySummary = {
   messageId: string;
@@ -91,7 +84,6 @@ export type RenderableChatMessage =
         preview: string;
       };
       mentions?: MessageMention[];
-      reactions?: MessageReactionSummary[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
       recalledAt?: number;
@@ -118,7 +110,6 @@ export type RenderableChatMessage =
         preview: string;
       };
       mentions?: MessageMention[];
-      reactions?: MessageReactionSummary[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
       recalledAt?: number;
@@ -153,7 +144,6 @@ export type RenderableChatMessage =
         preview: string;
       };
       mentions?: MessageMention[];
-      reactions?: MessageReactionSummary[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
       editedAt?: number;
@@ -192,7 +182,6 @@ export type RenderableChatMessage =
         preview: string;
       };
       mentions?: MessageMention[];
-      reactions?: MessageReactionSummary[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
       editedAt?: number;

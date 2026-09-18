@@ -14,7 +14,6 @@ import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import SignalStrip from "@/features/chat/message-flow/message/presentation/components/SignalStrip.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
-import { reactToMessage } from "@/features/chat/message-flow/presentation/store-access/messageFlowStoreAccess";
 import MultiSelectToolbar from "@/features/chat/presentation/patchbay/components/menus/MultiSelectToolbar.vue";
 import ComposerHost from "@/features/chat/presentation/patchbay/components/composer/ComposerHost.vue";
 import { PluginOverlayHost, PluginToolbarSlot } from "@/features/plugins/api";
@@ -150,7 +149,6 @@ const virtualizerOptions = computed(() => ({
     if (m.kind === 'image' || m.kind === 'video') return 220;
     let base = item.isGroupStart ? 52 : 32;
     if (m.replyToId) base += 28;
-    if (m.reactions && m.reactions.length > 0) base += 24;
     return base;
   },
   overscan: 10,
@@ -552,7 +550,6 @@ function getReplyText(m: VirtualMessageItem): string {
                   :reply-text="getReplyText(virtualListItems[vr.index].m)"
                   :domain-registry-store="props.model.domainRegistryStore"
                   @install="props.onInstallHint"
-                  @react="(messageId, emoji) => emoji && reactToMessage(messageId, emoji)"
                   @openLightbox="openLightbox"
                   @viewForwardDetail="openForwardDetail"
                   @retry="(mid: string) => retryMessage(mid)"

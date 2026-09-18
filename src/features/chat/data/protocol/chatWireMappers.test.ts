@@ -9,7 +9,6 @@ import {
   mapChatChannelWire,
   mapChatUnreadStateWire,
   mapChatMessageWire,
-  mapChatReactionWire,
   mapChatMessagePageWire,
   mapChatChannelMemberWire,
   mapChatChannelApplicationWire,
@@ -178,16 +177,6 @@ describe("mapChatMessageWire", () => {
     expect(result.mentions![0].userId).toBe("u2");
     // wire 顶层为 string[]，服务端不回传 displayName/type，留空由渲染层回退。
     expect(result.mentions![0].displayName).toBe("");
-  });
-});
-
-// ── mapChatReactionWire ──
-
-describe("mapChatReactionWire", () => {
-  it("should map reaction wire", () => {
-    const wire = { emoji: "👍", count: 5, reacted_by_me: true };
-    const result = mapChatReactionWire(wire as any);
-    expect(result).toEqual({ emoji: "👍", count: 5, reactedByMe: true });
   });
 });
 

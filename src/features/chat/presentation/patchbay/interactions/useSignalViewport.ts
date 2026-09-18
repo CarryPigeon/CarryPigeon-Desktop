@@ -13,14 +13,22 @@ const AT_BOTTOM_GAP_PX = 60;
 const TOP_AUTO_LOAD_THRESHOLD_PX = 40;
 const AUTO_LOAD_COOLDOWN_MS = 900;
 /**
- * 贴底吸附窗口：跳底动作完成后的一小段时间内持续把视口钉在底部。
+ * 贴底吸附窗口：跳底动作完成后持续把视口钉在底部，直到高度稳定。
  *
  * 原因：消息列表是 @tanstack/vue-virtual 虚拟列表，行高先按 estimateSize 估算、
  * 渲染后再由 measureElement 实测修正。单次 `scrollTop = scrollHeight` 会在实测
  * 过程中随总高度变化而漂移，导致切频道/登录后并没有真正停在最新一条消息。
+ *
+ * 停止条件：scrollHeight 连续稳定若干 tick（高度收敛），或到达硬上限兜底，
+ * 或用户产生真实滚动输入（wheel / touchstart / pointerdown）。
  */
-const STICK_DURATION_MS = 900;
 const STICK_TICK_MS = 32;
+/** 吸附“稳定即停”阈值：scrollHeight 连续稳定 5 个 tick（≈160ms）即认为高度收敛。 */
+const STICK_STABLE_TICKS = 5;
+/** 吸附硬上限：即使高度持续变化，超过该时长也强制停止，兜底防止无限吸附。 */
+const STICK_MAX_DURATION_MS = 3000;
+/** 用户真实输入事件：吸附期间任一触发即视为用户主动滚动，立即取消吸附。 */
+const STICK_USER_INPUT_EVENTS = ["wheel", "touchstart", "pointerdown"] as const;
 
 /**
  * Signal pane 视口编排依赖。
@@ -59,7 +67,8 @@ export type SignalViewportModel = {
  * - 切换频道后（含登录后进入首个频道、离开再返回聊天页）：自动滚到最新一条消息；
  * - 自己发送消息后：无论视口位置，自动跳到最底部；
  * - 跳底后短暂“贴底吸附”：等待虚拟列表（@tanstack/vue-virtual）实测行高稳定，
- *   避免单次滚动因估算高度漂移而偏离最新消息；用户主动上滚会立即解除吸附；
+ *   避免单次滚动因估算高度漂移而偏离最新消息；用户真实滚动输入
+ *   （wheel / touchstart / pointerdown）会立即解除吸附；
  * - 向上滚动到顶部：按节流自动加载历史页；
  * - 位于底部时：尽力上报已读状态。
  */
@@ -71,16 +80,54 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
   let pendingScrollToBottom = false;
   /** 自己发送的消息待入列标记：入列后无论视口位置都强制跳到底部。 */
   let pendingOwnSendScroll = false;
-  /** 贴底吸附状态：截止时间、轮询句柄与上一帧 scrollTop（用于识别用户手动上滚）。 */
-  let stickDeadline = 0;
+  /**
+   * 贴底吸附状态：起始时间、轮询句柄、上一 tick 的 scrollHeight 与稳定计数，
+   * 以及吸附期间挂在 signal pane 上的用户输入监听解绑函数。
+   */
+  let stickStartedAt = 0;
   let stickTimer: number | null = null;
-  let stickLastTop = 0;
+  let stickLastHeight: number | null = null;
+  let stickStableTicks = 0;
+  let stickDetachInputListeners: (() => void) | null = null;
 
   /**
-   * 取消贴底吸附（切频道或用户主动上滚时调用）。
+   * 移除吸附期间挂载的用户输入监听（wheel / touchstart / pointerdown）。
+   */
+  function detachStickInputListeners(): void {
+    stickDetachInputListeners?.();
+    stickDetachInputListeners = null;
+  }
+
+  /**
+   * 在 signal pane 上挂载用户输入监听：吸附期间用户产生任何真实滚动输入
+   * （滚轮、触摸、指针按下）即立即取消吸附。
+   *
+   * 用捕获阶段监听，避免被子元素 stopPropagation 拦截；解绑函数保存下来，
+   * 在吸附结束（取消/稳定/超时）与组件卸载时移除。
+   */
+  function attachStickInputListeners(el: HTMLElement): void {
+    if (stickDetachInputListeners) return;
+    const onUserInput = (): void => {
+      // 用户主动滚动：立即解除贴底吸附。
+      cancelStickToBottom();
+    };
+    const removers: Array<() => void> = [];
+    for (const type of STICK_USER_INPUT_EVENTS) {
+      el.addEventListener(type, onUserInput, { capture: true });
+      removers.push(() => el.removeEventListener(type, onUserInput, { capture: true }));
+    }
+    stickDetachInputListeners = () => {
+      for (const remove of removers) remove();
+    };
+  }
+
+  /**
+   * 取消贴底吸附（切频道、吸附结束或用户真实输入滚动时调用）。
    */
   function cancelStickToBottom(): void {
-    stickDeadline = 0;
+    stickStartedAt = 0;
+    stickLastHeight = null;
+    stickStableTicks = 0;
     if (stickTimer !== null) {
       // 用全局 clearTimeout 而非 window.clearTimeout：测试环境 jsdom teardown 后
       // window 标识符被移除，残留的吸附定时器若访问 window 会抛 ReferenceError；
@@ -88,29 +135,49 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
       clearTimeout(stickTimer);
       stickTimer = null;
     }
+    detachStickInputListeners();
   }
 
   /**
-   * 在吸附窗口内反复把视口钉在底部，直到实测高度稳定或用户上滚。
+   * 在吸附窗口内反复把视口钉在底部，直到实测高度稳定或用户主动滚动。
    *
-   * 用户上滚识别：轮询时若发现 scrollTop 比上一帧记录值更小（排除自身写入），
-   * 视为用户主动滚动，立即取消吸附。
+   * 稳定即停：每个 tick 记录 scrollHeight，与上一 tick 相同则稳定计数 +1，
+   * 连续稳定 STICK_STABLE_TICKS 个 tick 即认为虚拟列表实测行高已收敛，停止吸附；
+   * 高度变化则重置计数并继续钉底。同时设置 STICK_MAX_DURATION_MS 硬上限兜底。
+   *
+   * 注意：不能用“scrollTop 减小”识别用户上滚——虚拟列表行高实测修正会改变
+   * 总高度并触发浏览器/虚拟列表程序性下调 scrollTop，该启发式会误取消吸附，
+   * 导致打开多历史消息的频道时视口停在历史位置。用户输入识别完全交给
+   * attachStickInputListeners 挂载的真实输入事件监听。
    */
   function startStickToBottom(): void {
-    stickDeadline = Date.now() + STICK_DURATION_MS;
+    stickStartedAt = Date.now();
+    stickLastHeight = null;
+    stickStableTicks = 0;
+    const el = signalPaneRef.value;
+    if (el) attachStickInputListeners(el);
     if (stickTimer !== null) return;
-    stickLastTop = signalPaneRef.value?.scrollTop ?? 0;
     const tick = (): void => {
       stickTimer = null;
-      const el = signalPaneRef.value;
-      if (!el || Date.now() > stickDeadline) return;
-      if (el.scrollTop < stickLastTop - 1) {
-        // 用户在吸附期间向上滚动了历史，停止贴底。
-        stickLastTop = el.scrollTop;
+      const pane = signalPaneRef.value;
+      if (!pane || stickStartedAt === 0) return;
+      // 面板可能在吸附开始后才绑定：补挂用户输入监听。
+      attachStickInputListeners(pane);
+      pane.scrollTop = pane.scrollHeight;
+      const height = pane.scrollHeight;
+      stickStableTicks =
+        stickLastHeight !== null && height === stickLastHeight ? stickStableTicks + 1 : 0;
+      stickLastHeight = height;
+      if (stickStableTicks >= STICK_STABLE_TICKS) {
+        // 高度已稳定：结束吸附并清理用户输入监听。
+        cancelStickToBottom();
         return;
       }
-      el.scrollTop = el.scrollHeight;
-      stickLastTop = el.scrollTop;
+      if (Date.now() - stickStartedAt > STICK_MAX_DURATION_MS) {
+        // 硬上限兜底：高度长时间不稳定也强制结束。
+        cancelStickToBottom();
+        return;
+      }
       // 同上：全局 setTimeout，避免测试环境拆除后 window 未定义。
       stickTimer = setTimeout(tick, STICK_TICK_MS);
     };

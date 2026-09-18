@@ -19,7 +19,6 @@ import type {
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
-  ChatReactionRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
   ChatSendMessageInput,
@@ -124,18 +123,4 @@ export type ChatApiPort = {
   listMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPage>;
   markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void>;
   batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void>;
-  reactToMessage(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    mid: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]>;
-  removeReaction(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    mid: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]>;
 };

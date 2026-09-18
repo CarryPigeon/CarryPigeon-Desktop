@@ -165,7 +165,6 @@ export function createMessageMapper(deps: MessageModelDeps) {
             replyTo,
             quoteReply,
             mentions,
-            reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })),
             forwardedFrom,
             forwardedMessages,
             preview: String(m.preview ?? "").trim() || (isVideo ? `[Video] ${fileName}` : `[Image] ${fileName}`),
@@ -179,11 +178,11 @@ export function createMessageMapper(deps: MessageModelDeps) {
         }
       }
 
-      return { id: mid, kind: "core_text", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
+      return { id: mid, kind: "core_text", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, text, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
     }
 
     const preview = String(m.preview ?? "").trim() || `UNPATCHED SIGNAL · ${contentDomain}${domain.version ? `@${domain.version}` : ""}`;
-    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, reactions: m.reactions?.map(r => ({ emoji: r.emoji, count: r.count, reactedByMe: r.reactedByMe ?? false, })), recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
+    return { id: mid, kind: "domain_message", from: { id: uid, name: fromName, avatarUrl: fromAvatarUrl }, timeMs, domain, preview, data: m.data, replyToId, replyTo, quoteReply, mentions, forwardedFrom, forwardedMessages, recalledAt: m.recalledAt != null ? Number(m.recalledAt) : undefined, threadRootId: String(m.threadRootId ?? "").trim() || undefined, threadReplyCount: m.threadReplyCount != null ? Number(m.threadReplyCount) : undefined, linkPreview: m.linkPreview ? { url: m.linkPreview.url, title: m.linkPreview.title, description: m.linkPreview.description, imageUrl: m.linkPreview.imageUrl, } : undefined, status: "sent" as const, };
   }
 
   return { mapWireMessage };

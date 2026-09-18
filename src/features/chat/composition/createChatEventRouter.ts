@@ -41,7 +41,7 @@ export type ChatWsEventRouterDeps = {
   getCurrentUserId: () => string;
   timelineState: Pick<
     MessageTimelineStatePort,
-    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessageReactions" | "updateMessage" | "markMessageRecalled"
+    "readCurrentChannelId" | "appendMessageIfMissing" | "removeMessage" | "updateMessage" | "markMessageRecalled"
   >;
   unreadProjection: ChannelUnreadProjectionPort;
   readStateProjection: Pick<

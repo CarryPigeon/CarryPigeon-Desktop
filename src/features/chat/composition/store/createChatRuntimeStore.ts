@@ -128,8 +128,6 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     forwardMessage: async () => {
       throw new Error("forwardMessage: not available in live mode — use httpChatApiPort.forwardMessage directly");
     },
-    reactToMessage: messageFlow.reactToMessage,
-    removeReaction: messageFlow.removeReaction,
     listMentionCandidates: messageFlow.listMentionCandidates,
     searchCurrentChannel: messageFlow.searchCurrentChannel,
     loadContextAroundMessage: messageFlow.loadContextAroundMessage,

@@ -58,8 +58,6 @@ export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): Messag
     cancelReply: store.cancelReply,
     recallMessage: store.recallMessage,
     sendComposerMessage: store.sendComposerMessage,
-    reactToMessage: store.reactToMessage,
-    removeReaction: store.removeReaction,
     listMentionCandidates: store.listMentionCandidates,
     searchCurrentChannel: store.searchCurrentChannel,
     loadContextAroundMessage: store.loadContextAroundMessage,

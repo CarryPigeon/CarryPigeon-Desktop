@@ -17,9 +17,7 @@ import type {
   MessageMention,
   MessageReplySummary,
   MessageSearchState,
-  ReactToMessageOutcome,
   RecallChatMessageOutcome,
-  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "./domain/contracts";
 
@@ -34,7 +32,7 @@ export type {
 } from "./domain/contracts";
 
 export type { FileAttachment };
-export type { MentionCandidate, MessageMention, MessageReactionSummary, MessageReplySummary, ReactToMessageOutcome, RecallChatMessageOutcome, RemoveReactionOutcome } from "./domain/contracts";
+export type { MentionCandidate, MessageMention, MessageReplySummary, RecallChatMessageOutcome } from "./domain/contracts";
 
 /**
  * 当前频道消息时间线快照。
@@ -59,8 +57,6 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
   loadMoreHistory(): Promise<void>;
   beginReply(messageId: string): void;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
-  reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
-  removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   searchCurrentChannel(query: string): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
   clearSearch(): void;

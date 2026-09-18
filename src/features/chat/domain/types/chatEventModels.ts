@@ -7,7 +7,7 @@
  * - 已知事件 payload 在 data 层完成最小归一化，避免 snake_case 穿透到 application/presentation。
  */
 
-import type { ChatMessageRecord, ChatReactionRecord } from "./chatApiModels";
+import type { ChatMessageRecord } from "./chatApiModels";
 
 /**
  * 新消息创建事件。
@@ -47,15 +47,6 @@ export type ChatChannelChangedEvent = {
  * 多频道目录整体变化事件。
  */
 export type ChatChannelsChangedEvent = Record<string, never>;
-
-/**
- * 消息表情回复更新事件。
- */
-export type ChatMessageReactionsUpdatedEvent = {
-  channelId: string;
-  messageId: string;
-  reactions: ChatReactionRecord[];
-};
 
 /** 消息编辑事件。 */
 export type ChatMessageUpdatedEvent = {
@@ -162,12 +153,6 @@ export type ChatEventEnvelope =
       eventType: "channels.changed";
       serverTime: number;
       payload: ChatChannelsChangedEvent;
-    }
-  | {
-      eventId: string;
-      eventType: "message.reactions_updated";
-      serverTime: number;
-      payload: ChatMessageReactionsUpdatedEvent;
     }
   | {
       eventId: string;

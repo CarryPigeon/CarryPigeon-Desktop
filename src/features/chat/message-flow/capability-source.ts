@@ -44,9 +44,7 @@ import {
   loadingMoreMessages,
   messageActionError,
   quoteReplyDraft,
-  reactToMessage,
   recallMessage,
-  removeReaction,
   replyDraft,
   replyToMessageId,
   searchCurrentChannel,
@@ -345,8 +343,6 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
         if (message) startReply(message);
       },
       recallMessage,
-      reactToMessage,
-      removeReaction,
       searchCurrentChannel,
       loadContextAroundMessage,
       clearSearch,

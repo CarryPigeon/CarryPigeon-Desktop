@@ -19,7 +19,6 @@ import type {
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
-  ChatReactionRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
   ChatSendMessageInput,
@@ -60,20 +59,6 @@ export type ChatCoreApiPort = {
     channelId: string,
     messageId: string,
   ): Promise<ChatMessageRecord>;
-  reactToMessage(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]>;
-  removeReaction(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]>;
   updateReadState(
     serverSocket: string,
     accessToken: string,

@@ -26,7 +26,6 @@ import type {
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
-  ChatReactionRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
   ChatSendMessageInput,
@@ -50,8 +49,6 @@ export type ChatCoreApplicationServiceDeps = {
     | "listChannelMessages"
     | "sendChannelMessage"
     | "recallMessage"
-    | "reactToMessage"
-    | "removeReaction"
     | "updateReadState"
     | "applyJoinChannel"
     | "patchChannel"
@@ -129,32 +126,6 @@ export class ChatCoreApplicationService {
    */
   recallMessage(serverSocket: string, accessToken: string, channelId: string, messageId: string): Promise<ChatMessageRecord> {
     return this.deps.api.recallMessage(serverSocket, accessToken, channelId, messageId);
-  }
-
-  /**
-   * 添加消息回应。
-   */
-  reactToMessage(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]> {
-    return this.deps.api.reactToMessage(serverSocket, accessToken, channelId, messageId, emoji);
-  }
-
-  /**
-   * 移除消息回应。
-   */
-  removeReaction(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]> {
-    return this.deps.api.removeReaction(serverSocket, accessToken, channelId, messageId, emoji);
   }
 
   /**

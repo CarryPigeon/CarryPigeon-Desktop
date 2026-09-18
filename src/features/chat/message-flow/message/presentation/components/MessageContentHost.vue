@@ -24,7 +24,6 @@ import type { ForwardedMessageEntry, RenderableChatMessage } from "@/features/ch
 import CoreTextMessageBubble from "./CoreTextMessageBubble.vue";
 import MergedForwardBubble from "./MergedForwardBubble.vue";
 import FileRefMessageBubble from "./FileRefMessageBubble.vue";
-import ReactionBar from "./ReactionBar.vue";
 import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
 import { getAccountCapabilities } from "@/features/account/api";
 
@@ -52,10 +51,6 @@ const emit = defineEmits<{
    * 未知 domain 场景下触发安装提示。
    */
   (event: "install", pluginId: string | undefined): void;
-  /**
-   * 消息回应切换。
-   */
-  (event: "react", messageId: string, emoji: string): void;
   /**
    * 打开图片灯箱。
    */
@@ -315,11 +310,6 @@ function handleInstall(): void {
       :message-id="props.message.id"
       :error="sendFailedError"
       @retry="(mid: string) => emit('retry', mid)"
-    />
-    <ReactionBar
-      :message-id="props.message.id"
-      :reactions="props.message.reactions ?? []"
-      @react="(messageId, emoji) => emit('react', messageId, emoji)"
     />
     </div>
   </template>

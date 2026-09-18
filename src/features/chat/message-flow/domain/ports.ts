@@ -10,7 +10,6 @@ import type {
   ChatMessageActionErrorInfo,
   MessageDomain,
   MessageMention,
-  MessageReactionSummary,
   MessageReplySummary,
   MessageSearchState,
 } from "@/features/chat/message-flow/domain/contracts";
@@ -23,7 +22,7 @@ import type {
  */
 export type MessageFlowApiPort = Pick<
   ChatApiPort,
-  "sendChannelMessage" | "recallMessage" | "listChannelMessages" | "reactToMessage" | "removeReaction" | "searchChannelMessages" | "listChannelMessagesAround" | "listChannelMembers"
+  "sendChannelMessage" | "recallMessage" | "listChannelMessages" | "searchChannelMessages" | "listChannelMessagesAround" | "listChannelMembers"
 >;
 
 /**
@@ -66,8 +65,6 @@ export type MessageTimelineStatePort = {
   ): boolean;
   beginOptimisticMessageRemoval(channelId: string, messageId: string): { restore(): void };
   removeMessage(channelId: string, messageId: string): void;
-  /** 更新频道中某条消息的回应列表（用于 WS 事件和乐观更新）。 */
-  updateMessageReactions(channelId: string, messageId: string, reactions: MessageReactionSummary[]): void;
   /** 更新频道中某条消息的全部字段（用于编辑事件和乐观更新）。 */
   updateMessage(channelId: string, messageId: string, updater: (old: ChatMessage) => ChatMessage): void;
   readNextCursor(channelId: string): string;

@@ -1,6 +1,8 @@
 /**
  * @fileoverview useSignalViewport 单元测试。
- * @description 覆盖：自己发送消息后强制跳底、普通追加消息的既有滚动策略。
+ * @description 覆盖：自己发送消息后强制跳底、普通追加消息的既有滚动策略、
+ *              贴底吸附的用户输入取消（wheel/touchstart/pointerdown）与
+ *              “稳定即停 + 硬上限”停止条件。
  */
 import { describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
@@ -200,7 +202,7 @@ describe("useSignalViewport", () => {
     expect(pane.__scrollTop).toBe(1000);
   });
 
-  it("贴底吸附：用户在吸附窗口内上滚则停止贴底", async () => {
+  it("贴底吸附：用户真实 wheel 输入立即取消贴底；程序性 scrollTop 下调不取消", async () => {
     vi.useFakeTimers();
     try {
       const deps = createDeps();
@@ -213,13 +215,115 @@ describe("useSignalViewport", () => {
       await flushAsync();
       expect(pane.__scrollTop).toBe(1000);
 
-      // 用户向上滚动历史
-      pane.__scrollTop = 500;
-      // 虚拟列表实测后总高度增长（若无用户滚动，吸附会继续钉底）
+      // 程序性 scrollTop 下调（虚拟列表实测修正总高度导致）+ 高度变化：
+      // 不是用户输入 → 吸附不应取消，继续钉回最新一条
+      pane.__scrollTop = 400;
       pane.__scrollHeight = 1600;
+      vi.advanceTimersByTime(64);
+      expect(pane.__scrollTop).toBe(1600);
+
+      // 用户真实 wheel 输入 → 立即取消吸附
+      pane.dispatchEvent(new Event("wheel"));
+      pane.__scrollHeight = 1800;
       vi.advanceTimersByTime(200);
-      // 用户已上滚 → 吸附解除，视口停留在用户位置
-      expect(pane.__scrollTop).toBe(500);
+      // 吸附已解除：视口不再被钉底，停留在用户所在位置附近
+      expect(pane.__scrollTop).toBe(1600);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("贴底吸附：touchstart / pointerdown 同样立即取消贴底", async () => {
+    vi.useFakeTimers();
+    try {
+      const deps = createDeps();
+      deps.currentMessageCount.value = 5;
+      const pane = createPane(1000, 400, 600);
+      const model = useSignalViewport(deps);
+      model.setSignalPaneRef(pane);
+
+      deps.currentMessageCount.value = 6;
+      await flushAsync();
+      expect(pane.__scrollTop).toBe(1000);
+
+      pane.dispatchEvent(new Event("touchstart"));
+      pane.__scrollHeight = 1600;
+      vi.advanceTimersByTime(64);
+      expect(pane.__scrollTop).toBe(1000);
+
+      // 重新触发吸附后验证 pointerdown
+      model.handleJumpToBottom();
+      expect(pane.__scrollTop).toBe(1600);
+      pane.dispatchEvent(new Event("pointerdown"));
+      pane.__scrollHeight = 1800;
+      vi.advanceTimersByTime(64);
+      expect(pane.__scrollTop).toBe(1600);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("贴底吸附：高度持续变化时延长吸附，稳定后停止", async () => {
+    vi.useFakeTimers();
+    try {
+      const deps = createDeps();
+      deps.currentMessageCount.value = 5;
+      const pane = createPane(1000, 400, 600);
+      const model = useSignalViewport(deps);
+      model.setSignalPaneRef(pane);
+
+      deps.currentMessageCount.value = 6;
+      await flushAsync();
+      expect(pane.__scrollTop).toBe(1000);
+
+      // 每个 tick 之后总高度继续变化（模拟行高实测逐步修正）→ 吸附持续延长
+      let height = 1000;
+      for (let i = 0; i < 20; i += 1) {
+        vi.advanceTimersByTime(32);
+        height += 100;
+        pane.__scrollHeight = height;
+      }
+      // 最后一次高度变化后的下一个 tick：仍被钉在最新一条
+      vi.advanceTimersByTime(32);
+      expect(pane.__scrollTop).toBe(height);
+
+      // 高度不再变化：连续稳定若干 tick 后吸附停止
+      const settledHeight = height;
+      vi.advanceTimersByTime(5 * 32);
+      expect(pane.__scrollTop).toBe(settledHeight);
+      // 吸附已停止：此后总高度再变化也不会被钉底
+      pane.__scrollHeight = settledHeight + 500;
+      vi.advanceTimersByTime(300);
+      expect(pane.__scrollTop).toBe(settledHeight);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("贴底吸附：高度长时间不稳定时到达硬上限后停止（兜底）", async () => {
+    vi.useFakeTimers();
+    try {
+      const deps = createDeps();
+      deps.currentMessageCount.value = 5;
+      const pane = createPane(1000, 400, 600);
+      const model = useSignalViewport(deps);
+      model.setSignalPaneRef(pane);
+
+      deps.currentMessageCount.value = 6;
+      await flushAsync();
+      expect(pane.__scrollTop).toBe(1000);
+
+      // 持续变化高度超过硬上限（3000ms）：吸附必须停止，避免无限钉底
+      let height = 1000;
+      for (let i = 0; i < 110; i += 1) {
+        vi.advanceTimersByTime(32);
+        height += 10;
+        pane.__scrollHeight = height;
+      }
+      const stoppedAt = pane.__scrollTop;
+      pane.__scrollHeight = height + 999;
+      vi.advanceTimersByTime(300);
+      expect(pane.__scrollTop).toBe(stoppedAt);
     } finally {
       vi.useRealTimers();
     }

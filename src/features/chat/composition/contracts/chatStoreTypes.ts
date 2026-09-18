@@ -22,9 +22,7 @@ import type {
   MessageMention,
   MessageReplySummary,
   MessageSearchState,
-  ReactToMessageOutcome,
   RecallChatMessageOutcome,
-  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
 import type {
@@ -90,8 +88,6 @@ export type MessageFlowRuntimeStore = {
   cancelReply(): void;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   sendComposerMessage(payload?: ComposerSubmitPayload): Promise<SendChatMessageOutcome>;
-  reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome>;
-  removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome>;
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   searchCurrentChannel(query: string): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;

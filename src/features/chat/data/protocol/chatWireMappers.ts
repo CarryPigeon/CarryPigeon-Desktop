@@ -21,7 +21,6 @@ import type {
   ChatMessageReplyRecord,
   ChatPinRecord,
   ChatQuoteReplyRecord,
-  ChatReactionRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
   ChatReplyMessageData,
@@ -37,7 +36,6 @@ import type {
   ChatMessageCreatedEvent,
   ChatMessageDeletedEvent,
   ChatMessagePinnedEvent,
-  ChatMessageReactionsUpdatedEvent,
   ChatMessageUnpinnedEvent,
   ChatMessageUpdatedEvent,
   ChatReadStateUpdatedEvent,
@@ -56,7 +54,6 @@ import type {
   ChatMentionWire,
   ChatMessageAttachmentUploadWire,
   ChatMessagePageWire,
-  ChatMessageReactionWire,
   ChatMessageReplyWire,
   ChatMessageWire,
   ChatPinWire,
@@ -74,7 +71,6 @@ import type {
   ChatMessageCreatedEventPayloadWire,
   ChatMessageDeletedEventPayloadWire,
   ChatMessagePinnedEventPayloadWire,
-  ChatMessageReactionsUpdatedEventPayloadWire,
   ChatMessageUnpinnedEventPayloadWire,
   ChatMessageUpdatedEventPayloadWire,
   ChatReadStateUpdatedEventPayloadWire,
@@ -337,20 +333,10 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
     replyTo,
     quoteReply,
     mentions,
-    reactions: wire.reactions?.map(mapChatReactionWire),
     recalledAt,
     forwardedFrom,
     forwardedMessages,
     linkPreview,
-  };
-}
-
-/** Map reaction wire → domain record. */
-export function mapChatReactionWire(wire: ChatMessageReactionWire): ChatReactionRecord {
-  return {
-    emoji: asTrimmedString(wire.emoji),
-    count: asSafeNumber(wire.count),
-    reactedByMe: Boolean(wire.reacted_by_me),
   };
 }
 
@@ -555,19 +541,6 @@ function mapChannelChangedPayload(wire: ChatChannelChangedEventPayloadWire): Cha
   };
 }
 
-/**
- * 将 "message.reactions_updated" 事件 payload 从 wire 映射为领域事件。
- */
-function mapMessageReactionsUpdatedPayload(
-  wire: ChatMessageReactionsUpdatedEventPayloadWire,
-): ChatMessageReactionsUpdatedEvent {
-  return {
-    channelId: asTrimmedString(wire.cid),
-    messageId: asTrimmedString(wire.mid),
-    reactions: (wire.reactions ?? []).map(mapChatReactionWire),
-  };
-}
-
 function mapMessageUpdatedPayload(wire: ChatMessageUpdatedEventPayloadWire): ChatMessageUpdatedEvent {
   return {
     channelId: asTrimmedString(wire.cid),
@@ -686,14 +659,6 @@ export function mapChatWsEventWire(wire: ChatWsEventWire): ChatEventEnvelope {
       ...base,
       eventType: "channels.changed",
       payload: {},
-    };
-  }
-
-  if (base.eventType === "message.reactions_updated") {
-    return {
-      ...base,
-      eventType: "message.reactions_updated",
-      payload: mapMessageReactionsUpdatedPayload(wire.payload as ChatMessageReactionsUpdatedEventPayloadWire),
     };
   }
 

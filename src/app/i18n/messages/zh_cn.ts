@@ -829,7 +829,6 @@ export const zh_cn = {
   // ARIA / 可访问性
   close_reply: "关闭回复",
   close_quote: "关闭引用",
-  add_reaction: "添加表情",
   close_link_preview: "关闭预览",
   voice_record_start: "录制语音",
   voice_record_stop: "停止录制",

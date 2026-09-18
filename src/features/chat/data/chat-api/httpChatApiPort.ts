@@ -15,7 +15,6 @@ import type {
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
-  ChatReactionRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
   ChatSendMessageInput,
@@ -47,10 +46,8 @@ import {
   httpPatchChannel,
   httpPinMessage,
   httpPutChannelBan,
-  httpReactToMessage,
   httpRecallMessage,
   httpRemoveChannelAdmin,
-  httpRemoveReaction,
   httpSearchChannelMessages,
   httpSendChannelMessage,
   httpUnpinMessage,
@@ -69,7 +66,6 @@ import {
   mapChatMessagePageWire,
   mapChatMessageWire,
   mapChatPinWire,
-  mapChatReactionWire,
   mapChatReadStateInput,
   mapChatReadStateResponseWire,
   mapChatSendMessageInput,
@@ -281,25 +277,5 @@ export const httpChatApiPort: ChatApiPort = {
   },
   async batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
     return httpBatchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
-  },
-  async reactToMessage(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    mid: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]> {
-    const wire = await httpReactToMessage(serverSocket, accessToken, cid, mid, { emoji });
-    return (wire.reactions ?? []).map(mapChatReactionWire);
-  },
-  async removeReaction(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    mid: string,
-    emoji: string,
-  ): Promise<ChatReactionRecord[]> {
-    const wire = await httpRemoveReaction(serverSocket, accessToken, cid, mid, emoji);
-    return (wire.reactions ?? []).map(mapChatReactionWire);
   },
 };

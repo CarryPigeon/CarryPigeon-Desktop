@@ -170,20 +170,12 @@ export type ChatMessageRecord = {
   replyTo?: ChatMessageReplyRecord;
   quoteReply?: ChatQuoteReplyRecord;
   mentions?: ChatMessageMentionRecord[];
-  reactions?: ChatReactionRecord[];
   recalledAt?: number;   // 非空表示消息已被撤回；值为服务器分配的 Unix 毫秒时间戳
   threadRootId?: string;      // 非空 = 此消息是线程回复；值 = 根消息 ID（服务端尚未实现 thread 功能）
   threadReplyCount?: number;  // 根消息上的回复计数（服务端尚未实现 thread 功能）
   forwardedFrom?: ChatForwardedFromRecord;
   forwardedMessages?: ChatForwardedFromRecord[];
   linkPreview?: ChatLinkPreview;
-};
-
-/** 消息回应领域模型。 */
-export type ChatReactionRecord = {
-  emoji: string;
-  count: number;
-  reactedByMe: boolean;
 };
 
 /**

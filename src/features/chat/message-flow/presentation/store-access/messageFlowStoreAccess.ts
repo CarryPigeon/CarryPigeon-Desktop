@@ -14,9 +14,7 @@ import type {
   MentionCandidate,
   MessageMention,
   MessageReplySummary,
-  ReactToMessageOutcome,
   RecallChatMessageOutcome,
-  RemoveReactionOutcome,
   SendChatMessageOutcome,
 } from "@/features/chat/message-flow/api-types";
 
@@ -158,14 +156,6 @@ export function sendComposerMessage(payload?: ComposerSubmitPayload): Promise<Se
  */
 export function startReply(message: ChatMessage): void {
   return resolveMessageFlowStore().startReply(message);
-}
-
-export function reactToMessage(messageId: string, emoji: string): Promise<ReactToMessageOutcome> {
-  return resolveMessageFlowStore().reactToMessage(messageId, emoji);
-}
-
-export function removeReaction(messageId: string, emoji: string): Promise<RemoveReactionOutcome> {
-  return resolveMessageFlowStore().removeReaction(messageId, emoji);
 }
 
 export function listMentionCandidates(channelId?: string): Promise<MentionCandidate[]> {

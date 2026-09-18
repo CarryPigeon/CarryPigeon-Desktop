@@ -1399,35 +1399,6 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   }
 
   // -------------------------------------------------------------------------
-  // Reactions — add (auth)
-  // -------------------------------------------------------------------------
-  if (method === "POST" && pathnameParts.length === 5 && pathnameParts[0] === "channels" && pathnameParts[4] === "reactions") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
-    const mid = decodeURIComponent(pathnameParts[3] ?? "").trim();
-    const body = req.body as { emoji?: string } | null;
-    const emoji = body?.emoji?.trim();
-    if (!emoji) return { ok: false, error: apiError(400, "invalid_request", "Missing emoji") };
-    const reactions = [{ emoji, count: 1, reacted_by_me: true }];
-    emitWs(server, "message.reactions_updated", { cid, mid, reactions });
-    return { ok: true, status: 200, body: { reactions } };
-  }
-
-  // -------------------------------------------------------------------------
-  // Reactions — remove (auth)
-  // -------------------------------------------------------------------------
-  if (method === "DELETE" && pathnameParts.length === 5 && pathnameParts[0] === "channels" && pathnameParts[4] === "reactions") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
-    const mid = decodeURIComponent(pathnameParts[3] ?? "").trim();
-    const emoji = searchParams.get("emoji")?.trim() ?? "";
-    emitWs(server, "message.reactions_updated", { cid, mid, reactions: [], emoji });
-    return { ok: true, status: 200, body: [] };
-  }
-
-  // -------------------------------------------------------------------------
   // Files list (auth)
   // -------------------------------------------------------------------------
   if (method === "GET" && pathname === "/files/list") {

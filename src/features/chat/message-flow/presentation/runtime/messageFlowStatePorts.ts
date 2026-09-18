@@ -11,7 +11,6 @@ import type {
   MessageTimelineStatePort,
 } from "@/features/chat/message-flow/domain/ports";
 import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
-import type { MessageReactionSummary } from "@/features/chat/message-flow/domain/contracts";
 
 /**
  * 单个频道在内存中保留的最大消息数量。
@@ -84,13 +83,6 @@ export function createMessageTimelineStatePort(
       const list = deps.messagesByChannel[channelId] ?? [];
       const index = list.findIndex((entry) => entry.id === messageId);
       if (index >= 0) list.splice(index, 1);
-    },
-    updateMessageReactions(channelId: string, messageId: string, reactions: MessageReactionSummary[]): void {
-      const list = deps.messagesByChannel[channelId] ?? [];
-      const idx = list.findIndex((m) => m.id === messageId);
-      if (idx >= 0) {
-        list.splice(idx, 1, { ...list[idx], reactions });
-      }
     },
     updateMessage(channelId: string, messageId: string, updater: (old: ChatMessage) => ChatMessage): void {
       const list = deps.messagesByChannel[channelId] ?? [];

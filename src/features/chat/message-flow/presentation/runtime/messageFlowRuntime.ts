@@ -161,8 +161,6 @@ export function createChatMessageFlowRuntime(
     startReply: (message) => applicationService.startReply(message),
     cancelReply: () => applicationService.cancelReply(),
     sendComposerMessage: (payload) => applicationService.sendComposerMessage(payload),
-    reactToMessage: (messageId, emoji) => applicationService.reactToMessage(messageId, emoji),
-    removeReaction: (messageId, emoji) => applicationService.removeReaction(messageId, emoji),
     listMentionCandidates: (channelId) => applicationService.listMentionCandidates(channelId),
     searchCurrentChannel: (query) => applicationService.searchCurrentChannel(query),
     loadContextAroundMessage: (messageId) => applicationService.loadContextAroundMessage(messageId),

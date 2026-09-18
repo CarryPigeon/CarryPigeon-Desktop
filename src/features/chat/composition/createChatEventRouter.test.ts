@@ -15,7 +15,6 @@ function buildDeps(overrides?: Partial<ChatWsEventRouterDeps>): ChatWsEventRoute
       readCurrentChannelId: () => "c1",
       appendMessageIfMissing: vi.fn(() => true),
       removeMessage: vi.fn(),
-      updateMessageReactions: vi.fn(),
       updateMessage: vi.fn(),
       markMessageRecalled: vi.fn(),
     },

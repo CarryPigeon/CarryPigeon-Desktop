@@ -827,7 +827,6 @@ export const en_us = {
   // ARIA / accessibility
   close_reply: "Close reply",
   close_quote: "Close quote",
-  add_reaction: "Add reaction",
   close_link_preview: "Close preview",
   voice_record_start: "Record voice message",
   voice_record_stop: "Stop recording",

@@ -6,9 +6,9 @@
 
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
-import type { MessageDomainRef, MessageMention, MessageReactionSummary, MessageReplySummary, RenderableChatMessage } from "../message/domain/messageModels";
+import type { MessageDomainRef, MessageMention, MessageReplySummary, RenderableChatMessage } from "../message/domain/messageModels";
 
-export type { MessageMention, MessageReactionSummary, MessageReplySummary };
+export type { MessageMention, MessageReplySummary };
 
 /**
  * 提及候选项（输入 @ 时自动补全的结果）。
@@ -68,7 +68,6 @@ export type ChatMessageActionErrorCode =
   | "missing_message_id"
   | "stale_runtime_scope"
   | "send_failed"
-  | "reaction_failed"
   | "recall_failed";
 
 /**
@@ -85,20 +84,6 @@ export type ChatMessageActionErrorInfo = SemanticErrorInfo<ChatMessageActionErro
 export type SendChatMessageOutcome =
   | SuccessOutcome<"chat_message_sent", { message: ChatMessage }>
   | FailureOutcome<"chat_message_send_rejected", ChatMessageActionErrorCode>;
-
-/**
- * 添加回应显式结果。
- */
-export type ReactToMessageOutcome =
-  | SuccessOutcome<"message_reacted", { messageId: string; emoji: string; reactions: MessageReactionSummary[] }>
-  | FailureOutcome<"message_reaction_rejected", ChatMessageActionErrorCode>;
-
-/**
- * 移除回应显式结果。
- */
-export type RemoveReactionOutcome =
-  | SuccessOutcome<"message_reaction_removed", { messageId: string; emoji: string; reactions: MessageReactionSummary[] }>
-  | FailureOutcome<"message_reaction_removal_rejected", ChatMessageActionErrorCode>;
 
 /**
  * 撤回消息显式结果。

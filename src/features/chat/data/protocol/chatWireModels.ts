@@ -135,7 +135,7 @@ export type ChatForwardMessageWireData = {
  * 消息实体的 wire 表示（对齐服务端 `ChannelMessageV1Response`）。
  *
  * - 顶层固定 10 字段：mid / uid / cid / domain / domain_version / data / send_time /
- *   mentions / preview / status。其余可选字段（reactions 等）仍保留以便扩展。
+ *   mentions / preview / status。其余可选字段仍保留以便扩展。
  * - 服务端目前不在 canonical 信封携带 sender/nickname/avatar，作者信息由客户端
  *   通过 channel members 等接口自行解析。
  */
@@ -150,17 +150,6 @@ export type ChatMessageWire = {
   mentions?: string[];
   preview?: string;
   status?: "sent" | "recalled";
-  // 可选扩展：服务端尚未推送 reactions，但本地乐观更新用到时仍可承载。
-  reactions?: ChatMessageReactionWire[];
-};
-
-/**
- * 消息回应 wire 模型。
- */
-export type ChatMessageReactionWire = {
-  emoji: string;
-  count: number;
-  reacted_by_me: boolean;
 };
 
 /**
@@ -277,12 +266,4 @@ export type ChatMentionPageWire = {
   items: ChatMentionWire[];
   next_cursor?: string;
   has_more?: boolean;
-};
-
-export type ChatReactionRequestWire = {
-  emoji: string;
-};
-
-export type ChatReactionResponseWire = {
-  reactions: ChatMessageReactionWire[];
 };
