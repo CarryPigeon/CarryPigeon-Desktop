@@ -397,18 +397,23 @@ function selectSystemMention(type: "everyone" | "here"): void {
 <template>
   <!-- 组件：ComposerHost｜职责：统一发送区（工具栏 + 输入 + 发送） -->
   <section ref="composerEl" class="cp-composer" :class="{ 'cp-composer--collapsed': collapsed }">
-    <!-- 折叠态：只显示占位输入条（v-show 保持挂载，配合展开动画平滑切换） -->
-    <div
-      v-show="collapsed"
-      class="cp-composer__collapsed"
-      role="button"
-      tabindex="0"
-      :aria-label="t('message_input_placeholder')"
-      @click="handleCollapsedClick"
-      @focus="handleCollapsedClick"
-    >
-      <span class="cp-composer__collapsedPlaceholder">{{ t('message_input_placeholder') }}</span>
-      <button class="cp-composer__send" type="button" disabled>{{ t('send') }}</button>
+    <!-- 折叠态：占位输入条（常驻挂载，外层 grid 0fr↔1fr 高度过渡，与展开区交叉渐变） -->
+    <div class="cp-composer__collapsedExpander" :data-open="collapsed">
+      <div class="cp-composer__collapsedClip">
+        <div
+          class="cp-composer__collapsed"
+          role="button"
+          :tabindex="collapsed ? 0 : -1"
+          :aria-hidden="!collapsed"
+          :inert="!collapsed"
+          :aria-label="t('message_input_placeholder')"
+          @click="handleCollapsedClick"
+          @focus="handleCollapsedClick"
+        >
+          <span class="cp-composer__collapsedPlaceholder">{{ t('message_input_placeholder') }}</span>
+          <button class="cp-composer__send" type="button" disabled>{{ t('send') }}</button>
+        </div>
+      </div>
     </div>
 
     <!-- 展开态：常驻挂载；外层用 grid-template-rows 0fr↔1fr 做高度过渡，折叠时 inert 防误焦 -->
@@ -627,6 +632,18 @@ function selectSystemMention(type: "everyone" | "here"): void {
   background: var(--cp-panel);
 }
 
+/* 聚焦态：改用 inset 光环，绘制在边框盒内部，不会被任何祖先的 overflow:hidden 裁掉左右两侧 */
+.cp-composer__inputArea :deep(.t-textarea__wrap:focus-within),
+.cp-composer__inputArea :deep(.t-textarea:focus-within) {
+  box-shadow: none !important;
+}
+
+.cp-composer__inputArea :deep(.t-textarea__inner:focus) {
+  box-shadow:
+    inset 0 0 0 2px color-mix(in oklab, var(--cp-highlight) 55%, transparent),
+    var(--cp-inset) !important;
+}
+
 .cp-composer__plugin {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
@@ -839,6 +856,22 @@ function selectSystemMention(type: "everyone" | "here"): void {
   background: var(--cp-border-light, var(--cp-border));
 }
 
+/* 折叠态高度过渡：与展开区对称的 1fr↔0fr，交叉渐变避免瞬时跳变 */
+.cp-composer__collapsedExpander {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 300ms var(--cp-ease);
+}
+
+.cp-composer__collapsedExpander[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+
+.cp-composer__collapsedClip {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .cp-composer__collapsed {
   display: flex;
   align-items: center;
@@ -847,6 +880,13 @@ function selectSystemMention(type: "everyone" | "here"): void {
   padding: 8px 12px;
   min-height: 40px;
   cursor: text;
+  opacity: 1;
+  transition: opacity 180ms var(--cp-ease);
+}
+
+.cp-composer__collapsedExpander[data-open="false"] .cp-composer__collapsed {
+  opacity: 0;
+  transition: opacity 120ms var(--cp-ease);
 }
 
 .cp-composer__collapsedPlaceholder {
@@ -868,8 +908,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
   grid-template-rows: 0fr;
   opacity: 0;
   transition:
-    grid-template-rows 180ms var(--cp-ease),
-    opacity 150ms var(--cp-ease);
+    grid-template-rows 300ms var(--cp-ease),
+    opacity 200ms var(--cp-ease);
 }
 
 .cp-composer__expander[data-open="true"] {
@@ -893,5 +933,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
 .cp-composer__expanded {
   display: flex;
   flex-direction: column;
+  /* 左右留出负边距补偿：给聚焦环（3px）留出绘制空间，避免被裁剪层的 overflow:hidden 裁掉左右两侧 */
+  padding: 0 4px;
+  margin: 0 -4px;
 }
 </style>

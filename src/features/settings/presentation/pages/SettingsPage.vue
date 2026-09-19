@@ -17,7 +17,7 @@ import { getAboutCapabilities } from "@/features/about/api";
 import type { AppInfo } from "@/features/about/api-types";
 import { checkForUpdate, type UpdateStatus } from "@/shared/updater/checkUpdate";
 import { useSettingsPageModel } from "@/features/settings/presentation/composables/useSettingsPageModel";
-import { DEFAULT_APP_THEME, type AppAccent, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
+import { DEFAULT_APP_THEME, type AppAccent, type AppThemePreference } from "@/features/settings/domain/types/SettingsTypes";
 import { DEFAULT_APP_LOCALE } from "@/shared/utils/locale";
 import {
   exportSettingsEnvelope,
@@ -139,18 +139,9 @@ onMounted(async () => {
 const importFileInput = ref<HTMLInputElement | null>(null);
 const dataStatus = ref<{ tone: "success" | "danger"; message: string } | null>(null);
 
-const shellStatus = computed(() =>
-  themeError.value || preferencesError.value || businessPreferencesError.value
-    ? {
-        tone: "danger" as const,
-        title: t("settings_status_error"),
-        message: themeError.value || preferencesError.value || businessPreferencesError.value,
-      }
-    : {
-        tone: "success" as const,
-        title: t("settings_status_ready"),
-        message: t("settings_status_ready_message"),
-      },
+// 选择器：`.cp-settings__errBanner` 数据源｜用途：聚合各偏好加载错误，仅在出错时展示
+const settingsError = computed(
+  () => themeError.value || preferencesError.value || businessPreferencesError.value,
 );
 
 function goToSection(sectionId: SectionId): void {
@@ -173,9 +164,9 @@ function clearDataStatus(): void {
   dataStatus.value = null;
 }
 
-function normalizeImportTheme(raw: unknown): AppTheme | null {
+function normalizeImportTheme(raw: unknown): AppThemePreference | null {
   // 兼容旧版本导出中的主题值：patchbay（品牌暗色）→ dark；legacy（经典浅色）→ light。
-  if (raw === "dark" || raw === "light") return raw;
+  if (raw === "system" || raw === "dark" || raw === "light") return raw;
   if (raw === "patchbay") return "dark";
   if (raw === "legacy") return "light";
   return null;
@@ -310,17 +301,7 @@ async function handleLogout(): Promise<void> {
         </template>
       </PageHeader>
 
-      <section class="cp-settings__toolbar">
-        <div class="cp-settings__status" :data-tone="shellStatus.tone">
-          <div class="cp-settings__statusK">{{ shellStatus.title }}</div>
-          <div class="cp-settings__statusV">{{ shellStatus.message }}</div>
-        </div>
-        <div class="cp-settings__toolbarActions">
-          <button class="cp-settings__btn" data-testid="settings-reset" type="button" @click="handleResetDefaults">
-            {{ t("settings_reset_defaults") }}
-          </button>
-        </div>
-      </section>
+      <div v-if="settingsError" class="cp-settings__errBanner" role="alert">{{ settingsError }}</div>
 
       <nav class="cp-settings__nav" :aria-label="t('settings_sections')">
         <button
@@ -353,6 +334,15 @@ async function handleLogout(): Promise<void> {
               <div class="cp-settings__k">{{ t("settings_theme") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__seg">
+                  <button
+                    class="cp-settings__segBtn"
+                    :data-active="theme === 'system'"
+                    data-testid="settings-theme-system"
+                    type="button"
+                    @click="pickTheme('system')"
+                  >
+                    {{ t("settings_theme_system") }}
+                  </button>
                   <button
                     class="cp-settings__segBtn"
                     :data-active="theme === 'dark'"
@@ -754,62 +744,15 @@ async function handleLogout(): Promise<void> {
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
 }
 
-/* 选择器：`.cp-settings__toolbar`｜用途：全局状态 / 主操作条 */
-.cp-settings__toolbar {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* 选择器：`.cp-settings__status`｜用途：成功/错误状态展示 */
-.cp-settings__status {
-  min-width: min(100%, 420px);
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 10px 12px;
-}
-
-.cp-settings__status[data-tone="success"] {
-  border-color: color-mix(in oklab, var(--cp-success) 24%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-success) 10%, var(--cp-panel));
-}
-
-.cp-settings__status[data-tone="danger"] {
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
+/* 选择器：`.cp-settings__errBanner`｜用途：全局错误提示条（仅出错时渲染） */
+.cp-settings__errBanner {
+  border: 1px solid color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
-}
-
-.cp-settings__statusK {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  border-radius: 14px;
+  padding: 10px 12px;
   font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-.cp-settings__statusV {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--cp-text);
   line-height: 1.45;
-}
-
-/* 选择器：`.cp-settings__toolbarActions`｜用途：全局操作按钮容器 */
-.cp-settings__toolbarActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
+  color: var(--cp-danger);
 }
 
 /* 选择器：`.cp-settings__nav`｜用途：设置 section tabs */

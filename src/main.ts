@@ -16,7 +16,7 @@ import App from "./App.vue";
 import { router } from "./app/router";
 import { i18n } from "./app/i18n";
 import "tdesign-vue-next/es/style/index.css";
-import { getStoredAccent, getStoredTheme, setAccent, setTheme } from "@/shared/utils/theme";
+import { followSystemTheme, getStoredAccent, getStoredThemePreference, resolveThemePreference, setAccent, setTheme } from "@/shared/utils/theme";
 import "@/shared/serverIdentity";
 import { routeIfSubWindow } from "@/app/bootstrap/subWindowRouting";
 import { registerUserProfileBridge } from "@/app/bootstrap/userProfileBridge";
@@ -67,14 +67,17 @@ serverConnectionCapabilities.scopeLifecycle.registerCleanupHandler(() => {
 // 首帧渲染前应用主题与强调色，尽量减少主题切换的“闪烁”。
 //
 // 兼容策略：旧用户可能仅持久化了旧版主题值（patchbay/legacy），
-// `getStoredTheme` 已按调色板迁移为 dark/light：
+// `getStoredThemePreference` 已按调色板迁移为 dark/light（另支持 `system` 跟随系统）：
 // - 若存储中没有 accent，根据迁移后的主题推断默认强调色：
 //   - `theme=dark`（原 patchbay）→ `accent=patchbay`（沿用原本的视觉）
 //   - 其他 → `accent=default`（与新拆分后的默认强调色对齐）
-const initialTheme = getStoredTheme() ?? "dark";
+const initialThemePreference = getStoredThemePreference() ?? "dark";
+const initialTheme = resolveThemePreference(initialThemePreference);
 const initialAccent = getStoredAccent() ?? (initialTheme === "dark" ? "patchbay" : "default");
-setTheme(initialTheme);
+setTheme(initialThemePreference);
 setAccent(initialAccent);
+// 主题偏好为「跟随系统」时，系统配色变化实时同步应用主题
+followSystemTheme();
 
 const searchParams = new URLSearchParams(window.location.search);
 const isSubWindow = routeIfSubWindow(router, searchParams);

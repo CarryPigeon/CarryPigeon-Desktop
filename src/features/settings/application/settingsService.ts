@@ -6,7 +6,7 @@
  */
 
 import { getSetAccentUseCase, getSetThemeUseCase, getSettingsUseCase } from "../di/settings.di";
-import type { AppAccent, AppSettings, AppTheme } from "../domain/types/SettingsTypes";
+import type { AppAccent, AppSettings, AppThemePreference } from "../domain/types/SettingsTypes";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { invokeTauri, safeInvokeTauri } from "@/shared/tauri/invokeClient";
 import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
@@ -46,9 +46,9 @@ export function readSettings(): Promise<AppSettings> {
 }
 
 /**
- * 更新当前应用主题。
+ * 更新当前应用主题偏好（`system` 跟随系统 / `light` / `dark`）。
  */
-export async function updateTheme(theme: AppTheme): Promise<void> {
+export async function updateTheme(theme: AppThemePreference): Promise<void> {
   await getSetThemeUseCase().execute(theme);
   // Also persist to backend config for import/export consistency
   try {

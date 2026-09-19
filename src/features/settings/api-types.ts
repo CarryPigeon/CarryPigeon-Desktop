@@ -4,9 +4,9 @@
  * 跨 feature 若需要消费 settings 的稳定能力，应优先依赖本文件导出的类型。
  */
 
-import type { AppSettings, AppTheme } from "./domain/types/SettingsTypes";
+import type { AppSettings, AppThemePreference } from "./domain/types/SettingsTypes";
 
-export type { AppSettings, AppTheme } from "./domain/types/SettingsTypes";
+export type { AppSettings, AppTheme, AppThemePreference } from "./domain/types/SettingsTypes";
 export type {
   SettingsApplyMode,
   SettingsBackendStateV1,
@@ -36,10 +36,10 @@ export type SettingsCapabilities = {
   readSettings(): Promise<AppSettings>;
 
   /**
-   * 更新应用主题。
+   * 更新应用主题偏好（`system` 跟随系统 / `light` / `dark`）。
    *
-   * @param theme - 目标主题值。
+   * @param theme - 目标主题偏好。
    * @returns 主题写入完成后 resolve。
    */
-  updateTheme(theme: AppTheme): Promise<void>;
+  updateTheme(theme: AppThemePreference): Promise<void>;
 };

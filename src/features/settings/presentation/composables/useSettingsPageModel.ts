@@ -4,7 +4,7 @@
  */
 
 import type { Ref } from "vue";
-import type { AppAccent, AppTheme } from "@/features/settings/domain/types/SettingsTypes";
+import type { AppAccent, AppThemePreference } from "@/features/settings/domain/types/SettingsTypes";
 import { useAccentPreferenceModel } from "./useAccentPreferenceModel";
 import { useThemePreferenceModel } from "./useThemePreferenceModel";
 import { useGeneralPreferencesModel } from "./useGeneralPreferencesModel";
@@ -13,9 +13,9 @@ import type { AppLocale } from "@/shared/utils/locale";
 export type UseSettingsPageModelDeps = Record<string, never>;
 
 export type SettingsPageModel = {
-  theme: Ref<AppTheme>;
+  theme: Ref<AppThemePreference>;
   themeError: Ref<string>;
-  pickTheme(v: AppTheme): void;
+  pickTheme(v: AppThemePreference): void;
   accent: Ref<AppAccent>;
   accentError: Ref<string>;
   pickAccent(v: AppAccent): void;

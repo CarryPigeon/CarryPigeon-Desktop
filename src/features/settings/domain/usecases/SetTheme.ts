@@ -4,7 +4,7 @@
  */
 
 import type { SettingsPort } from "../ports/SettingsPort";
-import type { AppAccent, AppTheme } from "../types/SettingsTypes";
+import type { AppAccent, AppThemePreference } from "../types/SettingsTypes";
 
 /**
  * 用例：设置应用主题。
@@ -13,9 +13,9 @@ export class SetTheme {
   constructor(private readonly settingsPort: SettingsPort) {}
 
   /**
-   * 将主题写入配置存储。
+   * 将主题偏好写入配置存储。
    */
-  execute(theme: AppTheme): Promise<void> {
+  execute(theme: AppThemePreference): Promise<void> {
     return this.settingsPort.setTheme(theme);
   }
 }

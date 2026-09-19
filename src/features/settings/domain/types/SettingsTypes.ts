@@ -4,10 +4,10 @@
  * 统一定义 settings feature 对外可见的稳定值对象与基础常量。
  */
 
-import type { AppTheme } from "@/shared/utils/theme";
+import type { AppTheme, AppThemePreference } from "@/shared/utils/theme";
 import type { AppAccent } from "@/shared/utils/theme";
 import type { AppLocale } from "@/shared/utils/locale";
-export type { AppTheme } from "@/shared/utils/theme";
+export type { AppTheme, AppThemePreference } from "@/shared/utils/theme";
 export type { AppAccent } from "@/shared/utils/theme";
 export type { AppLocale } from "@/shared/utils/locale";
 
@@ -68,7 +68,7 @@ export type SettingsBackendStateV1 = {
  * 本地缓存设置快照（版本 1）。
  */
 export type SettingsLocalCacheStateV1 = {
-  theme: AppTheme;
+  theme: AppThemePreference;
   accent: AppAccent;
   locale: AppLocale;
 };
@@ -229,7 +229,7 @@ export const DEFAULT_APP_ACCENT: AppAccent = "patchbay";
  * 应用设置快照。
  */
 export type AppSettings = {
-  theme: AppTheme;
+  theme: AppThemePreference;
   accent: AppAccent;
   locale: AppLocale;
 };

@@ -24,7 +24,7 @@
         <polyline points="6 9 12 15 18 9" />
       </svg>
     </button>
-    <div v-if="dropdownOpen" class="cp-screenshot-dropdown">
+    <div v-if="dropdownOpen" ref="dropdownRef" class="cp-screenshot-dropdown" :class="{ 'cp-screenshot-dropdown--up': dropUp }">
       <button class="cp-screenshot-dropdown__item" @click="handleClick(true)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { createLogger } from "@/shared/utils/logger";
 import { safeListen } from "@/shared/tauri/events";
@@ -55,12 +55,59 @@ const { t } = useI18n();
 const logger = createLogger("screenshot");
 const loading = ref(false);
 const dropdownOpen = ref(false);
+const dropdownRef = ref<HTMLElement | null>(null);
+const dropUp = ref(false);
+
+/** 视口边缘的安全间距（px） */
+const EDGE_MARGIN = 8;
 
 let outsideClickListener: ((e: MouseEvent) => void) | null = null;
+let repositionListener: (() => void) | null = null;
 
 function toggleDropdown() {
   if (loading.value) return;
   dropdownOpen.value = !dropdownOpen.value;
+  if (dropdownOpen.value) {
+    // 等待下拉菜单渲染完成后检查遮挡并调整位置
+    void nextTick(updateDropdownPlacement);
+  }
+}
+
+/**
+ * 检查下拉菜单是否会被窗口边缘遮挡，并调整显示位置：
+ * - 下方空间不足时翻转到触发按钮上方显示
+ * - 左右越界时水平收回到视口内
+ */
+function updateDropdownPlacement() {
+  const dropdown = dropdownRef.value;
+  if (!dropdown) return;
+  dropdown.style.removeProperty("max-width");
+
+  const triggerRect = dropdown.parentElement?.getBoundingClientRect();
+  const dropdownRect = dropdown.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  if (!triggerRect) return;
+
+  // 垂直方向：默认在按钮下方，空间不足（含安全间距）时翻转到上方
+  const spaceBelow = viewportHeight - triggerRect.bottom;
+  const spaceAbove = triggerRect.top;
+  dropUp.value = spaceBelow < dropdownRect.height + EDGE_MARGIN && spaceAbove > spaceBelow;
+
+  // 水平方向：以触发按钮右边缘对齐，越界时向左收缩，保证不超出窗口
+  const left = triggerRect.right - dropdownRect.width;
+  const overflowRight = triggerRect.right + EDGE_MARGIN > viewportWidth;
+  const overflowLeft = left < EDGE_MARGIN;
+  if (overflowRight || overflowLeft) {
+    dropdown.style.setProperty("right", "auto");
+    dropdown.style.setProperty("left", `${Math.max(EDGE_MARGIN, Math.min(left, viewportWidth - dropdownRect.width - EDGE_MARGIN))}px`);
+  } else {
+    dropdown.style.removeProperty("left");
+    dropdown.style.removeProperty("right");
+  }
+
+  // 极端情况下限制最大宽度，避免超出视口
+  dropdown.style.setProperty("max-width", `${Math.max(0, viewportWidth - EDGE_MARGIN * 2)}px`);
 }
 
 async function handleClick(hideWindow: boolean) {
@@ -95,6 +142,13 @@ onMounted(() => {
   };
   document.addEventListener("click", listener);
   outsideClickListener = listener;
+
+  // 窗口尺寸变化时重新检查遮挡并调整位置
+  const onResize = () => {
+    if (dropdownOpen.value) updateDropdownPlacement();
+  };
+  window.addEventListener("resize", onResize);
+  repositionListener = onResize;
 });
 
 onBeforeUnmount(() => {
@@ -103,6 +157,9 @@ onBeforeUnmount(() => {
   unlistenCancelled?.();
   if (outsideClickListener) {
     document.removeEventListener("click", outsideClickListener);
+  }
+  if (repositionListener) {
+    window.removeEventListener("resize", repositionListener);
   }
 });
 </script>
@@ -129,6 +186,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* 翻转到上方显示时的定位 */
+.cp-screenshot-dropdown--up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 4px;
 }
 
 .cp-screenshot-btn-group .cp-screenshot-dropdown__item {

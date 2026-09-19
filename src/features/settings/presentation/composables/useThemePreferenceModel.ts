@@ -7,28 +7,28 @@
 import { onMounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { readSettings, updateTheme } from "@/features/settings/application/settingsService";
-import { DEFAULT_APP_THEME, type AppTheme } from "@/features/settings/domain/types/SettingsTypes";
+import { DEFAULT_APP_THEME, type AppThemePreference } from "@/features/settings/domain/types/SettingsTypes";
 
 export type ThemePreferenceModel = {
-  theme: Ref<AppTheme>;
+  theme: Ref<AppThemePreference>;
   themeError: Ref<string>;
-  pickTheme(theme: AppTheme): void;
+  pickTheme(theme: AppThemePreference): void;
 };
 
 export function useThemePreferenceModel(): ThemePreferenceModel {
   const { t } = useI18n();
-  const theme = ref<AppTheme>(DEFAULT_APP_THEME);
+  const theme = ref<AppThemePreference>(DEFAULT_APP_THEME);
   const themeError = ref("");
   const hydrated = ref(false);
   const themeTouched = ref(false);
   let skipNextPersist = false;
 
-  function rollbackThemeTo(previousTheme: AppTheme): void {
+  function rollbackThemeTo(previousTheme: AppThemePreference): void {
     skipNextPersist = true;
     theme.value = previousTheme;
   }
 
-  async function persistTheme(nextTheme: AppTheme, previousTheme: AppTheme): Promise<void> {
+  async function persistTheme(nextTheme: AppThemePreference, previousTheme: AppThemePreference): Promise<void> {
     themeError.value = "";
     try {
       await updateTheme(nextTheme);
@@ -38,7 +38,7 @@ export function useThemePreferenceModel(): ThemePreferenceModel {
     }
   }
 
-  function applyHydratedTheme(nextTheme: AppTheme): void {
+  function applyHydratedTheme(nextTheme: AppThemePreference): void {
     if (theme.value === nextTheme) {
       return;
     }
@@ -70,7 +70,7 @@ export function useThemePreferenceModel(): ThemePreferenceModel {
     void hydrateThemeOnMounted();
   });
 
-  function pickTheme(nextTheme: AppTheme): void {
+  function pickTheme(nextTheme: AppThemePreference): void {
     themeTouched.value = true;
     theme.value = nextTheme;
   }
