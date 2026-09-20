@@ -55,6 +55,10 @@ type ApiUpdateUserProfileRequest = {
   /** 服务端 @NotNull；调用方可省略，http 层会发 "" */
   avatar?: string;
   brief: string;
+  /** 性别编码（API.md §4.5 示例为数值；省略时发 0）。 */
+  sex?: number;
+  /** 生日（epoch 毫秒；省略时发 0）。 */
+  birthday?: number;
 };
 
 /**
@@ -186,11 +190,14 @@ export async function httpUpdateUserProfile(
   input: ApiUpdateUserProfileRequest,
 ): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  // 服务端 PatchCurrentUserProfileRequest：username / avatar / brief 均为 @NotNull
-  const body: { username: string; brief: string; avatar: string } = {
+  // 服务端 PatchCurrentUserProfileRequest：username / avatar / brief 均为 @NotNull；
+  // sex / birthday 为文档示例字段（API.md §4.5），未提供时按示例默认值 0 发送。
+  const body: { username: string; brief: string; avatar: string; sex: number; birthday: number } = {
     username: String(input.username ?? "").trim(),
     brief: String(input.brief ?? ""),
     avatar: input.avatar != null ? String(input.avatar).trim() : "",
+    sex: Number.isFinite(input.sex) ? Math.trunc(input.sex as number) : 0,
+    birthday: Number.isFinite(input.birthday) ? Math.trunc(input.birthday as number) : 0,
   };
   if (!body.username) {
     throw new ProfileError({ code: "update_profile_failed", message: "Missing username." });

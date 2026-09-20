@@ -1315,7 +1315,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const pins = server.pinsByCid.get(cid) ?? [];
     pins.push(pin);
     server.pinsByCid.set(cid, pins);
-    emitWs(server, "message.pinned", pin);
+    emitWs(server, "message.pinned", { cid, mid });
     return { ok: true, status: 204, body: null };
   }
 
@@ -1331,7 +1331,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const idx = pins.findIndex((p) => (p as { mid: string }).mid === mid);
     if (idx >= 0) {
       pins.splice(idx, 1);
-      emitWs(server, "message.unpinned", { cid, mid, unpinned_by_uid: session.uid, unpinned_at: Date.now() });
+      emitWs(server, "message.unpinned", { cid, mid });
     }
     return { ok: true, status: 204, body: null };
   }

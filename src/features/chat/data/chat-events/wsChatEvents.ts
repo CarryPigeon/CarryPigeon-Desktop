@@ -145,14 +145,17 @@ function toWsOrigin(httpOrigin: string): string {
  * 归一化服务端返回的 WS URL override。
  *
  * 支持输入：
- * - `wss://host/api/ws`（服务端返回，且必须与登录 origin 同主机）
- * - `https://host/api/ws`（尽力转换为 wss，同样要求同主机）
+ * - `ws://host:18080/api/ws`（服务端 `GET /api/server` 返回的明文地址，登录链路为明文时放行）
+ * - `wss://host/api/ws`（网关终止 TLS 的部署，或 HTTPS 登录链路）
+ * - `https://host/api/ws` / `http://host/api/ws`（尽力提升为 wss / ws）
  * - `/api/ws`（相对路径，基于 socket 推导出的 origin 拼接）
  *
  * 安全约束：
- * - 明文 `ws:` / `http:` 一律拒绝（access_token 会明文上网）；
- * - 绝对地址必须与登录推导的 origin 同主机（含端口），防止被入侵的服务器
- *   把 token 与事件流重定向到第三方收集端点。
+ * - 明文策略与登录链路对齐：登录 origin 为明文（`ws://`，access_token 本就明文走 HTTP）时
+ *   放行 `ws://`；仅当登录 origin 为 `wss://`（HTTPS）时强制 `wss://`；
+ * - 绝对地址必须与登录推导的 origin 同主机（hostname，忽略端口——服务端 realtime
+ *   监听在独立端口（默认 18080），端口与 HTTP 登录端口不同是文档事实），
+ *   防止被入侵的服务器把 token 与事件流重定向到第三方收集端点。
  *
  * @param raw - 原始 override 字符串。
  * @param wsOrigin - 推导出的 ws(s) origin（用于拼接相对路径与同主机校验）。
@@ -164,15 +167,16 @@ function normalizeWsUrlOverride(raw: string, wsOrigin: string): string {
   if (v.startsWith("/")) return `${wsOrigin}${v}`;
   try {
     const u = new URL(v);
-    // 明文协议拒绝；https 提升为 wss。
-    if (u.protocol === "http:") return "";
-    if (u.protocol === "https:") {
-      u.protocol = "wss:";
-    }
-    if (u.protocol !== "wss:") return "";
-    // 同主机校验（host 含端口，忽略大小写）。
+    // 协议归一化：http(s) 提升为 ws(s)。
+    if (u.protocol === "http:") u.protocol = "ws:";
+    else if (u.protocol === "https:") u.protocol = "wss:";
+    if (u.protocol !== "ws:" && u.protocol !== "wss:") return "";
+    // 明文 ws 仅在登录链路本身为明文时放行；HTTPS 登录强制 wss（token 不降级到明文）。
+    const isPlaintextLogin = wsOrigin.startsWith("ws://");
+    if (u.protocol === "ws:" && !isPlaintextLogin) return "";
+    // 同主机校验（仅 hostname，忽略端口：WS 独立端口是服务端文档事实）。
     const base = new URL(wsOrigin);
-    if (u.host.toLowerCase() !== base.host.toLowerCase()) return "";
+    if (u.hostname.toLowerCase() !== base.hostname.toLowerCase()) return "";
     return u.toString();
   } catch {
     return "";
@@ -350,7 +354,6 @@ export function connectChatWs(
       type: "auth",
       id,
       data: {
-        api_version: 1,
         access_token: token,
         device_id: getDeviceId(),
         resume,
@@ -568,8 +571,11 @@ export function connectChatWs(
     const next = String(nextAccessToken ?? "").trim();
     if (!next) return;
     token = next;
+    // 协议约定：`reauth` 仅限已完成认证的连接；未鉴权/未打开的链路上发送会被服务端
+    // 以 auth.err/unauthorized 关闭。此时只更新本地 token，由重连后的 sendAuth 使用。
+    if (!hasAuthenticated || !ws || ws.readyState !== WebSocket.OPEN) return;
     try {
-      ws?.send(JSON.stringify({ type: "reauth", id: createRequestId(), data: { access_token: token } }));
+      ws.send(JSON.stringify({ type: "reauth", id: createRequestId(), data: { access_token: token } }));
     } catch {
       // 尽力而为：reauth 失败并不致命，重连后会重新 auth。
     }

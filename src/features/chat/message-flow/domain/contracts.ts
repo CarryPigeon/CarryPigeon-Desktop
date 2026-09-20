@@ -6,9 +6,9 @@
 
 import type { FailureOutcome, SemanticErrorInfo, SuccessOutcome } from "@/shared/types/semantics";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
-import type { MessageDomainRef, MessageMention, MessageReplySummary, RenderableChatMessage } from "../message/domain/messageModels";
+import type { MessageDomainRef, MessageMention, MessageQuoteSummary, MessageReplySummary, RenderableChatMessage } from "../message/domain/messageModels";
 
-export type { MessageMention, MessageReplySummary };
+export type { MessageMention, MessageQuoteSummary, MessageReplySummary };
 
 /**
  * 提及候选项（输入 @ 时自动补全的结果）。

@@ -2,7 +2,7 @@
  * @fileoverview HTTP JSON 客户端（面向 `/api/*`）。
  * @description 网络基础设施：httpJsonClient。
  * 这是一个对 `fetch` 的最小封装，目标是把“跨模块一致的协议细节”收敛到一处：
- * - 自动附加 API 版本 `Accept` 头（`application/vnd.carrypigeon+json; version=1`）
+ * - 自动附加 `Accept: application/json` 头（服务端未启用媒体类型版本协商，见 API.md §1.2）
  * - 在有 token 时附加 `Authorization: Bearer ...`
  * - 解析 JSON 成功响应
  * - 将非 2xx 响应归一化为 `ApiRequestError`

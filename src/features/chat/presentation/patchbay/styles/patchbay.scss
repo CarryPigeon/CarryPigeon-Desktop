@@ -785,6 +785,11 @@
   opacity: 0.82;
 }
 
+/* 元信息（meta）：组内非首条（仅保留“⋯”操作入口，收紧占位） */
+.cp-msg__meta[data-bare="true"] {
+  margin-bottom: 2px;
+}
+
 /* 元信息（meta）：发送者名称 */
 .cp-msg__from {
   font-family: var(--cp-font-display);

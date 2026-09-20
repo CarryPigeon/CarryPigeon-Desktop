@@ -39,6 +39,20 @@ export type MessageMention = {
 };
 
 /**
+ * 内联引用（quote reply）摘要模型。
+ *
+ * 说明：服务端 wire 只携带 `uid`，`senderName` 为展示投影字段，
+ * 由视图层按 uid 解析填充；缺失时 UI 回退显示 userId。
+ */
+export type MessageQuoteSummary = {
+  messageId: string;
+  userId: string;
+  preview: string;
+  /** 展示投影字段：引用作者昵称；由视图层解析，缺失时回退 userId。 */
+  senderName?: string;
+};
+
+/**
  * 消息发送者最小模型。
  */
 export type MessageSender = {
@@ -78,11 +92,7 @@ export type RenderableChatMessage =
       text: string;
       replyToId?: string;
       replyTo?: MessageReplySummary;
-      quoteReply?: {
-        messageId: string;
-        userId: string;
-        preview: string;
-      };
+      quoteReply?: MessageQuoteSummary;
       mentions?: MessageMention[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
@@ -104,11 +114,7 @@ export type RenderableChatMessage =
       data?: unknown;
       replyToId?: string;
       replyTo?: MessageReplySummary;
-      quoteReply?: {
-        messageId: string;
-        userId: string;
-        preview: string;
-      };
+      quoteReply?: MessageQuoteSummary;
       mentions?: MessageMention[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
@@ -138,11 +144,7 @@ export type RenderableChatMessage =
       localPath?: string;
       replyToId?: string;
       replyTo?: MessageReplySummary;
-      quoteReply?: {
-        messageId: string;
-        userId: string;
-        preview: string;
-      };
+      quoteReply?: MessageQuoteSummary;
       mentions?: MessageMention[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];
@@ -176,11 +178,7 @@ export type RenderableChatMessage =
       duration?: number;
       replyToId?: string;
       replyTo?: MessageReplySummary;
-      quoteReply?: {
-        messageId: string;
-        userId: string;
-        preview: string;
-      };
+      quoteReply?: MessageQuoteSummary;
       mentions?: MessageMention[];
       forwardedFrom?: ForwardedMessageEntry;
       forwardedMessages?: ForwardedMessageEntry[];

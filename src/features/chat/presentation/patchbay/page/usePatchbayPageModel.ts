@@ -13,7 +13,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { toast } from "@/shared/utils/toast";
 import { debounce } from "@/shared/utils/rateLimit";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
-import { currentChatUserId } from "@/features/chat/composition/chatAccountSession";
+import { currentChatUserId, currentChatUsername } from "@/features/chat/composition/chatAccountSession";
 import {
   chatConnectionDetail,
   chatConnectionPillState,
@@ -494,6 +494,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   // Forwarding variable to break circular dependency between useMessageContextMenu and chatCenter
   let _enterMultiSelectMode: ((messageId: string) => void) = () => {};
   let _openForwardDialog: ((messageId: string) => void) = () => {};
+  let _startReply: ((messageId: string) => void) = () => {};
 
   const {
     menuOpen,
@@ -515,7 +516,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       }
       return ok;
     },
-    startReply: currentChannelMessageFlow.beginReply,
+    startReply: (messageId: string) => {
+      _startReply(messageId);
+    },
     recallMessage: async (messageId: string) => {
       const outcome = await currentChannelMessageFlow.recallMessage(messageId) as RecallChatMessageOutcome;
       if (!outcome.ok) {
@@ -592,12 +595,14 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       return;
     }
     const preview = message.kind === "core_text" ? message.text : message.preview;
+    // 收藏存的是展示快照：优先使用行投影里已按 uid 解析出的昵称，避免落入「用户 <uid>」占位名。
+    const resolvedSenderName = chatCenter.messageRows.find((row) => row.m.id === messageId)?.m.from.name;
     const entry: BookmarkEntry = {
       messageId,
       channelId: cid,
       channelName,
       contentPreview: String(preview ?? "").slice(0, 200),
-      senderName: message.from.name,
+      senderName: resolvedSenderName || message.from.name,
       bookmarkedAt: Date.now(),
     };
     addBookmark(entry);
@@ -659,7 +664,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     dismissLinkPreview,
     resolveSenderName: (uid: string) => {
       const member = membersSnapshot.value.find((m) => isSameUserId(m.id, uid));
-      return member?.name ?? "";
+      if (member?.name) return member.name;
+      // 自己：成员目录尚未就绪时用账户会话昵称兜底
+      // （服务端可能把频道 bootstrap 消息归到创建者 uid，且该频道成员列表为空）。
+      if (isSameUserId(uid, currentUserId.value)) return currentChatUsername.value;
+      return "";
     },
     fetchUserNames: async (uids: string[]) => {
       const s = socket.value;
@@ -676,7 +685,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
         }
         return names;
       } catch (error) {
-        logger.warn("Action: chat_forward_author_profile_fetch_failed", { count: uids.length, error: String(error) });
+        logger.warn("Action: chat_message_author_profile_request_failed", { count: uids.length, error: String(error) });
         return {};
       }
     },
@@ -694,6 +703,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   };
   _openForwardDialog = (messageId: string) => {
     chatCenter.handleSingleForward(messageId);
+  };
+  // 回复态：把展示层已解析的作者昵称一并传入，避免回复摘要/服务端回执回退成「用户 <uid>」占位名。
+  _startReply = (messageId: string) => {
+    const resolvedName = chatCenter.messageRows.find((row) => row.m.id === messageId)?.m.from.name;
+    currentChannelMessageFlow.beginReply(messageId, resolvedName);
   };
 
   const connectionToastLabel = computed(() => {
@@ -754,9 +768,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     goPlugins,
     handleOpenFiles: () => {
       void router.push("/files");
-    },
-    handleOpenContacts: () => {
-      void router.push("/contacts");
     },
     toggleServerMute: serverRailModel.toggleServerMute,
     muteServerForDuration: serverRailModel.muteServerForDuration,

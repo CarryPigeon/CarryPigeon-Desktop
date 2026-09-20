@@ -90,9 +90,11 @@ export type ChatChannelApplicationWire = {
 export type ChatChannelBanWire = {
   cid: string;
   uid: string;
-  until: number;
+  /** 禁言到期时间(epoch 毫秒)。对应服务端响应字段 expires_at(API.md §5.14)。 */
+  expires_at: number;
   reason: string;
-  create_time?: number;
+  /** 禁言创建时间(epoch 毫秒)。对应服务端响应字段 created_at(API.md §5.14)。 */
+  created_at?: number;
 };
 
 export type ChatForwardedFromWire = {
@@ -136,8 +138,8 @@ export type ChatForwardMessageWireData = {
  *
  * - 顶层固定 10 字段：mid / uid / cid / domain / domain_version / data / send_time /
  *   mentions / preview / status。其余可选字段仍保留以便扩展。
- * - 服务端目前不在 canonical 信封携带 sender/nickname/avatar，作者信息由客户端
- *   通过 channel members 等接口自行解析。
+ * - 最新契约不再要求信封携带 `sender`，作者信息由客户端通过 users/members 接口解析；
+ *   但历史/部分服务端仍可能回传，故保留可选 `sender` 并优先复用其昵称。
  */
 export type ChatMessageWire = {
   mid: string;
@@ -147,9 +149,21 @@ export type ChatMessageWire = {
   domain_version: string;
   data: unknown;
   send_time: number;
-  mentions?: string[];
-  preview?: string;
-  status?: "sent" | "recalled";
+  /**
+   * 发送者公开资料（可选）。
+   *
+   * 说明：canonical 信封不强制携带（最新契约为「作者信息由客户端经 users/members 接口解析」），
+   * 但 `docs/api/11-http-endpoints-v1.md` §7.1 与 `docs/api/12-ws-events-v1.md` §5.1 的示例
+   * 及部分服务端版本仍会回传 `sender.nickname` / `sender.avatar`；有值时直接复用，
+   * 缺失时由客户端按 uid 批量补拉公开资料。
+   */
+  sender?: ChatUserWire;
+  /** 顶层 mentions；服务端保证不为 null（缺失时规范化为 []），必填以对齐消息数据模型 §4。 */
+  mentions: string[];
+  /** 消息预览；服务端保证不为 null（缺失时规范化为 ""）。 */
+  preview: string;
+  /** 消息状态；缺失时按文档默认 "sent"。 */
+  status: "sent" | "recalled";
 };
 
 /**

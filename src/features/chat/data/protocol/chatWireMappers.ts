@@ -285,6 +285,8 @@ function mapChatForwardMessageWireDataToRecord(data: ChatForwardMessageWireData)
  * 服务端 canonical envelope 固定 10 字段；关系元数据只在 `data` 内按 domain 分支
  * 约定（Core:ReplyText 含 reply/quote/link_preview、Core:Forward 含 forward 快照），
  * 在 mapper 内解出后回填到顶层 ChatMessageRecord 对应字段。
+ * 顶层可选 `sender`（旧版/部分服务端仍回传）会被映射为 `ChatMessageRecord.sender`，
+ * 使发送者昵称/头像在展示层无需再按 uid 兜底；缺失时由展示层批量补拉用户资料。
  * `mentions` 整体在顶层为 `string[]`，映射时构造默认 displayName 为空的
  * `ChatMessageMentionRecord`，由渲染层做用户名回退。
  * `status` 为 `recalled` 时回填 `recalledAt`，触发撤回态展示。
@@ -292,6 +294,8 @@ function mapChatForwardMessageWireDataToRecord(data: ChatForwardMessageWireData)
 export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   const domain = asTrimmedString(wire.domain);
   const sendTime = asSafeNumber(wire.send_time);
+  const uid = asTrimmedString(wire.uid);
+  const sender = mapChatUserWire(wire.sender);
   const mentions: ChatMessageMentionRecord[] = wireMentionsToRecords(wire.mentions);
 
   let replyToMessageId: string | undefined;
@@ -322,8 +326,9 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   return {
     id: asTrimmedString(wire.mid),
     channelId: asTrimmedString(wire.cid),
-    userId: asTrimmedString(wire.uid),
-    sender: undefined,
+    userId: uid,
+    // 服务端回传 sender 时直接复用其昵称/头像；顶层 uid 作为 sender.uid 缺失时的兜底。
+    sender: sender ? { ...sender, id: sender.id || uid } : undefined,
     sentTime: sendTime,
     domain,
     domainVersion: asTrimmedString(wire.domain_version),
@@ -422,9 +427,9 @@ export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanR
   return {
     channelId: asTrimmedString(wire.cid),
     userId: asTrimmedString(wire.uid),
-    until: asSafeNumber(wire.until),
+    until: asSafeNumber(wire.expires_at),
     reason: asTrimmedString(wire.reason),
-    createTime: wire.create_time == null ? undefined : asSafeNumber(wire.create_time),
+    createTime: wire.created_at == null ? undefined : asSafeNumber(wire.created_at),
   };
 }
 
@@ -552,10 +557,6 @@ function mapMessagePinnedPayload(wire: ChatMessagePinnedEventPayloadWire): ChatM
   return {
     channelId: asTrimmedString(wire.cid),
     messageId: asTrimmedString(wire.mid),
-    pinId: asTrimmedString(wire.pin_id),
-    pinnedByUserId: asTrimmedString(wire.pinned_by_uid),
-    pinnedAt: asSafeNumber(wire.pinned_at),
-    note: asOptionalString(wire.note),
   };
 }
 
@@ -563,9 +564,6 @@ function mapMessageUnpinnedPayload(wire: ChatMessageUnpinnedEventPayloadWire): C
   return {
     channelId: asTrimmedString(wire.cid),
     messageId: asTrimmedString(wire.mid),
-    pinId: asTrimmedString(wire.pin_id),
-    unpinnedByUserId: asTrimmedString(wire.unpinned_by_uid),
-    unpinnedAt: asSafeNumber(wire.unpinned_at),
   };
 }
 

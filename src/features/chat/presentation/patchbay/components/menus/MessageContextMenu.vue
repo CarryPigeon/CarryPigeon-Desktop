@@ -4,8 +4,9 @@
  * @description chat｜组件：MessageContextMenu。
  */
 
-import { onBeforeUnmount, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 
 type MessageMenuAction = "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark";
 
@@ -84,6 +85,22 @@ function handleBeforeUnmount(): void {
 }
 
 onBeforeUnmount(handleBeforeUnmount);
+
+/**
+ * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
+ */
+const { setMenuEl, menuStyle, schedulePlacement } = useFloatingMenu({
+  x: () => props.x,
+  y: () => props.y,
+  open: () => props.open,
+});
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) schedulePlacement();
+  },
+);
 </script>
 
 <template>
@@ -93,8 +110,9 @@ onBeforeUnmount(handleBeforeUnmount);
     <template v-if="props.open">
       <div class="cp-msgmenu__backdrop" @click="handleClose"></div>
       <div
+        :ref="setMenuEl"
         class="cp-msgmenu"
-        :style="{ left: `${props.x}px`, top: `${props.y}px` }"
+        :style="menuStyle"
         role="menu"
         @click.stop
       >

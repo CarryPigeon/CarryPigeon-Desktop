@@ -6,8 +6,8 @@
 
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import MonoTag from "@/shared/ui/MonoTag.vue";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
+import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 import CategoryGroupHeader from "@/features/chat/presentation/patchbay/components/rails/CategoryGroupHeader.vue";
 import type { ChannelRailModel } from "@/features/chat/presentation/patchbay/view-models/useChannelRailModel";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
@@ -25,23 +25,20 @@ const { t } = useI18n();
 const serverMenuOpen = ref(false);
 const serverMenuAnchor = ref<HTMLElement | null>(null);
 
-const MENU_WIDTH = 200;
-const MENU_HEIGHT_ESTIMATE = 220;
-
-const serverMenuStyle = computed(() => {
-  const el = serverMenuAnchor.value;
-  if (!el) return { position: "fixed" as const, left: "0px", top: "0px", zIndex: 9999 };
-  const rect = el.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const rightSpace = vw - rect.right;
-  const left = rightSpace >= MENU_WIDTH ? rect.right : Math.max(8, rect.left - MENU_WIDTH);
-  const top = Math.min(rect.bottom + 4, Math.max(8, vh - MENU_HEIGHT_ESTIMATE - 8));
-  return { position: "fixed" as const, left: `${left}px`, top: `${top}px`, zIndex: 9999 };
-});
+/**
+ * 浮动菜单定位：打开后测量菜单真实尺寸并钳制到视口内，避免被窗口边界裁切。
+ * 替代原先基于 MENU_WIDTH / MENU_HEIGHT_ESTIMATE 的估算逻辑。
+ */
+const { setMenuEl: setServerMenuEl, menuStyle: serverMenuStyle, schedulePlacement: scheduleServerMenuPlacement } =
+  useFloatingMenu({
+    x: () => serverMenuAnchor.value?.getBoundingClientRect().right ?? 0,
+    y: () => (serverMenuAnchor.value?.getBoundingClientRect().bottom ?? 0) + 4,
+    open: () => serverMenuOpen.value,
+  });
 
 function openServerMenu(): void {
   serverMenuOpen.value = true;
+  scheduleServerMenuPlacement();
 }
 
 function handleMenu(action: () => void): void {
@@ -149,9 +146,6 @@ onMounted(() => {
       <div class="cp-serverCard__meta">
         <div class="cp-serverCard__name">{{ props.model.serverInfo?.name ?? '—' }}</div>
         <div class="cp-serverCard__brief">{{ props.model.serverInfo?.brief || t('server_info_no_brief') }}</div>
-        <div class="cp-serverCard__socket">
-          <MonoTag :value="props.model.socket || 'no-server'" title="server socket" :copyable="true" />
-        </div>
       </div>
       <button
         ref="serverMenuAnchor"
@@ -168,6 +162,7 @@ onMounted(() => {
     <Teleport to="body">
       <div
         v-if="serverMenuOpen"
+        :ref="setServerMenuEl"
         class="cp-serverMenu"
         :style="serverMenuStyle"
         role="menu"
@@ -376,9 +371,6 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cp-serverCard__socket {
-  margin-top: 2px;
-}
 .cp-serverCard__menuBtn {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
@@ -396,6 +388,8 @@ onMounted(() => {
   color: var(--cp-text);
 }
 .cp-serverMenu {
+  position: fixed;
+  z-index: 9999;
   min-width: 180px;
   border: 1px solid color-mix(in oklab, var(--cp-info) 18%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-panel) 92%, rgba(0, 0, 0, 0.05));

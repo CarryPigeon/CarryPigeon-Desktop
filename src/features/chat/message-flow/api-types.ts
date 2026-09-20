@@ -32,7 +32,7 @@ export type {
 } from "./domain/contracts";
 
 export type { FileAttachment };
-export type { MentionCandidate, MessageMention, MessageReplySummary, RecallChatMessageOutcome } from "./domain/contracts";
+export type { MentionCandidate, MessageMention, MessageQuoteSummary, MessageReplySummary, RecallChatMessageOutcome } from "./domain/contracts";
 
 /**
  * 当前频道消息时间线快照。
@@ -55,7 +55,14 @@ export type MessageTimelineSnapshot = {
 export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnapshot> & {
   findMessageById(messageId: string): ChatMessage | null;
   loadMoreHistory(): Promise<void>;
-  beginReply(messageId: string): void;
+  /**
+   * 进入回复态。
+   *
+   * @param messageId - 被回复消息 id。
+   * @param senderName - 可选的展示昵称覆盖：服务端信封不带昵称时，
+   *   展示层已按 uid 解析出的昵称可在此传入，避免回复摘要回落成「用户 <uid>」占位名。
+   */
+  beginReply(messageId: string, senderName?: string): void;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   searchCurrentChannel(query: string): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;

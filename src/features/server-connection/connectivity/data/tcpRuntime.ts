@@ -4,7 +4,6 @@
  */
 
 import { invokeTauri, listenTcpFrame, TAURI_COMMANDS, tauriLog, type TcpMessageEvent } from "@/shared/tauri";
-import { setTcpServiceProvider } from "@/shared/net/tcp/tcpServiceProvider";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 import type { Event, UnlistenFn } from "@tauri-apps/api/event";
 import { TcpService } from "./TcpService";
@@ -22,7 +21,6 @@ const KEY_EXCHANGE_TIMEOUT_MS = 15_000;
 let tcpFrameListenerSubscribed = false;
 let tcpFrameListenerStartingPromise: Promise<void> | null = null;
 let tcpFrameUnlisten: UnlistenFn | null = null;
-let tcpServiceProviderRegistered = false;
 let serverScopeCleanupHandlerRegistered = false;
 let unregisterServerScopeCleanupHandler: (() => void) | null = null;
 
@@ -62,13 +60,6 @@ async function ensureTcpFrameListener(): Promise<void> {
   })();
 
   await tcpFrameListenerStartingPromise;
-}
-
-function ensureTcpServiceProvider(): void {
-  if (tcpServiceProviderRegistered) return;
-  tcpServiceProviderRegistered = true;
-  // 依赖倒置：由 server-connection/connectivity feature 提供 TcpService 获取方式，供 shared/net 基础设施消费（例如 BaseAPI）。
-  setTcpServiceProvider((serverSocket: string) => TCP_SERVICE.get(String(serverSocket ?? "").trim()) ?? null);
 }
 
 function disposeTcpServiceByKey(key: string): void {
@@ -173,12 +164,11 @@ export async function createServerTcpService(
  * 启动 TCP service 运行时（幂等）。
  *
  * 说明：
- * - 显式完成事件监听与 provider 注册；
+ * - 显式完成事件监听注册；
  * - 避免模块加载时执行副作用。
  */
 export async function startTcpServiceRuntime(): Promise<void> {
   await ensureTcpFrameListener();
-  ensureTcpServiceProvider();
   ensureServerScopeCleanupHandler();
 }
 
@@ -186,7 +176,7 @@ export async function startTcpServiceRuntime(): Promise<void> {
  * 停止 TCP service 运行时（best-effort）。
  *
  * 说明：
- * - 释放事件监听与 provider 注入；
+ * - 释放事件监听；
  * - 清理当前所有服务会话。
  */
 export async function stopTcpServiceRuntime(): Promise<void> {
@@ -202,11 +192,6 @@ export async function stopTcpServiceRuntime(): Promise<void> {
     unregisterServerScopeCleanupHandler = null;
   }
   serverScopeCleanupHandlerRegistered = false;
-
-  if (tcpServiceProviderRegistered) {
-    setTcpServiceProvider(() => null);
-    tcpServiceProviderRegistered = false;
-  }
 
   for (const key of Array.from(TCP_SERVICE.keys())) {
     disposeTcpServiceByKey(key);

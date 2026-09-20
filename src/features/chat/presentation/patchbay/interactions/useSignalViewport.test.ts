@@ -153,6 +153,26 @@ describe("useSignalViewport", () => {
     expect(model.showJumpToBottom.value).toBe(false);
   });
 
+  it("他人发送消息且视口停在最新消息附近（行高修正漂移）：仍自动跟随跳底", async () => {
+    const deps = createDeps();
+    deps.currentMessageCount.value = 5;
+    // scrollTop=400，gap = 1000 - (400 + 400) = 200：超过精确贴底阈值 60，
+    // 但仍在近底部跟随窗口（240）内 → 应自动跳底
+    const pane = createPane(1000, 400, 400);
+    const model = useSignalViewport(deps);
+    model.setSignalPaneRef(pane);
+    await flushAsync();
+    expect(pane.__scrollTop).toBe(1000);
+    // 模拟虚拟列表行高实测修正造成的漂移：视口离底部 200px
+    pane.__scrollTop = 400;
+
+    deps.currentMessageCount.value = 6;
+    await flushAsync();
+
+    expect(pane.__scrollTop).toBe(1000);
+    expect(model.showJumpToBottom.value).toBe(false);
+  });
+
   it("切换频道：即使消息数不变也自动跳到最新一条", async () => {
     const deps = createDeps();
     deps.currentChannelId.value = "ch1";

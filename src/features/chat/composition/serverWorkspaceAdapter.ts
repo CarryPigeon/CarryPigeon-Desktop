@@ -138,9 +138,10 @@ export function getChatTlsPolicy(serverSocket: string) {
  *
  * 判定依据（满足任一即视为有 realtime）：
  * - `ws_url` 非空字符串；
- * - 或 `capabilities.eventResume === true`（服务端 `ServerCapabilities.eventResume` 即 realtime.enabled）。
+ * - 或 `capabilities.websocket === true`（服务端文档口径：`realtime.enabled=false` 时为 `false`）；
+ * - 或 `capabilities.event_resume === true`（旧口径兜底：eventResume 即 realtime.enabled）。
  *
- * 当服务端默认 `realtime.enabled=false` 时，`ws_url` 为 `null` 且 `eventResume=false`，
+ * 当服务端默认 `realtime.enabled=false` 时，`ws_url` 为 `null` 且 `websocket=false`，
  * 此时客户端不应再尝试 `ws://<http-port>/api/ws`（HTTP 端口不开 WS），而应直接走 long-polling。
  *
  * @param serverSocket - 目标 server socket。
@@ -155,8 +156,9 @@ export function isChatRealtimeAvailable(serverSocket: string): boolean {
   if (wsUrl) return true;
   const capabilities = info?.capabilities;
   if (capabilities && typeof capabilities === "object") {
-    const eventResume = (capabilities as Record<string, unknown>).event_resume;
-    if (eventResume === true) return true;
+    const record = capabilities as Record<string, unknown>;
+    if (record.websocket === true) return true;
+    if (record.event_resume === true) return true;
   }
   return false;
 }

@@ -8,7 +8,6 @@ import { FileManagerPage } from '@/features/files/routes';
 import { aboutRoutes } from '@/features/about/routes';
 
 // 子窗口/低频页面使用动态导入，减少首屏 JS 体积
-const ContactsPage = () => import('@/features/chat/presentation/patchbay/contacts/ContactsPage.vue');
 const SavedMessagesPage = () => import('@/features/chat/message-flow/bookmark/presentation/SavedMessagesPage.vue');
 const ChannelInfoPopoverView = () => import('@/features/chat/presentation/channel-info/ChannelInfoPopoverView.vue');
 const UserPopoverPage = () => import('@/features/account/current-user/presentation/pages/UserPopoverPage.vue');
@@ -35,7 +34,6 @@ const router = createRouter({
     { path: '/plugins/domain-catalog', component: DomainCatalogPage, name: 'domain-catalog' },
     { path: '/plugins/detail/:pluginId', component: PluginDetailPage, name: 'plugin-detail' },
     { path: '/files', component: FileManagerPage, name: 'files' },
-    { path: '/contacts', component: ContactsPage, name: 'contacts' },
     { path: '/saved-messages', component: SavedMessagesPage, name: 'saved-messages' },
     { path: '/channel-info', component: ChannelInfoPage, name: 'channel-info' },
     { path: '/channel-members', component: ChannelMembersPage, name: 'channel-members' },

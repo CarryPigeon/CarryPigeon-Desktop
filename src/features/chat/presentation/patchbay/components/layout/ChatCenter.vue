@@ -48,6 +48,8 @@ interface VirtualListItem {
   key: string;
   m: VirtualMessageItem;
   isGroupStart: boolean;
+  /** 组首时间戳是否需要带日期前缀（跨自然日）。 */
+  showDate: boolean;
 }
 
 const props = defineProps<{
@@ -130,9 +132,9 @@ const virtualListItems = computed<VirtualListItem[]>(() => {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (row.isUnreadStart) {
-      items.push({ kind: 'separator', key: `sep-${row.m.id}`, m: row.m, isGroupStart: false });
+      items.push({ kind: 'separator', key: `sep-${row.m.id}`, m: row.m, isGroupStart: false, showDate: false });
     }
-    items.push({ kind: 'message', key: row.m.id, m: row.m, isGroupStart: row.isGroupStart });
+    items.push({ kind: 'message', key: row.m.id, m: row.m, isGroupStart: row.isGroupStart, showDate: row.showDate });
   }
   return items;
 });
@@ -533,13 +535,19 @@ function getReplyText(m: VirtualMessageItem): string {
               </div>
               <!-- 区块：内容列（meta + bubble/card） -->
               <div class="cp-msg__body">
-                <!-- 区块：meta 行 -->
-                <div class="cp-msg__meta" :data-compact="!virtualListItems[vr.index].isGroupStart">
-                  <span v-if="virtualListItems[vr.index].isGroupStart" class="cp-msg__from">{{ virtualListItems[vr.index].m.from.name }}</span>
-                  <span class="cp-msg__dot"></span>
-                  <span class="cp-msg__time">{{ props.model.fmtTime(virtualListItems[vr.index].m.timeMs) }}</span>
-                  <span class="cp-msg__dot"></span>
-                  <span class="cp-msg__domain">{{ virtualListItems[vr.index].m.domain.label }}</span>
+                <!-- 区块：meta 行（仅分组首条展示名字/时间/类型；组内其余条只保留“⋯”操作入口） -->
+                <div
+                  class="cp-msg__meta"
+                  :data-compact="!virtualListItems[vr.index].isGroupStart"
+                  :data-bare="!virtualListItems[vr.index].isGroupStart"
+                >
+                  <template v-if="virtualListItems[vr.index].isGroupStart">
+                    <span class="cp-msg__from">{{ virtualListItems[vr.index].m.from.name }}</span>
+                    <span class="cp-msg__dot"></span>
+                    <span class="cp-msg__time">{{ props.model.fmtGroupHeadTime(virtualListItems[vr.index].m.timeMs, virtualListItems[vr.index].showDate) }}</span>
+                    <span class="cp-msg__dot"></span>
+                    <span class="cp-msg__domain">{{ virtualListItems[vr.index].m.domain.label }}</span>
+                  </template>
                   <button v-if="!virtualListItems[vr.index].m.recalledAt" class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)">⋯</button>
                 </div>
 

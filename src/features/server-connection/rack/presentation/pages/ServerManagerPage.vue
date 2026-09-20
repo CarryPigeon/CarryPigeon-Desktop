@@ -15,8 +15,10 @@ import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { createLogger } from "@/shared/utils/logger";
+import { toast } from "@/shared/utils/toast";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import { useCurrentWorkspaceMaintenance } from "@/features/server-connection/scope-lifecycle/presentation/composables/useCurrentWorkspaceMaintenance";
+import { useServerLogout } from "../composables/useServerLogout";
 import {
   addServer,
   currentServerSocket,
@@ -54,6 +56,12 @@ const {
   clearCurrentWorkspaceLocalData,
 } = useCurrentWorkspaceMaintenance();
 const clearConfirmPlaceholder = computed(() => t("clear_confirm_placeholder", { token: clearConfirmToken }));
+
+const { loggingOut, logoutServer } = useServerLogout();
+/** 正在确认退出登录的服务器条目。 */
+const logoutTarget = ref<ServerRack | null>(null);
+const showLogoutConfirm = ref(false);
+const logoutError = ref("");
 
 const creating = reactive({
   name: "",
@@ -199,12 +207,65 @@ async function handleClearWorkspace(): Promise<void> {
 }
 
 /**
+ * 打开「退出登录」确认弹窗。
+ *
+ * @param rack - 目标服务器条目。
+ */
+function requestLogout(rack: ServerRack): void {
+  logoutTarget.value = rack;
+  logoutError.value = "";
+  showLogoutConfirm.value = true;
+}
+
+/**
+ * 确认退出登录：吊销该服务器 token 并清理其本地会话。
+ *
+ * 说明：退出的是当前活动服务器时回到登录页；退出其它服务器时仅清空该服务器的登录态，保留条目。
+ */
+async function handleLogout(): Promise<void> {
+  const rack = logoutTarget.value;
+  if (!rack) return;
+  const socket = rack.serverSocket.trim();
+  if (!socket) {
+    showLogoutConfirm.value = false;
+    return;
+  }
+
+  const outcome = await logoutServer(socket);
+  if (!outcome.ok) {
+    // 保持弹窗打开，让错误可见
+    logoutError.value = outcome.error || t("servers_logout_failed");
+    toast.error(t("servers_logout_failed"));
+    return;
+  }
+
+  showLogoutConfirm.value = false;
+  if (outcome.activeSessionCleared) {
+    void router.replace("/login");
+    return;
+  }
+  toast.success(t("servers_logout_done"));
+}
+
+/**
  * 选择某个 rack 作为当前 active server（用于预览/连接）。
  *
  * @param socket - 目标服务器 Socket 地址。
  */
 function selectRack(socket: string): void {
   setServerSocket(socket);
+}
+
+/**
+ * 判断 rack 行是否还有可展示的补充信息（仅保留条件性信息：TLS 指纹、备注）。
+ *
+ * 说明：TLS 策略与通知模式属于编辑态配置项，展示行不再重复渲染，避免信息冗余。
+ *
+ * @param rack - 服务器条目。
+ * @returns 存在可展示补充信息时为 `true`。
+ */
+function hasRackDetails(rack: ServerRack): boolean {
+  return Boolean((rack.tlsPolicy === "trust_fingerprint" && rack.tlsFingerprint) || rack.note);
 }
 
 /**
@@ -226,6 +287,13 @@ function handleActiveSocketChange(): void {
 }
 
 watch(watchActiveSocket, handleActiveSocketChange);
+
+// 关闭弹窗时清理退出登录上下文与错误提示
+watch(showLogoutConfirm, (visible) => {
+  if (visible) return;
+  logoutTarget.value = null;
+  logoutError.value = "";
+});
 </script>
 
 <template>
@@ -236,7 +304,6 @@ watch(watchActiveSocket, handleActiveSocketChange);
       <!-- Header -->
       <PageHeader
         :title="t('server_manager')"
-        :subtitle="t('servers_subtitle')"
         back
         :back-label="t('back')"
         data-testid="servers-header"
@@ -261,11 +328,10 @@ watch(watchActiveSocket, handleActiveSocketChange);
           </div>
           <div class="cp-servers__field wide">
             <div class="cp-servers__label">{{ t("server_socket_required") }}</div>
-            <t-input v-model="creating.serverSocket" :placeholder="t('server_socket_placeholder')" clearable />
+            <t-input v-model="creating.serverSocket" clearable />
           </div>
           <div class="cp-servers__actions">
             <button class="cp-servers__btn primary" type="button" @click="handleCreate">{{ t("server_add") }}</button>
-            <button class="cp-servers__btn" type="button" @click="$router.push('/chat')">{{ t("servers_open_patchbay") }}</button>
           </div>
         </div>
       </section>
@@ -337,24 +403,19 @@ watch(watchActiveSocket, handleActiveSocketChange);
                 </div>
               </div>
 
-              <div v-if="editingId !== rack.id" class="cp-rackRow__meta">
-                <div class="cp-rackRow__kv">
-                  <span class="cp-rackRow__k">{{ t("rack_kv_tls") }}</span>
-                  <span class="cp-rackRow__v">{{ rack.tlsPolicy }}</span>
+              <!-- 展示态：仅保留条件性补充信息（TLS 指纹 / 备注） -->
+              <template v-if="editingId !== rack.id">
+                <div v-if="hasRackDetails(rack)" class="cp-rackRow__meta">
+                  <div v-if="rack.tlsPolicy === 'trust_fingerprint' && rack.tlsFingerprint" class="cp-rackRow__kv wide">
+                    <span class="cp-rackRow__k">{{ t("rack_kv_fp") }}</span>
+                    <span class="cp-rackRow__v">{{ rack.tlsFingerprint.slice(0, 12) }}…</span>
+                  </div>
+                  <div v-if="rack.note" class="cp-rackRow__kv wide">
+                    <span class="cp-rackRow__k">{{ t("rack_kv_note") }}</span>
+                    <span class="cp-rackRow__v">{{ rack.note }}</span>
+                  </div>
                 </div>
-                <div v-if="rack.tlsPolicy === 'trust_fingerprint' && rack.tlsFingerprint" class="cp-rackRow__kv wide">
-                  <span class="cp-rackRow__k">{{ t("rack_kv_fp") }}</span>
-                  <span class="cp-rackRow__v">{{ rack.tlsFingerprint.slice(0, 12) }}…</span>
-                </div>
-                <div class="cp-rackRow__kv">
-                  <span class="cp-rackRow__k">{{ t("rack_kv_notify") }}</span>
-                  <span class="cp-rackRow__v">{{ rack.notifyMode }}</span>
-                </div>
-                <div v-if="rack.note" class="cp-rackRow__kv wide">
-                  <span class="cp-rackRow__k">{{ t("rack_kv_note") }}</span>
-                  <span class="cp-rackRow__v">{{ rack.note }}</span>
-                </div>
-              </div>
+              </template>
 
               <!-- 编辑态 -->
               <div v-else class="cp-rackRow__edit">
@@ -404,11 +465,31 @@ watch(watchActiveSocket, handleActiveSocketChange);
             <div class="cp-rackRow__ops">
               <button class="cp-rackRow__op" type="button" @click="togglePinServerById(rack.id)">{{ t("pin_server") }}</button>
               <button v-if="editingId !== rack.id" class="cp-rackRow__op" type="button" @click="beginEdit(rack)">{{ t("edit") }}</button>
+              <button class="cp-rackRow__op" type="button" :disabled="loggingOut" @click="requestLogout(rack)">{{ t("logout") }}</button>
               <button class="cp-rackRow__op danger" type="button" @click="handleRemove(rack.id)">{{ t("remove") }}</button>
             </div>
           </article>
         </div>
       </section>
+
+      <!-- 退出登录确认弹窗：退出登录按服务器维度执行 -->
+      <t-dialog
+        attach="body"
+        v-model:visible="showLogoutConfirm"
+        :header="t('logout')"
+        :confirm-btn="{
+          content: t('logout'),
+          loading: loggingOut,
+          theme: 'danger',
+        }"
+        :cancel-btn="t('cancel')"
+        @confirm="handleLogout"
+      >
+        <p>{{ t("servers_logout_confirm") }}</p>
+        <div class="cp-servers__logoutHint">{{ t("servers_logout_hint") }}</div>
+        <div v-if="logoutTarget" class="cp-servers__logoutTarget">{{ logoutTarget.name }} · {{ logoutTarget.serverSocket }}</div>
+        <div v-if="logoutError" class="cp-servers__error">{{ logoutError }}</div>
+      </t-dialog>
     </ErrorBoundary>
   </main>
 </template>
@@ -527,6 +608,22 @@ watch(watchActiveSocket, handleActiveSocketChange);
   margin-top: 8px;
   font-size: 12px;
   color: var(--cp-danger);
+}
+
+/* 退出登录确认弹窗补充说明 */
+.cp-servers__logoutHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  line-height: 1.5;
+}
+
+.cp-servers__logoutTarget {
+  margin-top: 8px;
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  color: var(--cp-text);
+  overflow-wrap: anywhere;
 }
 
 /* Create actions */

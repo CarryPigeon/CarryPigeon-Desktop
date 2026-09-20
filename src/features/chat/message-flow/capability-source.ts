@@ -338,9 +338,11 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       observeSnapshot: observeTimelineSnapshot,
       findMessageById: findCurrentChannelMessageById,
       loadMoreHistory: loadMoreMessages,
-      beginReply(messageId: string): void {
+      beginReply(messageId: string, senderName?: string): void {
         const message = findCurrentChannelMessageById(messageId);
-        if (message) startReply(message);
+        if (!message) return;
+        const resolved = String(senderName ?? "").trim();
+        startReply(resolved ? { ...message, from: { ...message.from, name: resolved } } : message);
       },
       recallMessage,
       searchCurrentChannel,

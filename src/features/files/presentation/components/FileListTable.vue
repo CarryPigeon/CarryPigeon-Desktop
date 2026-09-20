@@ -7,6 +7,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import AppIcon from "@/shared/ui/AppIcon.vue";
+import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 import type { FileRecord, FileSortField, SortOrder } from "../../domain/contracts";
 
 const props = defineProps<{
@@ -38,6 +39,15 @@ const contextMenu = ref<{ visible: boolean; x: number; y: number; file: FileReco
   file: null,
 });
 
+/**
+ * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
+ */
+const { setMenuEl, menuStyle, schedulePlacement } = useFloatingMenu({
+  x: () => contextMenu.value.x,
+  y: () => contextMenu.value.y,
+  open: () => contextMenu.value.visible,
+});
+
 const columns: { field: FileSortField | null; label: string; sortable: boolean }[] = [
   { field: null, label: "", sortable: false },
   { field: "filename", label: t("file_sort_filename"), sortable: true },
@@ -63,6 +73,7 @@ function handleRowClick(file: FileRecord): void {
 function handleContextMenu(event: MouseEvent, file: FileRecord): void {
   event.preventDefault();
   contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, file };
+  schedulePlacement();
 }
 
 function closeContextMenu(): void {
@@ -165,8 +176,9 @@ function formatTime(iso: string): string {
   <Teleport to="body">
     <div
       v-if="contextMenu.visible"
+      :ref="setMenuEl"
       class="cp-contextMenu"
-      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      :style="menuStyle"
       @click.stop="closeContextMenu"
     >
       <div class="cp-contextMenu__item" @click="contextMenu.file && emit('preview', contextMenu.file)">

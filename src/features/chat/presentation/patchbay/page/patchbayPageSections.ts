@@ -20,7 +20,6 @@ type PatchbayServerRailRawModel = {
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
-  handleOpenContacts(): void;
   toggleServerMute(): Promise<void>;
   muteServerForDuration(durationMs?: number): Promise<void>;
   unmuteServer(): Promise<void>;
@@ -105,7 +104,6 @@ type CreatePatchbayServerRailSectionDeps = {
   handleOpenSettings(): void;
   goPlugins(): void;
   handleOpenFiles(): void;
-  handleOpenContacts(): void;
   toggleServerMute(): Promise<void>;
   muteServerForDuration(durationMs?: number): Promise<void>;
   unmuteServer(): Promise<void>;
@@ -123,7 +121,6 @@ export function createPatchbayServerRailSection(deps: CreatePatchbayServerRailSe
     handleOpenSettings: deps.handleOpenSettings,
     goPlugins: deps.goPlugins,
     handleOpenFiles: deps.handleOpenFiles,
-    handleOpenContacts: deps.handleOpenContacts,
     toggleServerMute: deps.toggleServerMute,
     muteServerForDuration: deps.muteServerForDuration,
     unmuteServer: deps.unmuteServer,

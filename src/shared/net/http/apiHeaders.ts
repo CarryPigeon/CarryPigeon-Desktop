@@ -6,13 +6,17 @@
  */
 
 /**
- * 构造 CarryPigeon API 的 `Accept` 头值。
+ * CarryPigeon API 的 `Accept` 头值。
  *
- * @param apiVersion - 协议主版本号（例如 1）。
+ * 服务端 API 文档（API.md §1.2）明确：推荐 `Accept: application/json`，
+ * 当前没有启用媒体类型参数版本协商；自定义 vendor 媒体类型会被严格校验的
+ * 服务端以 406 not_acceptable 拒绝，因此统一使用标准 JSON 类型。
+ *
+ * @param _apiVersion - 协议主版本号（保留参数以兼容既有调用链；当前不影响 Accept 值）。
  * @returns `Accept` 头字符串。
  */
-export function buildCarryPigeonAcceptHeader(apiVersion: number): string {
-  return `application/vnd.carrypigeon+json; version=${apiVersion}`;
+export function buildCarryPigeonAcceptHeader(_apiVersion: number): string {
+  return "application/json";
 }
 
 /**
@@ -21,4 +25,3 @@ export function buildCarryPigeonAcceptHeader(apiVersion: number): string {
  * @constant
  */
 export const CARRY_PIGEON_ACCEPT_V1 = buildCarryPigeonAcceptHeader(1);
-

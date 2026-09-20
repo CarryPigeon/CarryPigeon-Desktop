@@ -34,4 +34,8 @@ export type UpdateUserProfileInput = {
   username: string;
   avatar?: string;
   brief: string;
+  /** 性别编码（服务端文档示例为数值，未知/未填写传 0）。 */
+  sex?: number;
+  /** 生日（epoch 毫秒；未填写传 0）。 */
+  birthday?: number;
 };

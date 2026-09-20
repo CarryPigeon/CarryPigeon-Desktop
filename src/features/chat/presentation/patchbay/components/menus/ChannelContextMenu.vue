@@ -4,6 +4,8 @@
  * @description chat｜presentation component：频道右键菜单。
  */
 import { useI18n } from "vue-i18n";
+import { watch } from "vue";
+import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 import type { ChannelContextAction } from "@/features/chat/presentation/patchbay/interactions/useChannelContextMenu";
 import type { NotificationLevel } from "@/features/chat/presentation/patchbay/view-models/useChannelMuteStore";
 import {
@@ -43,14 +45,32 @@ const muteDurations: { key: ChannelContextAction; labelKey: string }[] = [
 function onAction(action: ChannelContextAction): void {
   emit("action", action);
 }
+
+/**
+ * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
+ * 该菜单条目较多（通知级别 + 静音时长），视口过矮时依赖 maxHeight 内部滚动。
+ */
+const { setMenuEl, menuStyle, schedulePlacement } = useFloatingMenu({
+  x: () => props.x,
+  y: () => props.y,
+  open: () => props.open,
+});
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) schedulePlacement();
+  },
+);
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="open"
+      :ref="setMenuEl"
       class="cp-contextMenu cp-channelContextMenu"
-      :style="{ position: 'fixed', left: `${x}px`, top: `${y}px`, zIndex: 9999 }"
+      :style="menuStyle"
       @click.stop
     >
       <button class="cp-contextMenu__item" type="button" @click="onAction('channel_info')">
@@ -93,6 +113,8 @@ function onAction(action: ChannelContextAction): void {
 
 <style scoped lang="scss">
 .cp-channelContextMenu {
+  position: fixed;
+  z-index: 9999;
   background: var(--cp-surface);
   border: 1px solid var(--cp-border);
   border-radius: 14px;

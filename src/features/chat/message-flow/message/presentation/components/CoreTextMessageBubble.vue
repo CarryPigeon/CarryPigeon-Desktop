@@ -12,7 +12,7 @@ import FileRefMessageBubble from "./FileRefMessageBubble.vue";
 import CodeBlockReviewable from "@/features/chat/message-flow/code-review/presentation/CodeBlockReviewable.vue";
 import { hasFileToken, parseCoreTextParts } from "@/features/chat/message-flow/message/domain/coreTextFileSyntax";
 import { parseCoreTextWithCodeBlocks } from "@/features/chat/message-flow/code-review/domain/codeBlockParser";
-import type { MessageMention, MessageReplySummary } from "@/features/chat/message-flow/api-types";
+import type { MessageMention, MessageQuoteSummary, MessageReplySummary } from "@/features/chat/message-flow/api-types";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 
 type EmojiEntry = { id: string; name: string; filePath: string };
@@ -97,11 +97,7 @@ const props = defineProps<{
   /**
    * 内联引用回复（quote）。
    */
-  quoteReply?: {
-    messageId: string;
-    userId: string;
-    preview: string;
-  };
+  quoteReply?: MessageQuoteSummary;
   forwardedFrom?: {
     messageId: string;
     channelId: string;
@@ -179,7 +175,7 @@ function openLink(url: string): void {
     <div v-if="props.quoteReply" class="cp-quoteReply">
       <div class="cp-quoteReply__bar"></div>
       <div class="cp-quoteReply__content">
-        <span class="cp-quoteReply__sender">{{ props.quoteReply.userId }}</span>
+        <span class="cp-quoteReply__sender">{{ props.quoteReply.senderName || props.quoteReply.userId }}</span>
         <span class="cp-quoteReply__preview">{{ props.quoteReply.preview }}</span>
       </div>
     </div>
@@ -247,7 +243,7 @@ function openLink(url: string): void {
         class="cp-mentionTag"
         :class="mentionClass(m)"
       >
-        @{{ m.displayName }}
+        @{{ m.displayName || m.userId }}
       </span>
     </div>
   </div>

@@ -54,23 +54,16 @@ export type ChatMessageUpdatedEvent = {
   message: ChatMessageRecord;
 };
 
-/** 消息置顶事件。 */
+/** 消息置顶事件。payload 仅含定位信息；详情通过 HTTP 置顶列表获取（API.md §8.3）。 */
 export type ChatMessagePinnedEvent = {
   channelId: string;
   messageId: string;
-  pinId: string;
-  pinnedByUserId: string;
-  pinnedAt: number;
-  note?: string;
 };
 
-/** 消息取消置顶事件。 */
+/** 消息取消置顶事件。payload 仅含定位信息（API.md §8.3）。 */
 export type ChatMessageUnpinnedEvent = {
   channelId: string;
   messageId: string;
-  pinId: string;
-  unpinnedByUserId: string;
-  unpinnedAt: number;
 };
 
 /** 提及创建事件。 */

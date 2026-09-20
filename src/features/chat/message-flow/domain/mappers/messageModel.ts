@@ -30,6 +30,8 @@ export function createMessageMapper(deps: MessageModelDeps) {
   function mapWireMessage(serverSocket: string, m: ChatMessageRecord): ChatMessage {
     const mid = String(m.id ?? "").trim() || `msg_${Date.now()}`;
     const uid = String(m.userId ?? "").trim();
+    // 昵称缺失（服务端未回传 sender / 未命中成员目录）时生成可识别的占位名，
+    // 由展示层按 uid 批量补拉用户公开资料后替换，见 presentation/.../authorNameResolution.ts。
     const fromName = String(m.sender?.nickname ?? "").trim() || (uid ? `用户 ${uid}` : "未知用户");
     const fromAvatarUrl = (m.sender?.avatar ?? "").trim() || undefined;
     const timeMs = Number(m.sentTime ?? 0) || Date.now();
@@ -54,7 +56,8 @@ export function createMessageMapper(deps: MessageModelDeps) {
     const replyTo = m.replyTo
       ? {
           messageId: String(m.replyTo.messageId ?? "").trim(),
-          senderName: String(m.replyTo.senderName ?? "").trim() || String(m.sender?.nickname ?? "未知用户"),
+          // 服务端 reply_to.sender_name 缺失时不得回退成「当前消息发送者」昵称（会把作者张冠李戴）。
+          senderName: String(m.replyTo.senderName ?? "").trim() || "未知用户",
           preview: String(m.replyTo.preview ?? "").trim(),
           createdAt: Number(m.replyTo.createdAt ?? 0) || 0,
           unavailable: Boolean(m.replyTo.unavailable),

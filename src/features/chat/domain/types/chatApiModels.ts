@@ -153,8 +153,8 @@ export type ChatForwardedFromRecord = {
  * 说明：
  * - `data` 保留 domain payload 原始内容；
  * - 具体展示投影由 message-flow 子域负责。
- * - 服务端 canonical 信封不携带 sender/profile（author 信息由 members 等接口解析），
- *   保留 `sender?` 作 domain 占位以兼容现有 mapper 入参；新协议下恒为 undefined。
+ * - 服务端 canonical 信封不再强制携带 sender/profile（author 信息由 users/members 等接口解析）；
+ *   `sender?` 在服务端回传时由 wire mapper 填充，缺失时展示层按 uid 批量补拉公开资料。
  */
 export type ChatMessageRecord = {
   id: string;

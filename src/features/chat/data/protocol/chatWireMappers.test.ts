@@ -139,12 +139,36 @@ describe("mapChatMessageWire", () => {
     const result = mapChatMessageWire(wire as any);
     expect(result.id).toBe("msg1");
     expect(result.channelId).toBe("ch1");
-    // 服务端 canonical 信封不携带 sender，作者信息由客户端通过 members 等接口解析；
-    // mapper 应将 sender 留空，而非从 wire 顶层读取。
+    // 服务端 canonical 信封不强制携带 sender；缺失时 mapper 留空，
+    // 作者信息由客户端经 members / users 接口解析。
     expect(result.sender).toBeUndefined();
     expect(result.userId).toBe("u1");
     expect(result.domain).toBe("Core:Text");
     expect(result.sentTime).toBe(1700000000000);
+  });
+
+  it("should map optional sender profile when the envelope carries it", () => {
+    const wire = {
+      mid: "msg-sender", cid: "ch1", uid: "1001",
+      sender: { uid: "1001", nickname: "System", avatar: "avatars/u/1001.png" },
+      domain: "Core:System", data: { text: "" },
+      send_time: 1700000000000,
+    };
+    const result = mapChatMessageWire(wire as any);
+    // 旧版/部分服务端仍回传 sender：昵称必须被保留，避免展示层回退成「用户 <uid>」。
+    expect(result.sender).toEqual({ id: "1001", nickname: "System", avatar: "avatars/u/1001.png" });
+  });
+
+  it("should fall back to the envelope uid when sender.uid is missing", () => {
+    const wire = {
+      mid: "msg-sender2", cid: "ch1", uid: "1002",
+      sender: { nickname: "Relay" },
+      domain: "Core:Text", data: { text: "hi" },
+      send_time: 1700000000001,
+    };
+    const result = mapChatMessageWire(wire as any);
+    expect(result.sender?.id).toBe("1002");
+    expect(result.sender?.nickname).toBe("Relay");
   });
 
   it("should extract reply_to from Core:ReplyText data", () => {
@@ -291,7 +315,7 @@ describe("mapChatChannelBanWire", () => {
   it("should map ban to domain record", () => {
     const wire = {
       cid: "ch1", uid: "u1", reason: "Spam",
-      until: 1710000000000, create_time: 1700000000000,
+      expires_at: 1710000000000, created_at: 1700000000000,
     };
     const result = mapChatChannelBanWire(wire as any);
     expect(result.channelId).toBe("ch1");

@@ -43,10 +43,13 @@ export type ChatReadStateUpdatedEventPayloadWire = {
 
 /**
  * `channel.changed` 事件 payload 的 wire 结构。
+ *
+ * `hint` 当前恒为 "refresh"（API.md §8.3 事件表）。
  */
 export type ChatChannelChangedEventPayloadWire = {
   cid: string;
   scope?: string;
+  hint?: string;
 };
 
 /**
@@ -56,14 +59,13 @@ export type ChatMessageUpdatedEventPayloadWire = ChatMessageCreatedEventPayloadW
 
 /**
  * `message.pinned` 事件 payload。
+ *
+ * 服务端事件 payload 仅携带 `{cid, mid}`（API.md §8.3 事件表）；
+ * 置顶详情（pinned_by_uid/pinned_at/note 等）需通过 HTTP 置顶列表接口获取。
  */
 export type ChatMessagePinnedEventPayloadWire = {
   cid: string;
   mid: string;
-  pin_id: string;
-  pinned_by_uid: string;
-  pinned_at: number;
-  note?: string;
 };
 
 /**
@@ -79,13 +81,12 @@ export type ChatMessageRecalledEventPayloadWire = {
 
 /**
  * `message.unpinned` 事件 payload。
+ *
+ * 服务端事件 payload 仅携带 `{cid, mid}`（API.md §8.3 事件表）。
  */
 export type ChatMessageUnpinnedEventPayloadWire = {
   cid: string;
   mid: string;
-  pin_id: string;
-  unpinned_by_uid: string;
-  unpinned_at: number;
 };
 
 /**

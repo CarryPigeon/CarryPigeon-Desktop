@@ -46,7 +46,7 @@ export type RoomSessionConnectionApplicationServiceDeps = {
    * 查询某 server 是否在 `/api/server` 中声明提供 realtime（WS）能力。
    *
    * 当返回 `false` 时（典型场景：服务端 `realtime.enabled=false`，`ws_url` 为空，
-   * `capabilities.event_resume` 为 `false`），客户端将直接启用 long-polling，
+   * `capabilities.websocket` 为 `false`），客户端将直接启用 long-polling，
    * 不再尝试连接 `ws://<http-port>/api/ws`（HTTP 端口不开 WS，握手必然失败）。
    */
   isRealtimeAvailable: (socketKey: string) => boolean;
@@ -160,7 +160,7 @@ export class RoomSessionConnectionApplicationService {
       const origin = this.deps.toHttpOrigin(key);
       // WS 启用条件：
       // - 登录 origin 非 HTTPS-非-strict TLS（保持既有兼容回退逻辑）；
-      // - 且服务端在 `/api/server` 声明了 realtime 能力（`ws_url` 非空或 `event_resume=true`）。
+      // - 且服务端在 `/api/server` 声明了 realtime 能力（`ws_url` 非空或 `websocket=true`）。
       // 任一不满足即禁用 WS 并改走 long-polling，避免
       // `ws://<http-port>/api/ws` 在 HTTP-only 服务端永远握手失败并陷入静默指数退避死循环。
       const tlsIncompatibleWs = origin.startsWith("https://") && tlsPolicy !== "strict";

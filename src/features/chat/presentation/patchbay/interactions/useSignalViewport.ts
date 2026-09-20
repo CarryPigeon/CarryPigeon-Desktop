@@ -10,6 +10,17 @@ type CountRef = Ref<number> | ComputedRef<number>;
 type BoolRef = Ref<boolean> | ComputedRef<boolean>;
 type StringRef = Ref<string> | ComputedRef<string>;
 const AT_BOTTOM_GAP_PX = 60;
+/**
+ * 新消息到达时的“近底部跟随”窗口。
+ *
+ * 背景：消息列表是 @tanstack/vue-virtual 虚拟列表，行高先估算、渲染后实测修正，
+ * 一次高度修正就可能让视口与底部的间距悄悄超过 AT_BOTTOM_GAP_PX；此后每条
+ * 新消息都会被判定“不在底部”而只显示跳底入口，视口与最新消息的间距越拉越大。
+ *
+ * 因此新消息到达时的自动贴底判定放宽到该窗口（约最近 2-3 条消息的高度内）：
+ * 视口停在最新消息附近即跟随跳底；“跳到底部”按钮的显隐仍使用精确阈值。
+ */
+const AUTO_FOLLOW_GAP_PX = 240;
 const TOP_AUTO_LOAD_THRESHOLD_PX = 40;
 const AUTO_LOAD_COOLDOWN_MS = 900;
 /**
@@ -217,6 +228,19 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
   }
 
   /**
+   * 判断视口是否停留在“最新消息附近”（新消息到达时的跟随判定）。
+   *
+   * 与 `isSignalAtBottom` 的区别：该判定使用更宽容的 AUTO_FOLLOW_GAP_PX 窗口，
+   * 虚拟列表行高实测修正造成的微小漂移不应中断跟随。
+   */
+  function isSignalNearBottom(): boolean {
+    const el = signalPaneRef.value;
+    if (!el) return true;
+    const gap = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    return gap < AUTO_FOLLOW_GAP_PX;
+  }
+
+  /**
    * 判断消息面板是否已滚动到底部。
    */
   function isSignalAtBottom(): boolean {
@@ -362,7 +386,7 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
       maybeReportReadState();
       return;
     }
-    if (!isSignalAtBottom()) {
+    if (!isSignalNearBottom()) {
       showJumpToBottom.value = true;
       return;
     }

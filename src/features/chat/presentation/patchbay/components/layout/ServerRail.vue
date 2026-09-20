@@ -6,6 +6,7 @@
 
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 import {
   MUTE_DURATION_1H,
   MUTE_DURATION_8H,
@@ -62,10 +63,6 @@ const emit = defineEmits<{
    * 打开设置页。
    */
   (e: "open-settings"): void;
-  /**
-   * 打开联系人页（按用户 ID 查找）。
-   */
-  (e: "open-contacts"): void;
   (e: "toggle-server-mute"): [];
   (e: "mute-server-for-duration", durationMs: number | undefined): void;
   (e: "unmute-server"): void;
@@ -86,8 +83,20 @@ const dndMenuY = computed(() => {
   return el.getBoundingClientRect().bottom + 4;
 });
 
+/**
+ * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
+ * DND 按钮位于左栏底部，菜单通常需要向上翻转。
+ */
+const { setMenuEl: setDndMenuEl, menuStyle: dndMenuStyle, schedulePlacement: scheduleDndMenuPlacement } =
+  useFloatingMenu({
+    x: () => dndMenuX.value,
+    y: () => dndMenuY.value,
+    open: () => dndMenuOpen.value,
+  });
+
 function openDndMenu(): void {
   dndMenuOpen.value = true;
+  scheduleDndMenuPlacement();
 }
 
 function closeDndMenu(): void {
@@ -165,15 +174,15 @@ function formatTime(epoch: number): string {
       </button>
     </div>
     <div class="cp-rail__foot">
-      <button class="cp-rail__btn" type="button" @click="emit('open-contacts')">{{ t("contacts_title") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
     </div>
     <Teleport to="body">
       <div
         v-if="dndMenuOpen"
+        :ref="setDndMenuEl"
         class="cp-contextMenu cp-dndMenu"
-        :style="{ position: 'fixed', left: `${dndMenuX}px`, top: `${dndMenuY}px`, zIndex: 9999 }"
+        :style="dndMenuStyle"
         @click.stop
       >
         <div class="cp-contextMenu__label">{{ t("server_dnd_toggle") }}</div>
@@ -240,6 +249,8 @@ function formatTime(epoch: number): string {
 }
 
 .cp-dndMenu {
+  position: fixed;
+  z-index: 9999;
   background: var(--cp-surface);
   border: 1px solid var(--cp-border);
   border-radius: 14px;

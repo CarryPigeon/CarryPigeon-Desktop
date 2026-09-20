@@ -25,7 +25,7 @@ import type {
   CurrentChannelSessionSnapshot,
 } from "@/features/chat/room-session/api-types";
 import type { ServerWorkspaceConnectionOutcome } from "@/features/server-connection/api-types";
-import { isMessageAfterReadMarker } from "@/features/chat/presentation/utils/readMarker";
+import { formatGroupHeadTime, projectMessageRows } from "./messageRowProjection";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import {
   multiSelectMode as storeMultiSelectMode,
@@ -42,6 +42,13 @@ import {
   collectUnresolvedForwardAuthorUids,
   withResolvedForwardAuthorNames,
 } from "./forwardAuthorNames";
+import {
+  collectUnresolvedAuthorUids,
+  withResolvedMentionNames,
+  withResolvedQuoteReplyName,
+  withResolvedSenderName,
+} from "./authorNameResolution";
+import { normalizeUserId } from "@/features/chat/shared-kernel/userId";
 import { addBookmarks } from "@/features/chat/message-flow/bookmark/storage/localBookmarkStorage";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
@@ -67,8 +74,11 @@ export type DomainRegistryStoreLike = {
  */
 export type MessageRow = {
   m: ChatMessage;
+  /** 是否为分组首条（仅组首渲染名字 / 头像 / 时间戳）。 */
   isGroupStart: boolean;
   isUnreadStart: boolean;
+  /** 组首时间戳是否需要带日期前缀（跨自然日时为 `true`）。 */
+  showDate: boolean;
 };
 
 type ChatCenterRawModel = {
@@ -117,6 +127,10 @@ type ChatCenterRawModel = {
   fetchLinkPreview: (url: string) => Promise<void>;
   dismissLinkPreview: () => void;
   fmtTime(ms: number): string;
+  /**
+   * 格式化分组首条的时间戳：跨自然日时带 `MM-DD` 前缀。
+   */
+  fmtGroupHeadTime(ms: number, showDate: boolean): string;
   formatReplyMiniText(channelId: string, replyToId: string): string;
   setDomainId(v: string): void;
   setDraft(v: string): void;
@@ -233,103 +247,121 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     return out;
   });
 
-/** 发送者名兜底形态：mapper 在昵称缺失时会生成 `u:123456` / `用户 123456` 这类占位名。 */
-const FALLBACK_SENDER_NAME_RE = /^(?:u:|用户\s?)/i;
+  /** 已补拉的用户公开资料昵称缓存（归一化 uid → nickname）；重赋值新 Map 以触发响应式更新。 */
+  const fetchedUserNames = ref(new Map<string, string>());
+  /** 每个 uid 已发起的补拉次数（归一化 uid → attempts），用于去重与防止无限重试。 */
+  const profileFetchAttempts = new Map<string, number>();
+  /** 待补拉 uid 累积队列（debounce 合并成单次批量请求）。 */
+  const pendingFetchUids: string[] = [];
+  let profileFetchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 队列中最早一次入队时间（毫秒），用于避免持续变化把 debounce 一直往后推。 */
+  let pendingFetchSince: number | null = null;
 
-/**
- * 对兜底形态的发送者名做成员目录解析；解析失败时原样返回消息对象。
- *
- * @param m - 原始消息。
- * @returns 名字已解析（或无需解析）的消息；需要替换时返回浅拷贝，不改写 store 内对象。
- */
-function withResolvedSenderName(m: ChatMessage): ChatMessage {
-  const resolve = deps.resolveSenderName;
-  if (!resolve) return m;
-  if (!FALLBACK_SENDER_NAME_RE.test(m.from.name)) return m;
-  const name = resolve(m.from.id).trim();
-  if (!name || name === m.from.name) return m;
-  return { ...m, from: { ...m.from, name } };
-}
+  /** 单个 uid 的补拉次数上限：允许「连接/鉴权尚未就绪」后重试，但不会随投影变化无限放大请求。 */
+  const MAX_PROFILE_FETCH_ATTEMPTS = 2;
+  /** 批量补拉的 debounce 窗口（毫秒）。 */
+  const PROFILE_FETCH_DEBOUNCE_MS = 200;
+  /** 队列最长等待时间（毫秒）：持续有 uid 入队时也要强制冲刷一次。 */
+  const PROFILE_FETCH_MAX_WAIT_MS = 1000;
 
-/** 已补拉的用户昵称缓存（uid → nickname）；重赋值新 Map 以触发响应式更新。 */
-const fetchedUserNames = ref(new Map<string, string>());
-/** 已发起过补拉的 uid（含失败），避免重复请求。 */
-const requestedProfileUids = new Set<string>();
-/** 待补拉 uid 累积队列（debounce 合并成单次批量请求）。 */
-const pendingFetchUids: string[] = [];
-let profileFetchTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * 作者名解析：频道成员目录 → 已补拉用户公开资料缓存。
+   *
+   * @param uid - 发送者 / 提及目标 / 转发条目作者的用户 id。
+   * @returns 解析出的昵称；不可解析时返回空串。
+   */
+  function resolveAuthorName(uid: string): string {
+    const memberName = deps.resolveSenderName?.(uid)?.trim() ?? "";
+    if (memberName) return memberName;
+    return fetchedUserNames.value.get(normalizeUserId(uid)) ?? "";
+  }
 
-/**
- * 转发条目作者名解析：成员目录 → 已补拉档案缓存；均未命中返回空串（UI 回退显示 uid）。
- */
-function resolveForwardAuthorName(uid: string): string {
-  const memberName = deps.resolveSenderName?.(uid)?.trim() ?? "";
-  if (memberName) return memberName;
-  return fetchedUserNames.value.get(uid) ?? "";
-}
+  /**
+   * 调度补拉缺失昵称的用户：去重、debounce 合并为一次批量请求（`GET /users?ids=`）。
+   *
+   * 说明：
+   * - 每个 uid 最多尝试 {@link MAX_PROFILE_FETCH_ATTEMPTS} 次，避免「服务端解析不出昵称」的 uid
+   *   随消息列表频繁变化被反复请求；
+   * - 队列最早入队的 uid 等待超过 {@link PROFILE_FETCH_MAX_WAIT_MS} 时立即冲刷，避免持续变化饿死。
+   *
+   * @param uids - 需要补拉昵称的 uid 列表。
+   */
+  function scheduleUserProfileFetch(uids: string[]): void {
+    const fetchNames = deps.fetchUserNames;
+    if (!fetchNames) return;
+    const fresh = uids.filter((uid) => {
+      const key = normalizeUserId(uid);
+      return Boolean(key) && (profileFetchAttempts.get(key) ?? 0) < MAX_PROFILE_FETCH_ATTEMPTS;
+    });
+    if (fresh.length === 0) return;
+    for (const uid of fresh) {
+      const key = normalizeUserId(uid);
+      profileFetchAttempts.set(key, (profileFetchAttempts.get(key) ?? 0) + 1);
+    }
+    pendingFetchUids.push(...fresh);
+    const now = Date.now();
+    if (pendingFetchSince == null) pendingFetchSince = now;
+    const waitedMs = now - pendingFetchSince;
+    const delayMs = waitedMs >= PROFILE_FETCH_MAX_WAIT_MS ? 0 : PROFILE_FETCH_DEBOUNCE_MS;
+    if (profileFetchTimer) clearTimeout(profileFetchTimer);
+    profileFetchTimer = setTimeout(() => {
+      profileFetchTimer = null;
+      pendingFetchSince = null;
+      const batch = [...new Set(pendingFetchUids.splice(0))];
+      if (batch.length === 0) return;
+      // 包一层 Promise：fetchNames 同步抛错时也能走 catch，而不是逃逸出 setTimeout 回调。
+      void Promise.resolve()
+        .then(() => fetchNames(batch))
+        .then((names) => {
+          const next = fetchedUserNames.value;
+          let mutated = false;
+          for (const [uid, name] of Object.entries(names ?? {})) {
+            const key = normalizeUserId(uid);
+            const trimmed = String(name ?? "").trim();
+            if (!key || !trimmed || next.has(key)) continue;
+            next.set(key, trimmed);
+            mutated = true;
+          }
+          if (mutated) fetchedUserNames.value = new Map(next);
+        })
+        .catch((err) => {
+          logger.warn("Action: chat_message_author_profile_batch_failed", { count: batch.length, error: String(err) });
+        });
+    }, delayMs);
+  }
 
-/**
- * 调度补拉缺失昵称的转发条目作者：去重、debounce 合并为一次批量请求；失败不重试。
- */
-function scheduleForwardAuthorProfileFetch(uids: string[]): void {
-  const fetchNames = deps.fetchUserNames;
-  if (!fetchNames) return;
-  const fresh = uids.filter((uid) => !requestedProfileUids.has(uid));
-  if (fresh.length === 0) return;
-  for (const uid of fresh) requestedProfileUids.add(uid);
-  pendingFetchUids.push(...fresh);
-  if (profileFetchTimer) clearTimeout(profileFetchTimer);
-  profileFetchTimer = setTimeout(() => {
-    profileFetchTimer = null;
-    const batch = [...new Set(pendingFetchUids.splice(0))];
-    if (batch.length === 0) return;
-    void fetchNames(batch)
-      .then((names) => {
-        const next = fetchedUserNames.value;
-        let mutated = false;
-        for (const [uid, name] of Object.entries(names ?? {})) {
-          const trimmed = String(name ?? "").trim();
-          if (!trimmed || next.has(uid)) continue;
-          next.set(uid, trimmed);
-          mutated = true;
-        }
-        if (mutated) fetchedUserNames.value = new Map(next);
-      })
-      .catch((err) => {
-        logger.warn("Action: chat_forward_author_profile_fetch_failed", { count: batch.length, error: String(err) });
-      });
-  }, 200);
-}
+  /**
+   * 统一作者名投影：发送者 → 提及目标 → 内联引用作者 → 转发条目作者。
+   *
+   * @param message - 原始消息（store 内对象，不被改写）。
+   * @returns 作者名已解析（或无需解析）的消息。
+   */
+  function withResolvedAuthorNames(message: ChatMessage): ChatMessage {
+    return withResolvedForwardAuthorNames(
+      withResolvedQuoteReplyName(
+        withResolvedMentionNames(withResolvedSenderName(message, resolveAuthorName), resolveAuthorName),
+        resolveAuthorName,
+      ),
+      resolveAuthorName,
+    );
+  }
 
   const messageRows = computed<MessageRow[]>(() => {
     const list = messageTimelineSnapshot.value.currentMessages;
     const lastReadTime = currentSessionSnapshot.value.lastReadTimeMs;
     const lastReadMid = currentSessionSnapshot.value.lastReadMessageId;
-    const rows: MessageRow[] = [];
+    const projections = projectMessageRows(list, {
+      lastReadTimeMs: lastReadTime,
+      lastReadMessageId: lastReadMid,
+    });
 
-    for (let idx = 0; idx < list.length; idx += 1) {
-      const raw = list[idx];
-      const m = withResolvedForwardAuthorNames(withResolvedSenderName(raw), resolveForwardAuthorName);
-      const prev = idx > 0 ? list[idx - 1] : null;
-      const sameSender = prev ? prev.from.id === m.from.id : false;
-      const closeInTime = prev ? Math.abs(m.timeMs - prev.timeMs) < 1000 * 90 : false;
-      const isGroupStart = !(sameSender && closeInTime);
-      const isUnread = isMessageAfterReadMarker(m.timeMs, m.id, lastReadTime, lastReadMid);
-      const prevUnread = prev ? isMessageAfterReadMarker(prev.timeMs, prev.id, lastReadTime, lastReadMid) : false;
-      rows.push({ m, isGroupStart, isUnreadStart: isUnread && !prevUnread });
-    }
-
-    return rows;
+    return list.map((raw, idx) => ({
+      m: withResolvedAuthorNames(raw),
+      isGroupStart: projections[idx].isGroupStart,
+      isUnreadStart: projections[idx].isUnreadStart,
+      showDate: projections[idx].showDate,
+    }));
   });
-
-// 转发条目作者名补拉调度：行投影变化后收集缺失昵称的 uid 并 debounce 批量请求。
-watch(messageRows, (rows) => {
-  const missing = collectUnresolvedForwardAuthorUids(
-    rows.map((row) => row.m),
-    (uid) => Boolean(resolveForwardAuthorName(uid)),
-  );
-  if (missing.length > 0) scheduleForwardAuthorProfileFetch(missing);
-}, { immediate: true });
 
   const replyPreview = computed<{ title: string; snippet: string }>(() => {
     const draft = messageComposerSnapshot.value.replyDraft;
@@ -397,10 +429,36 @@ watch(messageRows, (rows) => {
 
   /**
    * 搜索面板状态。
+   *
+   * 搜索结果同样按 uid 解析作者昵称：服务端信封不带昵称时，避免结果行回退成「用户 <uid>」。
    */
   const searchPanelOpen = ref(false);
-  const searchState = computed(() => messageTimelineSnapshot.value.search);
+  const searchState = computed<MessageSearchState>(() => {
+    const state = messageTimelineSnapshot.value.search;
+    if (state.results.length === 0) return state;
+    return {
+      ...state,
+      results: state.results.map((result) => ({
+        ...result,
+        message: withResolvedAuthorNames(result.message),
+      })),
+    };
+  });
   const highlightedMessageId = computed(() => messageTimelineSnapshot.value.highlightedMessageId);
+
+  // 作者名补拉调度：行投影/搜索结果变化后收集仍缺失昵称的发送者/提及/转发作者，debounce 批量请求。
+  watch([messageRows, searchState], ([rows, search]) => {
+    const messages = [
+      ...rows.map((row) => row.m),
+      ...search.results.map((result) => result.message),
+    ];
+    const hasName = (uid: string): boolean => Boolean(resolveAuthorName(uid));
+    const missing = [
+      ...collectUnresolvedAuthorUids(messages, hasName),
+      ...collectUnresolvedForwardAuthorUids(messages, hasName),
+    ];
+    if (missing.length > 0) scheduleUserProfileFetch(missing);
+  }, { immediate: true });
 
   /**
    * Pin state.
@@ -620,6 +678,8 @@ watch(messageRows, (rows) => {
     const cid = currentSessionSnapshot.value.currentChannelId;
     const channelName = String(deps.currentChannelName.value ?? "");
     const lookup = cid ? deps.lookupChannel(cid) : null;
+    // 收藏存的是展示快照：优先使用行投影里已按 uid 解析出的昵称，避免落入「用户 <uid>」占位名。
+    const resolvedSenderNames = new Map(messageRows.value.map((row) => [row.m.id, row.m.from.name]));
     addBookmarks(
       ids.map((messageId) => {
         const msg = lookup?.findMessageById(messageId);
@@ -628,7 +688,7 @@ watch(messageRows, (rows) => {
           channelId: cid ?? "",
           channelName,
           contentPreview: msg ? (msg.kind === "core_text" ? msg.text : msg.preview) : "",
-          senderName: msg?.from?.name ?? "",
+          senderName: resolvedSenderNames.get(messageId) || msg?.from?.name || "",
           bookmarkedAt: Date.now(),
         };
       }),
@@ -638,6 +698,17 @@ watch(messageRows, (rows) => {
 
   function fmtTime(ms: number): string {
     return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  /**
+   * 格式化分组首条的时间戳。
+   *
+   * @param ms - 消息时间戳。
+   * @param showDate - 是否带 `MM-DD` 日期前缀（跨自然日的组首）。
+   * @returns `HH:MM` 或 `MM-DD HH:MM`。
+   */
+  function fmtGroupHeadTime(ms: number, showDate: boolean): string {
+    return formatGroupHeadTime(ms, showDate);
   }
 
   function formatReplyMiniText(channelId: string, replyToId: string): string {
@@ -774,6 +845,7 @@ watch(messageRows, (rows) => {
     fetchLinkPreview,
     dismissLinkPreview,
     fmtTime,
+    fmtGroupHeadTime,
     formatReplyMiniText,
     setDomainId,
     setDraft,

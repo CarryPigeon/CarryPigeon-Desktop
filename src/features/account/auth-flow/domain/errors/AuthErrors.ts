@@ -115,6 +115,10 @@ export function toAuthErrorMessage(e: unknown): string {
     if (e.reason === "mail_service_unavailable" || e.reason === "email_delivery_failed") {
       return "This server does not have email verification enabled. Sign in with username and password instead.";
     }
+    // 服务端 403 password_login_disabled（API.md §3.3）：密码登录被配置关闭，引导改用邮箱验证码。
+    if (e.reason === "password_login_disabled") {
+      return "Password sign-in is disabled on this server. Sign in with email verification code instead.";
+    }
     switch (e.code) {
       case "missing_server_socket":
         return "Missing server socket.";
