@@ -1,0 +1,4 @@
+/* 主题插件样式：当前仅提供最小占位（主题变量由宿主 data-theme/data-accent 驱动）。 */
+.cp-theme-plugin {
+  display: contents;
+}

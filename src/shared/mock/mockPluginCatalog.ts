@@ -114,4 +114,73 @@ export const MOCK_PLUGIN_CATALOG: MockPluginEntry[] = [
       { key: "fs", label: "Read/write local files", risk: "high" },
     ],
   },
+  {
+    pluginId: "theme",
+    name: "Theme Switcher",
+    tagline: "Light / dark / patchbay themes and accents",
+    description:
+      "Client-side theme plugin: cycles host themes (light/dark/patchbay) and accent colors, persisting the preference via plugin storage. Enabled by default.",
+    source: "repo",
+    downloadUrl: "https://repo.example.com/plugins/theme/0.1.0.zip",
+    sha256: "aa11bb22cc33dd44ee55ff6600112233445566778899aabbccddeeff0011223",
+    required: false,
+    versions: ["0.1.0"],
+    providesDomains: [],
+    permissions: [
+      { key: "ui", label: "Register toolbar entry", risk: "low" },
+      { key: "storage", label: "Persist theme preference", risk: "low" },
+    ],
+  },
+  {
+    pluginId: "markdown",
+    name: "Markdown Messages",
+    tagline: "Safe markdown composer & renderer",
+    description:
+      "Local markdown message plugin: provides the 'markdown' message domain with a textarea composer and a safe, dependency-free markdown renderer. Enabled by default.",
+    source: "repo",
+    downloadUrl: "https://repo.example.com/plugins/markdown/0.1.0.zip",
+    sha256: "bb22cc33dd44ee55ff6600112233445566778899aabbccddeeff0011223344",
+    required: false,
+    versions: ["0.1.0"],
+    providesDomains: [{ id: "markdown", label: "Markdown", version: "1", colorVar: "--cp-domain-ext-a" }],
+    permissions: [
+      { key: "render", label: "Render markdown messages", risk: "low" },
+      { key: "compose", label: "Compose markdown messages", risk: "low" },
+      { key: "storage", label: "Persist drafts", risk: "low" },
+    ],
+  },
+  {
+    pluginId: "group-notice",
+    name: "Group Notice",
+    tagline: "Server-sourced group notifications",
+    description:
+      "Server-sourced plugin for group notifications: renders group_notice messages and fetches the notice list from the current server origin. Enabled by default.",
+    source: "server",
+    sha256: "cc33dd44ee55ff6600112233445566778899aabbccddeeff0011223344556",
+    required: false,
+    versions: ["0.1.0"],
+    providesDomains: [{ id: "group_notice", label: "GroupNotice", version: "1", colorVar: "--cp-domain-ext-b" }],
+    permissions: [
+      { key: "render", label: "Render group notices", risk: "low" },
+      { key: "network", label: "Fetch notices from current server", risk: "medium" },
+      { key: "storage", label: "Persist read cursor", risk: "low" },
+    ],
+  },
+  {
+    pluginId: "ai-summary",
+    name: "AI Summary",
+    tagline: "Channel digest via server AI endpoint",
+    description:
+      "Summarizes the current channel by calling the current server origin's /api/ai/summarize endpoint, showing the result in an overlay panel. Enabled by default.",
+    source: "repo",
+    downloadUrl: "https://repo.example.com/plugins/ai-summary/0.1.0.zip",
+    sha256: "dd44ee55ff6600112233445566778899aabbccddeeff001122334455667788",
+    required: false,
+    versions: ["0.1.0"],
+    providesDomains: [{ id: "ai_summary", label: "AiSummary", version: "1", colorVar: "--cp-domain-ext-c" }],
+    permissions: [
+      { key: "network", label: "Call current server AI endpoint", risk: "medium" },
+      { key: "storage", label: "Cache summaries", risk: "low" },
+    ],
+  },
 ];

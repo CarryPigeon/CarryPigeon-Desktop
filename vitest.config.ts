@@ -22,7 +22,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setupLocalStorage.ts"],
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "plugins/*/src/**/*.test.ts"],
     exclude: ["node_modules", "src-tauri", "dist"],
     coverage: {
       provider: "v8",

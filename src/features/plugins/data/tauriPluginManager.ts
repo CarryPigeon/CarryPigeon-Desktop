@@ -24,6 +24,12 @@ import type { PluginInstallQueryPort } from "@/features/plugins/domain/ports/Plu
 import type { PluginLifecycleCommandPort } from "@/features/plugins/domain/ports/PluginLifecycleCommandPort";
 import { createPluginOperationError } from "@/features/plugins/domain/errors/PluginOperationError";
 import type { InstalledPluginState, PluginProgress, PluginProgressHandler } from "@/features/plugins/domain/types/pluginTypes";
+import {
+  getLocalInstalledState,
+  isLocalPluginSourceEnabled,
+  listLocalDefaultInstalledStates,
+  setLocalPluginDisabled,
+} from "@/features/plugins/data/localPluginSource";
 
 type RustInstalledPluginState = {
   pluginId: string;
@@ -77,12 +83,19 @@ function emitProgress(
 
 /**
  * 查询已安装插件列表。
+ *
+ * 说明：dev 本地源模式下，默认启用的本地源插件会被合并进结果
+ * （本地源插件不落盘安装，安装态由本地源注册表推导）。
  */
 async function listInstalled(serverSocket: string): Promise<InstalledPluginState[]> {
   const socket = serverSocket.trim();
   if (!socket) return [];
   const raw = await invokeTauri<RustInstalledPluginState[]>(TAURI_COMMANDS.pluginsListInstalled, { serverSocket: socket, ...buildTauriTlsArgs(socket) });
-  return (raw ?? []).map(mapInstalledState).filter((x) => Boolean(x.pluginId));
+  const merged = (raw ?? []).map(mapInstalledState).filter((x) => Boolean(x.pluginId));
+  for (const state of listLocalDefaultInstalledStates(socket)) {
+    if (!merged.some((x) => x.pluginId === state.pluginId)) merged.push(state);
+  }
+  return merged;
 }
 
 /**
@@ -97,7 +110,8 @@ async function getInstalledState(serverSocket: string, pluginId: string): Promis
     pluginId: id,
     ...buildTauriTlsArgs(socket),
   });
-  return raw ? mapInstalledState(raw) : null;
+  if (raw) return mapInstalledState(raw);
+  return getLocalInstalledState(socket, id);
 }
 
 async function install(
@@ -111,6 +125,15 @@ async function install(
   const v = version.trim();
   if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
   if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
+
+  // 本地源插件不落盘安装：清除停用标记即视为重新安装启用。
+  if (isLocalPluginSourceEnabled(id)) {
+    setLocalPluginDisabled(socket, id, false);
+    const state = getLocalInstalledState(socket, id);
+    if (!state) throw createPluginOperationError("plugin_not_installed", "Local plugin state unavailable", { pluginId: id });
+    emitProgress(id, "installed", 100, "Installed", onProgress);
+    return state;
+  }
 
   emitProgress(id, "confirm", 0, "Preparing...", onProgress);
   try {
@@ -149,6 +172,11 @@ async function installFromUrl(
   if (!u) throw createPluginOperationError("missing_download_url", "Missing download URL", { pluginId: id, version: v });
   if (!sum) throw createPluginOperationError("missing_sha256", "Missing SHA256", { pluginId: id, version: v });
 
+  // 本地源插件：委托 install 的本地分支处理。
+  if (isLocalPluginSourceEnabled(id)) {
+    return install(serverSocket, pluginId, version, onProgress);
+  }
+
   emitProgress(id, "confirm", 0, "Preparing...", onProgress);
   try {
     emitProgress(id, "downloading", 18, "Downloading...", onProgress);
@@ -184,6 +212,15 @@ async function switchVersion(
   if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
   if (!v) throw createPluginOperationError("missing_plugin_version", "Missing version", { pluginId: id });
 
+  // 本地源插件仅注册表单版本，切换等同 no-op。
+  if (isLocalPluginSourceEnabled(id)) {
+    emitProgress(id, "switching", 24, "Switching version...", onProgress);
+    emitProgress(id, "installed", 100, "Switched", onProgress);
+    const state = getLocalInstalledState(socket, id);
+    if (!state) throw createPluginOperationError("plugin_not_installed", "Local plugin state unavailable", { pluginId: id });
+    return state;
+  }
+
   emitProgress(id, "switching", 24, "Switching version...", onProgress);
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsSwitchVersion, {
     serverSocket: socket,
@@ -201,6 +238,16 @@ async function enable(serverSocket: string, pluginId: string, onProgress?: Plugi
   if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
   if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
 
+  // 本地源插件：清除停用标记即启用。
+  if (isLocalPluginSourceEnabled(id)) {
+    setLocalPluginDisabled(socket, id, false);
+    emitProgress(id, "enabling", 30, "Enabling...", onProgress);
+    emitProgress(id, "enabled", 100, "Enabled", onProgress);
+    const state = getLocalInstalledState(socket, id);
+    if (!state) throw createPluginOperationError("plugin_not_installed", "Local plugin state unavailable", { pluginId: id });
+    return state;
+  }
+
   emitProgress(id, "enabling", 30, "Enabling...", onProgress);
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsEnable, { serverSocket: socket, pluginId: id, ...buildTauriTlsArgs(socket) });
   emitProgress(id, "enabled", 100, "Enabled", onProgress);
@@ -211,6 +258,11 @@ async function disable(serverSocket: string, pluginId: string): Promise<Installe
   const socket = serverSocket.trim();
   const id = pluginId.trim();
   if (!socket || !id) return null;
+  // 本地源插件：写停用标记，不落 Rust。
+  if (isLocalPluginSourceEnabled(id)) {
+    setLocalPluginDisabled(socket, id, true);
+    return getLocalInstalledState(socket, id);
+  }
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsDisable, { serverSocket: socket, pluginId: id, ...buildTauriTlsArgs(socket) });
   return mapInstalledState(raw);
 }
@@ -221,6 +273,22 @@ async function setFailed(serverSocket: string, pluginId: string, message: string
   const msg = String(message ?? "").trim();
   if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
   if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
+  // 本地源插件未在 Rust 落盘，标记失败态直接在本地合成，避免无效命令报错。
+  if (isLocalPluginSourceEnabled(id)) {
+    return {
+      ...(getLocalInstalledState(socket, id) ?? {
+        pluginId: id,
+        installedVersions: [],
+        currentVersion: null,
+        enabled: false,
+        status: "ok" as const,
+        lastError: "",
+      }),
+      enabled: false,
+      status: "failed",
+      lastError: msg || "Plugin failed",
+    };
+  }
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsSetFailed, {
     serverSocket: socket,
     pluginId: id,
@@ -235,6 +303,12 @@ async function clearError(serverSocket: string, pluginId: string): Promise<Insta
   const id = pluginId.trim();
   if (!socket) throw createPluginOperationError("missing_server_socket", "Missing server socket");
   if (!id) throw createPluginOperationError("missing_plugin_id", "Missing plugin ID");
+  // 本地源插件：清错等同恢复本地安装态，不落 Rust。
+  if (isLocalPluginSourceEnabled(id)) {
+    const state = getLocalInstalledState(socket, id);
+    if (!state) throw createPluginOperationError("plugin_not_installed", "Local plugin state unavailable", { pluginId: id });
+    return state;
+  }
   const raw = await invokeTauri<RustInstalledPluginState>(TAURI_COMMANDS.pluginsClearError, { serverSocket: socket, pluginId: id, ...buildTauriTlsArgs(socket) });
   return mapInstalledState(raw);
 }
@@ -243,6 +317,11 @@ async function uninstall(serverSocket: string, pluginId: string): Promise<void> 
   const socket = serverSocket.trim();
   const id = pluginId.trim();
   if (!socket || !id) return;
+  // 本地源插件：写停用标记即视为卸载（不删除 dist 构建产物）。
+  if (isLocalPluginSourceEnabled(id)) {
+    setLocalPluginDisabled(socket, id, true);
+    return;
+  }
   await invokeTauri<void>(TAURI_COMMANDS.pluginsUninstall, { serverSocket: socket, pluginId: id, ...buildTauriTlsArgs(socket) });
 }
 

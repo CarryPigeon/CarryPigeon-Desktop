@@ -20,6 +20,7 @@ import {
 } from "@/features/plugins/domain/types/pluginTypes";
 import { createLogger } from "@/shared/utils/logger";
 import { enabledRepoSources } from "@/features/plugins/presentation/store/repoSourcesStore";
+import { listLocalPluginCatalogEntries } from "@/features/plugins/data/localPluginSource";
 import { getOrCreateServerScopedStore } from "@/shared/utils/scopedStoreCache";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
 
@@ -246,6 +247,12 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
           }
           const existing = mergedById.get(pluginId) ?? null;
           mergedById.set(pluginId, existing ? mergeCatalogEntry(existing, repoEntry) : repoEntry);
+        }
+
+        // 合并本地插件源目录条目（dev 下让插件中心看到本地构建的插件）。
+        for (const entry of listLocalPluginCatalogEntries()) {
+          const existing = mergedById.get(entry.pluginId) ?? null;
+          mergedById.set(entry.pluginId, existing ? mergeCatalogEntry(existing, entry) : entry);
         }
 
         catalog.value = sortCatalogEntries(mergedById.values());

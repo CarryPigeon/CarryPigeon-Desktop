@@ -407,7 +407,7 @@ export const zh_cn = {
   // 模块详情抽屉标签
   module_detail_drawer_domains: "域",
   switch_server: "切换服务器",
-  unpatched_signal: "未接线信号",
+  unpatched_signal: "未安装插件",
   unknown_domain: "未知消息类型",
   preview_unavailable: "无可用预览",
   install_module_to_view: "安装模块以查看完整内容",

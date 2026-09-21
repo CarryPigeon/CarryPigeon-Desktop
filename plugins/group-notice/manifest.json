@@ -1,0 +1,7 @@
+{
+  "pluginId": "group-notice",
+  "version": "0.1.0",
+  "entry": "index.js",
+  "permissions": ["ui", "events", "storage", "network"],
+  "providesDomains": ["group_notice"]
+}

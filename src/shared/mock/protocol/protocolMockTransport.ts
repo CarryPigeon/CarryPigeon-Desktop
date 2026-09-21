@@ -12,6 +12,11 @@
 import type { ApiErrorEnvelope } from "@/shared/net/http/apiErrors";
 import { MOCK_DISABLE_REQUIRED_GATE } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
+import {
+  buildMockAiSummarizeResponse,
+  buildMockGroupNotices,
+  type MockAiSummarizeRequest,
+} from "@/shared/mock/mockAiSummary";
 import { normalizeServerKey } from "@/shared/serverKey";
 
 /**
@@ -502,6 +507,22 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       ),
     ];
     return { ok: true, status: 200, body: { items } };
+  }
+
+  // -------------------------------------------------------------------------
+  // AI summarize（mock 确定性 extractive 摘要端点，供 ai-summary 插件消费）
+  // -------------------------------------------------------------------------
+  if (method === "POST" && pathname === "/ai/summarize") {
+    const result = buildMockAiSummarizeResponse(req.body as MockAiSummarizeRequest | null);
+    return { ok: true, status: 200, body: result };
+  }
+
+  // -------------------------------------------------------------------------
+  // Group notices（mock 群通知列表端点，供 group-notice 插件消费）
+  // -------------------------------------------------------------------------
+  if (method === "GET" && pathname === "/group/notices") {
+    const channelId = searchParams.get("channel_id") ?? searchParams.get("channel") ?? "";
+    return { ok: true, status: 200, body: { notices: buildMockGroupNotices(channelId) } };
   }
 
   // -------------------------------------------------------------------------

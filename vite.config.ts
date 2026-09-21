@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "node:path";
 import fs from "node:fs";
@@ -12,12 +12,84 @@ const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), 
   version: string;
 };
 
+// ---------------------------------------------------------------------------
+// 开发期本地插件资产服务
+//
+// 背景：Vite 禁止从源码（含运行时动态 import）加载 public/ 目录下的 JS
+// （"This file is in /public ... should not be imported from source code"），
+// 因此插件构建产物不能只靠 public/plugins 静态分发。
+//
+// 方案：dev 下由自定义中间件（先于 Vite 内部中间件注册）直接从文件系统服务：
+// - /plugins/<id>/<rel>  ->  plugins/<id>/dist/<rel>
+// - /vendor/<rel>        ->  public/vendor/<rel>（绕开 public-import 限制，
+//                            供插件产物 import "/vendor/vendor.mjs" 共享 vendor 实例）
+// ---------------------------------------------------------------------------
+const MIME_BY_EXT: Record<string, string> = {
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".map": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
+
+function serveFile(res: import("node:http").ServerResponse, file: string): void {
+  const ext = path.extname(file).toLowerCase();
+  res.setHeader("Content-Type", `${MIME_BY_EXT[ext] ?? "application/octet-stream"}; charset=utf-8`);
+  res.setHeader("Cache-Control", "no-store");
+  fs.createReadStream(file).pipe(res);
+}
+
+function localPluginAssetsPlugin(): Plugin {
+  return {
+    name: "carrypigeon-local-plugin-assets",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.method !== "GET" && req.method !== "HEAD") return next();
+        const rawUrl = req.url ?? "";
+        const pathname = decodeURIComponent(rawUrl.split("?")[0] ?? "");
+        // /plugins/<id>/<rel> -> plugins/<id>/dist/<rel>
+        const pluginMatch = /^\/plugins\/([A-Za-z0-9._-]+)\/(.+)$/.exec(pathname);
+        if (pluginMatch) {
+          const base = path.resolve(__dirname, "plugins", pluginMatch[1], "dist");
+          const file = path.resolve(base, pluginMatch[2]);
+          if (file.startsWith(base + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {
+            serveFile(res, file);
+            return;
+          }
+          return next();
+        }
+        // /vendor/<rel> -> public/vendor/<rel>
+        const vendorMatch = /^\/vendor\/(.+)$/.exec(pathname);
+        if (vendorMatch) {
+          const base = path.resolve(__dirname, "public", "vendor");
+          const file = path.resolve(base, vendorMatch[1]);
+          if (file.startsWith(base + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {
+            serveFile(res, file);
+            return;
+          }
+          return next();
+        }
+        return next();
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   const isBuild = command === "build";
 
   return {
     plugins: [
+      localPluginAssetsPlugin(),
       vue(),
       AutoImport({
         resolvers: [TDesignResolver({

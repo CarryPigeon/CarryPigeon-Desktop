@@ -11,7 +11,7 @@ import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginT
 import { IS_STORE_MOCK, USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { normalizeServerKey } from "@/shared/serverKey";
-import { getLocalVoiceCallRuntimeEntry, USE_LOCAL_VOICE_CALL_PLUGIN } from "@/features/plugins/data/localPluginSource";
+import { getLocalPluginRuntimeEntry, isLocalPluginSourceEnabled } from "@/features/plugins/data/localPluginSource";
 
 function getMockRuntimeEntry(serverSocket: string, pluginId: string, version?: string): PluginRuntimeEntry {
   const id = String(pluginId ?? "").trim();
@@ -37,11 +37,12 @@ function getMockRuntimeEntry(serverSocket: string, pluginId: string, version?: s
  * 获取“当前选中版本”的插件运行时入口信息。
  */
 export function getRuntimeEntry(serverSocket: string, pluginId: string): Promise<PluginRuntimeEntry> {
+  // 本地插件源优先于 mock：dev 下加载真实构建产物（public/plugins/<id>/）而非 mock 占位模块。
+  if (isLocalPluginSourceEnabled(pluginId)) {
+    return Promise.resolve(getLocalPluginRuntimeEntry(normalizeServerKey(serverSocket), pluginId));
+  }
   if (IS_STORE_MOCK || USE_MOCK_TRANSPORT) {
     return Promise.resolve(getMockRuntimeEntry(serverSocket, pluginId));
-  }
-  if (USE_LOCAL_VOICE_CALL_PLUGIN && pluginId === "voice-call") {
-    return Promise.resolve(getLocalVoiceCallRuntimeEntry(normalizeServerKey(serverSocket)));
   }
   return invokeTauri<RawPluginRuntimeEntry>(TAURI_COMMANDS.pluginsGetRuntimeEntry, {
     serverSocket,
@@ -54,6 +55,10 @@ export function getRuntimeEntry(serverSocket: string, pluginId: string): Promise
  * 获取“指定已安装版本”的插件运行时入口信息。
  */
 export function getRuntimeEntryForVersion(serverSocket: string, pluginId: string, version: string): Promise<PluginRuntimeEntry> {
+  if (isLocalPluginSourceEnabled(pluginId)) {
+    // dev 本地源插件不落盘安装，版本以本地源注册表为准（忽略请求的版本号）。
+    return Promise.resolve(getLocalPluginRuntimeEntry(normalizeServerKey(serverSocket), pluginId));
+  }
   if (IS_STORE_MOCK || USE_MOCK_TRANSPORT) {
     return Promise.resolve(getMockRuntimeEntry(serverSocket, pluginId, version));
   }
