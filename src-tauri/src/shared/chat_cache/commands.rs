@@ -37,8 +37,9 @@ fn ensure_default_keyring_store() {
         return;
     }
     ENSURE_KEYRING_STORE.call_once(|| {
-        // 参数 true：Linux 上跳过 keyutils，使用 Secret Service。
-        if let Err(err) = keyring::use_native_store(true) {
+        // keyring 4.2（v1 模式）：首次访问自动初始化平台默认存储，
+        // Linux 上为 Secret Service（跨重启持久化），跳过会话级 keyutils。
+        if let Err(err) = keyring::Entry::store_status() {
             tracing::warn!(action = "db_chat_cache_keyring_store_init_failed", error = %err);
         }
     });

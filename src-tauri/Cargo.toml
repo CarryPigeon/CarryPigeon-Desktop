@@ -46,7 +46,7 @@ sea-orm = { version = "2.0.0-rc.22", features = [ "sqlx-sqlite", "runtime-tokio-
 # 错误处理
 anyhow = "1"
 aes-gcm = "0.10.3"
-keyring = "4.0.0"
+keyring = "4.2.0"
 keyring-core = "1.0.0"
 
 # 网络请求
