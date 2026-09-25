@@ -10,6 +10,10 @@
  *   插件 activate 期间把作用域隐式注入到工厂函数中。
  */
 
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("plugin-scope");
+
 /** 清理回调类型（同步执行，抛错会被捕获并告警） */
 type DisposeCallback = () => void;
 
@@ -109,11 +113,11 @@ function createScope(id: string, parent: PluginScope | undefined): PluginScope {
         try {
           cb();
         } catch (err) {
-          // 单个回调抛错不阻断后续，仅告警（英文日志含 scope id）
-          console.warn(
-            `[plugin-scope] dispose callback error in scope "${id}":`,
-            err,
-          );
+          // 单个回调抛错不阻断后续，仅告警（英文日志含 scope id 与错误信息）
+          logger.warn("Action: plugins_scope_dispose_callback_error", {
+            scopeId: id,
+            error: String(err),
+          });
         }
       }
     })();

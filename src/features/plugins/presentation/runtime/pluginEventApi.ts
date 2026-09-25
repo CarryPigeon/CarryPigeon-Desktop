@@ -4,7 +4,10 @@
  */
 
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { createLogger } from "@/shared/utils/logger";
 import type { PluginScope } from "./pluginScope";
+
+const logger = createLogger("plugin-event-api");
 
 /**
  * 判断插件 scope 是否已销毁（已销毁时输出英文告警，含 pluginId）。
@@ -12,9 +15,7 @@ import type { PluginScope } from "./pluginScope";
  */
 function warnIfScopeDisposed(scope: PluginScope | undefined, pluginId: string): boolean {
   if (scope?.disposed) {
-    console.warn(
-      `[plugin-event-api] plugin "${pluginId}" scope is disposed; onEvent is a no-op`,
-    );
+    logger.warn("Action: plugins_scope_disposed_on_event_noop", { pluginId });
     return true;
   }
   return false;

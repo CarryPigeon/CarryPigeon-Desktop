@@ -11,6 +11,9 @@ import { createPluginInvokeApi } from "./pluginInvokeApi";
 import { createPluginEventApi } from "./pluginEventApi";
 import { createPluginUiApi, type PluginUiBridge } from "./pluginUiApi";
 import type { PluginScope } from "./pluginScope";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("plugin-host-api");
 
 export type TauriFetchResponse = {
   ok: boolean;
@@ -25,9 +28,7 @@ export type TauriFetchResponse = {
  */
 function warnIfScopeDisposed(scope: PluginScope | undefined, pluginId: string): boolean {
   if (scope?.disposed) {
-    console.warn(
-      `[plugin-host-api] plugin "${pluginId}" scope is disposed; call is a no-op`,
-    );
+    logger.warn("Action: plugins_scope_disposed_call_noop", { pluginId });
     return true;
   }
   return false;

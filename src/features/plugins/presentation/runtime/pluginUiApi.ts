@@ -6,6 +6,9 @@
 import type { Component } from "vue";
 import type { PluginChatContext, PluginOverlayMountHandle } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 import type { PluginScope } from "./pluginScope";
+import { createLogger } from "@/shared/utils/logger";
+
+const logger = createLogger("plugin-ui-api");
 
 /**
  * 宿主提供的 chat UI 桥（Task 4 实现 mountOverlay / registerToolbarAction）。
@@ -28,9 +31,7 @@ export type PluginUiBridge = {
  */
 function warnIfScopeDisposed(scope: PluginScope | undefined, pluginId: string): boolean {
   if (scope?.disposed) {
-    console.warn(
-      `[plugin-ui-api] plugin "${pluginId}" scope is disposed; ui api is a no-op`,
-    );
+    logger.warn("Action: plugins_scope_disposed_ui_noop", { pluginId });
     return true;
   }
   return false;
