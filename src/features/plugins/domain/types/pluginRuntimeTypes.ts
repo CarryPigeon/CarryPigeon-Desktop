@@ -53,6 +53,65 @@ export type PluginComposerPayload = {
 };
 
 /**
+ * `host.ai.summarize` 的失败原因分类。
+ *
+ * - `not-configured`：用户选择"跟随服务端"，插件应回退到服务端端点；
+ * - `incomplete-config`：已选客户端 provider 但 base URL / 模型名为空；
+ * - `api-key-missing`：需要密钥但尚未配置（或安全存储不可用）；
+ * - `request-failed`：请求已发出但失败（含上游错误码与传输错误）。
+ */
+export type PluginAiFailureCode =
+  | "not-configured"
+  | "incomplete-config"
+  | "api-key-missing"
+  | "request-failed";
+
+/**
+ * `host.ai.summarize` 的结果。
+ */
+export type PluginAiSummarizeResult =
+  | {
+      ok: true;
+      /** 总结正文。 */
+      summary: string;
+      /** 参与总结的消息条数。 */
+      messageCount: number;
+      /** provider 展示名（例如 `DeepSeek`）。 */
+      provider: string;
+      /** 实际使用的模型名。 */
+      model: string;
+    }
+  | {
+      ok: false;
+      code: PluginAiFailureCode;
+      /** 面向开发者的错误描述（已脱敏，不含密钥）。 */
+      error: string;
+      /** 上游 HTTP 状态码；传输失败时为 0/缺省。 */
+      status?: number;
+      /** 当前客户端 provider 展示名（用于拼装可操作提示）。 */
+      provider?: string;
+    };
+
+/**
+ * `host.ai` 能力面（最小权限）。
+ *
+ * 安全约束：
+ * - 只暴露"总结"这一窄能力，插件无法用任意提示词把客户端当作通用 LLM 代理；
+ * - API Key 由宿主从系统凭据管理器读取，插件既拿不到也无法读取明文；
+ * - 用户选择"跟随服务端"时返回 `not-configured`，插件应自行回退到服务端端点；
+ * - 提示词、温度、超时等采样参数一律由宿主按客户端设置决定，插件不可覆盖。
+ */
+export type PluginAiApi = {
+  /** 客户端 AI 是否已配置且就绪（不发起网络请求）。 */
+  isConfigured(): Promise<boolean>;
+  /** 以宿主的客户端 AI 配置生成总结。 */
+  summarize(input: {
+    channelId: string;
+    messages: readonly string[];
+  }): Promise<PluginAiSummarizeResult>;
+};
+
+/**
  * 插件运行时对外声明的 domain contract。
  */
 export type PluginRuntimeContract = {
@@ -67,7 +126,7 @@ export type PluginRuntimeContract = {
  *
  * 说明：
  * - 该类型描述“宿主允许插件做什么”，是插件权限与能力边界的核心；
- * - 其中 `host.network` 为可选：只有在插件声明并通过宿主校验后才会注入。
+ * - 其中 `host.network` / `host.ai` 为可选：只有在插件声明并通过宿主校验后才会注入。
  */
 export type PluginContext = {
   serverSocket: string;
@@ -100,6 +159,13 @@ export type PluginContext = {
     invoke?: <T = unknown>(command: string, args?: Record<string, unknown>) => Promise<T>;
     /** 订阅宿主 Tauri 事件（权限 + 事件白名单），返回取消函数 */
     onEvent?: <T = unknown>(event: string, handler: (payload: T) => void) => () => void;
+    /**
+     * 客户端 AI 总结能力（"ai" 权限门控）。
+     *
+     * 说明：仅在用户配置了客户端 AI provider 时才有实际效果；未配置时
+     * `summarize` 返回 `not-configured`，插件应回退服务端端点。
+     */
+    ai?: PluginAiApi;
     /** 挂载全局浮层组件，返回卸载函数与组件实例句柄 */
     mountOverlay?: (component: Component, opts?: { zIndex?: number; props?: Record<string, unknown> }) => PluginOverlayMountHandle;
     /** 注册聊天头部/工具栏入口，返回注销函数 */

@@ -4,6 +4,7 @@
  */
 
 import type { PluginContext, PluginComposerPayload } from "@/features/plugins/domain/types/pluginRuntimeTypes";
+import { getAiCapabilities } from "@/features/ai/api";
 import { buildTauriTlsArgs } from "@/shared/net/tls/tauriTlsArgs";
 import { invokeTauri } from "@/shared/tauri";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
@@ -88,10 +89,54 @@ export function createPluginNetworkApi(
 }
 
 /**
+ * 创建“权限受控”的 ai API（客户端可替换 AI provider，由宿主代持密钥）。
+ *
+ * 说明：
+ * - 只暴露 `isConfigured` / `summarize` 两个窄能力：插件无法用任意提示词把客户端
+ *   当作通用 LLM 代理，也无法读取 API Key（密钥只在 Rust 侧凭据管理器中存在）；
+ * - 提示词与采样参数由宿主按客户端设置决定，插件不可覆盖；
+ * - scope 已销毁后调用变为 no-op：`isConfigured` 返回 false，`summarize` 返回
+ *   `not-configured`，让插件自然回退到服务端端点。
+ *
+ * @param scope 可选的插件作用域：已销毁后调用变为 no-op 并告警。
+ */
+export function createPluginAiApi(scope?: PluginScope): NonNullable<PluginContext["host"]["ai"]> {
+  const notConfigured = {
+    ok: false as const,
+    code: "not-configured" as const,
+    error: "client ai provider is not configured",
+  };
+  return {
+    async isConfigured(): Promise<boolean> {
+      if (warnIfScopeDisposed(scope, "ai")) return false;
+      try {
+        return (await getAiCapabilities().getStatus()).ready;
+      } catch (e) {
+        logger.warn("Action: plugins_ai_status_failed", { error: String(e) });
+        return false;
+      }
+    },
+    async summarize(input) {
+      if (warnIfScopeDisposed(scope, "ai")) return notConfigured;
+      const channelId = String(input?.channelId ?? "").trim();
+      const messages = Array.isArray(input?.messages) ? input.messages.map((m) => String(m ?? "")) : [];
+      try {
+        return await getAiCapabilities().summarize(channelId, messages);
+      } catch (e) {
+        // capability 内部已做错误归一化；此处兜底 IPC 层异常，避免异常穿透插件运行时。
+        logger.warn("Action: plugins_ai_summarize_failed", { error: String(e) });
+        return { ok: false, code: "request-failed", error: String(e) };
+      }
+    },
+  };
+}
+
+/**
  * 组装受权限 / 白名单约束的完整插件 host 能力。
  *
  * 说明：
  * - `storage` 始终注入；`network` 仅当 `permissions` 包含 "network" 时注入；
+ * - `ai` 仅当 `permissions` 包含 "ai" 时注入（客户端 AI 密钥由宿主代持）；
  * - `invoke` / `onEvent` 分别由 "invoke" / "events" 权限门控，且命令/事件均以
  *   白名单前缀（目前固定为 "voice_call:"）约束，杜绝越权调用；
  * - `mountOverlay` / `registerToolbarAction` 由 "ui" 权限 + 宿主 UI 桥共同门控；
@@ -128,6 +173,7 @@ export function createHostApi(
     },
     storage: createPluginStorageApi(serverSocket, pluginId, scope),
     network: permissions.includes("network") ? createPluginNetworkApi(serverSocket, scope) : undefined,
+    ai: permissions.includes("ai") ? createPluginAiApi(scope) : undefined,
   };
   if (permissions.includes("invoke")) {
     host.invoke = createPluginInvokeApi(serverSocket, pluginId, "voice_call:", scope) as never;

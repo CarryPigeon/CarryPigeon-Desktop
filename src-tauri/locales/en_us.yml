@@ -151,3 +151,13 @@ error.network_tcp_scope_missing_socket: "Missing socket"
 error.network_tcp_scope_mock_rejection: "mock:// socket is only supported in debug builds"
 error.network_tcp_scope_unsupported_scheme: "Unsupported transport scheme"
 error.network_tcp_service_not_found: "TCP service not found"
+
+# ai provider
+error.ai_secret_store_unavailable: "Secure storage is unavailable; cannot store the AI API key"
+error.ai_secret_set_failed: "Failed to store AI API key"
+error.ai_secret_clear_failed: "Failed to clear AI API key"
+error.ai_invalid_provider_id: "Invalid AI provider id"
+error.ai_invalid_base_url: "Invalid AI base url"
+error.ai_invalid_request: "Invalid AI request parameters"
+error.ai_request_failed: "AI request failed"
+error.ai_models_request_failed: "Failed to request AI model list"

@@ -72,3 +72,9 @@ export const KEY_SERVER_ID_BY_SOCKET = "carrypigeon:serverIdBySocket:v1";
  * @description 插件 repo sources 持久化 key（全局）。
  */
 export const KEY_REPO_SOURCES = "carrypigeon:repoSources:v1";
+
+/**
+ * @constant
+ * @description 客户端 AI provider 配置 key（全局，仅非敏感字段；API Key 存于系统凭据管理器）。
+ */
+export const KEY_AI_PROVIDER_CONFIG = "carrypigeon:aiProvider:v1";

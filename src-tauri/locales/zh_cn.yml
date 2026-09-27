@@ -151,3 +151,13 @@ error.network_tcp_scope_missing_socket: "缺少套接字"
 error.network_tcp_scope_mock_rejection: "mock:// 套接字仅在调试构建中支持"
 error.network_tcp_scope_unsupported_scheme: "不支持的传输协议"
 error.network_tcp_service_not_found: "TCP服务未找到"
+
+# ai provider
+error.ai_secret_store_unavailable: "安全存储不可用，无法保存 AI 密钥"
+error.ai_secret_set_failed: "AI 密钥保存失败"
+error.ai_secret_clear_failed: "AI 密钥清除失败"
+error.ai_invalid_provider_id: "AI 服务商标识无效"
+error.ai_invalid_base_url: "AI 服务地址无效"
+error.ai_invalid_request: "AI 请求参数无效"
+error.ai_request_failed: "AI 请求失败"
+error.ai_models_request_failed: "AI 模型列表请求失败"

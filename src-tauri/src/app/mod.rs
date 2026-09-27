@@ -98,15 +98,23 @@ pub fn run() -> anyhow::Result<()> {
             let file_layer = tracing_subscriber::fmt::layer()
                 .with_writer(non_blocking)
                 .with_ansi(false);
-            // 尝试添加 file_layer 到全局 subscriber
+            // 全局 subscriber 唯一初始化点：stderr 层（debug 运行可见）+ 文件层（release 排障）。
+            // 未设置 RUST_LOG 时回退到 info，避免 EnvFilter 默认全静默导致日志文件为空。
+            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,sqlx::query=warn"));
+            let stderr_layer = tracing_subscriber::fmt::layer()
+                .pretty()
+                .with_writer(std::io::stderr);
             if let Err(e) = tracing_subscriber::registry()
-                .with(tracing_subscriber::EnvFilter::from_default_env())
+                .with(env_filter)
+                .with(stderr_layer)
                 .with(file_layer)
                 .try_init()
             {
                 // 如果 subscriber 已经设定，file_layer 会失败 — 用 warn 记录（会写入现有 subscriber）
                 tracing::warn!(action = "app_file_logger_already_set", error = %e);
             }
+            tracing::info!(action = "app_lifecycle_started", "CarryPigeon Desktop started");
             // Store the log guard as Tauri managed state so it lives for
             // the app's lifetime and properly flushes buffered logs on drop.
             app.manage(LogFlushGuard(std::sync::Mutex::new(Some(guard))));
@@ -431,6 +439,12 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::plugins::di::commands::plugins_storage_get,
             crate::features::plugins::di::commands::plugins_storage_set,
             crate::features::plugins::di::commands::plugins_network_fetch,
+            // ai（客户端可替换 AI provider：密钥保管 + OpenAI 兼容调用）
+            crate::features::ai::di::commands::ai_secret_set,
+            crate::features::ai::di::commands::ai_secret_status,
+            crate::features::ai::di::commands::ai_secret_clear,
+            crate::features::ai::di::commands::ai_chat_completion,
+            crate::features::ai::di::commands::ai_list_models,
             // voice_message
             crate::features::voice_message::di::commands::start_voice_recording,
             crate::features::voice_message::di::commands::stop_voice_recording,

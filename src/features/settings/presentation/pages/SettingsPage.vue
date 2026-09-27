@@ -28,6 +28,7 @@ import type { SettingsSchemaEnvelopeV1 } from "@/features/settings/api-types";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 import PageHeader from '@/shared/ui/PageHeader.vue';
 import DiagnosticsPanel from "@/features/settings/presentation/components/DiagnosticsPanel.vue";
+import { AiProviderSettings } from "@/features/ai/components";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -63,13 +64,14 @@ const {
   businessPreferencesError,
 } = useSettingsPageModel();
 
-const sectionIds = ["general", "business", "data", "about"] as const;
+const sectionIds = ["general", "business", "ai", "data", "about"] as const;
 
 type SectionId = (typeof sectionIds)[number];
 
 const sectionNav = computed(() => [
   { id: "general" as const, label: t("general"), subtitle: t("settings_nav_general_sub") },
   { id: "business" as const, label: t("settings_business"), subtitle: t("settings_nav_business_sub") },
+  { id: "ai" as const, label: t("settings_ai_service"), subtitle: t("settings_ai_provider") },
   { id: "data" as const, label: t("settings_data"), subtitle: t("settings_nav_data_sub") },
   { id: "about" as const, label: t("menu_about"), subtitle: t("about_version") },
 ]);
@@ -502,6 +504,23 @@ async function handleResetDefaults(): Promise<void> {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-section-ai" class="cp-settings__section" data-testid="settings-section-ai">
+          <header class="cp-settings__sectionHead">
+            <div>
+              <div class="cp-settings__sectionName">{{ t("settings_ai_service") }}</div>
+              <div class="cp-settings__sectionSub">{{ t("settings_ai_service_sub") }}</div>
+            </div>
+          </header>
+
+          <div class="cp-settings__grid">
+            <div class="cp-settings__card wide">
+              <ErrorBoundary>
+                <AiProviderSettings />
+              </ErrorBoundary>
             </div>
           </div>
         </section>
