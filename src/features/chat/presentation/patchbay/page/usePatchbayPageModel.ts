@@ -495,16 +495,19 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   let _enterMultiSelectMode: ((messageId: string) => void) = () => {};
   let _openForwardDialog: ((messageId: string) => void) = () => {};
   let _startReply: ((messageId: string) => void) = () => {};
+  let _jumpToReferencedMessage: ((messageId: string) => void) = () => {};
 
   const {
     menuOpen,
     menuX,
     menuY,
+    menuMode,
     menuMessageId,
     closeMenu,
     handleMenuAction,
     handleMessageContextMenu,
     handleMoreClick,
+    handleReferenceContextMenu,
   } = useMessageContextMenu({
     getClipboardText: getMessageClipboardText,
     copyTextToClipboard: async (text: string) => {
@@ -537,6 +540,9 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     unpinMessage: (messageId: string) => handleUnpinMessage(messageId),
     bookmarkMessage: (messageId: string) => handleBookmarkMessage(messageId),
     unbookmarkMessage: (messageId: string) => handleUnbookmarkMessage(messageId),
+    jumpToReferencedMessage: (messageId: string) => {
+      _jumpToReferencedMessage(messageId);
+    },
   });
 
   const showRecall = computed(() => {
@@ -709,6 +715,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     const resolvedName = chatCenter.messageRows.find((row) => row.m.id === messageId)?.m.from.name;
     currentChannelMessageFlow.beginReply(messageId, resolvedName);
   };
+  // 引用跳转：由 ChatCenter 把目标消息加载进时间线并滚入视口。
+  _jumpToReferencedMessage = (messageId: string) => {
+    void chatCenter.jumpToReferencedMessage(messageId);
+  };
 
   const connectionToastLabel = computed(() => {
     switch (chatCenter.connectionPillState) {
@@ -782,6 +792,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openChannelSettingsMenu,
     handleMessageContextMenu,
     handleMoreClick,
+    handleReferenceContextMenu,
+    // 引用块「跳转到原消息」按钮与右键菜单的 jump 动作走同一定位链路。
+    handleJumpReference: (messageId: string) => {
+      _jumpToReferencedMessage(messageId);
+    },
     handleInstallHint,
   });
 
@@ -789,6 +804,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     open: menuOpen,
     x: menuX,
     y: menuY,
+    mode: menuMode,
     showRecall,
     canPin,
     isPinned,

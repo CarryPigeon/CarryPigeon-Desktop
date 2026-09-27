@@ -164,6 +164,7 @@ export function createChatMessageFlowRuntime(
     listMentionCandidates: (channelId) => applicationService.listMentionCandidates(channelId),
     searchCurrentChannel: (query) => applicationService.searchCurrentChannel(query),
     loadContextAroundMessage: (messageId) => applicationService.loadContextAroundMessage(messageId),
+    clearHighlightedMessage: () => applicationService.clearHighlightedMessage(),
     clearSearch: () => applicationService.clearSearch(),
   };
 }

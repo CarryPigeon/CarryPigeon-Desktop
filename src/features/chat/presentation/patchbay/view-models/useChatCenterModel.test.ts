@@ -95,8 +95,20 @@ type CenterOptions = {
 function mountCenter(options: CenterOptions = {}): {
   model: ChatCenterModel;
   fetchUserNames: ReturnType<typeof vi.fn>;
+  loadContextAroundMessage: ReturnType<typeof vi.fn>;
+  clearHighlightedMessage: ReturnType<typeof vi.fn>;
+  selectChannel: ReturnType<typeof vi.fn>;
+  timeline: ReturnType<typeof capability<MessageTimelineSnapshot>>;
 } {
-  const timeline = capability<MessageTimelineSnapshot>(timelineSnapshot(options.messages ?? [placeholderMessage()]));
+  const timelineBase = capability<MessageTimelineSnapshot>(timelineSnapshot(options.messages ?? [placeholderMessage()]));
+  const clearHighlightedMessage = vi.fn(() => {
+    timelineBase.push({ ...timelineBase.getSnapshot(), highlightedMessageId: "" });
+  });
+  // 模拟真实语义：定位成功后 store 高亮目标消息。
+  const loadContextAroundMessage = vi.fn(async (mid: string) => {
+    timelineBase.push({ ...timelineBase.getSnapshot(), highlightedMessageId: mid });
+  });
+  const timeline = Object.assign(timelineBase, { loadContextAroundMessage, clearHighlightedMessage });
   const session = capability({
     currentChannelId: "cid-1",
     lastReadMessageId: "",
@@ -112,6 +124,7 @@ function mountCenter(options: CenterOptions = {}): {
     availableDomains: [],
   });
   const fetchUserNames = vi.fn(options.fetchUserNames ?? (async () => ({})));
+  const selectChannel = vi.fn(async () => {});
 
   const deps = {
     currentSession: session,
@@ -128,7 +141,7 @@ function mountCenter(options: CenterOptions = {}): {
     onLoadMoreMessages: () => {},
     onMessageContextMenu: () => {},
     onForwardMessage: async () => {},
-    selectChannel: async () => {},
+    selectChannel,
     resolveSenderName: options.resolveSenderName ?? (() => ""),
     fetchUserNames,
   };
@@ -145,7 +158,7 @@ function mountCenter(options: CenterOptions = {}): {
       plugins: [createI18n({ legacy: false, locale: "zh_cn", messages: { zh_cn: {} } })],
     },
   });
-  return { model: model as unknown as ChatCenterModel, fetchUserNames };
+  return { model: model as unknown as ChatCenterModel, fetchUserNames, loadContextAroundMessage, clearHighlightedMessage, selectChannel, timeline };
 }
 
 let wrapper: VueWrapper | null = null;
@@ -234,5 +247,81 @@ describe("useChatCenterModel 消息分组投影", () => {
     expect(model.messageRows).toHaveLength(1);
     expect(model.messageRows[0].isGroupStart).toBe(true);
     expect(model.messageRows[0].showDate).toBe(false);
+  });
+});
+
+describe("useChatCenterModel 消息定位", () => {
+  it("跳转到被引用消息时加载其上下文并发出定位请求", async () => {
+    const { model, loadContextAroundMessage } = mountCenter();
+
+    await model.jumpToReferencedMessage("m0");
+
+    expect(loadContextAroundMessage).toHaveBeenCalledWith("m0");
+    expect(model.messageReveal.messageId).toBe("m0");
+    expect(model.messageReveal.nonce).toBe(1);
+  });
+
+  it("重复跳转同一条消息时刷新定位请求（nonce 递增）", async () => {
+    const { model } = mountCenter();
+
+    await model.jumpToReferencedMessage("m0");
+    const first = model.messageReveal;
+    await model.jumpToReferencedMessage("m0");
+
+    expect(model.messageReveal.nonce).toBe(2);
+    expect(model.messageReveal).not.toBe(first);
+  });
+
+  it("空消息 id 不加载上下文也不发出定位请求", async () => {
+    const { model, loadContextAroundMessage } = mountCenter();
+
+    await model.jumpToReferencedMessage("   ");
+
+    expect(loadContextAroundMessage).not.toHaveBeenCalled();
+    expect(model.messageReveal.messageId).toBe("");
+    expect(model.messageReveal.nonce).toBe(0);
+  });
+});
+
+describe("useChatCenterModel 定位高亮自动清除", () => {
+  it("跳转后高亮在超时后被清除", async () => {
+    const { model, timeline, clearHighlightedMessage } = mountCenter();
+
+    await model.jumpToReferencedMessage("m0");
+    expect(timeline.getSnapshot().highlightedMessageId).toBe("m0");
+
+    await vi.advanceTimersByTimeAsync(2600);
+
+    expect(clearHighlightedMessage).toHaveBeenCalledTimes(1);
+    expect(timeline.getSnapshot().highlightedMessageId).toBe("");
+  });
+
+  it("连续跳转时只清除最后一次目标，不误伤新高亮", async () => {
+    const { model, timeline, clearHighlightedMessage } = mountCenter();
+
+    await model.jumpToReferencedMessage("m0");
+    await vi.advanceTimersByTimeAsync(1000);
+    await model.jumpToReferencedMessage("m1");
+    // 第一次调度的 2600ms 到期：此时高亮已是 m1，不应被提前抹掉。
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(timeline.getSnapshot().highlightedMessageId).toBe("m1");
+    expect(clearHighlightedMessage).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(clearHighlightedMessage).toHaveBeenCalledTimes(1);
+    expect(timeline.getSnapshot().highlightedMessageId).toBe("");
+  });
+
+  it("高亮目标与本次定位不一致时不清除", async () => {
+    const { model, timeline, clearHighlightedMessage } = mountCenter();
+
+    await model.jumpToReferencedMessage("m0");
+    // 模拟期间高亮被其它链路改写。
+    timeline.push({ ...timeline.getSnapshot(), highlightedMessageId: "mX" });
+
+    await vi.advanceTimersByTimeAsync(2600);
+
+    expect(clearHighlightedMessage).not.toHaveBeenCalled();
+    expect(timeline.getSnapshot().highlightedMessageId).toBe("mX");
   });
 });

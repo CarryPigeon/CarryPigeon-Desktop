@@ -63,6 +63,14 @@ const emit = defineEmits<{
    * 发送失败后重试。
    */
   (event: "retry", messageId: string): void;
+  /**
+   * 右键消息引用块：请求打开「跳转到被回复消息」菜单。
+   */
+  (event: "openReferenceMenu", payload: { event: MouseEvent; messageId: string }): void;
+  /**
+   * 点击引用块上的「跳转到原消息」按钮。
+   */
+  (event: "jumpReference", messageId: string): void;
 }>();
 
 const { t } = useI18n();
@@ -272,6 +280,7 @@ function handleInstall(): void {
       :text="renderModel.text"
       :reply-text="renderModel.replyText"
       :reply="props.message.kind === 'core_text' ? props.message.replyTo : undefined"
+      :reply-to-id="props.message.kind === 'core_text' ? props.message.replyToId : undefined"
       :mentions="props.message.kind === 'core_text' ? props.message.mentions : undefined"
       :quote-reply="props.message.kind === 'core_text' ? props.message.quoteReply : undefined"
       :forwarded-from="props.message.kind === 'core_text' ? props.message.forwardedFrom : undefined"
@@ -281,6 +290,8 @@ function handleInstall(): void {
       :current-user-id="currentChatUserId"
       :current-user-name="currentUserName"
       @openLightbox="(payload) => emit('openLightbox', payload)"
+      @open-reference-menu="(payload) => emit('openReferenceMenu', payload)"
+      @jump-reference="(mid: string) => emit('jumpReference', mid)"
     />
     <div v-else-if="renderModel.kind === 'plugin'" class="cp-pluginBubble">
       <component

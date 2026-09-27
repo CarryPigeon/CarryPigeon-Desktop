@@ -991,9 +991,18 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     highlightedMessageId.value = mid;
   }
 
+  /**
+   * 清除消息定位高亮。
+   *
+   * @returns 无返回值。
+   */
+  function clearHighlightedMessage(): void {
+    highlightedMessageId.value = "";
+  }
+
   function clearSearch(): void {
     searchState.value = { query: "", loading: false, error: "", results: [] };
-    highlightedMessageId.value = "";
+    clearHighlightedMessage();
   }
 
   async function listMentionCandidates(channelId?: string): Promise<MentionCandidate[]> {
@@ -1176,6 +1185,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     listMentionCandidates,
     searchCurrentChannel,
     loadContextAroundMessage,
+    clearHighlightedMessage,
     clearSearch,
     // 频道管理
     listMembers,

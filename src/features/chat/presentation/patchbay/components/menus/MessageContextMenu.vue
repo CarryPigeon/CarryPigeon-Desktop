@@ -8,12 +8,18 @@ import { onBeforeUnmount, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 
-type MessageMenuAction = "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark";
+type MessageMenuAction = "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark" | "jump";
 
 const props = defineProps<{
   open: boolean;
   x: number;
   y: number;
+  /**
+   * 菜单形态：
+   * - `message`（默认）：消息本身的右键菜单；
+   * - `reference`：消息引用块（回复 / 引用预览）的右键菜单，仅提供跳转动作。
+   */
+  mode?: "message" | "reference";
   showRecall?: boolean;
   canPin?: boolean;
   isPinned?: boolean;
@@ -116,28 +122,37 @@ watch(
         role="menu"
         @click.stop
       >
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('copy')">
-          {{ t("copy_message") || t("copy") }}
-        </button>
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('reply')">
-          {{ t("reply_message") }}
-        </button>
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
-          {{ t("forward_message") }}
-        </button>
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isBookmarked ? 'unbookmark' : 'bookmark')">
-          {{ props.isBookmarked ? t("remove_bookmark") : t("bookmark") }}
-        </button>
-        <button v-if="props.canPin" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isPinned ? 'unpin' : 'pin')">
-          {{ props.isPinned ? t("unpin_message") : t("pin_message") }}
-        </button>
-        <button v-if="props.showRecall" class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('recall')">
-          {{ t("recall_message") }}
-        </button>
-        <div class="cp-msgmenu__sep" aria-hidden="true"></div>
-        <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('select')">
-          {{ t("select_message") }}
-        </button>
+        <!-- 区块：引用块菜单（仅跳转到被回复消息） -->
+        <template v-if="props.mode === 'reference'">
+          <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('jump')">
+            {{ t("jump_to_referenced_message") }}
+          </button>
+        </template>
+        <!-- 区块：消息菜单 -->
+        <template v-else>
+          <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('copy')">
+            {{ t("copy_message") || t("copy") }}
+          </button>
+          <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('reply')">
+            {{ t("reply_message") }}
+          </button>
+          <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('forward')">
+            {{ t("forward_message") }}
+          </button>
+          <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isBookmarked ? 'unbookmark' : 'bookmark')">
+            {{ props.isBookmarked ? t("remove_bookmark") : t("bookmark") }}
+          </button>
+          <button v-if="props.canPin" class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction(props.isPinned ? 'unpin' : 'pin')">
+            {{ props.isPinned ? t("unpin_message") : t("pin_message") }}
+          </button>
+          <button v-if="props.showRecall" class="cp-msgmenu__item danger" type="button" role="menuitem" @click="handleAction('recall')">
+            {{ t("recall_message") }}
+          </button>
+          <div class="cp-msgmenu__sep" aria-hidden="true"></div>
+          <button class="cp-msgmenu__item" type="button" role="menuitem" @click="handleAction('select')">
+            {{ t("select_message") }}
+          </button>
+        </template>
       </div>
     </template>
   </teleport>

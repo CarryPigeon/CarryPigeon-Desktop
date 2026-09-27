@@ -61,5 +61,6 @@ export type ChatMessageFlowRuntimePort = ChatMessageTimelinePort & {
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   searchCurrentChannel(query: string): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
+  clearHighlightedMessage(): void;
   clearSearch(): void;
 };

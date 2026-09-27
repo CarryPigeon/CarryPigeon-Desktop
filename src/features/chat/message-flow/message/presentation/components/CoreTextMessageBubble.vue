@@ -91,6 +91,10 @@ const props = defineProps<{
    */
   reply?: MessageReplySummary;
   /**
+   * 被回复消息 id（reply 摘要缺失时的兜底定位依据）。
+   */
+  replyToId?: string;
+  /**
    * 消息提及列表。
    */
   mentions?: MessageMention[];
@@ -137,7 +141,85 @@ const emit = defineEmits<{
    * 打开图片灯箱。
    */
   (event: "openLightbox", payload: { url: string; fileName: string }): void;
+  /**
+   * 右键消息引用块：请求打开「跳转到被回复消息」菜单。
+   */
+  (event: "openReferenceMenu", payload: { event: MouseEvent; messageId: string }): void;
+  /**
+   * 点击引用块上的「跳转到原消息」按钮。
+   */
+  (event: "jumpReference", messageId: string): void;
 }>();
+
+/**
+ * 回复引用的目标消息 id：优先取 reply 摘要，缺失时回退 `replyToId`。
+ *
+ * 说明：原消息不可用（已删除 / 撤回）时返回空串，表示不可跳转。
+ */
+const replyReferenceId = computed(() => {
+  if (props.reply) {
+    if (props.reply.unavailable) return "";
+    return String(props.reply.messageId ?? "").trim();
+  }
+  return String(props.replyToId ?? "").trim();
+});
+
+/**
+ * 内联引用（quote）的目标消息 id；缺失表示不可跳转。
+ */
+const quoteReferenceId = computed(() => String(props.quoteReply?.messageId ?? "").trim());
+
+/**
+ * 右键引用块：派发「跳转到被回复消息」菜单请求。
+ *
+ * 说明：仅在存在可跳转目标时拦截事件；否则不拦截，让消息行的右键菜单照常打开。
+ *
+ * @param e - 鼠标右键事件。
+ * @param messageId - 被引用的消息 id。
+ * @returns 无返回值。
+ */
+function handleReferenceContextMenu(e: MouseEvent, messageId: string): void {
+  const mid = String(messageId ?? "").trim();
+  if (!mid) return;
+  e.preventDefault();
+  e.stopPropagation();
+  emit("openReferenceMenu", { event: e, messageId: mid });
+}
+
+/**
+ * 回复引用块右键处理。
+ *
+ * @param e - 鼠标右键事件。
+ * @returns 无返回值。
+ */
+function handleReplyReferenceContextMenu(e: MouseEvent): void {
+  handleReferenceContextMenu(e, replyReferenceId.value);
+}
+
+/**
+ * 内联引用块右键处理。
+ *
+ * @param e - 鼠标右键事件。
+ * @returns 无返回值。
+ */
+function handleQuoteReferenceContextMenu(e: MouseEvent): void {
+  handleReferenceContextMenu(e, quoteReferenceId.value);
+}
+
+/**
+ * 点击引用块上的「跳转到原消息」按钮。
+ *
+ * @param e - 鼠标点击事件。
+ * @param messageId - 被引用的消息 id。
+ * @returns 无返回值。
+ */
+function handleJumpReference(e: MouseEvent, messageId: string): void {
+  const mid = String(messageId ?? "").trim();
+  if (!mid) return;
+  // 阻止冒泡：避免点击按钮被当作「点击消息行」处理。
+  e.stopPropagation();
+  emit("jumpReference", mid);
+}
 
 /**
  * 根据提及类型返回对应的 CSS class 名。
@@ -172,20 +254,71 @@ function openLink(url: string): void {
       <span class="cp-forwardedFrom__icon">↩</span>
       <span class="cp-forwardedFrom__text">{{ $t('forwarded_from') }} #{{ props.forwardedFrom.channelId }}</span>
     </div>
-    <div v-if="props.quoteReply" class="cp-quoteReply">
+    <!-- 区块：内联引用（quote）——可跳转到被引用消息 -->
+    <div
+      v-if="props.quoteReply"
+      class="cp-quoteReply"
+      :class="{ 'cp-quoteReply--jumpable': Boolean(quoteReferenceId) }"
+      @contextmenu="handleQuoteReferenceContextMenu"
+    >
       <div class="cp-quoteReply__bar"></div>
       <div class="cp-quoteReply__content">
         <span class="cp-quoteReply__sender">{{ props.quoteReply.senderName || props.quoteReply.userId }}</span>
         <span class="cp-quoteReply__preview">{{ props.quoteReply.preview }}</span>
       </div>
+      <button
+        v-if="quoteReferenceId"
+        class="cp-jumpRef"
+        type="button"
+        :title="$t('jump_to_referenced_message')"
+        :aria-label="$t('jump_to_referenced_message')"
+        @click="handleJumpReference($event, quoteReferenceId)"
+      >
+        <t-icon name="rollback" size="14" />
+      </button>
     </div>
-    <div v-if="props.reply" class="cp-coreText__reply" :data-unavailable="Boolean(props.reply.unavailable)">
-      <div class="cp-coreText__replyAuthor">{{ props.reply.senderName }}</div>
-      <div class="cp-coreText__replyPreview">{{ props.reply.unavailable ? 'Original message unavailable' : props.reply.preview }}</div>
+    <!-- 区块：回复引用（reply 摘要）——可跳转到被回复消息 -->
+    <div
+      v-if="props.reply"
+      class="cp-coreText__reply"
+      :data-unavailable="Boolean(props.reply.unavailable)"
+      :class="{ 'cp-coreText__reply--jumpable': Boolean(replyReferenceId) }"
+      @contextmenu="handleReplyReferenceContextMenu"
+    >
+      <div class="cp-coreText__replyBody">
+        <div class="cp-coreText__replyAuthor">{{ props.reply.senderName }}</div>
+        <div class="cp-coreText__replyPreview">{{ props.reply.unavailable ? 'Original message unavailable' : props.reply.preview }}</div>
+      </div>
+      <button
+        v-if="replyReferenceId"
+        class="cp-jumpRef"
+        type="button"
+        :title="$t('jump_to_referenced_message')"
+        :aria-label="$t('jump_to_referenced_message')"
+        @click="handleJumpReference($event, replyReferenceId)"
+      >
+        <t-icon name="rollback" size="14" />
+      </button>
     </div>
-    <div v-else-if="props.replyText" class="cp-replyMini">
+    <!-- 区块：回复引用（仅有 replyToId 时的迷你预览）——可跳转到被回复消息 -->
+    <div
+      v-else-if="props.replyText"
+      class="cp-replyMini"
+      :class="{ 'cp-replyMini--jumpable': Boolean(replyReferenceId) }"
+      @contextmenu="handleReplyReferenceContextMenu"
+    >
       <div class="cp-replyMini__k">reply</div>
       <div class="cp-replyMini__v">{{ props.replyText }}</div>
+      <button
+        v-if="replyReferenceId"
+        class="cp-jumpRef"
+        type="button"
+        :title="$t('jump_to_referenced_message')"
+        :aria-label="$t('jump_to_referenced_message')"
+        @click="handleJumpReference($event, replyReferenceId)"
+      >
+        <t-icon name="rollback" size="14" />
+      </button>
     </div>
 
     <!-- 链接预览 -->
@@ -255,6 +388,14 @@ function openLink(url: string): void {
   gap: 8px;
   margin-bottom: 6px;
   padding: 4px 0;
+  border-radius: 8px;
+}
+/* 可跳转提示：右键菜单中的「跳转到被回复的消息」。 */
+.cp-quoteReply--jumpable {
+  cursor: context-menu;
+}
+.cp-quoteReply--jumpable:hover {
+  background: color-mix(in oklab, var(--cp-info) 10%, transparent);
 }
 .cp-quoteReply__bar {
   width: 3px;
@@ -264,6 +405,7 @@ function openLink(url: string): void {
 }
 .cp-quoteReply__content {
   display: flex;
+  flex: 1 1 auto;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -282,6 +424,9 @@ function openLink(url: string): void {
   white-space: nowrap;
 }
 .cp-coreText__reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   border-left: 3px solid color-mix(in oklab, var(--cp-info) 55%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-info) 8%, transparent);
   border-radius: 10px;
@@ -289,8 +434,62 @@ function openLink(url: string): void {
   margin-bottom: 8px;
 }
 .cp-coreText__reply[data-unavailable="true"] { opacity: 0.72; }
+/* 可跳转提示：右键打开「跳转到被回复的消息」菜单。 */
+.cp-coreText__reply--jumpable {
+  cursor: context-menu;
+}
+.cp-coreText__reply--jumpable:hover {
+  background: color-mix(in oklab, var(--cp-info) 16%, transparent);
+  border-left-color: var(--cp-info);
+}
+/* 引用块文本列：需要 min-width 才能让长预览正确省略号截断。 */
+.cp-coreText__replyBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .cp-coreText__replyAuthor { font-size: 11px; color: var(--cp-text-muted); }
 .cp-coreText__replyPreview { margin-top: 4px; font-size: 12px; color: var(--cp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 引用块「跳转到原消息」按钮：沿用消息行 ⋯ 的幽灵按钮语言，靠右常驻。 */
+.cp-jumpRef {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in oklab, var(--cp-info) 72%, var(--cp-text-muted));
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+.cp-jumpRef:hover {
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
+  color: var(--cp-text);
+}
+.cp-jumpRef:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline-offset: 1px;
+}
+/* 单行引用条（quote / 迷你回复）内按行高垂直居中。 */
+.cp-quoteReply .cp-jumpRef,
+.cp-replyMini .cp-jumpRef {
+  align-self: center;
+}
+
+/* 可跳转提示：仅有 replyToId 的迷你引用同样支持右键跳转。 */
+.cp-replyMini--jumpable {
+  cursor: context-menu;
+}
+.cp-replyMini--jumpable:hover {
+  border-color: color-mix(in oklab, var(--cp-info) 45%, var(--cp-border-light));
+}
 
 .cp-mentionList {
   display: flex;

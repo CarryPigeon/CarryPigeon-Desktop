@@ -91,6 +91,8 @@ export type MessageFlowRuntimeStore = {
   listMentionCandidates(channelId?: string): Promise<MentionCandidate[]>;
   searchCurrentChannel(query: string): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
+  /** 清除消息定位高亮。 */
+  clearHighlightedMessage(): void;
   clearSearch(): void;
 };
 

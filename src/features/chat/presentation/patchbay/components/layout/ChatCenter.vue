@@ -4,7 +4,7 @@
  * @description Patchbay 中央消息区：顶部状态、消息流、编辑器。
  */
 
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChatCenterModel } from "@/features/chat/presentation/patchbay/view-models/useChatCenterModel";
 import type { ChatMessage } from "@/features/chat/message-flow/domain/contracts";
@@ -87,6 +87,14 @@ const props = defineProps<{
    */
   onMoreClick: (e: MouseEvent, messageId: string) => void;
   /**
+   * 打开消息引用块（回复 / 引用预览）的右键菜单。
+   */
+  onReferenceContextMenu: (e: MouseEvent, messageId: string) => void;
+  /**
+   * 点击消息引用块上的「跳转到原消息」按钮。
+   */
+  onJumpReference: (messageId: string) => void;
+  /**
    * 安装提示：从未知 domain 卡片跳转到插件中心。
    */
   onInstallHint: (pluginId: string | undefined) => void;
@@ -158,10 +166,106 @@ const virtualizerOptions = computed(() => ({
 
 const virtualizer = useVirtualizer(virtualizerOptions);
 
-/** 通用浮层宿主：把 expose.mount 注入 chat UI 桥，供插件经 host.mountOverlay 注册全局浮层。 */
+/** 消息定位时等待目标行渲染的最大帧数（≈6 帧 / 100ms），超时即放弃滚动。 */
+const MESSAGE_REVEAL_MAX_FRAMES = 6;
+
+/**
+ * 等待下一帧渲染。
+ *
+ * @returns 下一帧完成后的 Promise。
+ */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+/**
+ * 属性选择器取值转义（`CSS.escape` 不可用时退化为最小转义）。
+ *
+ * @param value - 原始取值。
+ * @returns 可安全用于属性选择器的取值。
+ */
+function escapeSelectorValue(value: string): string {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") return CSS.escape(value);
+  return value.replace(/["\\]/g, "\\$&");
+}
+
+/**
+ * 等待目标消息行被虚拟列表渲染出来。
+ *
+ * 说明：消息列表是虚拟列表，只有先滚动到目标索引附近才会渲染对应行；
+ * 这里做有限次帧轮询，避免「已定位但目标行尚未渲染」导致跳转静默失败。
+ *
+ * @param messageId - 目标消息 id。
+ * @returns 目标行元素；超时未渲染时返回 null。
+ */
+async function waitForMessageElement(messageId: string): Promise<HTMLElement | null> {
+  const selector = `[data-message-id="${escapeSelectorValue(messageId)}"]`;
+  for (let attempt = 0; attempt < MESSAGE_REVEAL_MAX_FRAMES; attempt++) {
+    const el = signalPaneEl.value?.querySelector(selector);
+    if (el instanceof HTMLElement) return el;
+    await nextFrame();
+  }
+  return null;
+}
+
+/**
+ * 把目标消息滚入视口。
+ *
+ * 说明：先按虚拟列表索引定位（这是目标行能被渲染出来的前提），
+ * 再等目标行渲染后做一次 DOM 级居中，修正估算行高带来的偏移。
+ *
+ * @param messageId - 目标消息 id。
+ * @returns 无返回值。
+ */
+async function revealMessageInViewport(messageId: string): Promise<void> {
+  const mid = String(messageId ?? "").trim();
+  if (!mid) return;
+  await nextTick();
+  const index = virtualListItems.value.findIndex((item) => item.kind === "message" && item.m.id === mid);
+  if (index < 0) return;
+  virtualizer.value.scrollToIndex(index, { align: "center" });
+  await nextTick();
+  const el = await waitForMessageElement(mid);
+  el?.scrollIntoView({ block: "center" });
+}
+
+// 消息定位请求：搜索跳转 / 置顶跳转 / 引用跳转共用同一入口。
+watch(
+  () => props.model.messageReveal,
+  (reveal) => {
+    void revealMessageInViewport(reveal?.messageId ?? "");
+  },
+);
+
+/**
+ * 处理消息引用块右键：转发给页面层的引用菜单编排。
+ *
+ * @param payload - 右键事件与被引用消息 id。
+ * @returns 无返回值。
+ */
+function handleReferenceContextMenu(payload: { event: MouseEvent; messageId: string }): void {
+  props.onReferenceContextMenu(payload.event, payload.messageId);
+}
+
+/**
+ * 处理引用块「跳转到原消息」按钮点击：转发给页面层定位编排。
+ *
+ * @param messageId - 被引用的消息 id。
+ * @returns 无返回值。
+ */
+function handleJumpReference(messageId: string): void {
+  props.onJumpReference(messageId);
+}
+
+/** 通用浮层宿主：把 expose.mount 注入 chat UI 桥，供插件经 host.mountOverlay 注册全局浮层。
+ *  卸载时必须解绑：浮层注册表在桥（模块级）中，重挂载时由 bindOverlayMount 重放到新宿主，
+ *  否则离开聊天页（插件中心/设置）再返回后，插件工具栏入口会因句柄指向已销毁宿主而失效。 */
 const overlayHostRef = ref<InstanceType<typeof PluginOverlayHost> | null>(null);
 onMounted(() => {
   if (overlayHostRef.value) bindOverlayMount(overlayHostRef.value.mount);
+});
+onBeforeUnmount(() => {
+  bindOverlayMount(null);
 });
 
 /** 实时频道上下文：注入给插件工具栏动作（如语音通话插件的 3 个通话入口）。 */
@@ -561,6 +665,8 @@ function getReplyText(m: VirtualMessageItem): string {
                   @openLightbox="openLightbox"
                   @viewForwardDetail="openForwardDetail"
                   @retry="(mid: string) => retryMessage(mid)"
+                  @open-reference-menu="handleReferenceContextMenu"
+                  @jump-reference="handleJumpReference"
                 />
               </div>
             </div>
@@ -648,6 +754,12 @@ function getReplyText(m: VirtualMessageItem): string {
 .cp-msg[data-mentioned="true"] {
   background: color-mix(in oklab, var(--cp-warning) 10%, transparent);
   border-radius: 14px;
+}
+/* 消息行：定位高亮通过 transition 平滑淡出（高亮由模型在跳转后定时清除） */
+.cp-msg {
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    outline-color var(--cp-fast) var(--cp-ease);
 }
 .cp-msg[data-highlighted="true"] {
   background: color-mix(in oklab, var(--cp-primary) 12%, transparent);

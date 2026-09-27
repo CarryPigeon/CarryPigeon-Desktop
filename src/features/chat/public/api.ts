@@ -101,7 +101,8 @@ export function getChatCapabilities(): ChatCapabilities {
  * 说明：
  * - `chatPluginUiBridge` 实现 `PluginUiBridge`，供插件运行时注入；
  * - `toolbarActions` 为工具栏动作响应式列表，`PluginToolbarSlot` 渲染它；
- * - `bindOverlayMount` 由 `PluginOverlayHost` 的 expose.mount 注入。
+ * - `bindOverlayMount` 由宿主页面（ChatCenter）在挂载/卸载时注入/置空：浮层注册表在桥中，
+ *   宿主重挂载时会把既有插件浮层注册重放到新宿主实例（页面切换后插件入口不失效）。
  * 这些符号经 chat 公共 API 透出，供 plugins 等跨 feature 消费。
  */
 export { chatPluginUiBridge, toolbarActions, bindOverlayMount } from "@/features/chat/presentation/plugins/chatPluginUiBridge";

@@ -131,6 +131,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     listMentionCandidates: messageFlow.listMentionCandidates,
     searchCurrentChannel: messageFlow.searchCurrentChannel,
     loadContextAroundMessage: messageFlow.loadContextAroundMessage,
+    clearHighlightedMessage: messageFlow.clearHighlightedMessage,
     clearSearch: messageFlow.clearSearch,
     // 频道管理
     listMembers: governance.listMembers,

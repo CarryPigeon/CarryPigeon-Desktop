@@ -280,6 +280,8 @@ onBeforeUnmount(() => {
         :on-open-channel-settings-menu="page.chatViewport.openChannelSettingsMenu"
         :on-message-context-menu="page.chatViewport.handleMessageContextMenu"
         :on-more-click="page.chatViewport.handleMoreClick"
+        :on-reference-context-menu="page.chatViewport.handleReferenceContextMenu"
+        :on-jump-reference="page.chatViewport.handleJumpReference"
         :on-install-hint="page.chatViewport.handleInstallHint"
       />
 
@@ -314,6 +316,7 @@ onBeforeUnmount(() => {
         :open="page.messageContextMenu.open"
         :x="page.messageContextMenu.x"
         :y="page.messageContextMenu.y"
+        :mode="page.messageContextMenu.mode"
         :show-recall="page.messageContextMenu.showRecall"
         :can-pin="page.messageContextMenu.canPin"
         :is-pinned="page.messageContextMenu.isPinned"

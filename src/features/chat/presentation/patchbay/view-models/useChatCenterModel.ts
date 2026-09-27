@@ -4,7 +4,7 @@
  * 收敛 ChatCenter 所需的消息流、连接状态、composer 状态与交互动作，避免布局组件直接依赖多个 store。
  */
 
-import { computed, nextTick, onBeforeUnmount, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
+import { computed, onBeforeUnmount, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { createMessageActionError } from "@/features/chat/message-flow/domain/outcomes/messageActionOutcome";
 import { createLogger } from "@/shared/utils/logger";
@@ -81,6 +81,20 @@ export type MessageRow = {
   showDate: boolean;
 };
 
+/**
+ * 消息定位请求。
+ *
+ * 说明：滚动定位由视图层负责（消息列表是虚拟列表，必须先按索引定位才能真正渲染目标行），
+ * 页面模型只负责把目标消息加载进当前时间线并发出请求；
+ * `nonce` 每次递增，保证连续两次跳转到同一条消息时视图层仍能感知变更并重新滚动。
+ */
+export type MessageRevealRequest = {
+  /** 目标消息 id。 */
+  messageId: string;
+  /** 请求序号。 */
+  nonce: number;
+};
+
 type ChatCenterRawModel = {
   connectionDetail: ComputedRef<string>;
   connectionPillState: ComputedRef<ChatConnectionPillStateView>;
@@ -106,6 +120,10 @@ type ChatCenterRawModel = {
   searchPanelOpen: Ref<boolean>;
   searchState: ComputedRef<MessageSearchState>;
   highlightedMessageId: ComputedRef<string>;
+  /** 消息定位请求（视图层据此把目标消息滚入视口）。 */
+  messageReveal: Ref<MessageRevealRequest>;
+  /** 跳转到被回复 / 被引用消息的位置。 */
+  jumpToReferencedMessage(messageId: string): Promise<void>;
   /** 置顶消息摘要列表。 */
   pins: Ref<PinSummary[]>;
   /** 是否正在加载置顶消息。 */
@@ -446,6 +464,10 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   });
   const highlightedMessageId = computed(() => messageTimelineSnapshot.value.highlightedMessageId);
 
+  /** 消息定位请求：每次跳转（搜索 / 置顶 / 引用）都会更新，供视图层滚动到目标消息。 */
+  const messageReveal = ref<MessageRevealRequest>({ messageId: "", nonce: 0 });
+  let messageRevealNonce = 0;
+
   // 作者名补拉调度：行投影/搜索结果变化后收集仍缺失昵称的发送者/提及/转发作者，debounce 批量请求。
   watch([messageRows, searchState], ([rows, search]) => {
     const messages = [
@@ -474,6 +496,8 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     pinsLoading.value = false;
     pinsError.value = null;
     pinsDismissed.value = false;
+    // 切频道：旧频道的高亮不应残留（切回原频道也不复现）。
+    cancelHighlightAutoClear();
   });
 
   /**
@@ -517,10 +541,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   async function selectPinnedMessage(messageId: string): Promise<void> {
-    await deps.currentTimeline.loadContextAroundMessage(messageId);
-    await nextTick();
-    const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
-    if (el) el.scrollIntoView({ block: "center" });
+    await revealMessage(messageId);
   }
 
   async function unpinFromBar(messageId: string): Promise<void> {
@@ -557,13 +578,80 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   async function openSearchResult(messageId: string, channelId?: string): Promise<void> {
+    await revealMessage(messageId, channelId);
+  }
+
+  /**
+   * 跳转到被回复 / 被引用消息的位置。
+   *
+   * @param messageId - 被引用的消息 id。
+   * @returns 定位请求完成后的 Promise。
+   */
+  async function jumpToReferencedMessage(messageId: string): Promise<void> {
+    await revealMessage(messageId);
+  }
+
+  /**
+   * 加载目标消息上下文并发出定位请求。
+   *
+   * 说明：滚动动作由视图层完成（虚拟列表需要按索引定位后才会渲染目标行），
+   * 这里只保证目标消息已进入当前时间线，并递增请求序号。
+   *
+   * @param messageId - 目标消息 id。
+   * @param channelId - 目标消息所在频道；与当前频道不同时先切换频道。
+   * @returns 无返回值。
+   */
+  async function revealMessage(messageId: string, channelId?: string): Promise<void> {
+    const mid = String(messageId ?? "").trim();
+    if (!mid) return;
     if (channelId && channelId !== currentSessionSnapshot.value.currentChannelId) {
       await deps.selectChannel(channelId);
     }
-    await deps.currentTimeline.loadContextAroundMessage(messageId);
-    await nextTick();
-    const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
-    if (el) el.scrollIntoView({ block: "center" });
+    await deps.currentTimeline.loadContextAroundMessage(mid);
+    messageRevealNonce += 1;
+    messageReveal.value = { messageId: mid, nonce: messageRevealNonce };
+    scheduleHighlightAutoClear(mid);
+  }
+
+  /**
+   * 高亮自动清除时长：足够看清定位目标，又不至于让高亮显得"卡住不消失"。
+   */
+  const HIGHLIGHT_AUTO_CLEAR_MS = 2600;
+
+  /**
+   * 高亮自动清除定时器：每次新定位都会重置，只保留最后一次。
+   */
+  let highlightClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * 调度自动清除定位高亮。
+   *
+   * 说明：到期时仅当高亮仍是本次目标时才清除——期间用户又跳转到别的消息时，
+   * 由新一次调度接管清除时机，避免把新高亮提前抹掉。
+   *
+   * @param messageId - 本次定位目标的消息 id。
+   * @returns 无返回值。
+   */
+  function scheduleHighlightAutoClear(messageId: string): void {
+    if (highlightClearTimer) clearTimeout(highlightClearTimer);
+    highlightClearTimer = setTimeout(() => {
+      highlightClearTimer = null;
+      if (messageTimelineSnapshot.value.highlightedMessageId !== messageId) return;
+      deps.currentTimeline.clearHighlightedMessage();
+    }, HIGHLIGHT_AUTO_CLEAR_MS);
+  }
+
+  /**
+   * 清除定位高亮并取消待执行的自动清除。
+   *
+   * @returns 无返回值。
+   */
+  function cancelHighlightAutoClear(): void {
+    if (highlightClearTimer) {
+      clearTimeout(highlightClearTimer);
+      highlightClearTimer = null;
+    }
+    deps.currentTimeline.clearHighlightedMessage();
   }
 
   /**
@@ -738,6 +826,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   onBeforeUnmount(() => {
     if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
     if (profileFetchTimer) clearTimeout(profileFetchTimer);
+    if (highlightClearTimer) clearTimeout(highlightClearTimer);
   });
 
   function handleCancelReply(): void {
@@ -832,6 +921,8 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     searchPanelOpen,
     searchState,
     highlightedMessageId,
+    messageReveal,
+    jumpToReferencedMessage,
     pins,
     pinsLoading,
     pinsError,

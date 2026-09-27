@@ -40,6 +40,7 @@ public/plugins/
 # Local tool/runtime artifacts
 .tmp-crops/
 .tmp-fonttest/
+.tmp-replypreview/
 docs/superpowers/
 .superpowers/
 .worktrees/

@@ -30,6 +30,7 @@ import {
   addMention,
   availableDomains,
   cancelReply,
+  clearHighlightedMessage,
   clearSearch,
   composerDraft,
   currentChannelHasMore,
@@ -347,6 +348,7 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       recallMessage,
       searchCurrentChannel,
       loadContextAroundMessage,
+      clearHighlightedMessage,
       clearSearch,
     },
     composer: {

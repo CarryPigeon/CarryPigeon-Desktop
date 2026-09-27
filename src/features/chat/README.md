@@ -75,7 +75,7 @@ chat 负责“聊天域”的端到端落地：频道列表、消息列表、消
   - `message-flow/message/presentation/components/`：消息时间线共享组件与未知 domain 降级卡，统一由 message 子域持有。
   - `composables/useSignalViewport`：消息面板滚动/分页/已读上报编排。
   - `composables/usePatchbayLifecycle`：主页面启动与全局监听器生命周期。
-  - `composables/useMessageContextMenu`：消息右键菜单状态与动作分发。
+  - `composables/useMessageContextMenu`：消息右键菜单（消息本体 / 消息引用块两种形态）状态与动作分发，含「跳转到被回复的消息」。
   - `composables/useChannelSettingsMenu`：频道设置菜单坐标与显隐编排。
   - `composables/useChannelNavigation`：频道详情类页面路由跳转与 query 组装。
   - `composables/useChannelDialogs`：创建/删除频道弹窗状态与后续动作编排。

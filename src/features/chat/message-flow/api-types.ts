@@ -66,6 +66,8 @@ export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnap
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   searchCurrentChannel(query: string): Promise<void>;
   loadContextAroundMessage(messageId: string): Promise<void>;
+  /** 清除消息定位高亮（跳转后由视图层定时清除）。 */
+  clearHighlightedMessage(): void;
   clearSearch(): void;
 };
 

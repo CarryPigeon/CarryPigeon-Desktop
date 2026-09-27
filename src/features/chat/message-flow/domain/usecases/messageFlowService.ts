@@ -415,11 +415,20 @@ export class MessageFlowApplicationService {
   }
 
   /**
+   * 清除消息定位高亮。
+   *
+   * @returns 无返回值。
+   */
+  clearHighlightedMessage(): void {
+    this.deps.timelineState.setHighlightedMessageId("");
+  }
+
+  /**
    * 清除搜索状态。
    */
   clearSearch(): void {
     this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
-    this.deps.timelineState.setHighlightedMessageId("");
+    this.clearHighlightedMessage();
   }
 
   /**

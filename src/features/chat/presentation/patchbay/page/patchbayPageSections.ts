@@ -37,6 +37,10 @@ type PatchbayChatViewportRawModel = {
   openChannelSettingsMenu(e: MouseEvent): void;
   handleMessageContextMenu(e: MouseEvent, messageId: string): void;
   handleMoreClick(e: MouseEvent, messageId: string): void;
+  /** 打开消息引用块（回复 / 引用预览）的右键菜单。 */
+  handleReferenceContextMenu(e: MouseEvent, messageId: string): void;
+  /** 点击消息引用块上的「跳转到原消息」按钮。 */
+  handleJumpReference(messageId: string): void;
   handleInstallHint(pluginId: string | undefined): void;
 };
 /**
@@ -48,12 +52,14 @@ type PatchbayMessageContextMenuRawModel = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
+  /** 菜单形态：消息本身 or 消息引用块。 */
+  mode: RefLike<"message" | "reference">;
   showRecall: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
   isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
+  handleMenuCommand(command: "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark" | "jump"): void;
 };
 /**
  * Patchbay 页面消息右键菜单 section model。
@@ -135,6 +141,8 @@ type CreatePatchbayChatViewportSectionDeps = {
   openChannelSettingsMenu(e: MouseEvent): void;
   handleMessageContextMenu(e: MouseEvent, messageId: string): void;
   handleMoreClick(e: MouseEvent, messageId: string): void;
+  handleReferenceContextMenu(e: MouseEvent, messageId: string): void;
+  handleJumpReference(messageId: string): void;
   handleInstallHint(pluginId: string | undefined): void;
 };
 
@@ -150,6 +158,8 @@ export function createPatchbayChatViewportSection(deps: CreatePatchbayChatViewpo
     openChannelSettingsMenu: deps.openChannelSettingsMenu,
     handleMessageContextMenu: deps.handleMessageContextMenu,
     handleMoreClick: deps.handleMoreClick,
+    handleReferenceContextMenu: deps.handleReferenceContextMenu,
+    handleJumpReference: deps.handleJumpReference,
     handleInstallHint: deps.handleInstallHint,
   });
 }
@@ -158,12 +168,13 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
+  mode: RefLike<"message" | "reference">;
   showRecall: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
   isBookmarked: RefLike<boolean>;
   close(): void;
-  handleMenuCommand(command: "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark"): void;
+  handleMenuCommand(command: "copy" | "reply" | "forward" | "select" | "recall" | "pin" | "unpin" | "bookmark" | "unbookmark" | "jump"): void;
 };
 
 /**
@@ -176,6 +187,7 @@ export function createPatchbayMessageContextMenuSection(
     open: deps.open,
     x: deps.x,
     y: deps.y,
+    mode: deps.mode,
     showRecall: deps.showRecall,
     canPin: deps.canPin,
     isPinned: deps.isPinned,

@@ -61,6 +61,7 @@ export function createMessageFlowSlice(store: ChatRuntimeAggregateStore): Messag
     listMentionCandidates: store.listMentionCandidates,
     searchCurrentChannel: store.searchCurrentChannel,
     loadContextAroundMessage: store.loadContextAroundMessage,
+    clearHighlightedMessage: store.clearHighlightedMessage,
     clearSearch: store.clearSearch,
   };
 }

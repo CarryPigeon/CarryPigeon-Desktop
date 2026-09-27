@@ -170,6 +170,15 @@ export function loadContextAroundMessage(messageId: string): Promise<void> {
   return resolveMessageFlowStore().loadContextAroundMessage(messageId);
 }
 
+/**
+ * 清除消息定位高亮。
+ *
+ * @returns 无返回值。
+ */
+export function clearHighlightedMessage(): void {
+  return resolveMessageFlowStore().clearHighlightedMessage();
+}
+
 export function clearSearch(): void {
   return resolveMessageFlowStore().clearSearch();
 }
