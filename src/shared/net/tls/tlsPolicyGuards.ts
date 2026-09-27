@@ -42,14 +42,22 @@ export function shouldRejectBearerAuthOverInsecureTls(args: {
 }
 
 /**
- * 判断是否需要由 Tauri 侧执行 HTTPS 请求。
+ * 判断是否需要由 Tauri(Rust reqwest) 侧执行 HTTP(S) 请求。
+ *
+ * 背景：
+ * - 自签证书/指纹信任场景下 WebView `fetch` 无法绕过证书校验，必须走 Rust；
+ * - release 桌面构建中 WebView origin（如 `http://tauri.localhost`）直连服务器属于跨域，
+ *   JSON POST 会触发 CORS 预检；自托管服务端通常不处理预检，导致登录等写请求在
+ *   release 中失败（dev 环境被 Vite 同源代理掩盖）。
+ * - reqwest 不受 WebView CORS 约束，因此在 Tauri 运行时内统一走 Rust 通道；
+ *   仅浏览器预览（无 Tauri bridge）回退到 `fetch`。
  */
-export function shouldUseTauriTlsTransport(args: { tlsPolicy: TlsPolicy; url: string }): boolean {
+export function shouldUseTauriHttpTransport(args: { url: string; isTauriRuntime: boolean }): boolean {
+  if (!args.isTauriRuntime) return false;
   try {
     const u = new URL(args.url);
-    if (u.protocol !== "https:") return false;
+    return u.protocol === "http:" || u.protocol === "https:";
   } catch {
     return false;
   }
-  return args.tlsPolicy === "insecure" || args.tlsPolicy === "trust_fingerprint";
 }

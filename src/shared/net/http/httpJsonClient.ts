@@ -25,8 +25,9 @@ import { buildCarryPigeonAcceptHeader } from "@/shared/net/http/apiHeaders";
 import { getServerTlsConfig } from "@/shared/net/tls/serverTlsConfigProvider";
 import {
   shouldRejectBearerAuthOverInsecureTls,
-  shouldUseTauriTlsTransport,
+  shouldUseTauriHttpTransport,
 } from "@/shared/net/tls/tlsPolicyGuards";
+import { isTauriRuntimeAvailable } from "@/shared/tauri";
 
 const logger = createLogger("httpJsonClient");
 
@@ -148,17 +149,22 @@ async function tauriRequestJson(
   const normalizedPath = normalizeApiPath(path);
   const apiPath = `/api${normalizedPath}`;
   const tls = getServerTlsConfig(serverSocket);
+  // 传归一化后的 HTTP origin 而非原始 socket：Rust 侧 `to_http_origin` 对裸 `host:port`
+  // 默认按 https 处理，与前端回环明文端口的推断规则不一致，这里显式统一。
+  const httpOrigin = toHttpOrigin(serverSocket);
   try {
-    const args: Record<string, unknown> = {
-      serverSocket,
+    const commandArgs: Record<string, unknown> = {
+      serverSocket: httpOrigin || serverSocket,
       method,
       path: apiPath,
       headers,
       tlsPolicy: tls.tlsPolicy,
       tlsFingerprint: tls.tlsFingerprint,
     };
-    if (body !== undefined) args.body = body;
-    return await invokeTauri<TauriApiResponse>(TAURI_COMMANDS.apiRequestJson, args);
+    if (body !== undefined) commandArgs.body = body;
+    // Rust 命令签名为 `api_request_json(args: ApiRequestJsonArgs)`：
+    // 所有字段必须嵌套在顶层 `args` 键下，否则报 missing required key `args`。
+    return await invokeTauri<TauriApiResponse>(TAURI_COMMANDS.apiRequestJson, { args: commandArgs });
   } catch (e) {
     logger.warn("Action: http_tauri_api_request_json_failed_fallback_to_fetch", { method, path: apiPath, error: String(e) });
     throw e;
@@ -324,7 +330,7 @@ export class HttpJsonClient {
       return res.body as T;
     }
 
-    if (shouldUseTauriTlsTransport({ tlsPolicy: tls.tlsPolicy, url })) {
+    if (shouldUseTauriHttpTransport({ url, isTauriRuntime: isTauriRuntimeAvailable() })) {
       try {
         const tauriRes = await tauriRequestJson(this.serverSocket, method, normalizedPath, headers, body);
         if (!tauriRes.ok) {
@@ -346,11 +352,19 @@ export class HttpJsonClient {
       }
     }
 
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (e) {
+      // fetch 抛出的原始异常（如 CORS 预检失败、网络不可达、混合内容阻断）此前
+      // 不经任何日志直接穿透，release 中难以定位；这里记录后原样抛出。
+      logger.error("Action: http_fetch_request_threw", { method, url, error: String(e) });
+      throw e;
+    }
 
     if (!res.ok) {
       const err = await toApiError(res, url, method);

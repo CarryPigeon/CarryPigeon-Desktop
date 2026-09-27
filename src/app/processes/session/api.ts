@@ -11,9 +11,12 @@ import { isApiRequestError } from "@/shared/net/http/apiErrors";
 import { IS_STORE_MOCK, MOCK_DISABLE_REQUIRED_GATE } from "@/shared/config/runtime";
 import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import { getMockPluginsState } from "@/shared/mock/mockPluginState";
-import { readAuthSession, writeAuthSession } from "@/shared/utils/localState";
+import { readAuthSession, writeAuthSession, type AuthSession } from "@/shared/utils/localState";
+import { ensureSecureChatCacheReady } from "@/shared/utils/chatSecureCache";
+import { ensureValidAuthSession, forceRefreshAuthSession } from "@/shared/net/auth/api";
 import { createLogger } from "@/shared/utils/logger";
 import { setStartupPhaseLabel } from "@/app/bootstrap/startupState";
+import { syncCurrentUserWithRefresh, mergeUidIntoSession } from "./currentUserRestore";
 
 const serverConnectionCapabilities = getServerConnectionCapabilities();
 const accountCapabilities = getAccountCapabilities();
@@ -65,49 +68,89 @@ async function redirectIfRequiredSetupNeeded(router: Router, serverSocket: strin
   }
 }
 
+/**
+ * 判定异常是否为“会话鉴权失败”（HTTP 401/403）。
+ *
+ * 兼容两类错误来源：统一网络层的 `ApiRequestError`，以及 profile 域包装后的错误对象。
+ *
+ * @param error - 待判定的异常。
+ * @returns 鉴权失败时返回 `true`。
+ */
+function isSessionAuthFailure(error: unknown): boolean {
+  if (isApiRequestError(error)) return error.status === 401 || error.status === 403;
+  if (!accountCapabilities.profileErrors.isProfileError(error)) return false;
+  const status = typeof (error as { status?: unknown }).status === "number" ? (error as { status: number }).status : null;
+  return status === 401 || status === 403;
+}
+
 async function restoreCurrentUserFromSession(router: Router, serverSocket: string): Promise<void> {
-  const session = await readAuthSession(serverSocket);
-  const accessToken = session?.accessToken ?? "";
-  if (!accessToken.trim()) return;
-
+  // 会话存放在加密缓存里：`readAuthSession` 读的是同步内存缓存，而缓存水合是启动时的
+  // 异步流程（main.ts fire-and-forget）。这里先等待水合完成，避免“启动早于水合”时
+  // 读到空会话而静默丢失登录态（该函数幂等，已就绪时立即返回）。
   try {
-    const nextCurrentUser = await accountCapabilities.forServer(serverSocket).syncCurrentUserSnapshot(accessToken);
-    if (!session?.uid || session.uid !== nextCurrentUser.id) {
-      try {
-        await writeAuthSession(serverSocket, {
-          ...(session ?? { accessToken, refreshToken: "" }),
-          uid: nextCurrentUser.id,
-        });
-      } catch (error) {
-        logger.warn("Action: auth_session_write_failed", {
-          serverSocket,
-          error: String(error),
-        });
-      }
-    }
+    await ensureSecureChatCacheReady();
+  } catch (error) {
+    // 水合失败（如 Rust 侧命令异常）不阻塞启动：退化为“读不到会话”，后续启动重试。
+    logger.warn("Action: auth_session_cache_hydrate_failed", { error: String(error) });
+  }
 
-    if (router.currentRoute.value.path === "/") {
-      void router.replace("/chat");
+  // access token 可能已过期：`ensureValidAuthSession` 会在临近/超过过期时间时先刷新。
+  const session = await ensureValidAuthSession(serverSocket);
+  const accessToken = String(session?.accessToken ?? "").trim();
+  if (!accessToken) return;
+  // 归一化当前会话：access token 以刷新结果为准（存储中可能仍是旧值）。
+  const currentSession: AuthSession = {
+    accessToken,
+    refreshToken: String(session?.refreshToken ?? ""),
+    uid: session?.uid,
+    expiresAtMs: session?.expiresAtMs,
+  };
+
+  const outcome = await syncCurrentUserWithRefresh({
+    initialAccessToken: accessToken,
+    sync: (token) => accountCapabilities.forServer(serverSocket).syncCurrentUserSnapshot(token),
+    refresh: async () => {
+      const refreshed = await forceRefreshAuthSession(serverSocket);
+      return String(refreshed?.accessToken ?? "").trim() || null;
+    },
+    isAuthFailure: isSessionAuthFailure,
+  });
+
+  if (!outcome.ok) {
+    // 非鉴权错误（网络不可达等）：保留本地会话，等下次启动/连接成功后再恢复。
+    if (!outcome.authFailure) return;
+    // 刷新后仍鉴权失败：凭证确实失效，清空本地会话避免反复失败。
+    try {
+      await writeAuthSession(serverSocket, null);
+    } catch (error) {
+      logger.warn("Action: auth_session_clear_failed", {
+        serverSocket,
+        error: String(error),
+      });
     }
-  } catch (e) {
-    let status: number | null = null;
-    if (isApiRequestError(e)) {
-      status = e.status;
-    } else if (accountCapabilities.profileErrors.isProfileError(e) && typeof (e as { status?: unknown }).status === "number") {
-      status = (e as { status: number }).status;
+    accountCapabilities.currentUser.clearSnapshot();
+    return;
+  }
+
+  // 回写 uid：后续启动可据此判断是否需要重新同步用户快照。
+  //
+  // 必须重新读取存储中的会话，而不是复用进入时的快照——刷新成功后存储里已经是新的
+  // access/refresh token，用旧快照回写会把刚刷新的凭证覆盖掉（见 mergeUidIntoSession）。
+  const nextCurrentUser = outcome.value;
+  const sessionToWrite = mergeUidIntoSession(readAuthSession(serverSocket), currentSession, nextCurrentUser.id);
+  if (sessionToWrite) {
+    try {
+      await writeAuthSession(serverSocket, sessionToWrite);
+    } catch (error) {
+      logger.warn("Action: auth_session_write_failed", {
+        serverSocket,
+        error: String(error),
+      });
     }
-    if (status === 401 || status === 403) {
-      try {
-        await writeAuthSession(serverSocket, null);
-      } catch (error) {
-        logger.warn("Action: auth_session_clear_failed", {
-          serverSocket,
-          error: String(error),
-        });
-      }
-      accountCapabilities.currentUser.clearSnapshot();
-      return;
-    }
+  }
+
+  if (router.currentRoute.value.path === "/") {
+    void router.replace("/chat");
   }
 }
 

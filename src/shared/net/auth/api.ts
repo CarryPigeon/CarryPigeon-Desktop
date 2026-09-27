@@ -8,6 +8,7 @@
 export {
   ensureValidAccessToken,
   ensureValidAuthSession,
+  forceRefreshAuthSession,
   onAuthSessionChanged,
   revokeAndClearSession,
   startAuthSessionAutoRefresh,

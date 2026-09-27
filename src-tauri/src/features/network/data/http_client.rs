@@ -12,7 +12,9 @@ use crate::features::network::domain::ports::api_request_port::{
 };
 use crate::shared::net::tls_fingerprint::verify_der_sha256_fingerprint;
 
-const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+// 45s：覆盖服务端慢接口（例如登录在异常时 ~30s 才返回错误），
+// 保证真实响应/错误能被透传给前端，而不是客户端先超时再重复发送。
+const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(45);
 const API_RESPONSE_BODY_MAX_BYTES: u64 = 5 * 1024 * 1024;
 
 /// 基于 reqwest 的 API 请求适配器。
@@ -106,7 +108,8 @@ async fn execute_json_request_impl(args: ApiHttpRequest) -> anyhow::Result<ApiHt
     }
 
     let client = build_reqwest_client(tls_policy)?;
-    let mut req = client.request(method.parse()?, url);
+    let body_is_some = body.is_some();
+    let mut req = client.request(method.parse()?, url.clone());
 
     for (k, v) in headers {
         if k.trim().is_empty() {
@@ -119,7 +122,28 @@ async fn execute_json_request_impl(args: ApiHttpRequest) -> anyhow::Result<ApiHt
         req = req.json(&body);
     }
 
-    let res = req.send().await.context("Failed to send request")?;
+    // 诊断日志：记录请求起点与完整错误链（超时/连接/协议错误需可区分）。
+    tracing::debug!(
+        action = "network_api_request_sending",
+        method = %method,
+        url = %url,
+        has_body = body_is_some,
+        timeout_secs = API_REQUEST_TIMEOUT.as_secs()
+    );
+    let res = match req.send().await {
+        Ok(res) => res,
+        Err(e) => {
+            // reqwest 错误 Debug 输出包含 kind/url/is_timeout 与 source 链。
+            let chain = format!("send failed: {e:?}");
+            tracing::warn!(
+                action = "network_api_request_send_failed",
+                method = %method,
+                url = %url,
+                error_debug = ?e
+            );
+            return Err(anyhow::anyhow!("Failed to send request: {}", chain));
+        }
+    };
     let status = res.status().as_u16();
     let ok = res.status().is_success();
 

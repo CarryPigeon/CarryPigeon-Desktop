@@ -2,6 +2,8 @@
  * @fileoverview 前端日志工具（console 统一出口）。
  * @description 业务代码不应直接使用 `console.*`，而应使用 `createLogger(scope)` 输出结构化日志。
  */
+import { isTauriRuntimeAvailable, tauriLog } from "@/shared/tauri";
+
 type LogMeta = Record<string, unknown>;
 
 /**
@@ -90,6 +92,19 @@ export type Logger = {
 export function createLogger(scope?: string): Logger {
   const isDev = !!import.meta.env?.DEV;
 
+  // release 构建没有 devtools 时 console 不可见：将 warn/error 尽力转发到 Rust 文件日志，
+  // 便于对发布包进行排障（转发失败会被 tauriLog 吞掉，不影响 UI）。
+  //
+  // 注意：check-log-standards 按行校验 `Action: <domain>_...`，转发语句自身也必须带合法的
+  // Action；原始动作名去掉 `Action: ` 前缀后放进正文，避免文件日志里出现两段 `Action:`。
+  const forwardToTauri = (level: "warn" | "error", normalized: string, formatted: string): void => {
+    if (!isTauriRuntimeAvailable()) return;
+    const body = `${normalized.replace(/^Action:\s*/i, "")}${formatted}`;
+    const scopeTag = scope ?? "-";
+    if (level === "warn") tauriLog.warn(`Action: api_log_forwarded_warn scope=${scopeTag} ${body}`);
+    else tauriLog.error(`Action: api_log_forwarded_error scope=${scopeTag} ${body}`);
+  };
+
   return {
     debug(message, meta) {
       if (!isDev) return;
@@ -102,11 +117,15 @@ export function createLogger(scope?: string): Logger {
     },
     warn(message, meta) {
       const normalized = normalizeActionMessage(message);
-      console.warn(`${prefix("WARN", scope)} ${normalized}${formatMeta(meta)}`);
+      const formatted = formatMeta(meta);
+      console.warn(`${prefix("WARN", scope)} ${normalized}${formatted}`);
+      forwardToTauri("warn", normalized, formatted);
     },
     error(message, meta) {
       const normalized = normalizeActionMessage(message);
-      console.error(`${prefix("ERROR", scope)} ${normalized}${formatMeta(meta)}`);
+      const formatted = formatMeta(meta);
+      console.error(`${prefix("ERROR", scope)} ${normalized}${formatted}`);
+      forwardToTauri("error", normalized, formatted);
     },
   };
 }

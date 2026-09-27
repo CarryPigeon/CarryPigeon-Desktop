@@ -128,11 +128,55 @@ async function refreshViaHttp(serverSocket: string, refreshToken: string): Promi
 }
 
 /**
+ * 使用 refresh token 刷新会话（singleflight 去重，避免并发刷新风暴）。
+ *
+ * @param socket - 已 trim 的服务端 socket。
+ * @param current - 当前会话（提供 refresh token）。
+ * @returns 刷新成功返回新 session；失败返回 `null`（由调用方决定后续处置）。
+ */
+function refreshWithSingleflight(socket: string, current: AuthSession): Promise<AuthSession | null> {
+  const inflight = refreshSingleflight.get(socket);
+  if (inflight) return inflight;
+
+  const p = (async () => {
+    const next = await refreshViaHttp(socket, current.refreshToken);
+    if (!next) return null;
+    writeAuthSession(socket, next);
+    emitSession(socket, next);
+    return next;
+  })().finally(() => {
+    refreshSingleflight.delete(socket);
+  });
+
+  refreshSingleflight.set(socket, p);
+  return p;
+}
+
+/**
+ * 强制刷新会话（不看本地过期时间），用于“响应 401/403 后自救”。
+ *
+ * 说明：
+ * - 调用方通常是启动恢复路径：存储中的 access token 可能早已过期，
+ *   而 `ensureValidAuthSession` 只依赖 `expiresAtMs` 判断，旧会话缺该字段时不会刷新；
+ * - 刷新失败返回 `null` 且不改动本地存储，是否清理会话交由调用方决定。
+ *
+ * @param serverSocket - 服务端 socket。
+ * @returns 新 session；无 refresh token 或刷新失败时返回 `null`。
+ */
+export async function forceRefreshAuthSession(serverSocket: string): Promise<AuthSession | null> {
+  const socket = serverSocket.trim();
+  if (!socket) return null;
+  const current = readAuthSession(socket);
+  if (!current?.refreshToken) return null;
+  return refreshWithSingleflight(socket, current);
+}
+
+/**
  * 确保本地存储的 session 持有“可用的（未临近过期）”access token。
  *
  * 行为：
  * - 若 session 不存在：返回 `null`。
- * - 若 session 临近过期：通过 HTTP 刷新，并更新 localStorage。
+ * - 若 session 临近过期：通过 HTTP 刷新，并更新 localStorage（失败时保持原 session）。
  * - 使用 singleflight 避免并发刷新风暴。
  *
  * @param serverSocket - 服务端 socket。
@@ -149,21 +193,8 @@ export async function ensureValidAuthSession(serverSocket: string): Promise<Auth
   const nowMs = Date.now();
   if (!shouldRefreshSoon(current, nowMs)) return current;
 
-  const inflight = refreshSingleflight.get(socket);
-  if (inflight) return inflight;
-
-  const p = (async () => {
-    const next = await refreshViaHttp(socket, current.refreshToken);
-    if (!next) return current;
-    writeAuthSession(socket, next);
-    emitSession(socket, next);
-    return next;
-  })().finally(() => {
-    refreshSingleflight.delete(socket);
-  });
-
-  refreshSingleflight.set(socket, p);
-  return p;
+  const next = await refreshWithSingleflight(socket, current);
+  return next ?? current;
 }
 
 /**
