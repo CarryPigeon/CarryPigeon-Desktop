@@ -17,7 +17,7 @@
         "plugins:build:all": "pnpm run plugins:build:voice-call && pnpm run plugins:build:theme && pnpm run plugins:build:markdown && pnpm run plugins:build:group-notice && pnpm run plugins:build:ai-summary",
         "plugins:dev:link": "node scripts/copy-plugin-dist.mjs",
         "predev": "pnpm run vendor:build && pnpm run plugins:build:all && pnpm run plugins:dev:link",
-        "prebuild": "pnpm run vendor:build",
+        "prebuild": "pnpm run vendor:build && pnpm run plugins:build:all && pnpm run plugins:dev:link",
         "typecheck": "vue-tsc --noEmit",
         "build": "pnpm run -s typecheck && vite build",
         "preview": "vite preview",

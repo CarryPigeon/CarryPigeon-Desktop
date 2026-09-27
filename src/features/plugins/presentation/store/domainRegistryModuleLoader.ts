@@ -9,9 +9,11 @@ import { MOCK_PLUGIN_CATALOG } from "@/shared/mock/mockPluginCatalog";
 import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginTypes";
 import { defineComponent, h, ref, type Component } from "vue";
 import {
+  ensurePluginStylesheet,
   importPluginModule,
   normalizePluginModule,
   toAppPluginEntryUrl,
+  toPluginStyleUrl,
   type LoadedPluginModule,
 } from "@/features/plugins/presentation/runtime/pluginRuntime";
 
@@ -42,6 +44,8 @@ export async function loadPluginRuntimeModule(runtime: PluginRuntimeEntry): Prom
   const entryUrl = /^(https?:)?\/\//u.test(entry) || entry.startsWith("/")
     ? entry
     : toAppPluginEntryUrl(runtime);
+  // 插件样式由构建抽取到同目录 style.css，JS 产物不含样式导入，必须由宿主加载。
+  ensurePluginStylesheet(toPluginStyleUrl(entryUrl));
   const moduleNamespace = await importPluginModule(entryUrl);
   return normalizePluginModule(runtime.pluginId, runtime.version, runtime, moduleNamespace);
 }

@@ -14,6 +14,7 @@ import {
   isLocalPluginSourceEnabled,
   listLocalDefaultInstalledStates,
   listLocalPluginCatalogEntries,
+  resolveEnabledLocalPluginIds,
   setLocalPluginDisabled,
 } from "./localPluginSource";
 
@@ -53,11 +54,14 @@ describe("localPluginSource", () => {
     expect(() => getLocalPluginRuntimeEntry("server-1", "unknown.plugin")).toThrow(/not found/i);
   });
 
-  it("dev 下未设置 env 时默认启用四个新插件", () => {
-    // vitest 运行于 DEV 模式：未设置 VITE_USE_LOCAL_PLUGINS 时回落到 dev 默认列表。
+  it("未设置 env 时（dev 与 release 一致）默认启用自带插件", () => {
+    // 回归：release 下 import.meta.env.DEV === false，不得再据此关闭自带插件，
+    // 否则打包后的插件中心看不到任何自带插件。
     vi.stubEnv("VITE_USE_LOCAL_PLUGINS", undefined as unknown as string);
     vi.stubEnv("VITE_USE_LOCAL_VOICE_CALL_PLUGIN", "false");
     expect([...getEnabledLocalPluginIds()]).toEqual([...DEFAULT_ENABLED_PLUGIN_IDS]);
+    expect([...resolveEnabledLocalPluginIds(undefined)]).toEqual([...DEFAULT_ENABLED_PLUGIN_IDS]);
+    expect([...resolveEnabledLocalPluginIds(null)]).toEqual([...DEFAULT_ENABLED_PLUGIN_IDS]);
   });
 
   it("显式设置空字符串可关闭本地源", () => {

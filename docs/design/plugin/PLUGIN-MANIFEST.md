@@ -18,6 +18,10 @@
 
 - `storage` 不需要声明：宿主默认提供按 `server_id` 隔离的存储能力。
 - `network/clipboard/notifications` 等能力需显式声明。
+- `ai`：使用客户端自配 AI provider（OpenAI 兼容）生成总结。属高危权限，
+  安装/更新时需用户显式确认；密钥由宿主代持，插件只能调用
+  `host.ai.summarize()`，无法读取密钥或传入任意提示词。
+  详见 `docs/design/client/PLUGIN-RUNTIME.md` §5.2。
 
 ## 3. Contract 交付（P0）
 

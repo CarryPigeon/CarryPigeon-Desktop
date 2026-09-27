@@ -71,6 +71,18 @@
 - 宿主只提供一个受控的 `host.network.fetch()`，内部做 allowlist 校验；
 - 不直接把原生 `fetch` 或不受控的 HTTP 能力暴露给插件。
 
+### 5.2 ai 权限边界（P0，已确定）
+若插件声明 `ai` 权限，宿主提供客户端自配 AI（OpenAI 兼容）的**窄能力**，边界如下：
+- 只暴露 `host.ai.isConfigured()` 与 `host.ai.summarize({ channelId, messages })`：
+  不提供任意提示词入口，插件无法把客户端当作通用 LLM 代理；
+- 系统提示词、温度、超时、base URL、模型名一律由宿主的客户端设置决定，插件不可覆盖；
+- API Key 只由宿主（Rust 侧系统凭据管理器）持有：插件既拿不到明文，也无法通过
+  `host.storage` / localStorage 读到；密钥写入是单向接口，任何读取接口都不返回明文；
+- 用户选择“跟随服务端”时 `summarize` 返回 `{ ok: false, code: "not-configured" }`，
+  插件应据此回退到服务端端点；其余失败码（`incomplete-config` / `api-key-missing` /
+  `request-failed`）表示用户已显式配置客户端 AI 但不可用，插件应提示而非静默回退，
+  否则用户会误以为自己配置的模型在生效。
+
 ## 6. required gate（客户端行为）
 - 连接服务器后，若发现 required 插件未满足：
   - 允许：查看服务器信息、打开插件中心、下载/安装/启用 required 插件

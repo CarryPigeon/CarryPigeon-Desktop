@@ -129,6 +129,18 @@ function sortCatalogEntries(entries: Iterable<PluginCatalogEntry>): PluginCatalo
   });
 }
 
+/**
+ * 构造“仅自带插件”的兜底目录。
+ *
+ * 自带插件随宿主分发、不依赖服务端目录，因此在服务端/repo 目录不可用时
+ * 仍需展示（否则用户会看到插件中心整体空白，连自带插件也一起消失）。
+ *
+ * @returns 排序后的自带插件目录条目。
+ */
+function buildLocalOnlyCatalog(): PluginCatalogEntry[] {
+  return sortCatalogEntries(listLocalPluginCatalogEntries().map(normalizeCatalogEntry));
+}
+
 type RepoCatalogLoadResult = {
   mergedById: Map<string, PluginCatalogEntry>;
   versionPermissionsById: Map<string, Map<string, PluginPermission[]>>;
@@ -218,7 +230,8 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
      *
      * 失败处理：
      * - 错误会写入 `error.value` 并记录日志；
-     * - 拉取失败时将目录重置为空列表，保证 UI 状态一致且可预测。
+     * - 拉取失败时目录回退为“自带插件”条目（`buildLocalOnlyCatalog`），
+     *   保证自带插件不因服务端不可用而消失；无自带插件时即为空列表。
      *
      * @returns 无返回值。
      */
@@ -249,7 +262,7 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
           mergedById.set(pluginId, existing ? mergeCatalogEntry(existing, repoEntry) : repoEntry);
         }
 
-        // 合并本地插件源目录条目（dev 下让插件中心看到本地构建的插件）。
+        // 合并本地（自带）插件源目录条目：dev 与 release 下插件中心都要能看到自带插件。
         for (const entry of listLocalPluginCatalogEntries()) {
           const existing = mergedById.get(entry.pluginId) ?? null;
           mergedById.set(entry.pluginId, existing ? mergeCatalogEntry(existing, entry) : entry);
@@ -266,7 +279,7 @@ export function usePluginCatalogStore(serverSocket: string): CatalogStore {
         logger.error("Action: plugins_catalog_list_failed", { key, error: String(e) });
         error.value = String(e);
         versionPermissionsById.clear();
-        catalog.value = [];
+        catalog.value = buildLocalOnlyCatalog();
       } finally {
         loading.value = false;
       }

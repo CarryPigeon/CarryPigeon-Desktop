@@ -3,6 +3,7 @@
  * @description plugins｜runtime：module normalizers（纯函数）。
  */
 
+import { markRaw } from "vue";
 import type { Component } from "vue";
 import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginTypes";
 import type { PluginRuntimeContract } from "@/features/plugins/domain/types/pluginRuntimeTypes";
@@ -63,5 +64,13 @@ export function normalizeRuntimeContracts(rawContracts: unknown): PluginRuntimeC
  */
 export function normalizeComponentRecord(raw: unknown): Record<string, Component> {
   if (!raw || typeof raw !== "object") return {};
-  return raw as Record<string, Component>;
+  const normalized: Record<string, Component> = {};
+  for (const [key, value] of Object.entries(raw as RawRecord)) {
+    if (!value) continue;
+    // markRaw：组件定义随后会存入深响应式的 loadedById（domainRegistryStore），
+    // 若被深度代理，渲染 <component :is> 时触发 Vue「Component made reactive」
+    // 告警并带来无谓的代理开销。在唯一收口点统一标记为不可代理。
+    normalized[key] = markRaw(value as Component);
+  }
+  return normalized;
 }

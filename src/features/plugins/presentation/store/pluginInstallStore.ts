@@ -37,6 +37,7 @@ import type {
 import { toPluginCommandErrorInfo } from "@/features/plugins/application/pluginCommandOutcome";
 import { createLogger } from "@/shared/utils/logger";
 import { NO_SERVER_KEY, normalizeServerKey } from "@/shared/serverKey";
+import { listLocalDefaultInstalledStates } from "@/features/plugins/data/localPluginSource";
 import type { PluginRuntimeOpsPort, ApplyPluginRuntimeOps } from "@/features/plugins/domain/usecases/ApplyPluginRuntimeOps";
 import type { RuntimeOpsUsecase } from "./pluginInstallActionTypes";
 import { registerServerScopeCleanupHandler } from "@/shared/utils/serverScopeLifecycle";
@@ -265,6 +266,9 @@ export function usePluginInstallStore(serverSocket: string): InstallStore {
       }
     } catch (e) {
       logger.error("Action: plugins_list_installed_failed", { key, error: String(e) });
+      // 兜底：后端安装态查询失败时仍标注自带插件的安装态（本地推导，不依赖后端），
+      // 避免插件中心连带把自带插件显示成“未安装”。
+      for (const state of listLocalDefaultInstalledStates(key)) installedById[state.pluginId] = state;
     }
   }
 

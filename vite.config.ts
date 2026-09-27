@@ -51,6 +51,30 @@ function localPluginAssetsPlugin(): Plugin {
   return {
     name: "carrypigeon-local-plugin-assets",
     configureServer(server) {
+      // 解析预构建依赖的浏览器加载 URL。
+      // 宿主源码 `import "vue"` 会被 Vite 重写为 `<root 相对路径>?v=<browserHash>`
+      // 指向 node_modules/.vite/deps 产物；此处返回完全一致的 URL，保证模块实例同一。
+      const resolveOptimizedDepUrl = (id: string): string | null => {
+        type DepsMetadata = {
+          browserHash?: string;
+          optimized?: Record<string, { file?: string; browserHash?: string }>;
+        };
+        // Vite 8（rolldown）把 optimizer 挂在 client 环境；旧版兼容 server.optimizeDeps。
+        const metadata = (
+          server as unknown as {
+            environments?: { client?: { depsOptimizer?: { metadata?: DepsMetadata } } };
+            optimizeDeps?: { metadata?: DepsMetadata };
+          }
+        ).environments?.client?.depsOptimizer?.metadata
+          ?? (server as unknown as { optimizeDeps?: { metadata?: DepsMetadata } }).optimizeDeps?.metadata;
+        const entry = metadata?.optimized?.[id];
+        const hash = entry?.browserHash ?? metadata?.browserHash;
+        if (!entry?.file || !hash) return null;
+        const rel = path.relative(server.config.root, entry.file).split(path.sep).join("/");
+        if (!rel || rel.startsWith("..")) return null;
+        return `/${encodeURI(rel)}?v=${hash}`;
+      };
+
       server.middlewares.use((req, res, next) => {
         if (req.method !== "GET" && req.method !== "HEAD") return next();
         const rawUrl = req.url ?? "";
@@ -69,6 +93,34 @@ function localPluginAssetsPlugin(): Plugin {
         // /vendor/<rel> -> public/vendor/<rel>
         const vendorMatch = /^\/vendor\/(.+)$/.exec(pathname);
         if (vendorMatch) {
+          // dev shim：插件产物 import "/vendor/vendor.mjs" 时，不返回 public 下的生产
+          // 构建产物（那是一份独立的 Vue 实例），而是重导出宿主正在使用的预构建
+          // vue / tdesign-vue-next，使宿主与插件共享同一运行时实例。否则插件组件的
+          // 响应式全部失效（首帧渲染正常、状态更新死掉）。release 不经过 dev 中间件，
+          // 仍由 dist 内真实 vendor.mjs + index.html import map 承担同一职责。
+          if (vendorMatch[1] === "vendor.mjs") {
+            const vueUrl = resolveOptimizedDepUrl("vue");
+            const tdesignUrl = resolveOptimizedDepUrl("tdesign-vue-next");
+            if (vueUrl && tdesignUrl) {
+              const body = [
+                "// CarryPigeon dev vendor shim: re-export the SAME pre-bundled",
+                "// vue / tdesign-vue-next instances the host app uses, so plugin",
+                '// dists importing "/vendor/vendor.mjs" share one runtime copy.',
+                `export * from ${JSON.stringify(vueUrl)};`,
+                `export * from ${JSON.stringify(tdesignUrl)};`,
+                // 与 src/vendor-entry.ts 对齐：vue 与 tdesign-vue-next 存在同名运行时
+                // 导出（Comment / Text），浏览器对歧义 star export 一律不导出，需显式消歧。
+                `export { Comment, Text } from ${JSON.stringify(vueUrl)};`,
+                `export { default as TDesign } from ${JSON.stringify(tdesignUrl)};`,
+                "",
+              ].join("\n");
+              res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+              res.setHeader("Cache-Control", "no-store");
+              res.end(body);
+              return;
+            }
+            // 预构建 metadata 尚未就绪（极早期请求）时退回真实产物，行为等同修复前。
+          }
           const base = path.resolve(__dirname, "public", "vendor");
           const file = path.resolve(base, vendorMatch[1]);
           if (file.startsWith(base + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {

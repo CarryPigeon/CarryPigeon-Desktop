@@ -40,12 +40,15 @@ export function mapDomainColorVar(domain: string): PluginDomainPort["colorVar"] 
 /**
  * 将 permission key 映射为 UI 权限描述。
  *
+ * 说明：`network`（可外联）与 `ai`（可消耗用户自配 AI 额度）同属高危，安装/更新
+ * 时需用户显式确认。
+ *
  * @param key - Permission key 字符串。
  * @returns 权限描述对象。
  */
 export function mapPermission(key: string): PluginPermission {
   const k = key.trim();
-  const risk: PluginPermission["risk"] = k === "network" ? "high" : "medium";
+  const risk: PluginPermission["risk"] = k === "network" || k === "ai" ? "high" : "medium";
   return { key: k, label: k, risk };
 }
 
