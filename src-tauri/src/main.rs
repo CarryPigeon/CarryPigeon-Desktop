@@ -4,24 +4,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tracing_subscriber::{
-    Registry, filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
-};
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,sqlx::query=warn"));
-    let formatting_layer = fmt::layer().pretty().with_writer(std::io::stderr);
-
-    Registry::default()
-        .with(env_filter)
-        .with(formatting_layer)
-        .init();
-
-    tracing::info!(
-        action = "app_lifecycle_started",
-        "CarryPigeon Desktop started"
-    );
+    // 注意：全局 tracing subscriber 由 `app::run()` 的 setup 阶段统一初始化
+    // （stderr 层 + 文件层）。此处不能提前 `init()`，否则文件日志层
+    // `try_init()` 会因 subscriber 已存在而失败，导致 release 包日志文件恒为空。
     carrypigeon_desktop_lib::run()
 }
