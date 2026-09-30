@@ -30,6 +30,8 @@ public/plugins/
 *.sln
 *.sw?
 /target/
+# 服务端插件工程构建产物（Maven）
+/server-plugins
 /src-tauri/Cargo.lock
 /database.carrypigeon
 

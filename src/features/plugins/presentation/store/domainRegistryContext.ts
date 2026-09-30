@@ -11,7 +11,7 @@ import type { LoadedPluginModule } from "@/features/plugins/presentation/runtime
 import { createHostApi } from "@/features/plugins/presentation/runtime/hostApiFactory";
 import type { PluginUiBridge } from "@/features/plugins/presentation/runtime/pluginUiApi";
 import type { PluginScope } from "@/features/plugins/presentation/runtime/pluginScope";
-import { chatPluginUiBridge } from "@/features/chat/public/api";
+import { chatPluginMessagesBridge, chatPluginUiBridge } from "@/features/chat/public/api";
 import { getCurrentPluginUserId } from "@/features/plugins/integration/accountSession";
 import type { DomainBinding, DomainRegistryHostBridge } from "@/features/plugins/contracts/domainRegistry";
 import { createPluginRuntimeError } from "@/features/plugins/presentation/runtime/pluginRuntimeError";
@@ -38,7 +38,7 @@ export function createDomainRegistryContextResolver(deps: DomainRegistryContextR
     const uid = getCurrentPluginUserId();
     const lang = navigator.language || "en-US";
 
-    // 去重并清理权限列表，统一交由 createHostApi 做能力门控（storage/network/invoke/onEvent/ui）。
+    // 去重并清理权限列表，统一交由 createHostApi 做能力门控（storage/network/invoke/onEvent/ui/messages）。
     const permissions = Array.from(
       new Set(plugin.permissions.map((item) => String(item).trim()).filter(Boolean)),
     );
@@ -60,7 +60,19 @@ export function createDomainRegistryContextResolver(deps: DomainRegistryContextR
     // 仅当插件具备 "ui" 权限时注入 chat UI 桥（mountOverlay / registerToolbarAction）。
     const uiBridge: PluginUiBridge | undefined = permissions.includes("ui") ? chatPluginUiBridge : undefined;
 
-    const host = createHostApi(socket, plugin.pluginId, permissions, uiBridge, sendMessage, scope ?? undefined);
+    // 频道消息读取桥由 chat feature 持有（读的是聊天时间线），此处按权限注入，
+    // 避免 plugins 运行时直接依赖 chat store（host.messages）。
+    const messagesReader = permissions.includes("messages:read") ? chatPluginMessagesBridge : undefined;
+
+    const host = createHostApi({
+      serverSocket: socket,
+      pluginId: plugin.pluginId,
+      permissions,
+      uiBridge,
+      sendMessage,
+      messagesReader,
+      scope: scope ?? undefined,
+    });
 
     return {
       serverSocket: socket,

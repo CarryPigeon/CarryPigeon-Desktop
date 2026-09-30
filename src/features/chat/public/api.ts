@@ -106,3 +106,11 @@ export function getChatCapabilities(): ChatCapabilities {
  * 这些符号经 chat 公共 API 透出，供 plugins 等跨 feature 消费。
  */
 export { chatPluginUiBridge, toolbarActions, bindOverlayMount } from "@/features/chat/presentation/plugins/chatPluginUiBridge";
+
+/**
+ * 插件频道消息读取桥（`host.messages`，"messages:read" 权限门控）。
+ *
+ * 说明：插件只能读取**当前频道**已载入的消息；`loadMoreHistory` 由插件在用户显式动作下调用。
+ * 这些符号经 chat 公共 API 透出，供 plugins 运行时注入，避免 plugins 直接接触 chat 内部 store。
+ */
+export { chatPluginMessagesBridge } from "@/features/chat/presentation/plugins/chatPluginMessagesBridge";

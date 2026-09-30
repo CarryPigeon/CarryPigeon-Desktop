@@ -83,7 +83,28 @@
   `request-failed`）表示用户已显式配置客户端 AI 但不可用，插件应提示而非静默回退，
   否则用户会误以为自己配置的模型在生效。
 
+### 5.3 messages:read 权限边界（P0，已确定）
+
+若插件声明 `messages:read` 权限，宿主提供**当前频道消息**的只读读取能力，边界如下：
+
+- 只暴露两个方法：
+  - `host.messages.readCurrentChannel({ maxMessages? })`：返回当前频道**已载入时间线**的快照
+    （`channelId` / `channelName` / `messages`（时间升序）/ `totalCount` / `truncated` /
+    `hasMoreHistory` / `capturedAtMs`）。单次最多 500 条（与宿主 AI 总结上限一致，越界由宿主钳制），
+    该调用不发起网络请求、不改动聊天视图；
+    快照还会带上聊天视图**当前多选中**的消息（`selectedMessageIds`（仅"已载入且可参与总结"的
+    id，时间线顺序）/ `selectedTotalCount`（原始多选条数，含被过滤/未载入的条目）），
+    供插件让用户显式圈定处理范围；这不构成新的读取权限——仍是同一频道、同一 `messages:read`
+    门控，只是按用户圈定收敛；未处于多选或旧宿主未提供该字段时为空数组/0。
+  - `host.messages.loadMoreHistory()`：向更早历史翻页一页并回报调用前后的条数变化
+    （`loadedCount` / `loadedDelta` / `hasMore`），插件只应在用户显式动作（点击按钮）时调用。
+- 不接受任意 `channelId`：插件无法读取用户未打开的频道，也无法读取其他服务器。
+- 读取结果已由宿主过滤撤回消息与空内容；插件**不得持久化消息正文**（缓存只允许保存摘要与
+  “参与消息集合指纹 + 末条消息 id + 参与条数”指纹，集合指纹由消息 id 计算，不含正文）。
+- 未声明该权限时宿主不注入 `host.messages`，插件应提示用户升级/重新安装插件而不是静默失败。
+
 ## 6. required gate（客户端行为）
+
 - 连接服务器后，若发现 required 插件未满足：
   - 允许：查看服务器信息、打开插件中心、下载/安装/启用 required 插件
   - 禁止：进入登录流程

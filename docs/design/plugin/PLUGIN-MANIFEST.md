@@ -22,6 +22,10 @@
   安装/更新时需用户显式确认；密钥由宿主代持，插件只能调用
   `host.ai.summarize()`，无法读取密钥或传入任意提示词。
   详见 `docs/design/client/PLUGIN-RUNTIME.md` §5.2。
+- `messages:read`：读取**当前频道**已载入的消息（供 AI 总结等面板型插件使用）。属高危权限，
+  安装/更新时需用户显式确认；宿主只提供 `host.messages.readCurrentChannel()` 与
+  `host.messages.loadMoreHistory()`，不接受任意 channelId，单次最多 500 条，
+  且插件不得持久化消息正文。详见 `docs/design/client/PLUGIN-RUNTIME.md` §5.3。
 
 ## 3. Contract 交付（P0）
 

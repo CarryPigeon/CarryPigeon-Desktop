@@ -59,8 +59,9 @@ const LOCAL_PLUGIN_SOURCES: Record<string, LocalPluginSourceDefinition> = {
   "ai-summary": {
     pluginId: "ai-summary",
     version: "0.1.0",
-    // `ai`：允许使用客户端自配的 AI provider（密钥由宿主代持）；`network`：回退服务端端点。
-    permissions: ["ui", "network", "storage", "ai"],
+    // `ai`：允许使用客户端自配的 AI provider（密钥由宿主代持）；`network`：回退服务端端点；
+    // `messages:read`：读取当前频道消息用于总结（只读当前频道，上限 500 条）。
+    permissions: ["ui", "network", "storage", "ai", "messages:read"],
     providesDomains: [{ domain: "ai_summary", domainVersion: "1" }],
   },
 };

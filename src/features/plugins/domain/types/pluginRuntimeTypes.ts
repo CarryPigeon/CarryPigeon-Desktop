@@ -112,6 +112,104 @@ export type PluginAiApi = {
 };
 
 /**
+ * 读取到的单条频道消息（只读投影，不携带原始 wire 字段）。
+ */
+export type PluginChannelMessage = {
+  /** 消息 id。 */
+  messageId: string;
+  /** 发送者 id。 */
+  senderId: string;
+  /** 发送者展示名；宿主无法解析时回退为 senderId。 */
+  senderName: string;
+  /** 发送时间（ms）。 */
+  timeMs: number;
+  /** 可读文本投影：文本消息为正文，图片/视频/插件域消息为 preview 或占位描述。 */
+  text: string;
+};
+
+/**
+ * `host.messages.readCurrentChannel` 的返回快照。
+ *
+ * 说明：
+ * - 只覆盖“当前频道”已载入的时间线，宿主不会为了该读取发起历史翻页；
+ * - 已撤回消息与文本投影为空的条目已被宿主过滤，`totalCount` 为过滤前条数；
+ * - `selectedMessageIds` 复用聊天视图的多选状态（右键消息 →「多选」），
+ *   与 `messages` 同权限、同频道，不新增可读范围。
+ */
+export type PluginCurrentChannelMessagesSnapshot = {
+  /** 当前频道 id；空字符串表示宿主当前未选择频道。 */
+  channelId: string;
+  /** 频道展示名；无法解析时回退为 channelId。 */
+  channelName: string;
+  /** 时间线中该频道的消息总数（裁剪前，含被过滤掉的条目）。 */
+  totalCount: number;
+  /** 是否因单次上限（500 条）被裁剪。 */
+  truncated: boolean;
+  /** 时间线是否仍有更早历史未载入。 */
+  hasMoreHistory: boolean;
+  /** 读取时刻（ms）。 */
+  capturedAtMs: number;
+  /** 按时间升序（旧 → 新）的消息列表。 */
+  messages: PluginChannelMessage[];
+  /**
+   * 聊天视图中当前多选中、且本次快照里可参与总结的消息 id（时间线顺序）。
+   *
+   * 说明：
+   * - 只包含“已载入且通过投影过滤”（未撤回、文本投影非空）的选中项；
+   * - 未处于多选、或旧客户端未提供该字段时为空数组；
+   * - 插件应把它当作“用户显式圈定的范围”，不应默认发送整个 `messages`。
+   */
+  selectedMessageIds: string[];
+  /**
+   * 聊天视图中当前多选的原始条数（含被投影过滤或未载入的条目）。
+   *
+   * 用途：与 `selectedMessageIds.length` 比较后提示“部分选中项不可参与总结”，
+   * 避免插件静默丢弃用户的选择。
+   */
+  selectedTotalCount: number;
+};
+
+/**
+ * `host.messages.loadMoreHistory` 的结果。
+ */
+export type PluginChannelHistoryLoadResult = {
+  /** 调用后时间线中的消息总数。 */
+  loadedCount: number;
+  /** 本次新增载入条数（0 表示已无更早历史、有并发翻页或本次加载失败）。 */
+  loadedDelta: number;
+  /** 是否仍有更早历史未载入。 */
+  hasMore: boolean;
+};
+
+/**
+ * `host.messages` 能力面（"messages:read" 权限门控）。
+ *
+ * 安全约束：
+ * - 只暴露“当前频道”的读取，不接受任意 channelId，插件无法读取用户未打开的频道；
+ * - `readCurrentChannel` 为只读快照，不改动聊天视图，也不触发网络请求；
+ *   快照会附带聊天视图“当前多选中”的消息 id（见 `selectedMessageIds`），
+ *   供插件让用户显式圈定范围，不构成新的读取权限；
+ * - `loadMoreHistory` 会向聊天视图补入更早消息并访问当前 server origin，
+ *   插件只应在用户显式动作（点击按钮）时调用；
+ * - 单次最多返回 500 条（与宿主 AI 总结上限一致），插件无法请求更大范围。
+ */
+export type PluginMessagesApi = {
+  /**
+   * 读取当前频道已载入的消息。
+   *
+   * @param input - 可选的单次上限（越界时由宿主钳制到 [1, 500]，缺省 500）。
+   * @returns 当前频道消息快照；宿主未选择频道时 `channelId` 为空字符串。
+   */
+  readCurrentChannel(input?: { maxMessages?: number }): Promise<PluginCurrentChannelMessagesSnapshot>;
+  /**
+   * 向更早历史翻页一页，并回报调用前后的条数变化。
+   *
+   * @returns 翻页结果；无频道/无更多历史/并发翻页时 `loadedDelta` 为 0。
+   */
+  loadMoreHistory(): Promise<PluginChannelHistoryLoadResult>;
+};
+
+/**
  * 插件运行时对外声明的 domain contract。
  */
 export type PluginRuntimeContract = {
@@ -166,6 +264,12 @@ export type PluginContext = {
      * `summarize` 返回 `not-configured`，插件应回退服务端端点。
      */
     ai?: PluginAiApi;
+    /**
+     * 当前频道消息读取能力（"messages:read" 权限门控）。
+     *
+     * 说明：只读当前频道，不提供任意频道读取；未声明该权限时不会注入。
+     */
+    messages?: PluginMessagesApi;
     /** 挂载全局浮层组件，返回卸载函数与组件实例句柄 */
     mountOverlay?: (component: Component, opts?: { zIndex?: number; props?: Record<string, unknown> }) => PluginOverlayMountHandle;
     /** 注册聊天头部/工具栏入口，返回注销函数 */

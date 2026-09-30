@@ -169,9 +169,9 @@ export const MOCK_PLUGIN_CATALOG: MockPluginEntry[] = [
   {
     pluginId: "ai-summary",
     name: "AI Summary",
-    tagline: "Channel digest via client-configured or server AI",
+    tagline: "Channel digest read from the current channel",
     description:
-      "Summarizes the current channel using the client-configured AI provider (OpenAI-compatible; API key held by the host OS credential store), falling back to the current server origin's /api/ai/summarize endpoint when no client provider is configured. Enabled by default.",
+      "Reads the current channel's loaded messages (permission messages:read, capped at 500) and summarizes them with the client-configured AI provider (OpenAI-compatible; API key held by the host OS credential store), falling back to the current server origin's /api/ai/summarize endpoint when no client provider is configured. Enabled by default.",
     source: "repo",
     downloadUrl: "https://repo.example.com/plugins/ai-summary/0.1.0.zip",
     sha256: "dd44ee55ff6600112233445566778899aabbccddeeff001122334455667788",
@@ -179,6 +179,7 @@ export const MOCK_PLUGIN_CATALOG: MockPluginEntry[] = [
     versions: ["0.1.0"],
     providesDomains: [{ id: "ai_summary", label: "AiSummary", version: "1", colorVar: "--cp-domain-ext-c" }],
     permissions: [
+      { key: "messages:read", label: "Read the current channel's messages to summarize", risk: "high" },
       { key: "network", label: "Call the current server AI endpoint", risk: "high" },
       { key: "ai", label: "Use the client-configured AI provider", risk: "high" },
       { key: "storage", label: "Cache summaries", risk: "low" },
