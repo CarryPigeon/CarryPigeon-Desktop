@@ -531,6 +531,23 @@
   opacity: 0.8;
 }
 
+/* 频道行：置顶指示器 */
+.cp-channel__pin-icon {
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: 0.9;
+}
+
+/* 频道行：置顶分组内的行使用强调边框 */
+.cp-channelRow[data-pinned="true"] {
+  border-color: color-mix(in oklab, var(--cp-highlight) 36%, var(--cp-border));
+}
+
+/* 频道行：置顶分组的分类标题强化视觉 */
+.cp-categoryHeader[data-group="__pinned__"] {
+  color: var(--cp-highlight);
+}
+
 /* 频道行：右侧动作（unread/join/info） */
 .cp-channelRow__right {
   display: flex;

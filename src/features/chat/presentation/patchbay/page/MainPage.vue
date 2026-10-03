@@ -308,6 +308,7 @@ onBeforeUnmount(() => {
         :x="page.channelContextMenu.x.value"
         :y="page.channelContextMenu.y.value"
         :notification-level="page.channelContextMenu.currentNotifLevel()"
+        :pinned="page.channelContextMenu.isPinned()"
         @action="page.channelContextMenu.handleMenuAction"
         @close="page.channelContextMenu.close"
       />

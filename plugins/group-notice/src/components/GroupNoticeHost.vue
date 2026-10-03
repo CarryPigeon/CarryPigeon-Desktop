@@ -95,7 +95,7 @@ function formatTime(ms: number): string {
 /** 从插件存储读取已读游标（容错：任意异常视为无已读记录）。 */
 async function loadReadIds(channelId: string): Promise<Set<string>> {
   try {
-    const raw = await getContext().host.storage.get(readIdsStorageKey(channelId));
+    const raw = await getContext().storage.get(readIdsStorageKey(channelId));
     if (Array.isArray(raw)) {
       return new Set(raw.map((x) => String(x)).filter(Boolean));
     }
@@ -120,7 +120,7 @@ async function refresh(channelId: string): Promise<void> {
   try {
     readIds.value = await loadReadIds(ch);
     // 网络能力由 "network" 权限注入；相对路径会被宿主拼接到当前 server origin。
-    const res = await getContext().host.network?.fetch(
+    const res = await getContext().network?.fetch(
       `/api/group/notices?channel_id=${encodeURIComponent(ch)}`,
     );
     if (!res || !res.ok) {
@@ -151,7 +151,7 @@ async function markAllRead(): Promise<void> {
   for (const item of notices.value) next.add(item.noticeId);
   readIds.value = next;
   try {
-    await getContext().host.storage.set(readIdsStorageKey(ch), Array.from(next));
+    await getContext().storage.set(readIdsStorageKey(ch), Array.from(next));
   } catch (e) {
     logger.warn("group_notice_read_ids_save_failed", { error: String(e) });
   }

@@ -5,7 +5,6 @@
  */
 
 import type { DomainBinding, DomainRegistryHostBridge } from "../contracts/domainRegistry";
-import type { PluginContext as RuntimePluginContext } from "../domain/types/pluginRuntimeTypes";
 import { createPluginsRuntimeStateAccess, createPluginsWorkspaceStateAccess } from "../di/plugins.di";
 
 export type AvailablePluginMessageDomain = {
@@ -23,8 +22,8 @@ export type AvailablePluginMessageDomain = {
 
 export type PluginRuntimeCapabilities = {
   getBinding(domain: string): DomainBinding | null;
-  getContextForPlugin(pluginId: string): RuntimePluginContext | null;
-  getContextForDomain(domain: string): RuntimePluginContext | null;
+  getContextForPlugin(pluginId: string): unknown;
+  getContextForDomain(domain: string): unknown;
 };
 
 export async function ensurePluginRuntimeLoaded(serverSocket: string): Promise<void> {

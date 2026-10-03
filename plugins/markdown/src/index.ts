@@ -1,13 +1,12 @@
 /**
- * @fileoverview markdown 插件入口。
+ * @fileoverview markdown 插件入口（Cordis v2 契约）。
  * @description
  * 提供 domain "markdown"（version "1"）的 renderer 与 composer：
- * - renderers.markdown 渲染 { text } 消息（安全 markdown，无 innerHTML）；
- * - composers.markdown 提供编辑 + 预览，submit 事件携带宿主契约 payload。
+ * - `ctx.domains.renderer("markdown", ...)` 渲染 { text } 消息（安全 markdown，无 innerHTML）；
+ * - `ctx.domains.composer("markdown", ...)` 提供编辑 + 预览，submit 事件携带宿主契约 payload。
  */
 
-import type { Component } from "vue";
-import type { PluginContext } from "@/features/plugins/api-types";
+import type { Context } from "@/features/plugins/sdk";
 import { markdownManifest } from "./manifest";
 import MarkdownMessage from "./components/MarkdownMessage.vue";
 import MarkdownComposer from "./components/MarkdownComposer.vue";
@@ -16,32 +15,13 @@ import "./styles/markdown.css";
 
 const logger = createLogger("plugin");
 
+export const name = "markdown";
 export const manifest = markdownManifest;
+/** 需要 domain 注册能力与服务器上下文。 */
+export const inject = ["domains", "server"];
 
-export const renderers: Record<string, Component> = {
-  markdown: MarkdownMessage,
-};
-
-export const composers: Record<string, Component> = {
-  markdown: MarkdownComposer,
-};
-
-let cleanup: (() => void) | null = null;
-
-export function activate(ctx: PluginContext): void {
-  // markdown 插件无全局副作用；此处仅记录激活并挂接可选的 scope dispose。
-  logger.info("markdown_plugin_activated", { pluginId: ctx.pluginId, server: ctx.serverSocket });
-
-  const dispose = () => {
-    logger.info("markdown_plugin_disposed");
-    cleanup = null;
-  };
-  ctx.onDispose?.(dispose);
-  // 兼容宿主未注入 onDispose 的场景：deactivate 时兜底清理。
-  cleanup = dispose;
-}
-
-export function deactivate(): void {
-  cleanup?.();
-  cleanup = null;
+export function apply(ctx: Context): void {
+  ctx.domains.renderer("markdown", MarkdownMessage);
+  ctx.domains.composer("markdown", MarkdownComposer);
+  logger.info("markdown_plugin_activated", { pluginId: ctx.server.serverId });
 }

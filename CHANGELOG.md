@@ -4,16 +4,54 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-03
+
 ### 新增功能
+- **插件运行时 Cordis 重构（入口契约 v2）**：以 `@cordisjs/core` v3 的 `Context` 完全替换自研作用域内核。新增 `src/features/plugins/runtime/**`（`createServerContext` / `applyPlugin` / `legacyAdapter` / `permissions` / `services/*`）与 `src/features/plugins/sdk`，删除 `pluginScope`、`pluginScopeRegistry`、`hostApiFactory`、`domainRegistryContext`、`domainRegistryBindings`、`pluginUiApi` / `pluginInvokeApi` / `pluginEventApi`。宿主能力改为 Cordis 服务（`storage` / `domains` / `network` / `ai` / `messages` / `ui` / `ipc`），生命周期交由 Cordis 管理（`ctx.plugin` / `fiber.dispose` / `ctx.effect` / `ctx.on("dispose")`）。
+- **插件入口契约 v2**：插件改为 `{ name, manifest, inject, apply(ctx) }`，`renderers` / `composers` / `contracts` 由模块静态导出改为运行时注册到 `ctx.domains`；v1 旧插件由 `legacyAdapter` 原样兼容（`entryApiVersion` 缺省即 1），远端已发布 v1 插件零改动可运行。
+- **权限 = 服务可见性**：按 `manifest.permissions` 决定插件 context 上存在哪些能力服务，插件以 `inject` 声明依赖（支持可选依赖）；apply 前 `assertRequiredPermissions` 显式失败并 markFailed，杜绝“加载成功但不生效”的静默 pending。
+- **IPC 白名单改为 manifest 声明**：新增 `ipcPrefixes` 字段替换宿主硬编码的 `voice_call:` 前缀，并与宿主可暴露命名空间白名单双重约束（拒绝 `*`、空串等过宽前缀）；`invoke` 与 `events` 权限分别门控，互不越权。
+- **频道置顶（本地离线）**：服务端暂未提供置顶 API，置顶信息写入本机 `channel-pins.json`（`{app_data_dir}` 下），频道栏置顶分组独立展示。新增 Rust `channel_pins` feature（`channel_pins_get` / `set` / `toggle` / `file_path` / `open_file`）与 `channel-pins-changed` 事件；后台轮询文件变化并向前端广播完整状态，手动编辑 JSON 后无需重启即可生效。
+- **客户端可替换 AI 服务（OpenAI 兼容协议）**：新增 Rust `features/ai` 与 `shared/secure_store`，密钥经系统凭据管理器存取（仅单向写入、无读取接口回传，`providerId` 白名单校验、错误文本统一脱敏），请求经 reqwest 直连以避开 WebView CORS 限制。设置页新增「AI 服务」分区，支持 OpenAI / DeepSeek / 阿里百炼 / Kimi / 本地 Ollama / 自定义 / 跟随服务端 7 种来源与模型列表一键拉取。
+- **AI 摘要插件增强**：`ai-summary` 摘要范围选择、请求构造与宿主桥接补齐；新增 `channelMessageProjection` 与 `chatPluginMessagesBridge` 支撑插件只读读取当前频道消息。
+- **消息引用跳转**：回复引用块与内联引用支持右键「跳转到被回复的消息」及引用块跳转按钮，虚拟列表按索引定位目标行后滚动并高亮；原消息已删除 / 撤回时不显示入口。
+- **theme 插件改为宿主主题薄代理**：不再持有主题状态，读写宿主 `carrypigeon:theme`，首次激活一次性迁移旧版插件私有偏好；`system` 偏好跟随系统配色并监听变化实时同步。
 
-### 性能优化
-
-### UX 改进
+### 修复
+- **release 包日志文件恒为空**：`main.rs` 入口提前 `init()` 全局 tracing subscriber，导致 `app::run()` 中文件日志层 `try_init()` 必然失败；改为统一交由 `app::run()` setup 阶段初始化。
+- **release 下写请求因 CORS 失败**：桌面端 HTTP 统一走 Rust（reqwest）通道，修复 WebView `app://` origin 直连服务端触发预检、导致登录等写请求在 release 中失败的问题；请求超时 30s → 45s 并记录完整 reqwest 错误链。
+- **release 下自带插件加载与浮层交互**：dev / release 一致加载自带插件并产出 `public/plugins`；按入口 URL 幂等注入插件 `style.css`；浮层 Teleport 到 body 并交还指针事件，修复“透明浮层铺满全屏吃掉所有点击”；插件组件在唯一收口点统一 `markRaw`；插件目录拉取失败回退自带条目。
+- **会话恢复**：启动恢复当前用户前先等待加密缓存水合，access token 过期先刷新，刷新后仍 401/403 才清空本地会话，非鉴权错误保留会话等待重试。
 
 ### 国际化
+- 新增置顶频道中英文键值（频道栏置顶分组、置顶 / 取消置顶、失败提示、编辑置顶频道入口）。
+- Rust 侧新增置顶频道错误键（保存失败 / 打开文件失败）中英文覆盖。
 
 ### 代码质量
-- **依赖安全升级**：wasmtime 46.0.3 → 48.0.3，修复 RUSTSEC-2026-0316（46.x 分支无修复补丁），恢复 CI `cargo audit` 通过。
+- **依赖安全升级**：wasmtime 48.0.3 → 48.0.5，修复 RUSTSEC-2026-0325 / 0326 / 0327（wasmtime GC 与 component 回调缺陷，修复区间为 >=48.0.4,<49.0.0），CI `cargo audit` 与 `cargo deny check` 恢复通过。
+- 插件 runtime 日志改走 `createLogger`（英文日志 + Action 词汇表），替代散落的直接输出。
+- 设计文档同步 Cordis 契约：新增 `docs/design/plugin/CORDIS-MIGRATION.md`，更新 `PLUGIN-ENTRY-API.md` / `PLUGIN-MANIFEST.md` / `PLUGIN-RUNTIME.md`。
+- 测试：Vitest 83 suites / 654 tests 全部通过；Rust 217 passed / 2 ignored / 0 failed。
+
+## [0.5.0] - 2026-09-21
+
+> 说明：v0.5.0 已打标签发布但当时未记录 CHANGELOG，本节按 `v0.4.0..v0.5.0` 提交补记。
+
+### 新增功能
+- **内置插件首批落地**：新增 theme / markdown / group-notice / ai-summary 四个默认启用插件；插件运行时引入 cordis-style `PluginScope` 生命周期（为 0.6.0 的 Cordis 重构铺路）。
+- **频道发现与协作能力补全**：发现筛选、提及收件箱、审计日志、通讯录 UID 查找的 UI 与服务端接线；移除假的“添加好友私聊”入口。
+- **设置与主题**：支持主题跟随系统；优化截图与输入区交互；主题收敛为亮 / 暗两种并兼容迁移旧主题值。
+
+### 修复
+- 修复大量历史消息时频道跳底失败；移除消息表情回应功能。
+- 修复 release 白屏与离线 TDesign 图标缺失。
+- 修复消息发送后列表未落到最新消息，进入频道时同样定位到最新。
+- 对齐服务端 204 / 幂等 / 下载 302 等协议行为。
+
+### 代码质量
+- 清理旧网络层并抽取 patchbay 视图模型。
+- libspa-sys 本地补丁：bindgen 升级到 0.72，适配 clang >= 21 下的 Linux 构建。
+- CI Rust 规范扫描范围收敛到 `src-tauri/src`。
 
 ## [0.4.0] - 2026-07-02
 

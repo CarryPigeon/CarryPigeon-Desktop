@@ -98,6 +98,23 @@ function localPluginAssetsPlugin(): Plugin {
           // vue / tdesign-vue-next，使宿主与插件共享同一运行时实例。否则插件组件的
           // 响应式全部失效（首帧渲染正常、状态更新死掉）。release 不经过 dev 中间件，
           // 仍由 dist 内真实 vendor.mjs + index.html import map 承担同一职责。
+          if (vendorMatch[1] === "cordis.mjs") {
+            // 与 vendor.mjs 同理：dev 下把 /vendor/cordis.mjs 重导出为宿主正在使用的
+            // 预构建 @cordisjs/core 实例，保证宿主与插件共享同一 Cordis 运行时。
+            const cordisUrl = resolveOptimizedDepUrl("@cordisjs/core");
+            if (cordisUrl) {
+              const body = [
+                "// CarryPigeon dev vendor shim: re-export the SAME pre-bundled",
+                "// @cordisjs/core instance the host app uses.",
+                `export * from ${JSON.stringify(cordisUrl)};`,
+                "",
+              ].join("\n");
+              res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+              res.setHeader("Cache-Control", "no-store");
+              res.end(body);
+              return;
+            }
+          }
           if (vendorMatch[1] === "vendor.mjs") {
             const vueUrl = resolveOptimizedDepUrl("vue");
             const tdesignUrl = resolveOptimizedDepUrl("tdesign-vue-next");
@@ -229,10 +246,13 @@ export default defineConfig(({ command }) => {
                 !id.endsWith(".css") &&
                 (id === "vue" ||
                   id === "tdesign-vue-next" ||
+                  id === "@cordisjs/core" ||
                   id.startsWith("vue/") ||
                   id.startsWith("tdesign-vue-next/") ||
+                  id.startsWith("@cordisjs/core/") ||
                   id.includes("node_modules/vue/") ||
-                  id.includes("node_modules/tdesign-vue-next/")),
+                  id.includes("node_modules/tdesign-vue-next/") ||
+                  id.includes("node_modules/@cordisjs/core/")),
             }
           : {}),
         output: {
@@ -246,7 +266,7 @@ export default defineConfig(({ command }) => {
 
     // Optimize dependency pre-bundling
     optimizeDeps: {
-      include: ['vue', 'vue-router', 'tdesign-vue-next', '@tauri-apps/api'],
+      include: ['vue', 'vue-router', 'tdesign-vue-next', '@tauri-apps/api', '@cordisjs/core'],
     },
   };
 });

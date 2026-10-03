@@ -51,6 +51,10 @@ pub struct PluginRuntimeEntry {
     pub min_host_version: String,
     pub permissions: Vec<String>,
     pub provides_domains: Vec<PluginProvidesDomain>,
+    /// 入口 API 版本（1 = 传统契约；2 = Cordis 契约）。
+    pub entry_api_version: u32,
+    /// IPC 白名单前缀（来自已校验的 plugin.json）。
+    pub ipc_prefixes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -134,6 +134,13 @@ export const TAURI_COMMANDS = {
   removeTempFile: "remove_temp_file",
   saveTempFile: "save_temp_file",
   openTempFile: "open_temp_file",
+
+  // channel_pins（置顶频道：本地 JSON 持久化 + 文件变更热加载）
+  channelPinsGet: "channel_pins_get",
+  channelPinsSet: "channel_pins_set",
+  channelPinsToggle: "channel_pins_toggle",
+  channelPinsFilePath: "channel_pins_file_path",
+  channelPinsOpenFile: "channel_pins_open_file",
 } as const;
 
 /**

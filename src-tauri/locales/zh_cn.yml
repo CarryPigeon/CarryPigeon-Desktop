@@ -46,6 +46,11 @@ error.screenshot_save_fail: "保存截图失败"
 error.screenshot_show_window_fail: "显示主窗口失败"
 error.screenshot_event_fail: "发送截图完成事件失败"
 
+# channel pins
+# 频道置顶（本地 JSON 热加载）
+error.channel_pins_save_failed: "保存置顶频道失败"
+error.channel_pins_open_failed: "打开置顶频道文件失败"
+
 # emoji
 error.emoji_save_failed: "保存表情失败"
 error.emoji_delete_failed: "删除表情失败"

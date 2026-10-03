@@ -1,7 +1,7 @@
 {
     "name": "carrypigeon-desktop",
     "private": true,
-    "version": "0.5.1",
+    "version": "0.6.0",
     "type": "module",
     "engines": {
         "node": ">=20"
@@ -33,6 +33,7 @@
         "benchmark": "bash scripts/perf-benchmark.sh"
     },
     "dependencies": {
+        "@cordisjs/core": "^3.18.1",
         "@tanstack/vue-virtual": "^3.13.32",
         "@tauri-apps/api": "^2.11.1",
         "@tauri-apps/plugin-notification": "^2.4.0",

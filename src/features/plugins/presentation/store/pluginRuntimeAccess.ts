@@ -4,7 +4,6 @@
  * 提供面向能力的运行时访问层，避免其他 store 或跨 feature API 直接依赖 domain registry 实现细节。
  */
 
-import type { PluginContext } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 import type { DomainBinding, DomainRegistryHostBridge } from "@/features/plugins/contracts/domainRegistry";
 import { useDomainRegistryStore } from "./domainRegistryStore";
 
@@ -14,8 +13,8 @@ export type PluginRuntimeAccess = {
   reload(pluginId: string): Promise<void>;
   disable(pluginId: string): Promise<void>;
   getBinding(domain: string): DomainBinding | null;
-  getContextForPlugin(pluginId: string): PluginContext | null;
-  getContextForDomain(domain: string): PluginContext | null;
+  getContextForPlugin(pluginId: string): unknown;
+  getContextForDomain(domain: string): unknown;
   setHostBridge(bridge: DomainRegistryHostBridge | null): void;
 };
 
@@ -40,10 +39,10 @@ export function usePluginRuntimeAccess(serverSocket: string): PluginRuntimeAcces
       if (!normalizedDomain) return null;
       return registry.bindingByDomain[normalizedDomain] ?? null;
     },
-    getContextForPlugin(pluginId: string): PluginContext | null {
+    getContextForPlugin(pluginId: string): unknown {
       return registry.getContextForPlugin(pluginId);
     },
-    getContextForDomain(domain: string): PluginContext | null {
+    getContextForDomain(domain: string): unknown {
       return registry.getContextForDomain(domain);
     },
     setHostBridge(bridge: DomainRegistryHostBridge | null): void {

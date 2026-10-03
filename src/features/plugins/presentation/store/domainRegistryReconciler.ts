@@ -7,7 +7,7 @@
 import type { Ref } from "vue";
 import { NO_SERVER_KEY } from "@/shared/serverKey";
 import type { InstalledPluginState } from "@/features/plugins/domain/types/pluginTypes";
-import type { LoadedPluginModule } from "@/features/plugins/presentation/runtime/pluginRuntime";
+import type { LoadedPluginRuntime } from "@/features/plugins/runtime";
 
 type LoggerLike = {
   error(message: string, payload?: Record<string, unknown>): void;
@@ -16,7 +16,7 @@ type LoggerLike = {
 export type DomainRegistryReconcilerDeps = {
   key: string;
   runtimeLoadingDisabled: boolean;
-  loadedById: Record<string, LoadedPluginModule>;
+  loadedById: Record<string, LoadedPluginRuntime>;
   loading: Ref<boolean>;
   error: Ref<string>;
   logger: LoggerLike;

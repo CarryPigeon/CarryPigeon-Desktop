@@ -20,3 +20,4 @@
 
 - 客户端运行时：`docs/design/client/PLUGIN-RUNTIME.md`
 - 协议与 required gate：`docs/design/protocol/PLUGIN-CATALOG-AND-ERRORS.md`
+- Cordis 重构方案（待评审）：`docs/design/plugin/CORDIS-MIGRATION.md`

@@ -9,7 +9,9 @@ var manifest_default = {
 		"ui",
 		"storage"
 	],
-	providesDomains: ["call_record"]
+	providesDomains: ["call_record"],
+	entryApiVersion: 2,
+	ipcPrefixes: ["voice_call:"]
 };
 //#endregion
 //#region plugins/voice-call/src/manifest.ts
@@ -22,19 +24,24 @@ var ctx = null;
 function bindContext(c) {
 	ctx = c;
 }
+function unbindContext() {
+	ctx = null;
+}
 function getContext() {
 	if (!ctx) throw new Error("voice-call plugin context not bound");
 	return ctx;
 }
-/** 调宿主原生 voice_call 后端命令（host.invoke 已按 voice_call:* 白名单校验）。 */
+/** 调宿主原生 voice_call 后端命令（`ctx.ipc` 已按 voice_call:* 前缀白名单校验）。 */
 function invokeVoiceCall(command, args) {
-	if (!ctx?.host.invoke) throw new Error("host.invoke not available");
-	return ctx.host.invoke(command, args);
+	const c = getContext();
+	if (!c.ipc) throw new Error("host.ipc not available");
+	return c.ipc.invoke(command, args);
 }
-/** 订阅 voice_call:* 后端事件。 */
+/** 订阅 voice_call:* 后端事件（随插件 fiber 自动取消订阅）。 */
 function onVoiceCallEvent(event, handler) {
-	if (!ctx?.host.onEvent) throw new Error("host.onEvent not available");
-	return ctx.host.onEvent(event, handler);
+	const c = getContext();
+	if (!c.ipc) throw new Error("host.ipc not available");
+	return c.ipc.onEvent(event, handler);
 }
 //#endregion
 //#region plugins/voice-call/src/shared/logger.ts
@@ -845,7 +852,7 @@ var voiceCallMessages = {
 function t(key, params) {
 	let lang = "zh_cn";
 	try {
-		lang = getContext().lang || "zh_cn";
+		lang = getContext().server.lang || "zh_cn";
 	} catch {}
 	const messages = voiceCallMessages;
 	let str = (messages[lang] ?? messages.zh_cn)[key] ?? key;
@@ -1382,7 +1389,7 @@ var VoiceCallHost_default = /* @__PURE__ */ defineComponent({
 		const logger = createLogger("VoiceCallHost");
 		function getCurrentUserId() {
 			try {
-				return getContext().uid ?? "";
+				return getContext().server.getUid() ?? "";
 			} catch {
 				return "";
 			}
@@ -1696,10 +1703,23 @@ var CallRecordBubble_default = /*#__PURE__*/ _plugin_vue_export_helper_default(/
 }), [["__scopeId", "data-v-4db1606a"]]);
 //#endregion
 //#region plugins/voice-call/src/index.ts
+/**
+* @fileoverview voice-call 插件入口（Cordis v2 契约）。
+* @description
+* - 注册 `call_record` domain 渲染器；
+* - 挂载全局通话浮层（VoiceCallHost）并注册工具栏入口（视频/语音/会议）；
+* - 事件订阅兜底：确保连接建立（无副作用）；订阅随插件 fiber 自动取消。
+*/
 var logger = createLogger("voice-call:plugin");
+var name = "voice-call";
 var manifest = voiceCallManifest;
-var renderers = { call_record: CallRecordBubble_default };
-var cleanup = null;
+var inject = [
+	"ui",
+	"ipc",
+	"storage",
+	"domains",
+	"server"
+];
 function makeIcon(name) {
 	return defineComponent({
 		name: `VoiceCallToolbarIcon-${name}`,
@@ -1709,9 +1729,11 @@ function makeIcon(name) {
 var VideoCallIcon = makeIcon("video");
 var AudioCallIcon = makeIcon("call");
 var ConferenceIcon = makeIcon("usergroup");
-function activate(ctx) {
+function apply(ctx) {
 	bindContext(ctx);
-	const overlayHandle = ctx.host.mountOverlay?.(VoiceCallHost_default, { props: {
+	ctx.on("dispose", () => unbindContext());
+	ctx.domains.renderer("call_record", CallRecordBubble_default);
+	const overlayHandle = ctx.ui?.mountOverlay(VoiceCallHost_default, { props: {
 		roomId: "",
 		roomName: "",
 		targetUserId: void 0
@@ -1719,12 +1741,8 @@ function activate(ctx) {
 		unmount: () => {},
 		instance: null
 	};
-	const unmount = overlayHandle.unmount;
-	function voiceHost() {
-		return overlayHandle.instance;
-	}
 	function startCall(kind, chatCtx) {
-		const host = voiceHost();
+		const host = overlayHandle.instance;
 		if (!host) {
 			logger.warn("voice_call_toolbar_host_missing", { kind });
 			return;
@@ -1739,7 +1757,7 @@ function activate(ctx) {
 		else if (kind === "audio") host.startDirectCall?.(targetUserId, roomId);
 		else host.startConference?.(roomId);
 	}
-	const detachers = [
+	const actions = [
 		{
 			id: "voice-call.video",
 			label: "",
@@ -1761,21 +1779,11 @@ function activate(ctx) {
 			order: 50,
 			onClick: (c) => startCall("conference", c)
 		}
-	].map((a) => ctx.host.registerToolbarAction?.(a) ?? (() => {}));
-	const offIncoming = onVoiceCallEvent("voice_call:incoming", (p) => void 0);
-	const offState = onVoiceCallEvent("voice_call:state_change", () => {});
-	const offVideo = onVoiceCallEvent("voice_call:video_signaling", () => {});
-	cleanup = () => {
-		detachers.forEach((d) => d());
-		unmount();
-		offIncoming();
-		offState();
-		offVideo();
-	};
-}
-function deactivate() {
-	cleanup?.();
-	cleanup = null;
+	];
+	for (const action of actions) ctx.ui?.registerToolbarAction(action);
+	onVoiceCallEvent("voice_call:incoming", (p) => void 0);
+	onVoiceCallEvent("voice_call:state_change", () => {});
+	onVoiceCallEvent("voice_call:video_signaling", () => {});
 }
 //#endregion
-export { activate, deactivate, manifest, renderers };
+export { apply, inject, manifest, name };

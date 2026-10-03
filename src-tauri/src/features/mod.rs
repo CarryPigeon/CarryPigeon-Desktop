@@ -4,6 +4,7 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 pub mod ai;
+pub mod channel_pins;
 pub mod emoji;
 pub mod network;
 pub mod plugins;

@@ -211,6 +211,22 @@ export type PluginRuntimeEntry = {
   permissions: string[];
   providesDomains: RuntimeProvidesDomain[];
   minHostVersion: string;
+  /**
+   * 入口 API 版本。
+   *
+   * - `1`：传统契约（`activate` / `deactivate` + 静态 `renderers` / `composers`）；
+   * - `2`：Cordis 契约（`apply(ctx)` + `ctx.domains` 注册）。
+   *
+   * 来源为已校验的 `plugin.json`（Rust 侧权威字段），缺省按 `1` 处理。
+   */
+  entryApiVersion: number;
+  /**
+   * IPC（`ctx.ipc.invoke` / `onEvent`）白名单前缀。
+   *
+   * 来源为已校验的 `plugin.json`；插件 JS 模块中声明的同名值不会被采用，
+   * 避免恶意插件自行扩大命令调用范围。
+   */
+  ipcPrefixes: string[];
 };
 
 /**

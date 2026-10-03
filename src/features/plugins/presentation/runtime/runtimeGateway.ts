@@ -30,6 +30,9 @@ function getMockRuntimeEntry(serverSocket: string, pluginId: string, version?: s
       domainVersion: domain.version,
     })),
     minHostVersion: "0.0.0",
+    // mock 运行时使用传统契约（loadPluginRuntimeModule 会为其合成 mock 模块）。
+    entryApiVersion: 1,
+    ipcPrefixes: [],
   };
 }
 

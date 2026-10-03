@@ -30,7 +30,7 @@ export type { DomainRegistryHostBridge, PluginAiApi, PluginAiFailureCode, Plugin
  *
  * 说明：此处从 runtime 内部实现透出为 plugins 公共类型，供 chat 等宿主 feature 消费。
  */
-export type { PluginUiBridge } from "./presentation/runtime/pluginUiApi";
+export type { PluginUiBridge } from "./runtime";
 
 /**
  * 插件在 chat 工具栏注册的动作。
@@ -326,20 +326,22 @@ export type PluginRuntimeCapabilities = {
   getBinding(domain: string): DomainBinding | null;
 
   /**
-   * 按插件 id 查询运行时上下文。
+   * 按插件 id 查询插件运行时上下文（Cordis `Context`）。
+   *
+   * 说明：返回类型对跨 feature 调用方保持 `unknown`，避免 plugins 内部运行时类型泄漏。
    *
    * @param pluginId - 插件 id。
    * @returns 找到时返回运行时上下文；否则返回 `null`。
    */
-  getContextForPlugin(pluginId: string): PluginContext | null;
+  getContextForPlugin(pluginId: string): unknown;
 
   /**
-   * 按消息 domain 查询所属插件运行时上下文。
+   * 按消息 domain 查询所属插件运行时上下文（Cordis `Context`）。
    *
    * @param domain - 消息 domain 标识。
    * @returns 找到时返回运行时上下文；否则返回 `null`。
    */
-  getContextForDomain(domain: string): PluginContext | null;
+  getContextForDomain(domain: string): unknown;
 };
 
 /**

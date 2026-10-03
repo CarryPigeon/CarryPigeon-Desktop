@@ -5,7 +5,6 @@
  */
 
 import type { DomainCatalogItem } from "../domain/types/domainCatalogTypes";
-import type { PluginContext } from "../domain/types/pluginRuntimeTypes";
 import type {
   InstalledPluginState,
   PluginCatalogEntryLike,
@@ -64,7 +63,7 @@ export type PluginsWorkspaceStateAccess = {
 export type PluginsRuntimeStateAccess = {
   ensureLoaded(): Promise<void>;
   getBinding(domain: string): DomainBinding | null;
-  getContextForPlugin(pluginId: string): PluginContext | null;
-  getContextForDomain(domain: string): PluginContext | null;
+  getContextForPlugin(pluginId: string): unknown;
+  getContextForDomain(domain: string): unknown;
   setHostBridge(bridge: DomainRegistryHostBridge | null): void;
 };

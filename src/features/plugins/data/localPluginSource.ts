@@ -20,6 +20,10 @@ type LocalPluginSourceDefinition = {
   version: string;
   permissions: string[];
   providesDomains: Array<{ domain: string; domainVersion: string }>;
+  /** 入口 API 版本：自带插件均已迁移到 Cordis v2 契约。 */
+  entryApiVersion: number;
+  /** IPC 白名单前缀（仅 voice-call 需要）。 */
+  ipcPrefixes: string[];
 };
 
 /**
@@ -37,24 +41,32 @@ const LOCAL_PLUGIN_SOURCES: Record<string, LocalPluginSourceDefinition> = {
     version: "0.1.0",
     permissions: ["invoke", "events", "ui", "storage"],
     providesDomains: [{ domain: "call_record", domainVersion: "1" }],
+    entryApiVersion: 2,
+    ipcPrefixes: ["voice_call:"],
   },
   theme: {
     pluginId: "theme",
     version: "0.1.0",
     permissions: ["ui", "storage"],
     providesDomains: [],
+    entryApiVersion: 2,
+    ipcPrefixes: [],
   },
   markdown: {
     pluginId: "markdown",
     version: "0.1.0",
     permissions: ["ui", "storage"],
     providesDomains: [{ domain: "markdown", domainVersion: "1" }],
+    entryApiVersion: 2,
+    ipcPrefixes: [],
   },
   "group-notice": {
     pluginId: "group-notice",
     version: "0.1.0",
     permissions: ["ui", "events", "storage", "network"],
     providesDomains: [{ domain: "group_notice", domainVersion: "1" }],
+    entryApiVersion: 2,
+    ipcPrefixes: [],
   },
   "ai-summary": {
     pluginId: "ai-summary",
@@ -63,6 +75,8 @@ const LOCAL_PLUGIN_SOURCES: Record<string, LocalPluginSourceDefinition> = {
     // `messages:read`：读取当前频道消息用于总结（只读当前频道，上限 500 条）。
     permissions: ["ui", "network", "storage", "ai", "messages:read"],
     providesDomains: [{ domain: "ai_summary", domainVersion: "1" }],
+    entryApiVersion: 2,
+    ipcPrefixes: [],
   },
 };
 
@@ -160,6 +174,8 @@ export function getLocalPluginRuntimeEntry(serverId: string, pluginId: string): 
     permissions: def.permissions,
     providesDomains: def.providesDomains,
     minHostVersion: "0.0.0",
+    entryApiVersion: def.entryApiVersion,
+    ipcPrefixes: def.ipcPrefixes,
   };
 }
 

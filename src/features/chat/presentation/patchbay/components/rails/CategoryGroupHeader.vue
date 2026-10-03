@@ -38,6 +38,7 @@ function handleToggle(): void {
   <div
     class="cp-categoryHeader"
     :class="{ 'cp-categoryHeader--uncategorized': isUncategorized }"
+    :data-group="groupId"
     role="button"
     :tabindex="0"
     :aria-expanded="!collapsed"

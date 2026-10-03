@@ -9,6 +9,7 @@ import type { NotificationLevel } from "../view-models/useChannelMuteStore";
 export type ChannelContextAction =
   | "mute"
   | "unmute"
+  | "toggle_pin"
   | "channel_info"
   | "mark_read"
   | `level:${NotificationLevel}`
@@ -17,6 +18,10 @@ export type ChannelContextAction =
 export type UseChannelContextMenuDeps = {
   isMuted(channelId: string): boolean;
   getNotificationLevel(channelId: string): NotificationLevel;
+  /** 查询指定频道是否已置顶（本地 JSON）。 */
+  isPinned(channelId: string): boolean;
+  /** 切换指定频道置顶状态（本地 JSON）。 */
+  togglePin(channelId: string): Promise<void>;
   toggleMute(channelId: string): Promise<void>;
   setNotificationLevel(channelId: string, level: NotificationLevel, serverSocket: string, accessToken: string): Promise<void>;
   /**
@@ -49,6 +54,11 @@ export function useChannelContextMenu(deps: UseChannelContextMenuDeps) {
     return deps.getNotificationLevel(menuChannelId.value);
   }
 
+  /** 当前右键菜单频道是否已置顶。 */
+  function currentPinned(): boolean {
+    return deps.isPinned(menuChannelId.value);
+  }
+
   async function handleMenuAction(action: ChannelContextAction): Promise<void> {
     const channelId = menuChannelId.value;
     if (!channelId) return;
@@ -58,6 +68,9 @@ export function useChannelContextMenu(deps: UseChannelContextMenuDeps) {
       case "mute":
       case "unmute":
         await deps.toggleMute(channelId);
+        break;
+      case "toggle_pin":
+        await deps.togglePin(channelId);
         break;
       case "channel_info":
         deps.openChannelInfo(channelId);
@@ -88,5 +101,6 @@ export function useChannelContextMenu(deps: UseChannelContextMenuDeps) {
     closeMenu,
     handleMenuAction,
     currentNotifLevel,
+    currentPinned,
   };
 }

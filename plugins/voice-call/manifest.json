@@ -2,6 +2,17 @@
   "pluginId": "voice-call",
   "version": "0.1.0",
   "entry": "index.js",
-  "permissions": ["invoke", "events", "ui", "storage"],
-  "providesDomains": ["call_record"]
+  "permissions": [
+    "invoke",
+    "events",
+    "ui",
+    "storage"
+  ],
+  "providesDomains": [
+    "call_record"
+  ],
+  "entryApiVersion": 2,
+  "ipcPrefixes": [
+    "voice_call:"
+  ]
 }

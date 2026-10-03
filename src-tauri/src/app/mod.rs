@@ -119,6 +119,9 @@ pub fn run() -> anyhow::Result<()> {
             // the app's lifetime and properly flushes buffered logs on drop.
             app.manage(LogFlushGuard(std::sync::Mutex::new(Some(guard))));
 
+            // 启动频道置顶本地文件热加载监听（服务端无置顶 API，仅本地 JSON 持久化）。
+            crate::features::channel_pins::data::store::start_watcher(app.handle().clone());
+
             let metadata_db_path = app_data_dir.join("temp_files").join("metadata.db");
             let temp_file_manager = std::thread::spawn({
                 let app_data_dir = app_data_dir.clone();
@@ -457,6 +460,12 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::emoji::di::commands::copy_emoji,
             crate::features::emoji::di::commands::write_temp_emoji_file,
             crate::features::emoji::di::commands::get_emoji_image_path,
+            // channel_pins（置顶频道：本地 JSON 持久化 + 文件变更热加载）
+            crate::features::channel_pins::di::commands::channel_pins_get,
+            crate::features::channel_pins::di::commands::channel_pins_set,
+            crate::features::channel_pins::di::commands::channel_pins_toggle,
+            crate::features::channel_pins::di::commands::channel_pins_file_path,
+            crate::features::channel_pins::di::commands::channel_pins_open_file,
             // screenshot
             crate::features::screenshot::di::commands::start_screenshot,
             crate::features::screenshot::di::commands::get_screenshot_data,

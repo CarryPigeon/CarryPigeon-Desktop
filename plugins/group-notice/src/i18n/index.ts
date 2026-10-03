@@ -35,7 +35,7 @@ const messages: Record<string, Dict> = { zh_cn: zhCn, en };
 export function t(key: string): string {
   let lang = "zh_cn";
   try {
-    lang = getContext().lang || "zh_cn";
+    lang = getContext().server.lang || "zh_cn";
   } catch {
     // 插件上下文尚未绑定（如非运行时场景），回退默认语言。
   }

@@ -68,15 +68,31 @@ type ChannelGroup = {
   channels: ChannelSummary[];
 };
 
+/** 置顶频道伪分组 ID。 */
+const PINNED_GROUP_ID = "__pinned__";
+
+/** 当前服务器下的置顶频道（按本机 JSON 中的顺序）。 */
+const pinnedChannels = computed<ChannelSummary[]>(() => {
+  if (props.model.channelTab !== "joined") return [];
+  const byId = new Map(props.model.channels.map((c) => [c.id, c]));
+  return props.model.pinnedChannelIds
+    .map((id) => byId.get(id))
+    .filter((c): c is ChannelSummary => c != null);
+});
+
+const pinnedIdSet = computed(() => new Set(pinnedChannels.value.map((c) => c.id)));
+
 /**
  * 按 categoryId 对频道列表分组。空 categoryId 归入 "uncategorized"。
- * 组内按 order 排序，组间按首个频道的 order 排序。
+ * 置顶频道单独置顶展示，不再参与分类分组。
  */
 const channelGroups = computed(() => {
   const groups = new Map<string, ChannelGroup>();
   const uncategorizedId = "__uncategorized__";
+  const excluded = pinnedIdSet.value;
 
   for (const c of props.model.channels) {
+    if (excluded.has(c.id)) continue;
     const gid = c.categoryId || uncategorizedId;
     let group = groups.get(gid);
     if (!group) {
@@ -100,11 +116,21 @@ const channelGroups = computed(() => {
   }
 
   // 转为数组，组间按首个频道的 order 排序
-  return Array.from(groups.values()).sort((a, b) => {
+  const sorted = Array.from(groups.values()).sort((a, b) => {
     const firstA = a.channels[0]?.order ?? Number.MAX_SAFE_INTEGER;
     const firstB = b.channels[0]?.order ?? Number.MAX_SAFE_INTEGER;
     return firstA - firstB;
   });
+
+  // 置顶分组始终排在最前（组内保持本机 JSON 的置顶顺序）。
+  if (pinnedChannels.value.length > 0) {
+    sorted.unshift({
+      id: PINNED_GROUP_ID,
+      name: t("channel_pinned_group"),
+      channels: pinnedChannels.value,
+    });
+  }
+  return sorted;
 });
 
 /** 服务端频道摘要不含 category_*；无真实分类时扁平展示。 */
@@ -190,6 +216,9 @@ onMounted(() => {
         <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openSettings)">
           {{ t('server_info_menu_settings') }}
         </button>
+        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openPinnedChannelsFile)">
+          {{ t('server_info_menu_edit_pinned_channels') }}
+        </button>
       </div>
       <div v-if="serverMenuOpen" class="cp-serverMenu__backdrop" @click="serverMenuOpen = false" />
     </Teleport>
@@ -256,7 +285,7 @@ onMounted(() => {
         <template v-for="group in channelGroups" :key="group.id">
           <!-- 区块：分组标题（仅 joined 视图显示分组） -->
           <CategoryGroupHeader
-            v-if="hasServerCategories"
+            v-if="hasServerCategories || group.id === '__pinned__'"
             :group-id="group.id"
             :name="group.name"
             :count="group.channels.length"
@@ -271,6 +300,7 @@ onMounted(() => {
               v-if="!collapsedGroups.has(group.id)"
               class="cp-channelRow"
               :data-active="c.id === props.model.currentChannelId"
+              :data-pinned="group.id === '__pinned__'"
               @contextmenu.prevent="onChannelContextMenu($event, c.id)"
             >
               <!-- 区块：频道主入口（未加入时禁用） -->
@@ -289,6 +319,7 @@ onMounted(() => {
                 <span class="cp-channelRow__meta">
                   <span class="cp-channel__name">
                     {{ c.name }}
+                    <span v-if="group.id === '__pinned__'" class="cp-channel__pin-icon" :title="t('channel_pinned')">📌</span>
                     <span v-if="props.model.isChannelMuted(c.id)" class="cp-channel__muted-icon" title="muted">🔇</span>
                   </span>
                   <span class="cp-channelRow__brief">{{ c.brief }}</span>

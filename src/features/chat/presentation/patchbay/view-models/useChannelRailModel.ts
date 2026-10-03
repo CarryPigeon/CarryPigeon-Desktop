@@ -52,10 +52,16 @@ type ChannelRailRawModel = {
   openServerManager(): void;
   openFileManager(): void;
   openSettings(): void;
+  /** 打开本机置顶频道 JSON 文件（本地热加载配置）。 */
+  openPinnedChannelsFile(): void;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   hasDraft(channelId: string): boolean;
   isChannelMuted(channelId: string): boolean;
+  /** 当前服务器下置顶频道 ID 顺序列表。 */
+  pinnedChannelIds: ComputedRef<readonly string[]>;
+  /** 查询指定频道是否已置顶。 */
+  isChannelPinned(channelId: string): boolean;
 };
 /**
  * ChannelRail 组件消费的页面模型。
@@ -80,10 +86,14 @@ export type UseChannelRailModelDeps = {
   openServerManager(): void;
   openFileManager(): void;
   openSettings(): void;
+  /** 打开本机置顶频道 JSON 文件。 */
+  openPinnedChannelsFile(): void;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   onAsyncError: AsyncErrorHandler;
   /** 频道静音状态查询 */
   isChannelMuted(channelId: string): boolean;
+  /** 当前服务器下置顶频道 ID 顺序列表。 */
+  pinnedChannelIds: RefLike<readonly string[]>;
   /** 切换频道静音 */
   toggleChannelMute(channelId: string): Promise<void>;
   /** 打开频道右键菜单 */
@@ -215,6 +225,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     openServerManager: deps.openServerManager,
     openFileManager: deps.openFileManager,
     openSettings: deps.openSettings,
+    openPinnedChannelsFile: deps.openPinnedChannelsFile,
     selectChannel,
     applyJoin,
     hasDraft(channelId: string): boolean {
@@ -222,6 +233,11 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
       return draftStorage.readDraft(channelId) !== null;
     },
     isChannelMuted: deps.isChannelMuted,
+    pinnedChannelIds: computed(() => deps.pinnedChannelIds.value),
+    isChannelPinned(channelId: string): boolean {
+      if (!channelId) return false;
+      return deps.pinnedChannelIds.value.includes(channelId);
+    },
   };
   return proxyRefs(rawModel);
 }

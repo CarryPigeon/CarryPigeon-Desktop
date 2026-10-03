@@ -56,6 +56,8 @@ import { getChatAggregateStore } from "@/features/chat/composition/chat.di";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { useChannelMuteStore, type NotificationLevel } from "../view-models/useChannelMuteStore";
+import { useChannelPinStore } from "../view-models/useChannelPinStore";
+import { openChannelPinsFile } from "@/features/chat/channel-pins/data/localChannelPinsData";
 import { useServerRailModel } from "../view-models/useServerRailModel";
 import { useChannelContextMenu, type ChannelContextAction } from "../interactions/useChannelContextMenu";
 import { currentServerSocket } from "@/features/server-connection/api";
@@ -126,6 +128,7 @@ type PatchbayPageRawModel = {
     y: Ref<number>;
     currentChannelId: Ref<string>;
     isMuted: (channelId: string) => boolean;
+    isPinned: () => boolean;
     close: () => void;
     handleMenuAction: (action: ChannelContextAction) => Promise<void>;
     currentNotifLevel: () => NotificationLevel;
@@ -344,10 +347,23 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   });
 
   const channelMuteStore = useChannelMuteStore();
+  const channelPinStore = useChannelPinStore();
   const serverRailModel = useServerRailModel();
   const channelContextMenu = useChannelContextMenu({
     isMuted: (channelId) => channelMuteStore.isMuted(channelId),
     getNotificationLevel: (channelId) => channelMuteStore.getNotificationLevel(channelId),
+    isPinned: (channelId) => channelPinStore.isPinned(currentServerSocket.value ?? "", channelId),
+    togglePin: async (channelId) => {
+      const s = currentServerSocket.value ?? "";
+      if (!s) return;
+      const wasPinned = channelPinStore.isPinned(s, channelId);
+      try {
+        await channelPinStore.togglePin(s, channelId);
+        toast.success(wasPinned ? t("channel_unpinned_toast") : t("channel_pinned_toast"));
+      } catch {
+        toast.error(t("channel_pin_update_failed"));
+      }
+    },
     toggleMute: async (channelId) => {
       const socket = currentServerSocket.value ?? "";
       const token = readAuthToken(socket) ?? "";
@@ -397,6 +413,14 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     }
   });
 
+  // 置顶频道：启动时从本机 JSON 加载，并订阅文件变更热加载事件。
+  onMounted(() => {
+    void channelPinStore.start();
+  });
+  onBeforeUnmount(() => {
+    channelPinStore.stop();
+  });
+
   // 定时免打扰：每 30s 检查频道静音是否到期；服务端级在 useServerRailModel 内随 refresh 处理。
   if (typeof window !== "undefined") {
     const reapTimer = window.setInterval(() => {
@@ -426,9 +450,16 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openServerManager: handleOpenServerManager,
     openFileManager: handleOpenFileManager,
     openSettings: handleOpenSettings,
+    openPinnedChannelsFile: () => {
+      void openChannelPinsFile().catch((error) => {
+        logger.error("Action: chat_open_channel_pins_file_failed", { error: String(error) });
+        toast.error(t("channel_pin_update_failed"));
+      });
+    },
     applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
     onAsyncError: logAsyncError,
     isChannelMuted: (channelId) => channelMuteStore.isMuted(channelId),
+    pinnedChannelIds: computed(() => channelPinStore.pinnedIds(currentServerSocket.value ?? "")),
     toggleChannelMute: async (channelId) => {
       const socket = currentServerSocket.value ?? "";
       const token = readAuthToken(socket) ?? "";
@@ -866,6 +897,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       y: channelContextMenu.menuY,
       currentChannelId: channelContextMenu.menuChannelId,
       isMuted: (channelId: string) => channelMuteStore.isMuted(channelId),
+      isPinned: () => channelContextMenu.currentPinned(),
       close: channelContextMenu.closeMenu,
       handleMenuAction: channelContextMenu.handleMenuAction,
       currentNotifLevel: channelContextMenu.currentNotifLevel,

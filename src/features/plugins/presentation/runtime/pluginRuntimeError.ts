@@ -6,7 +6,9 @@
 
 export type PluginRuntimeErrorCode =
   | "missing_plugin_entry_url"
-  | "missing_plugin_host_bridge";
+  | "missing_plugin_host_bridge"
+  | "plugin_permission_denied"
+  | "plugin_invalid_entry";
 
 export class PluginRuntimeError extends Error {
   readonly code: PluginRuntimeErrorCode;

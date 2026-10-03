@@ -131,6 +131,7 @@ import type {
   PluginCurrentChannelMessagesSnapshot,
 } from "@/features/plugins/api-types";
 import { getContext } from "../host/bridge";
+import type { PluginAiService, PluginMessagesService } from "@/features/plugins/sdk";
 import { createLogger } from "../shared/logger";
 import {
   buildChannelMessageLines,
@@ -157,8 +158,8 @@ import { t } from "../i18n";
 
 const logger = createLogger("AiSummaryHost");
 
-/** 宿主频道消息读取能力（`host.messages`）。 */
-type HostMessagesApi = NonNullable<ReturnType<typeof getContext>["host"]["messages"]>;
+/** 宿主频道消息读取能力（`ctx.messages`）。 */
+type HostMessagesApi = PluginMessagesService;
 
 /** 日期区间选择器的绑定值（与 TDesign `DateRangeValue` 兼容）。 */
 type RangePickerValue = Array<Date | string | number>;
@@ -339,9 +340,9 @@ const showConfigureHint = computed(
  *
  * @returns ai 能力或 undefined。
  */
-function getHostAi(): NonNullable<ReturnType<typeof getContext>["host"]["ai"]> | undefined {
+function getHostAi(): PluginAiService | undefined {
   try {
-    return getContext().host.ai;
+    return getContext().ai;
   } catch {
     return undefined;
   }
@@ -354,7 +355,7 @@ function getHostAi(): NonNullable<ReturnType<typeof getContext>["host"]["ai"]> |
  */
 function getHostMessages(): HostMessagesApi | undefined {
   try {
-    return getContext().host.messages;
+    return getContext().messages;
   } catch {
     return undefined;
   }
@@ -414,7 +415,7 @@ function setScopeMode(mode: ScopeMode): void {
  */
 async function loadCachedSummary(channelId: string): Promise<CachedSummary | null> {
   try {
-    const raw = await getContext().host.storage.get(resultStorageKey(channelId));
+    const raw = await getContext().storage.get(resultStorageKey(channelId));
     return parseCachedSummary(raw);
   } catch (e) {
     logger.warn("ai_summary_cache_load_failed", { error: String(e) });
@@ -466,7 +467,7 @@ async function saveResult(
       provider: src.kind === "client" ? src.provider : "",
       model: src.kind === "client" ? src.model : "",
     };
-    await getContext().host.storage.set(resultStorageKey(currentChannelId.value), payload);
+    await getContext().storage.set(resultStorageKey(currentChannelId.value), payload);
   } catch (e) {
     logger.warn("ai_summary_cache_save_failed", { error: String(e) });
   }
@@ -590,7 +591,7 @@ async function requestSummary(
 
     // 服务端端点：网络能力由 "network" 权限注入；相对路径会被宿主拼接到当前 server origin。
     const requestBody = buildSummarizeRequestBody(channelId, messages);
-    const res = await getContext().host.network?.fetch("/api/ai/summarize", {
+    const res = await getContext().network?.fetch("/api/ai/summarize", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(requestBody),

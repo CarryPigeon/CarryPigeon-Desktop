@@ -74,6 +74,20 @@ pub struct PluginManifestV1 {
     pub permissions: Vec<String>,
     /// 插件提供的 domain 列表。
     pub provides_domains: Vec<PluginProvidesDomain>,
+    /// 入口 API 版本：1 = 传统 activate/deactivate 契约；2 = Cordis apply 契约。
+    /// 缺省为 1，保证旧插件清单无需修改即可继续加载。
+    #[serde(default = "default_entry_api_version")]
+    pub entry_api_version: u32,
+    /// IPC（invoke/onEvent）白名单前缀列表（如 `voice_call:`）。
+    /// 缺省为空，表示不授予任何 IPC 能力。该字段来自已校验的 plugin.json，
+    /// 是宿主的权威来源，插件 JS 模块中声明的同名值不会被采用。
+    #[serde(default)]
+    pub ipc_prefixes: Vec<String>,
+}
+
+/// 入口 API 版本缺省值：1（传统 activate/deactivate 契约）。
+fn default_entry_api_version() -> u32 {
+    1
 }
 
 // current.json/state.json 的结构体与读写逻辑已下沉到 `state` 子模块。
@@ -238,6 +252,18 @@ async fn get_runtime_entry_for_version_inner(
                 domain_version: d.domain_version.trim().to_string(),
             })
             .filter(|d| !d.domain.is_empty())
+            .collect(),
+        // 入口版本兜底为 1：即使清单写了 0 也按旧契约处理，避免误判为 Cordis 插件。
+        entry_api_version: if manifest.entry_api_version >= 2 {
+            2
+        } else {
+            1
+        },
+        ipc_prefixes: manifest
+            .ipc_prefixes
+            .iter()
+            .map(|x| x.trim().to_string())
+            .filter(|x| !x.is_empty())
             .collect(),
     })
 }

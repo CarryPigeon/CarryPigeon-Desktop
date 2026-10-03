@@ -1,170 +1,118 @@
 # 发布准备状态检查清单
 
-## 当前版本: 0.4.0
+## 当前版本: 0.6.0
 
-### ✅ 已完成的优化和修复
+发布日期：2026-10-03
 
-#### 代码质量改进
-- ✅ 修复了 `ManagedDbKind::as_str` 未使用方法的警告
-- ✅ Rust 代码通过规范检查（150个测试全部通过，0 failed）
-- ✅ TypeScript 类型检查通过
-- ✅ Frontend Vitest 测试全部通过（19 suites, 165 tests）
-- ✅ 修复 config_store 测试因 `APP_DATA_DIR` 全局状态污染导致的 5 个测试失败
-- ✅ Tauri 命令名全量收敛到 `TAURI_COMMANDS`，消除前端散落硬编码字符串
+> 上一版（0.4.0）清单见本文件历史提交。本次为插件运行时 Cordis 重构版本，清单已按 0.6.0 实际状态重写。
 
-#### 构建优化
-- ✅ Vite 构建配置优化完成
-- ✅ 前端构建时间约 3.04 秒
-- ✅ 生产构建成功，生成优化的资源文件
-- ✅ MainPage 构建体积从 ~435 KB 降至 ~227 KB（-48%）
+## 版本号一致性
 
-#### 性能优化
-- ✅ 聊天消息虚拟滚动已实现
-- ✅ 虚拟滚动 estimateSize 精度提升（按消息类型区分高度：image/video=220px, text=52px/32px）
-- ✅ 全部路由改为内联动态导入，code splitting 更精确
-- ✅ ImageLightbox 改为 defineAsyncComponent 懒加载
-- ✅ ThreadPanel 回复列表虚拟滚动（@tanstack/vue-virtual）
-- ✅ 启动性能优化已完成
-- ✅ 依赖预优化配置完成
-- ✅ 图片懒加载（IntersectionObserver + 重试退避）
-- ✅ WebSocket 连接池（连接复用、LRU 驱逐、闲置清理）
-- ✅ 前端内存监控（定时采样、趋势分析、阈值告警）
-- ✅ 下载进度事件节流（按 100ms / 64KB 聚合）
-- ✅ 聊天缓存上限（8192 条 LRU 式淘汰）
-- ✅ TCP 状态事件节流（200ms 同状态去重）
-- ✅ `get_config_value` TTL 内存缓存 + 高频写入 100ms 批量 flush
-- ✅ 聊天内代码片段审查（localStorage MVP、行级注释）
-- ✅ 文件 IO 流式化：新增 `read_file_base64_chunk` 分块读取本地文件，上传直接传递 `File`/`Blob` 避免整文件进内存
-- ✅ 语音通话超时取消（Dialing/Ringing 60s 超时自动结束并通知前端）
-- ✅ Composer 链接预览防抖：输入含 URL 时 400ms 防抖后请求 `fetch_link_preview`，减少高频 IPC
-- ✅ 附件转换优化：语音消息、截图插入改为分块读取后流式组装 Blob，避免单条 base64 内存尖峰
-- ✅ 启动反馈增强：`StartupShell` 根据初始化阶段显示“初始化运行时 / 连接服务器 / 检查必要组件 / 恢复会话”文案（i18n 中英双语）
+| 文件 | 字段 | 值 |
+| --- | --- | --- |
+| `package.json` | `version` | 0.6.0 |
+| `src-tauri/Cargo.toml` | `package.version` | 0.6.0 |
+| `src-tauri/tauri.conf.json` | `version` | 0.6.0 |
+| `Cargo.lock` | `carrypigeon-desktop.version` | 0.6.0 |
 
-#### 用户体验
-- ✅ 消息编辑状态视觉反馈（虚线边框 + 背景色高亮）
-- ✅ 国际化支持（中文 / English）
-- ✅ 错误消息和托盘菜单已翻译
-- ✅ 视频消息支持（播放、错误重试、灯箱预览）
-- ✅ 关闭窗口到托盘行为（可配置，内存缓存加速）
-- ✅ 语音通话设备热插拔检测（3s 轮询）
-- ✅ 灯箱升级：旋转、下载、视频播放、全频道媒体导航
-- ✅ AvatarBadge 统一头像组件：支持真实图片 + 首字母 fallback
-- ✅ 文件附件发送后自动清理已上传项，保留失败项供重试
-- ✅ 文件上传支持多选（图片/视频），发送时统一上传
-- ✅ 消息模型增强：处理多个 [file:xxx] 附件引用的消息
+- ⚠️ **本次修复**：`tauri.conf.json` 此前长期停留于 `0.4.0`。CI 的 `tauri-action` 用 `tagName: v__VERSION__`，而 `__VERSION__` 取自该文件，未对齐会把本次发布打成 `v0.4.0` 标签。现已三处对齐，`Cargo.lock` 由 `cargo metadata` 刷新。
 
-#### 架构和文档
-- ✅ Feature-first + Clean Layers 架构
-- ✅ 完整的开发文档和规范
-- ✅ 迭代优化计划文档
-- ✅ CHANGELOG.md 已创建
-- ✅ close_to_tray 缓存下沉到 data 层，di/commands 层职责单一
+## 质量门禁（本次实测）
 
-### 📋 发布前检查清单
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| 前端 lint | `pnpm run lint` | ✅ 通过（Windows 跳过 3 个 bash 检查） |
+| feature 边界 | `bash scripts/check-feature-boundaries.sh` | ✅ 通过 |
+| Rust 规范 | `bash scripts/check-rust-standards.sh` | ✅ 7/7 通过（含 rustfmt） |
+| 日志规范 | `bash scripts/check-log-standards.sh` | ✅ 3/3 通过 |
+| 类型检查 | `pnpm run typecheck` | ✅ 通过 |
+| 前端测试 | `pnpm test` | ✅ 83 suites / 654 tests |
+| 前端构建 | `pnpm run build` | ✅ 通过（含 vendor + 5 插件 prebuild） |
+| Rust 测试 | `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` | ✅ 217 passed / 2 ignored / 0 failed |
+| 依赖漏洞 | `cargo audit`（CI 原命令） | ✅ exit 0 |
+| 依赖合规 | `cargo deny check` | ✅ advisories / bans / licenses / sources ok |
 
-#### 功能完整性
-- ✅ 用户认证和登录
-- ✅ 聊天消息发送和接收（文本/图片/视频/文件）
-- ✅ 文件上传和下载（多选、拖拽、预览条）
-- ✅ 图片消息支持（懒加载、缩略图、灯箱预览）
-- ✅ 视频消息支持（播放、灯箱预览、错误重试）
-- ✅ 语音消息功能
-- ✅ 语音通话（设备管理、热插拔、噪声抑制）
-- ✅ 搜索功能（频道级 + 服务器级）
-- ✅ 用户资料管理（头像/背景编辑）
-- ✅ 插件系统（安装、更新、卸载、沙箱）
-- ✅ 设置管理（导入/导出/重置/主题）
-- ✅ 关闭到托盘（可配置，窗口关闭隐藏到托盘）
-- ✅ 系统托盘（未读徽标闪烁、本地化菜单、手动版本检查）
-- ✅ 消息操作（编辑、撤回、转发、引用回复、多选批量）
-- ✅ 关于页面（/about 路由）
-- ✅ 通知中心（应用内铃铛图标 + 通知面板）
-- ✅ 通知声音（Web Audio API）
-- ✅ 频道通知级别（全部消息/仅提及/静音）
-- ✅ 持久连接状态指示器
-- ✅ 截图功能（全屏捕获、标注工具、窗口叠加）
+### 本阶段修复的发布阻塞项
 
-#### 质量保证
-- ✅ TypeScript 类型检查通过
-- ✅ Rust 测试全部通过（150个，0 failed）
-- ✅ Frontend Vitest 测试通过（165个）
-- ✅ 代码规范检查通过（日志、Rust、feature boundaries、文档）
-- ✅ cargo audit 通过（忽略 RUSTSEC-2023-0071，项目仅使用 SQLite 不触发 MySQL 路径）
-- ✅ cargo deny check 通过（advisories / bans / licenses / sources 均 ok）
-- ⚠️ Windows 本地 Tauri build：release 后端编译通过，`target/release/carrypigeon-desktop.exe` 生成并启动成功；安装包 bundling 因本机缺少 WiX/NSIS 且下载超时失败，CI 跨平台构建会补齐 `.msi` / `.exe`
-- ✅ 构建流程正常
-- ✅ Screenshot 叠加层测试（2 个测试文件）
-- ✅ i18n 键值一致性测试
-- ✅ 类型安全改进（VirtualListItem 类型、消除 any 转换）
-- ✅ 构建错误修复（ComposerHost.vue v-else 语法）
+1. **`tauri.conf.json` 版本漂移**（`0.4.0` → `0.6.0`）：会导致 CI 生成错误 tag。
+2. **wasmtime 3 条新的 RUSTSEC 公告**：48.0.3 命中 RUSTSEC-2026-0325 / 0326 / 0327，`cargo deny check` 失败，且 CI 的 `cargo audit` 忽略列表不含这 3 条 → CI 必红。已升级到 **48.0.5**（修复区间 `>=48.0.4,<49.0.0`），未新增 ignore。
+3. **`CHANGELOG.md` 缺失 v0.5.0 条目**（该版本已打标签但未记录）：已按 `v0.4.0..v0.5.0` 提交补记，并新增 0.6.0 条目。
 
-#### 性能指标
-- ✅ 渲染性能：虚拟滚动 + 精度优化
-- ✅ 构建体积：MainPage 227KB (-48%)
-- ✅ 图片懒加载已实现
-- ✅ WebSocket 连接池已集成
-- ✅ 前端构建时间约 3.6s
-- ✅ Rust 侧 i18n 完整覆盖（119 个错误键，双语）
-- ✅ 消息编辑状态视觉反馈
-- ✅ SearchPanel i18n 修复
-- ✅ 启动时间：通过 `Action: app_startup_ready` 埋点量化（默认关闭，诊断模式可开启）
-- ✅ 内存使用：内存监控 + dev-only 长测入口，release 默认关闭采样
-- ✅ 性能监控分级：release 默认关闭所有监控，仅保留 ERROR 错误日志；诊断模式手动开启
+## 功能完整性
 
-#### 安全性
-- ✅ 依赖安全审计：cargo audit + cargo deny 通过
-- ✅ `.cargo/audit.toml` 记录已接受的 RUSTSEC-2023-0071 风险
-- ✅ 错误处理机制完善
-- ✅ 敏感数据保护
-- ✅ WebRTC P2P 加密
-- ✅ 插件 wasmtime 沙箱隔离
+### 0.6.0 新增 / 变更
 
-#### 文档
-- ✅ 用户文档：安装和使用说明
-- ✅ 开发者文档：架构和API文档
-- ✅ 变更日志（CHANGELOG.md）
-- ✅ feature 边界检查脚本
-- ✅ Rust 规范检查脚本
+- ✅ 插件运行时 Cordis 重构：`runtime/**` + `sdk/` 新增，旧 `pluginScope` / `hostApiFactory` / `domainRegistryContext` / `domainRegistryBindings` / `pluginUiApi` / `pluginInvokeApi` / `pluginEventApi` 删除
+- ✅ 插件入口契约 v2（`apply` / `inject` / `ctx.domains` / `ctx.ui` / `ctx.ipc` / `ctx.storage` / `ctx.network` / `ctx.ai` / `ctx.messages`）
+- ✅ v1 legacy adapter（`entryApiVersion` 缺省 = 1，兼容旧 `PluginContext` 全字段）
+- ✅ 权限 = 服务可见性；`assertRequiredPermissions` + `markFailed`
+- ✅ IPC 白名单 manifest 声明（`ipcPrefixes`）+ 宿主命名空间双重约束
+- ✅ Cordis 单实例（`src/cordis-entry.ts` → `public/vendor/cordis.mjs` + importmap + 插件 alias）
+- ✅ 五个内置插件迁移 v2（markdown / theme / group-notice / ai-summary / voice-call）
+- ✅ 频道置顶（本地 `channel-pins.json` + 文件热加载事件 + 5 个 Tauri 命令）
+- ✅ 客户端可替换 AI 服务（7 种来源、密钥凭据管理器单向存取、模型列表拉取）
+- ✅ AI 摘要插件增强（范围选择 + `chatPluginMessagesBridge` / `channelMessageProjection`）
+- ✅ 消息引用跳转（右键 + 引用块按钮，虚拟列表定位高亮）
+- ✅ theme 插件改为宿主主题薄代理
 
-### 📊 构建产物分析
+### 沿用的既有能力（回归范围）
 
-#### 当前构建结果（优化后）
-- **首页入口 (index)**: 231.07 kB (gzip: 61.32 kB)
-- **聊天主页面 (MainPage)**: 262.69 kB (gzip: 79.93 kB)
-- **Vue 运行时 (vendor-vue)**: 80.80 kB (gzip: 28.37 kB)
-- **TDesign 组件库 (vendor-tdesign)**: 386.89 kB (gzip: 127.03 kB)
-- **Tauri API (vendor-tauri)**: 19.02 kB (gzip: 4.87 kB)
-- **图片灯箱 (ImageLightbox)**: 懒加载（defineAsyncComponent）
+- ✅ 用户认证与登录、会话恢复、多服务器管理
+- ✅ 聊天消息收发（文本 / 图片 / 视频 / 文件）、引用回复、转发、撤回、编辑、多选批量
+- ✅ 文件上传下载（多选、拖拽、预览、流式 IO）
+- ✅ 语音 / 视频通话、屏幕共享、设备热插拔
+- ✅ 截图工具（全屏捕获、标注、叠加窗口）
+- ✅ 搜索、通知中心、频道通知级别、全局 DND、托盘
+- ✅ 设置体系（主题 / 语言 / 关闭到托盘 / 诊断模式 / 导入导出 / 重置）
+- ✅ 安全聊天缓存（AES-GCM）、插件包校验（SHA256 / 同源 / TLS fingerprint）、wasmtime 沙箱
 
-#### 构建优化效果
-- 分块加载策略：按功能模块分离
-- Gzip 压缩：总体压缩率约 75%
-- 代码分割：所有路由均使用内联动态导入
-- MainPage 体积降低 48%
+## 架构与规范
 
-### 🎯 发布建议
+- ✅ Feature-first + Clean Layers；跨 feature 仅经 `api.ts` / `api-types`
+- ✅ Cordis import 未越出 plugins feature 边界（`check-feature-boundaries.sh` 通过）
+- ✅ 所有 `#[tauri::command]` 返回 `CommandResult<T>`；新增命令已在 `app/mod.rs` 的 `invoke_handler!` 注册
+- ✅ Rust 生产代码无 `unwrap` / `expect` / `panic!` / `todo!`（规范脚本通过）
+- ✅ 日志：英文 + Action 词汇表（规范脚本通过）
+- ✅ 注释中文
 
-#### 可发布（v0.4.0）
-- ✅ 功能完整且稳定
-- ✅ 性能优化到位
-- ✅ CHANGELOG 已创建
-- ✅ 构建产物体积合理
-- ✅ 150/150 Rust 测试通过
-- ✅ 161/161 前端测试通过
-- ✅ 全部 lint 检查通过
+## 文档
 
-### 📝 发布前最终检查
+- ✅ `CHANGELOG.md`：新增 0.6.0、补记 0.5.0
+- ✅ `docs/v0.6.0-release-notes.md`：发布说明（含破坏性变更、验证结果、冒烟清单）
+- ✅ `docs/design/plugin/CORDIS-MIGRATION.md`：重构方案与落地清单
+- ✅ `docs/design/plugin/PLUGIN-ENTRY-API.md` / `PLUGIN-MANIFEST.md` / `README.md`：契约与清单同步
+- ✅ `docs/design/client/PLUGIN-RUNTIME.md`：生命周期 / 权限 / 服务同步
+- ✅ `docs/release-readiness-checklist.md`（本文件）
 
-#### 必须完成
-- ✅ 所有已知 bug 修复
-- ✅ 关键功能测试通过
-- ✅ 构建流程正常
-- ✅ 基础文档完善
-- ✅ 变更日志编写
-- ✅ 视频消息功能
-- ✅ 关闭到托盘行为
+## 未在本机执行、由 CI 覆盖
 
-#### 建议完成
-- ✅ 性能基准测试（typecheck + build ~3s, Rust tests ~9s）
-- ✅ 前端测试基础（18 test files, 161 tests）
-- ✅ 长时间运行测试：dev-only 内存长测入口已提供，release 产物不包含相关代码
+- ⏳ 安装包 bundling（`.msi` / `.dmg` / `.deb` / `.AppImage`）：CI 跨平台矩阵产出，本机不下载 WiX / NSIS。
+- ⏳ `cargo audit` / `cargo deny check` 的 Linux 环境复跑：本机已通过，CI 将复跑。
+- ⏳ 真机端到端冒烟：按 `docs/v0.6.0-release-notes.md` 的冒烟清单执行。
+
+## 发布步骤
+
+```bash
+# 1) 确认工作区干净、门禁全绿（见上表）
+pnpm run lint && pnpm run build && pnpm test
+cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
+cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0235
+cargo deny check
+
+# 2) 提交并打 tag
+git commit -m "chore(release): v0.6.0"
+git tag -a v0.6.0 -m "Release v0.6.0"
+
+# 3) 推送（需 GitHub 权限）
+git push origin master
+git push origin v0.6.0
+
+# 4) 创建 draft release
+gh release create v0.6.0 --draft --title "CarryPigeon Desktop v0.6.0" --notes-file docs/v0.6.0-release-notes.md
+```
+
+## 发布建议
+
+**可发布**：功能完整、门禁全绿、安全公告清零、版本号三处对齐、文档同步。
+
+**唯一遗留风险**：插件运行时为“一次性切换”（无运行时开关），legacy adapter 是 v1 兼容的唯一保障。建议按冒烟清单第 3–5 项重点回归插件加载、禁用、v1 兼容与权限门控。

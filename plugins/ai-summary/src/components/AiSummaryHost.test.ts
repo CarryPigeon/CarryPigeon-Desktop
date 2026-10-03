@@ -13,9 +13,9 @@ import type {
   PluginAiSummarizeResult,
   PluginChannelHistoryLoadResult,
   PluginChannelMessage,
-  PluginContext,
   PluginCurrentChannelMessagesSnapshot,
 } from "@/features/plugins/api-types";
+import type { Context } from "@/features/plugins/sdk";
 import { bindContext, unbindContext } from "../host/bridge";
 import { computeScopeFingerprint } from "../domain/summarizeScope";
 import AiSummaryHost from "./AiSummaryHost.vue";
@@ -138,26 +138,24 @@ function bindStubContext(): void {
       }
     : undefined;
   const ctx = {
-    lang: "zh_cn",
-    host: {
-      storage: {
-        async get(key: string) {
-          return storage.get(key) ?? null;
-        },
-        async set(key: string, value: unknown) {
-          storage.set(key, value);
-        },
+    server: { lang: "zh_cn", getUid: () => "", getCid: () => "", serverSocket: "", serverId: "" },
+    storage: {
+      async get(key: string) {
+        return storage.get(key) ?? null;
       },
-      network: {
-        fetch(input: string, init?: { method?: string; body?: string }) {
-          fetchCalls.push({ input, init });
-          return fetchImpl(input, init);
-        },
+      async set(key: string, value: unknown) {
+        storage.set(key, value);
       },
-      ai,
-      messages,
     },
-  } as unknown as PluginContext;
+    network: {
+      fetch(input: string, init?: { method?: string; body?: string }) {
+        fetchCalls.push({ input, init });
+        return fetchImpl(input, init);
+      },
+    },
+    ai,
+    messages,
+  } as unknown as Context;
   bindContext(ctx);
 }
 

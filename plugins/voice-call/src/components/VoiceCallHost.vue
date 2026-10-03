@@ -52,7 +52,7 @@ const logger = createLogger("VoiceCallHost");
 
 function getCurrentUserId(): string {
   try {
-    return getContext().uid ?? "";
+    return getContext().server.getUid() ?? "";
   } catch {
     return "";
   }

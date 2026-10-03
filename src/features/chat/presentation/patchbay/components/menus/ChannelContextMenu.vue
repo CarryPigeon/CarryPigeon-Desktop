@@ -20,6 +20,8 @@ const props = defineProps<{
   x: number;
   y: number;
   notificationLevel: NotificationLevel;
+  /** 当前频道是否已置顶（本地 JSON）。 */
+  pinned: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -75,6 +77,9 @@ watch(
     >
       <button class="cp-contextMenu__item" type="button" @click="onAction('channel_info')">
         {{ t("channel_info") }}
+      </button>
+      <button class="cp-contextMenu__item" type="button" @click="onAction('toggle_pin')">
+        {{ props.pinned ? t("unpin_channel") : t("pin_channel") }}
       </button>
       <button class="cp-contextMenu__item" type="button" @click="onAction('mark_read')">
         {{ t("channel_mark_read") }}

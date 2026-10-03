@@ -2,6 +2,15 @@
   "pluginId": "ai-summary",
   "version": "0.1.0",
   "entry": "index.js",
-  "permissions": ["ui", "network", "storage", "ai", "messages:read"],
-  "providesDomains": ["ai_summary"]
+  "permissions": [
+    "ui",
+    "network",
+    "storage",
+    "ai",
+    "messages:read"
+  ],
+  "providesDomains": [
+    "ai_summary"
+  ],
+  "entryApiVersion": 2
 }

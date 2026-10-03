@@ -14,6 +14,7 @@ export const TAURI_EVENTS = {
   tcpState: "tcp-state",
   userProfileRequest: "user-profile-request",
   userProfileResponse: "user-profile-response",
+  channelPinsChanged: "channel-pins-changed",
 } as const;
 
 /**
@@ -69,6 +70,19 @@ export type UserProfileRequest =
  * user-profile 响应事件载荷（frontend -> frontend，经由 Tauri event bus）。
  */
 export type UserProfileResponse = { id: string; ok: boolean; message?: string };
+
+/**
+ * 置顶频道本地文件热加载事件载荷（Rust -> 前端）。
+ *
+ * 说明：Rust 侧监听 `channel-pins.json` 变化后广播完整状态，
+ * 前端据此覆盖本地缓存，无需重启即可生效。
+ */
+export type ChannelPinsChangedEvent = {
+  /** schema 版本号。 */
+  schemaVersion: number;
+  /** serverSocket -> 置顶频道 ID 列表。 */
+  servers: Record<string, string[]>;
+};
 
 /**
  * 监听 TCP 消息事件（由 Rust 侧发出）。
@@ -168,4 +182,16 @@ export function listenUserProfileResponse(
   handler: (event: Event<UserProfileResponse>) => void,
 ): Promise<UnlistenFn> {
   return listen<UserProfileResponse>(TAURI_EVENTS.userProfileResponse, handler);
+}
+
+/**
+ * 监听置顶频道本地文件热加载事件。
+ *
+ * @param handler - 事件处理函数。
+ * @returns 取消监听函数（UnlistenFn）的 Promise。
+ */
+export function listenChannelPinsChanged(
+  handler: (event: Event<ChannelPinsChangedEvent>) => void,
+): Promise<UnlistenFn> {
+  return safeListen<ChannelPinsChangedEvent>(TAURI_EVENTS.channelPinsChanged, handler);
 }

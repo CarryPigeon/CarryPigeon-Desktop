@@ -46,6 +46,11 @@ error.screenshot_save_fail: "Failed to save the screenshot"
 error.screenshot_show_window_fail: "Failed to show the main window"
 error.screenshot_event_fail: "Failed to emit the screenshot completed event"
 
+# channel pins
+# Pinned channels (local JSON hot reload)
+error.channel_pins_save_failed: "Failed to save pinned channels"
+error.channel_pins_open_failed: "Failed to open pinned channels file"
+
 # emoji
 error.emoji_save_failed: "Failed to save emoji"
 error.emoji_delete_failed: "Failed to delete emoji"

@@ -29,6 +29,7 @@ export default defineConfig({
       // 确保插件与宿主主包运行期共享同一 Vue/TDesign 实例。
       vue: "/vendor/vendor.mjs",
       "tdesign-vue-next": "/vendor/vendor.mjs",
+      "@cordisjs/core": "/vendor/cordis.mjs",
       "@": path.resolve(__dirname, "../../src"),
     },
   },
@@ -47,6 +48,10 @@ export default defineConfig({
       external: (id: string) =>
         id === "/vendor/vendor.mjs" ||
         id.startsWith("/vendor/vendor.mjs") ||
+        id === "/vendor/cordis.mjs" ||
+        id.startsWith("/vendor/cordis.mjs") ||
+        id === "@cordisjs/core" ||
+        id.startsWith("@cordisjs/core/") ||
         id === "@tauri-apps/api" ||
         id === "@tauri-apps/api/event",
       output: {

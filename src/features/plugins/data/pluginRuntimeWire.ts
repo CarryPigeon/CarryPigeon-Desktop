@@ -19,6 +19,10 @@ export type RawPluginRuntimeEntry = {
   permissions: string[];
   providesDomains: RawRuntimeProvidesDomain[];
   minHostVersion: string;
+  /** 入口 API 版本；旧宿主可能缺省，按 1 处理。 */
+  entryApiVersion?: number;
+  /** IPC 白名单前缀；旧宿主可能缺省，按空处理。 */
+  ipcPrefixes?: string[];
 };
 
 function toTrimmedString(value: unknown): string {
@@ -41,5 +45,10 @@ export function mapPluginRuntimeEntry(input: RawPluginRuntimeEntry): PluginRunti
     permissions: Array.isArray(input.permissions) ? input.permissions.map((item) => toTrimmedString(item)).filter(Boolean) : [],
     providesDomains: Array.isArray(input.providesDomains) ? input.providesDomains.map(mapRuntimeProvidesDomain) : [],
     minHostVersion: toTrimmedString(input.minHostVersion),
+    // 仅显式声明 >= 2 才按 Cordis 契约处理，其余（含缺失/非法）一律回退传统契约。
+    entryApiVersion: Number(input.entryApiVersion) >= 2 ? 2 : 1,
+    ipcPrefixes: Array.isArray(input.ipcPrefixes)
+      ? input.ipcPrefixes.map((item) => toTrimmedString(item)).filter(Boolean)
+      : [],
   };
 }

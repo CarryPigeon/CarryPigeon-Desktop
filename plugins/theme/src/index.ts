@@ -1,20 +1,24 @@
 /**
- * @fileoverview theme 插件入口。
+ * @fileoverview theme 插件入口（Cordis v2 契约）。
  * @description
  * 本插件是**宿主主题体系的薄代理**，不持有主题状态：
- * - activate 时读取宿主主题偏好 key（`carrypigeon:theme`），按宿主规则解析并应用
+ * - apply 时读取宿主主题偏好 key（`carrypigeon:theme`），按宿主规则解析并应用
  *   `data-theme`（`system` 时跟随系统配色，并监听系统配色变化实时同步）；
  * - 首次激活时把旧版插件私有偏好（`theme.preference`）一次性迁移到宿主 key；
  * - 注册工具栏动作（palette 图标，order 60）点击循环切换「亮 → 暗 → 跟随系统」并写回宿主 key；
  * - 强调色（`data-accent`）由宿主设置页独占，本插件**永不**读写；
  * - 偏好缺失/无法识别时保持当前 DOM 主题不变，避免用插件的默认值覆盖宿主主题；
- * - deactivate 时仅摘除工具栏入口与系统配色监听，不回滚主题（主题归宿主所有）。
+ * - dispose 时仅摘除工具栏入口与系统配色监听，不回滚主题（主题归宿主所有）。
+ *
+ * 例外说明：按设计决策，theme **直接读写宿主 localStorage key**（而非 `ctx.storage`），
+ * 因为它代理的是宿主全局主题偏好，需要与宿主设置页共享同一个 key。
  */
 
 import { h, defineComponent } from "vue";
 import { Icon } from "tdesign-vue-next";
 import type { Component } from "vue";
-import type { PluginContext, ToolbarAction } from "@/features/plugins/api-types";
+import type { ToolbarAction } from "@/features/plugins/api-types";
+import type { Context } from "@/features/plugins/sdk";
 import { themeManifest } from "./manifest";
 import {
   HOST_THEME_STORAGE_KEY,
@@ -31,11 +35,9 @@ import "./styles/theme.css";
 
 const logger = createLogger("plugin");
 
+export const name = "theme";
 export const manifest = themeManifest;
-
-// 本插件不提供消息 domain，无 renderer/composer。
-export const renderers: Record<string, Component> = {};
-export const composers: Record<string, Component> = {};
+export const inject = ["ui", "storage"];
 
 // 工具栏图标：复用宿主共享的 TDesign Icon 组件实例。
 function makeIcon(name: string): Component {
@@ -95,10 +97,9 @@ function writeHostPreference(preference: ThemePreference): void {
   }
 }
 
-let cleanup: (() => void) | null = null;
-
-export function activate(ctx: PluginContext): void {
+export function apply(ctx: Context): void {
   let current: ThemePreference | null = null;
+  let disposed = false;
   const media = systemDarkMedia();
   let detachSystemListener: () => void = () => {};
 
@@ -128,21 +129,28 @@ export function activate(ctx: PluginContext): void {
     syncSystemListener();
   }
 
+  // dispose 时摘除系统配色监听（工具栏入口由 ui 服务随 fiber 自动反注册）。
+  ctx.on("dispose", () => {
+    disposed = true;
+    detachSystemListener();
+    detachSystemListener = () => {};
+  });
+
   const hostPreference = readHostPreference();
   if (hostPreference) {
     setPreference(hostPreference, false);
   } else {
     // 宿主 key 缺失：尝试一次性迁移旧插件偏好；无法识别则完全不碰 DOM。
-    void ctx.host.storage
+    void ctx.storage
       .get(LEGACY_THEME_STORAGE_KEY)
       .then((raw) => {
-        // 仅当仍处于激活状态时迁移，避免 deactivate 后的迟到写入。
-        if (!cleanup) return;
+        // 仅当仍处于激活状态时迁移，避免 dispose 后的迟到写入。
+        if (disposed) return;
         const migrated = parseThemePreference(raw);
         if (!migrated) return;
         setPreference(migrated, true);
         // 旧键迁移完成后清空，避免后续版本重复迁移（写入 null 即视为“无偏好”）。
-        void ctx.host.storage.set(LEGACY_THEME_STORAGE_KEY, null).catch((error: unknown) => {
+        void ctx.storage.set(LEGACY_THEME_STORAGE_KEY, null).catch((error: unknown) => {
           logger.warn("theme_legacy_preference_clear_failed", { error: String(error) });
         });
         logger.info("theme_preference_migrated", { theme: migrated });
@@ -167,17 +175,5 @@ export function activate(ctx: PluginContext): void {
     onClick: () => cycle(),
   };
 
-  const detach = ctx.host.registerToolbarAction?.(action) ?? (() => {});
-
-  cleanup = () => {
-    detach();
-    detachSystemListener();
-    detachSystemListener = () => {};
-    cleanup = null;
-  };
-}
-
-export function deactivate(): void {
-  cleanup?.();
-  cleanup = null;
+  ctx.ui?.registerToolbarAction(action);
 }
