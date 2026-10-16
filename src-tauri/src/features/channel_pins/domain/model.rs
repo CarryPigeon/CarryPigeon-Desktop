@@ -15,7 +15,7 @@ fn default_schema_version() -> u32 {
 
 /// 置顶频道本地存储信封（版本 1）。
 ///
-/// 文件为面向用户可编辑的 JSON，因此字段均提供默认值，
+/// 由应用内置顶频道编辑器读写；字段均提供默认值，
 /// 缺失字段或旧版本文件不应导致解析整体失败。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

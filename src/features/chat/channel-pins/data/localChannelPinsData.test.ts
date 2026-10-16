@@ -20,9 +20,9 @@ vi.mock("@/shared/tauri/events", () => ({
 }));
 
 import {
-  getChannelPinsFilePath,
   loadChannelPins,
   setChannelPinned,
+  setChannelPinsOrder,
   toggleChannelPinned,
 } from "./localChannelPinsData";
 
@@ -67,8 +67,17 @@ describe("localChannelPinsData", () => {
     });
   });
 
-  it("returns null file path fallback when command yields nothing", async () => {
-    invokeMock.safeInvokeTauri.mockResolvedValue(undefined);
-    expect(await getChannelPinsFilePath()).toBeNull();
+  it("forwards the ordered id list to the backend", async () => {
+    invokeMock.invokeTauri.mockResolvedValue({
+      schemaVersion: 1,
+      servers: { srv: ["c2", "c1"] },
+    });
+
+    const state = await setChannelPinsOrder("srv", ["c2", "c1"]);
+    expect(invokeMock.invokeTauri).toHaveBeenCalledWith("channel_pins_set_order", {
+      serverSocket: "srv",
+      channelIds: ["c2", "c1"],
+    });
+    expect(state.servers).toEqual({ srv: ["c2", "c1"] });
   });
 });

@@ -1,6 +1,8 @@
 allowBuilds:
   '@parcel/watcher': true
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@tauri-apps/api@2.12.2'
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - esbuild

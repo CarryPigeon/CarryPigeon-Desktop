@@ -17,6 +17,7 @@ import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginT
 import type { DomainsRegistry } from "./domainsRegistry";
 import { createRuntimeGuard } from "./guard";
 import { assertRequiredPermissions, CAPABILITY_SERVICE_NAMES, isServiceVisible, normalizePermissions } from "./permissions";
+import type { PluginSettingsRegistry } from "./pluginSettingsRegistry";
 import { createAiService } from "./services/ai";
 import { createDomainsService } from "./services/domains";
 import { createIpcService, resolveIpcPrefixes } from "./services/ipc";
@@ -32,6 +33,8 @@ export type ApplyPluginDeps = {
   serverSocket: string;
   /** 共享 domain 注册表。 */
   registry: DomainsRegistry;
+  /** 共享插件设置项注册表（可选：缺省时 `ctx.ui.registerSettingsItem` 为 no-op）。 */
+  settingsRegistry?: PluginSettingsRegistry;
   /** 宿主 chat UI 桥（可选：仅当 host 提供时注入 `ui` 服务）。 */
   uiBridge?: PluginUiBridge;
   /** chat 频道消息读取桥（`messages:read` 门控）。 */
@@ -109,7 +112,10 @@ export async function applyPlugin(
         );
       }
       if (isServiceVisible("ui", permissions) && deps.uiBridge) {
-        ctx.set("ui", createUiService(deps.uiBridge, ctx, runtime.pluginId, guard));
+        ctx.set(
+          "ui",
+          createUiService(deps.uiBridge, deps.settingsRegistry, ctx, runtime.pluginId, guard),
+        );
       }
       if (isServiceVisible("ipc", permissions)) {
         const prefixes = resolveIpcPrefixes(runtime.ipcPrefixes);

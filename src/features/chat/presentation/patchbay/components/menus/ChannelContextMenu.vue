@@ -4,8 +4,10 @@
  * @description chat｜presentation component：频道右键菜单。
  */
 import { useI18n } from "vue-i18n";
-import { watch } from "vue";
-import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
+import ContextMenuSurface from "@/shared/ui/contextMenu/ContextMenuSurface.vue";
+import ContextMenuItem from "@/shared/ui/contextMenu/ContextMenuItem.vue";
+import ContextMenuSeparator from "@/shared/ui/contextMenu/ContextMenuSeparator.vue";
+import ContextMenuLabel from "@/shared/ui/contextMenu/ContextMenuLabel.vue";
 import type { ChannelContextAction } from "@/features/chat/presentation/patchbay/interactions/useChannelContextMenu";
 import type { NotificationLevel } from "@/features/chat/presentation/patchbay/view-models/useChannelMuteStore";
 import {
@@ -47,151 +49,61 @@ const muteDurations: { key: ChannelContextAction; labelKey: string }[] = [
 function onAction(action: ChannelContextAction): void {
   emit("action", action);
 }
-
-/**
- * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
- * 该菜单条目较多（通知级别 + 静音时长），视口过矮时依赖 maxHeight 内部滚动。
- */
-const { setMenuEl, menuStyle, schedulePlacement } = useFloatingMenu({
-  x: () => props.x,
-  y: () => props.y,
-  open: () => props.open,
-});
-
-watch(
-  () => props.open,
-  (open) => {
-    if (open) schedulePlacement();
-  },
-);
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      :ref="setMenuEl"
-      class="cp-contextMenu cp-channelContextMenu"
-      :style="menuStyle"
-      @click.stop
+  <ContextMenuSurface
+    :open="props.open"
+    :x="props.x"
+    :y="props.y"
+    :min-width="200"
+    @close="emit('close')"
+  >
+    <ContextMenuItem @select="onAction('channel_info')">
+      {{ t("channel_info") }}
+    </ContextMenuItem>
+    <ContextMenuItem @select="onAction('toggle_pin')">
+      {{ props.pinned ? t("unpin_channel") : t("pin_channel") }}
+    </ContextMenuItem>
+    <ContextMenuItem @select="onAction('mark_read')">
+      {{ t("channel_mark_read") }}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuLabel>{{ t("notif_level") }}</ContextMenuLabel>
+    <ContextMenuItem
+      v-for="lv in levels"
+      :key="lv.key"
+      :active="notificationLevel === lv.key"
+      :danger="lv.key === 'muted'"
+      @select="onAction(`level:${lv.key}`)"
     >
-      <button class="cp-contextMenu__item" type="button" @click="onAction('channel_info')">
-        {{ t("channel_info") }}
-      </button>
-      <button class="cp-contextMenu__item" type="button" @click="onAction('toggle_pin')">
-        {{ props.pinned ? t("unpin_channel") : t("pin_channel") }}
-      </button>
-      <button class="cp-contextMenu__item" type="button" @click="onAction('mark_read')">
-        {{ t("channel_mark_read") }}
-      </button>
-      <div class="cp-contextMenu__sep" />
-      <div class="cp-contextMenu__label">{{ t("notif_level") }}</div>
-      <button
-        v-for="lv in levels"
-        :key="lv.key"
-        class="cp-contextMenu__item"
-        :class="{
-          'cp-contextMenu__item--active': notificationLevel === lv.key,
-          'cp-contextMenu__item--danger': lv.key === 'muted',
-        }"
-        type="button"
-        @click="onAction(`level:${lv.key}`)"
-      >
-        <span class="cp-contextMenu__radio" :class="{ 'cp-contextMenu__radio--checked': notificationLevel === lv.key }" />
-        {{ t(lv.labelKey) }}
-      </button>
-      <div class="cp-contextMenu__sep" />
-      <div class="cp-contextMenu__label">{{ t("mute_for") }}</div>
-      <button
-        v-for="d in muteDurations"
-        :key="d.key"
-        class="cp-contextMenu__item"
-        type="button"
-        @click="onAction(d.key)"
-      >
-        {{ t(d.labelKey) }}
-      </button>
-    </div>
-    <div v-if="open" class="cp-contextMenu__backdrop" @click="emit('close')" />
-  </Teleport>
+      <span class="cp-channelCtxRadio" :class="{ 'cp-channelCtxRadio--checked': notificationLevel === lv.key }" />
+      {{ t(lv.labelKey) }}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuLabel>{{ t("mute_for") }}</ContextMenuLabel>
+    <ContextMenuItem
+      v-for="d in muteDurations"
+      :key="d.key"
+      @select="onAction(d.key)"
+    >
+      {{ t(d.labelKey) }}
+    </ContextMenuItem>
+  </ContextMenuSurface>
 </template>
 
 <style scoped lang="scss">
-.cp-channelContextMenu {
-  position: fixed;
-  z-index: 9999;
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-border);
-  border-radius: 14px;
-  box-shadow: var(--cp-shadow-float);
-  padding: 6px;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cp-contextMenu__item {
-  border: none;
-  background: transparent;
-  color: var(--cp-text);
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--cp-fast) var(--cp-ease);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  &:hover {
-    background: var(--cp-hover-bg);
-  }
-
-  &--danger {
-    color: var(--cp-danger);
-  }
-
-  &--active {
-    background: var(--cp-hover-bg);
-  }
-}
-
-.cp-contextMenu__radio {
+/* 样式：ChannelContextMenu｜仅保留通知级别单选圆点（菜单外观由共享基元提供） */
+.cp-channelCtxRadio {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--cp-text-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border: 2px solid var(--cp-text-light);
   flex-shrink: 0;
-
-  &--checked {
-    border-color: var(--cp-accent);
-    background: var(--cp-accent);
-  }
 }
 
-.cp-contextMenu__label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--cp-text-tertiary);
-  padding: 6px 12px 2px;
-  letter-spacing: 0.5px;
-}
-
-.cp-contextMenu__sep {
-  height: 1px;
-  background: var(--cp-border);
-  margin: 4px 8px;
-}
-
-.cp-contextMenu__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
+.cp-channelCtxRadio--checked {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent);
 }
 </style>

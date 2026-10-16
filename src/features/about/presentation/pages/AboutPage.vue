@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
+import PageHeader from "@/shared/ui/PageHeader.vue";
 import { createLogger } from "@/shared/utils/logger";
 import { getAboutCapabilities } from "../../api";
 import type { AppInfo } from "../../api-types";
 
 const logger = createLogger("AboutPage");
 const { t } = useI18n();
+const router = useRouter();
 
 const appInfo = ref<AppInfo | null>(null);
 const loading = ref(true);
@@ -27,52 +30,71 @@ onMounted(async () => {
 
 <template>
   <div class="cp-about">
-    <template v-if="loading">
-      <div class="cp-about__loading">{{ t("loading") }}</div>
-    </template>
-    <template v-else-if="error">
-      <div class="cp-about__error">{{ error }}</div>
-    </template>
-    <template v-else-if="appInfo">
-      <h1 class="cp-about__title">{{ appInfo.name }}</h1>
-      <p class="cp-about__description">{{ appInfo.description }}</p>
+    <PageHeader
+      :title="t('menu_about')"
+      back
+      data-testid="about-header"
+      @back="router.back()"
+    />
 
-      <section class="cp-about__section">
-        <h2>{{ t("about_version") }}</h2>
-        <p>{{ appInfo.version }}</p>
-      </section>
+    <div class="cp-about__body">
+      <template v-if="loading">
+        <div class="cp-about__loading">{{ t("loading") }}</div>
+      </template>
+      <template v-else-if="error">
+        <div class="cp-about__error">{{ error }}</div>
+      </template>
+      <template v-else-if="appInfo">
+        <h1 class="cp-about__title">{{ appInfo.name }}</h1>
+        <p class="cp-about__description">{{ appInfo.description }}</p>
 
-      <section class="cp-about__section">
-        <h2>{{ t("about_tech_stack") }}</h2>
-        <ul>
-          <li v-for="item in appInfo.techStack" :key="item">{{ item }}</li>
-        </ul>
-      </section>
+        <section class="cp-about__section">
+          <h2>{{ t("about_version") }}</h2>
+          <p>{{ appInfo.version }}</p>
+        </section>
 
-      <section class="cp-about__section">
-        <h2>{{ t("about_license") }}</h2>
-        <p>{{ appInfo.license }}</p>
-      </section>
+        <section class="cp-about__section">
+          <h2>{{ t("about_tech_stack") }}</h2>
+          <ul>
+            <li v-for="item in appInfo.techStack" :key="item">{{ item }}</li>
+          </ul>
+        </section>
 
-      <section class="cp-about__section">
-        <h2>{{ t("about_credits") }}</h2>
-        <ul>
-          <li v-for="credit in appInfo.credits" :key="credit.name">
-            <a v-if="credit.url" :href="credit.url" target="_blank" rel="noopener">{{ credit.name }}</a>
-            <span v-else>{{ credit.name }}</span>
-          </li>
-        </ul>
-      </section>
-    </template>
+        <section class="cp-about__section">
+          <h2>{{ t("about_license") }}</h2>
+          <p>{{ appInfo.license }}</p>
+        </section>
+
+        <section class="cp-about__section">
+          <h2>{{ t("about_credits") }}</h2>
+          <ul>
+            <li v-for="credit in appInfo.credits" :key="credit.name">
+              <a v-if="credit.url" :href="credit.url" target="_blank" rel="noopener">{{ credit.name }}</a>
+              <span v-else>{{ credit.name }}</span>
+            </li>
+          </ul>
+        </section>
+      </template>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .cp-about {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 32px 24px;
+  height: 100%;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
   color: var(--cp-text);
+}
+
+.cp-about__body {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 8px 10px 24px;
 }
 
 .cp-about__title {

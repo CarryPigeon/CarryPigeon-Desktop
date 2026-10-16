@@ -10,6 +10,8 @@ import { readActiveFileServerSocket } from "../../composition/activeServerSocket
 import { buildFileDownloadUrl } from "@/shared/file-transfer";
 import { useAuthedObjectUrl } from "@/shared/file-transfer/useAuthedObjectUrl";
 import type { FileRecord } from "../../domain/contracts";
+import AppIcon from "@/shared/ui/AppIcon.vue";
+import { fileTypeIconName } from "@/shared/ui/icons/fileTypeIcon";
 
 const props = defineProps<{
   file: FileRecord | null;
@@ -63,13 +65,14 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/**
+ * 选择文件类型图标（自绘注册表 key）。
+ *
+ * @param mimeType - 文件 mime type。
+ * @returns `AppIcon` 图标名。
+ */
 function getTypeIcon(mimeType: string): string {
-  if (mimeType.startsWith("image/")) return "🖼️";
-  if (mimeType.startsWith("video/")) return "🎬";
-  if (mimeType.startsWith("audio/")) return "🎵";
-  if (mimeType.includes("pdf")) return "📄";
-  if (mimeType.includes("zip") || mimeType.includes("rar") || mimeType.includes("gzip")) return "📦";
-  return "📎";
+  return fileTypeIconName(mimeType);
 }
 
 async function handleCopyLink(file: FileRecord): Promise<void> {
@@ -90,7 +93,7 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
           <header class="cp-previewPanel__head">
             <span class="cp-previewPanel__filename">{{ file.filename }}</span>
             <button class="cp-previewPanel__close" type="button" @click="emit('close')">
-              <t-icon name="close" />
+              <AppIcon name="close" />
             </button>
           </header>
 
@@ -127,12 +130,12 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
             </object>
             <!-- Too Large -->
             <div v-else-if="previewType === 'too-large'" class="cp-previewPanel__placeholder">
-              <span class="cp-previewPanel__bigIcon">📦</span>
+              <span class="cp-previewPanel__bigIcon"><AppIcon name="package" /></span>
               <p>{{ t("file_size_too_large") }}</p>
             </div>
             <!-- Other -->
             <div v-else class="cp-previewPanel__placeholder">
-              <span class="cp-previewPanel__bigIcon">{{ getTypeIcon(file.mimeType) }}</span>
+              <span class="cp-previewPanel__bigIcon"><AppIcon :name="getTypeIcon(file.mimeType)" /></span>
               <p>{{ t("file_no_preview") }}</p>
             </div>
           </div>
@@ -164,16 +167,16 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
 
           <div class="cp-previewPanel__actions">
             <button class="cp-previewPanel__actionBtn" type="button" @click="emit('download', file)">
-              <t-icon name="download" /> {{ t("download") }}
+              <AppIcon name="download" /> {{ t("download") }}
             </button>
             <button class="cp-previewPanel__actionBtn cp-previewPanel__actionBtn--danger" type="button" @click="emit('delete', file)">
-              <t-icon name="delete" /> {{ t("file_delete") }}
+              <AppIcon name="delete" /> {{ t("file_delete") }}
             </button>
             <button v-if="file.channelId" class="cp-previewPanel__actionBtn" type="button" @click="emit('openChannel', file)">
-              <t-icon name="chat" /> {{ t("file_open_channel") }}
+              <AppIcon name="chat" /> {{ t("file_open_channel") }}
             </button>
             <button class="cp-previewPanel__actionBtn" type="button" @click="handleCopyLink(file)">
-              <t-icon name="link" /> {{ t("file_copy_link") }}
+              <AppIcon name="link" /> {{ t("file_copy_link") }}
             </button>
           </div>
         </aside>

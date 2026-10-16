@@ -8,90 +8,26 @@
       :aria-label="t('screenshot')"
       @click="handleClick(true)"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-        <circle cx="12" cy="13" r="4" />
-      </svg>
+      <!-- 自绘相机图标（取自统一注册表），与表情/附件按钮同风格 -->
+      <AppIcon name="camera" :size="18" />
     </button>
-    <button
-      class="cp-screenshot-btn cp-screenshot-btn__dropdown"
-      type="button"
-      :disabled="loading"
-      :aria-label="t('screenshot_options')"
-      @click="toggleDropdown"
-    >
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
-    </button>
-    <div v-if="dropdownOpen" :ref="setDropdownEl" class="cp-screenshot-dropdown" :style="dropdownStyle">
-      <button class="cp-screenshot-dropdown__item" @click="handleClick(true)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-          <circle cx="12" cy="13" r="4" />
-        </svg>
-        <span>{{ t('screenshot_hide') }}</span>
-      </button>
-      <button class="cp-screenshot-dropdown__item" @click="handleClick(false)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-          <line x1="1" y1="1" x2="23" y2="23" />
-        </svg>
-        <span>{{ t('screenshot_show') }}</span>
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import { createLogger } from "@/shared/utils/logger";
 import { safeListen } from "@/shared/tauri/events";
-import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
 import { startScreenshot } from "../../data/screenshotCommands";
 
 const { t } = useI18n();
 const logger = createLogger("screenshot");
 const loading = ref(false);
-const dropdownOpen = ref(false);
-
-let outsideClickListener: ((e: MouseEvent) => void) | null = null;
-
-/**
- * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
- * 下拉默认与触发按钮组右对齐、在按钮下方展开，空间不足时自动翻转/贴边。
- */
-const { setMenuEl: setDropdownEl, menuEl: dropdownRef, menuStyle, schedulePlacement } = useFloatingMenu({
-  x: () => 0,
-  y: () => (dropdownRef.value?.parentElement?.getBoundingClientRect().bottom ?? 0) + 4,
-  right: () => dropdownRef.value?.parentElement?.getBoundingClientRect().right ?? 0,
-  open: () => dropdownOpen.value,
-});
-
-/**
- * 下拉菜单内联样式：共享组合式输出 + fixed 定位覆盖（覆盖 CSS 中的 absolute/right:0）。
- */
-const dropdownStyle = computed(() => ({
-  ...menuStyle.value,
-  position: "fixed" as const,
-  right: "auto",
-  marginTop: "0",
-}));
-
-function toggleDropdown() {
-  if (loading.value) return;
-  dropdownOpen.value = !dropdownOpen.value;
-  if (dropdownOpen.value) {
-    // 等待下拉菜单渲染完成后按视口钳制定位
-    schedulePlacement();
-  }
-}
 
 async function handleClick(hideWindow: boolean) {
   if (loading.value) return;
-  dropdownOpen.value = false;
   loading.value = true;
   try {
     await startScreenshot(hideWindow);
@@ -112,24 +48,12 @@ onMounted(() => {
   void safeListen("screenshot-cancelled", () => {
     if (mounted) loading.value = false;
   }).then((u) => { if (mounted) unlistenCancelled = u; });
-
-  const listener = (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (!target.closest?.(".cp-screenshot-btn-group")) {
-      dropdownOpen.value = false;
-    }
-  };
-  document.addEventListener("click", listener);
-  outsideClickListener = listener;
 });
 
 onBeforeUnmount(() => {
   mounted = false;
   unlistenCompleted?.();
   unlistenCancelled?.();
-  if (outsideClickListener) {
-    document.removeEventListener("click", outsideClickListener);
-  }
 });
 </script>
 
@@ -139,83 +63,32 @@ onBeforeUnmount(() => {
   display: inline-flex;
 }
 
-.cp-screenshot-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  background: var(--cp-panel);
-  border: 1px solid var(--cp-border);
-  border-radius: 14px;
-  box-shadow: var(--cp-shadow);
-  padding: 6px;
-  z-index: 1000;
-  min-width: 180px;
-  backdrop-filter: blur(10px);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cp-screenshot-btn-group .cp-screenshot-dropdown__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100% !important;
-  height: auto !important;
-  padding: 8px 12px !important;
-  border: none !important;
-  background: transparent;
-  color: var(--cp-text);
-  font-size: 12px;
-  border-radius: 10px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color 0.15s ease;
-}
-
 .cp-screenshot-btn-group .cp-screenshot-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px !important;
-  height: 32px !important;
-  border: 1px solid var(--cp-border);
+  width: 32px;
+  height: 32px;
+  border: none;
   background: transparent;
   color: var(--cp-text-muted);
+  border-radius: 8px;
   cursor: pointer;
   transition:
     background-color 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-.cp-screenshot-btn-group .cp-screenshot-btn:first-child {
-  border-radius: 8px 0 0 8px;
+    color 0.15s ease;
 }
 .cp-screenshot-btn-group .cp-screenshot-btn:hover:enabled {
   background: var(--cp-hover-bg);
   color: var(--cp-text);
-  border-color: var(--cp-accent);
 }
 .cp-screenshot-btn-group .cp-screenshot-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-.cp-screenshot-btn-group .cp-screenshot-btn__dropdown {
-  width: 20px !important;
-  padding: 0 4px !important;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
-}
-
-.cp-screenshot-btn-group .cp-screenshot-dropdown__item:hover {
-  background: var(--cp-hover-bg);
-}
-
-.cp-screenshot-btn-group .cp-screenshot-dropdown__item svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
+.cp-screenshot-btn-group .cp-screenshot-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 </style>

@@ -8,6 +8,7 @@ import { useI18n } from "vue-i18n";
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { getMentionInboxCapabilities } from "@/features/chat/mention-inbox/api";
 import MentionInboxPanel from "./MentionInboxPanel.vue";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 const caps = getMentionInboxCapabilities();
@@ -38,7 +39,7 @@ function togglePanel(): void {
 <template>
   <div class="cp-mention-bell">
     <button class="cp-mention-bell__btn" type="button" :title="t('mentions')" :aria-label="t('mentions')" @click="togglePanel">
-      <t-icon name="notification" class="cp-mention-bell__icon" />
+      <AppIcon name="notification" class="cp-mention-bell__icon" />
       <span v-if="badgeText" class="cp-mention-bell__badge">{{ badgeText }}</span>
     </button>
     <MentionInboxPanel v-if="showPanel" @close="showPanel = false" />

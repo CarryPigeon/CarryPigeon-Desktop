@@ -341,6 +341,9 @@ function handleInstall(): void {
 /* 消息内容包装容器，为置顶标记提供定位上下文 */
 .cp-messageContent {
   position: relative;
+  /* 面板被压窄时不超过内容槽位宽度，配合内部 min-width: 0 让长文本正常换行/省略。 */
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* 置顶标记（pin 图标） */

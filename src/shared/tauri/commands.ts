@@ -139,8 +139,7 @@ export const TAURI_COMMANDS = {
   channelPinsGet: "channel_pins_get",
   channelPinsSet: "channel_pins_set",
   channelPinsToggle: "channel_pins_toggle",
-  channelPinsFilePath: "channel_pins_file_path",
-  channelPinsOpenFile: "channel_pins_open_file",
+  channelPinsSetOrder: "channel_pins_set_order",
 } as const;
 
 /**

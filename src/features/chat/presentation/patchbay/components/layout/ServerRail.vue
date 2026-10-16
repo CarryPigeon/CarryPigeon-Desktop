@@ -6,13 +6,17 @@
 
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
+import ContextMenuSurface from "@/shared/ui/contextMenu/ContextMenuSurface.vue";
+import ContextMenuItem from "@/shared/ui/contextMenu/ContextMenuItem.vue";
+import ContextMenuSeparator from "@/shared/ui/contextMenu/ContextMenuSeparator.vue";
+import ContextMenuLabel from "@/shared/ui/contextMenu/ContextMenuLabel.vue";
 import {
   MUTE_DURATION_1H,
   MUTE_DURATION_8H,
   MUTE_DURATION_24H,
   MUTE_DURATION_FOREVER,
 } from "@/features/chat/presentation/patchbay/view-models/useChannelMuteStore";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 
@@ -84,19 +88,12 @@ const dndMenuY = computed(() => {
 });
 
 /**
- * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
- * DND 按钮位于左栏底部，菜单通常需要向上翻转。
+ * 打开服务器免打扰菜单（定位与视口钳制由 `ContextMenuSurface` 统一负责）。
+ *
+ * @returns 无返回值。
  */
-const { setMenuEl: setDndMenuEl, menuStyle: dndMenuStyle, schedulePlacement: scheduleDndMenuPlacement } =
-  useFloatingMenu({
-    x: () => dndMenuX.value,
-    y: () => dndMenuY.value,
-    open: () => dndMenuOpen.value,
-  });
-
 function openDndMenu(): void {
   dndMenuOpen.value = true;
-  scheduleDndMenuPlacement();
 }
 
 function closeDndMenu(): void {
@@ -151,7 +148,7 @@ function formatTime(epoch: number): string {
         @click.stop="openDndMenu"
         @contextmenu.prevent="openDndMenu"
       >
-        <span class="cp-dndBtn__icon" aria-hidden="true">{{ props.serverMuted ? "🔕" : "🔔" }}</span>
+        <span class="cp-dndBtn__icon" aria-hidden="true"><AppIcon :name="props.serverMuted ? 'bell-off' : 'notification'" /></span>
       </button>
     </div>
     <div class="cp-rail__top-actions">
@@ -177,35 +174,32 @@ function formatTime(epoch: number): string {
       <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
       <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
     </div>
-    <Teleport to="body">
-      <div
-        v-if="dndMenuOpen"
-        :ref="setDndMenuEl"
-        class="cp-contextMenu cp-dndMenu"
-        :style="dndMenuStyle"
-        @click.stop
-      >
-        <div class="cp-contextMenu__label">{{ t("server_dnd_toggle") }}</div>
-        <button class="cp-contextMenu__item" type="button" :class="{ 'cp-contextMenu__item--active': !props.serverMuted }" @click="onDndToggle">
-          {{ props.serverMuted ? t("server_dnd_off") : t("server_dnd_on") }}
-        </button>
-        <div class="cp-contextMenu__sep" />
-        <div class="cp-contextMenu__label">{{ t("mute_for") }}</div>
-        <button class="cp-contextMenu__item" type="button" @click="onDndMuteForDuration(MUTE_DURATION_1H)">
-          {{ t("mute_for_1h") }}
-        </button>
-        <button class="cp-contextMenu__item" type="button" @click="onDndMuteForDuration(MUTE_DURATION_8H)">
-          {{ t("mute_for_8h") }}
-        </button>
-        <button class="cp-contextMenu__item" type="button" @click="onDndMuteForDuration(MUTE_DURATION_24H)">
-          {{ t("mute_for_24h") }}
-        </button>
-        <button class="cp-contextMenu__item" type="button" @click="onDndMuteForDuration(MUTE_DURATION_FOREVER)">
-          {{ t("mute_for_manual") }}
-        </button>
-      </div>
-      <div v-if="dndMenuOpen" class="cp-contextMenu__backdrop" @click="closeDndMenu" />
-    </Teleport>
+    <ContextMenuSurface
+      :open="dndMenuOpen"
+      :x="dndMenuX"
+      :y="dndMenuY"
+      :min-width="200"
+      @close="closeDndMenu"
+    >
+      <ContextMenuLabel>{{ t("server_dnd_toggle") }}</ContextMenuLabel>
+      <ContextMenuItem :active="!props.serverMuted" @select="onDndToggle">
+        {{ props.serverMuted ? t("server_dnd_off") : t("server_dnd_on") }}
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuLabel>{{ t("mute_for") }}</ContextMenuLabel>
+      <ContextMenuItem @select="onDndMuteForDuration(MUTE_DURATION_1H)">
+        {{ t("mute_for_1h") }}
+      </ContextMenuItem>
+      <ContextMenuItem @select="onDndMuteForDuration(MUTE_DURATION_8H)">
+        {{ t("mute_for_8h") }}
+      </ContextMenuItem>
+      <ContextMenuItem @select="onDndMuteForDuration(MUTE_DURATION_24H)">
+        {{ t("mute_for_24h") }}
+      </ContextMenuItem>
+      <ContextMenuItem @select="onDndMuteForDuration(MUTE_DURATION_FOREVER)">
+        {{ t("mute_for_manual") }}
+      </ContextMenuItem>
+    </ContextMenuSurface>
   </aside>
 </template>
 
@@ -246,64 +240,6 @@ function formatTime(epoch: number): string {
 .cp-dndBtn__icon {
   font-size: 14px;
   line-height: 1;
-}
-
-.cp-dndMenu {
-  position: fixed;
-  z-index: 9999;
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-border);
-  border-radius: 14px;
-  box-shadow: var(--cp-shadow-float);
-  padding: 6px;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cp-contextMenu__item {
-  border: none;
-  background: transparent;
-  color: var(--cp-text);
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--cp-fast) var(--cp-ease);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  &:hover {
-    background: var(--cp-hover-bg);
-  }
-
-  &--active {
-    background: var(--cp-hover-bg);
-  }
-}
-
-.cp-contextMenu__label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--cp-text-tertiary);
-  padding: 6px 12px 2px;
-  letter-spacing: 0.5px;
-}
-
-.cp-contextMenu__sep {
-  height: 1px;
-  background: var(--cp-border);
-  margin: 4px 8px;
-}
-
-.cp-contextMenu__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
 }
 
 .cp-rail__top-actions {

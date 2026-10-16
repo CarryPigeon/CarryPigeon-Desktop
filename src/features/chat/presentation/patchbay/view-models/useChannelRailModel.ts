@@ -52,8 +52,8 @@ type ChannelRailRawModel = {
   openServerManager(): void;
   openFileManager(): void;
   openSettings(): void;
-  /** 打开本机置顶频道 JSON 文件（本地热加载配置）。 */
-  openPinnedChannelsFile(): void;
+  /** 打开应用内置顶频道编辑器。 */
+  openPinnedChannelsEditor(): void;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   hasDraft(channelId: string): boolean;
@@ -86,8 +86,8 @@ export type UseChannelRailModelDeps = {
   openServerManager(): void;
   openFileManager(): void;
   openSettings(): void;
-  /** 打开本机置顶频道 JSON 文件。 */
-  openPinnedChannelsFile(): void;
+  /** 打开应用内置顶频道编辑器。 */
+  openPinnedChannelsEditor(): void;
   applyJoin(channelId: string): Promise<ApplyJoinChannelOutcome>;
   onAsyncError: AsyncErrorHandler;
   /** 频道静音状态查询 */
@@ -225,7 +225,7 @@ export function useChannelRailModel(deps: UseChannelRailModelDeps): ChannelRailM
     openServerManager: deps.openServerManager,
     openFileManager: deps.openFileManager,
     openSettings: deps.openSettings,
-    openPinnedChannelsFile: deps.openPinnedChannelsFile,
+    openPinnedChannelsEditor: deps.openPinnedChannelsEditor,
     selectChannel,
     applyJoin,
     hasDraft(channelId: string): boolean {

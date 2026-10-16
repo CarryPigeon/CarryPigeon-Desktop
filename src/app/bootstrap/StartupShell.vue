@@ -9,6 +9,7 @@
 import { ref, onMounted } from 'vue';
 import { startupPromise, startupPhaseLabel, type StartupPhase } from '@/app/bootstrap/startupState';
 import { useI18n } from 'vue-i18n';
+import AppLogo from '@/shared/ui/AppLogo.vue';
 const { t } = useI18n();
 
 const phase = ref<StartupPhase>('initializing');
@@ -30,6 +31,7 @@ function handleRetry(): void {
 
   <!-- 初始化中 -->
   <div v-else-if="phase === 'initializing'" class="startup-shell">
+    <div class="startup-logo"><AppLogo :size="40" /></div>
     <p class="startup-text">CarryPigeon</p>
     <div class="startup-spinner" />
     <p v-if="startupPhaseLabel" class="startup-phase">{{ t(startupPhaseLabel) }}</p>
@@ -37,7 +39,7 @@ function handleRetry(): void {
 
   <!-- 启动失败 -->
   <div v-else class="startup-shell startup-shell--failed">
-    <div class="startup-logo"><t-icon name="error-circle" size="40" /></div>
+    <div class="startup-logo"><AppLogo :size="40" /></div>
     <p class="startup-text">{{ t('startup_failed') }}</p>
     <p class="startup-hint">{{ t('startup_failed_hint') }}</p>
     <button class="cp-field startup-retry-btn" @click="handleRetry">
@@ -80,11 +82,12 @@ function handleRetry(): void {
   min-height: 20px;
 }
 
+/* 品牌标记：自绘信封 + 鸽翼，走主题强调色，与图标同一 stroke 契约 */
 .startup-logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cp-warn, var(--cp-danger));
+  color: var(--cp-accent);
 }
 
 .startup-spinner {

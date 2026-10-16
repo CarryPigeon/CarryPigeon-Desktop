@@ -14,6 +14,7 @@ import { hasFileToken, parseCoreTextParts } from "@/features/chat/message-flow/m
 import { parseCoreTextWithCodeBlocks } from "@/features/chat/message-flow/code-review/domain/codeBlockParser";
 import type { MessageMention, MessageQuoteSummary, MessageReplySummary } from "@/features/chat/message-flow/api-types";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 type EmojiEntry = { id: string; name: string; filePath: string };
 type TextSegment = { type: "text"; value: string } | { type: "emoji"; name: string; imagePath: string };
@@ -251,7 +252,7 @@ function openLink(url: string): void {
   <!-- 组件：CoreTextMessageBubble｜职责：渲染 core-text（文本 + 文件引用 token） -->
   <div class="cp-bubble">
     <div v-if="props.forwardedFrom" class="cp-forwardedFrom">
-      <span class="cp-forwardedFrom__icon">↩</span>
+      <span class="cp-forwardedFrom__icon"><AppIcon name="corner-up-left" /></span>
       <span class="cp-forwardedFrom__text">{{ $t('forwarded_from') }} #{{ props.forwardedFrom.channelId }}</span>
     </div>
     <!-- 区块：内联引用（quote）——可跳转到被引用消息 -->
@@ -274,7 +275,7 @@ function openLink(url: string): void {
         :aria-label="$t('jump_to_referenced_message')"
         @click="handleJumpReference($event, quoteReferenceId)"
       >
-        <t-icon name="rollback" size="14" />
+        <AppIcon name="rollback" :size="14" />
       </button>
     </div>
     <!-- 区块：回复引用（reply 摘要）——可跳转到被回复消息 -->
@@ -297,7 +298,7 @@ function openLink(url: string): void {
         :aria-label="$t('jump_to_referenced_message')"
         @click="handleJumpReference($event, replyReferenceId)"
       >
-        <t-icon name="rollback" size="14" />
+        <AppIcon name="rollback" :size="14" />
       </button>
     </div>
     <!-- 区块：回复引用（仅有 replyToId 时的迷你预览）——可跳转到被回复消息 -->
@@ -317,7 +318,7 @@ function openLink(url: string): void {
         :aria-label="$t('jump_to_referenced_message')"
         @click="handleJumpReference($event, replyReferenceId)"
       >
-        <t-icon name="rollback" size="14" />
+        <AppIcon name="rollback" :size="14" />
       </button>
     </div>
 
@@ -389,6 +390,7 @@ function openLink(url: string): void {
   margin-bottom: 6px;
   padding: 4px 0;
   border-radius: 8px;
+  min-width: 0;
 }
 /* 可跳转提示：右键菜单中的「跳转到被回复的消息」。 */
 .cp-quoteReply--jumpable {
@@ -422,6 +424,10 @@ function openLink(url: string): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* flex 子项默认 min-width: auto：不显式归零则拒绝收缩到内容宽度以下，
+     text-overflow: ellipsis 永不触发，卡片会把消息行撑破（面板压窄时被裁切）。 */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .cp-coreText__reply {
   display: flex;
@@ -432,6 +438,7 @@ function openLink(url: string): void {
   border-radius: 10px;
   padding: 8px 10px;
   margin-bottom: 8px;
+  min-width: 0;
 }
 .cp-coreText__reply[data-unavailable="true"] { opacity: 0.72; }
 /* 可跳转提示：右键打开「跳转到被回复的消息」菜单。 */

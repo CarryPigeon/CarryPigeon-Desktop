@@ -6,6 +6,7 @@
 
 import { useI18n } from "vue-i18n";
 import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message/domain/messageModels";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -39,7 +40,7 @@ function handleClose(): void {
   >
     <div class="cp-forwardDetail">
       <div class="cp-forwardDetail__header">
-        <span class="cp-forwardDetail__icon">📋</span>
+        <span class="cp-forwardDetail__icon"><AppIcon name="clipboard" /></span>
         <span class="cp-forwardDetail__title">
           {{ t("forwarded_messages_count", { name: props.fromName, count: props.forwardedMessages.length }) }}
         </span>

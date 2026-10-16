@@ -6,6 +6,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { ChatChannelAnnouncementRecord } from '@/features/chat/domain/types/chatApiModels';
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 
@@ -28,11 +29,11 @@ const summary = computed(() => {
 
 <template>
   <div v-if="announcement && summary" class="cp-annBanner">
-    <span class="cp-annBanner__icon">📢</span>
+    <span class="cp-annBanner__icon"><AppIcon name="loudspeaker" /></span>
     <span v-if="hasUnread" class="cp-annBanner__dot" />
     <span class="cp-annBanner__text">{{ summary }}</span>
     <button class="cp-annBanner__btn" @click="emit('viewDetail')">{{ t('view_detail') }}</button>
-    <button class="cp-annBanner__close" @click="emit('dismiss')"><t-icon name="close" /></button>
+    <button class="cp-annBanner__close" @click="emit('dismiss')"><AppIcon name="close" /></button>
   </div>
 </template>
 

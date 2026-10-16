@@ -2,7 +2,7 @@
  * @fileoverview Cordis 运行时核心单测。
  * @description
  * 覆盖：能力服务按插件隔离、renderer 注册与销毁、权限 → 服务可见性、
- * IPC 前缀白名单、v1 兼容适配器、入口契约分流与非法入口拒绝。
+ * 插件设置项注册与 fiber 自动反注册、IPC 前缀白名单、v1 兼容适配器、入口契约分流与非法入口拒绝。
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +18,13 @@ import { assertRequiredPermissions, isServiceVisible, normalizePermissions } fro
 import { createIpcService, resolveIpcPrefixes } from "./services/ipc";
 
 const RENDERER = { name: "TestRenderer" } as unknown as Component;
+const SETTINGS_CONTROL = { name: "TestSettingsControl" } as unknown as Component;
+
+/** 最小 chat UI 桥桩（设置项注册不经过该桥，仅用于启用 `ctx.ui` 服务）。 */
+const uiBridgeStub = {
+  mountOverlay: () => ({ unmount: () => {}, instance: null }),
+  registerToolbarAction: () => () => {},
+};
 
 function runtimeOf(pluginId: string, overrides: Partial<PluginRuntimeEntry> = {}): PluginRuntimeEntry {
   return {
@@ -113,6 +120,68 @@ describe("applyPlugin", () => {
     await expect(
       applyPlugin(server.ctx, { serverSocket: "srv", registry: server.registry }, runtimeOf("need-net", { permissions: [] }), plugin),
     ).rejects.toThrow(/lacks permission/);
+  });
+
+  it("ctx.ui.registerSettingsItem 写入 server 注册表，fiber 销毁后自动反注册", async () => {
+    const server = makeServer();
+    const plugin = {
+      name: "settings-p",
+      inject: ["ui"],
+      apply(ctx: Context) {
+        ctx.ui?.registerSettingsItem({
+          id: "backend",
+          title: "AI 摘要后端",
+          description: "选择生成总结所走的通道",
+          keywords: ["后端", "backend", "后端"],
+          order: 3,
+          component: SETTINGS_CONTROL,
+        });
+      },
+    };
+
+    const applied = await applyPlugin(
+      server.ctx,
+      { serverSocket: "srv", registry: server.registry, settingsRegistry: server.settingsRegistry, uiBridge: uiBridgeStub },
+      runtimeOf("settings-p", { permissions: ["ui"] }),
+      plugin,
+    );
+
+    const items = server.settingsRegistry.list();
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      pluginId: "settings-p",
+      id: "backend",
+      title: "AI 摘要后端",
+      order: 3,
+      component: SETTINGS_CONTROL,
+      serverSocket: "srv",
+    });
+    expect(items[0]?.keywords).toEqual(["后端", "backend"]);
+
+    await applied.dispose();
+    expect(server.settingsRegistry.list()).toEqual([]);
+  });
+
+  it("未装配 settingsRegistry 时 registerSettingsItem 为 no-op（不抛错）", async () => {
+    const server = makeServer();
+    const plugin = {
+      name: "no-registry",
+      inject: ["ui"],
+      apply(ctx: Context) {
+        const cancel = ctx.ui?.registerSettingsItem({ id: "x", title: "X", component: SETTINGS_CONTROL });
+        expect(cancel).toBeTypeOf("function");
+      },
+    };
+
+    await expect(
+      applyPlugin(
+        server.ctx,
+        { serverSocket: "srv", registry: server.registry, uiBridge: uiBridgeStub },
+        runtimeOf("no-registry", { permissions: ["ui"] }),
+        plugin,
+      ),
+    ).resolves.toBeTruthy();
+    expect(server.settingsRegistry.list()).toEqual([]);
   });
 });
 

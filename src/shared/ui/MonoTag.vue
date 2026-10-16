@@ -5,6 +5,7 @@
  */
 
 import { computed } from "vue";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -61,7 +62,7 @@ async function handleCopy(): Promise<void> {
     @click="handleCopy"
   >
     <span class="mono-tag__text">{{ display || "—" }}</span>
-    <span v-if="props.copyable" class="mono-tag__hint" aria-hidden="true">⧉</span>
+    <span v-if="props.copyable" class="mono-tag__hint" aria-hidden="true"><AppIcon name="copy" /></span>
   </button>
 </template>
 

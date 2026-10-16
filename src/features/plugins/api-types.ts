@@ -6,7 +6,7 @@
 
 import type { Component } from "vue";
 import type { DomainBinding, DomainRegistryHostBridge } from "./contracts/domainRegistry";
-import type { PluginAiApi, PluginAiFailureCode, PluginAiSummarizeResult, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle } from "./domain/types/pluginRuntimeTypes";
+import type { PluginAiApi, PluginAiFailureCode, PluginAiSummarizeResult, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle, PluginSettingsContribution, PluginSettingsItemInput } from "./domain/types/pluginRuntimeTypes";
 import type {
   InstalledPluginState,
   PluginCatalogEntryLike,
@@ -22,7 +22,7 @@ import type {
   UpdatePluginToLatestOutcome,
 } from "./application/pluginCommandOutcome";
 
-export type { DomainRegistryHostBridge, PluginAiApi, PluginAiFailureCode, PluginAiSummarizeResult, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle };
+export type { DomainRegistryHostBridge, PluginAiApi, PluginAiFailureCode, PluginAiSummarizeResult, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle, PluginSettingsContribution, PluginSettingsItemInput };
 
 /**
  * 宿主 chat UI 桥（Task 4 实现 mountOverlay / registerToolbarAction）。
@@ -342,6 +342,16 @@ export type PluginRuntimeCapabilities = {
    * @returns 找到时返回运行时上下文；否则返回 `null`。
    */
   getContextForDomain(domain: string): unknown;
+
+  /**
+   * 列出当前 server 下插件注册的设置项（Vue 响应式投影的只读视图）。
+   *
+   * 说明：返回的数组是 store 内部响应式投影，调用方应视为只读；
+   * 在 `computed` 中读取可获得插件启停带来的自动更新。
+   *
+   * @returns 设置项列表（含插件来源与命名空间）。
+   */
+  listSettingsItems(): readonly PluginSettingsContribution[];
 };
 
 /**
@@ -426,6 +436,13 @@ export type PluginsCapabilities = {
      * @returns 插件运行时只读 capability。
      */
     getRuntimeCapabilities(): PluginRuntimeCapabilities;
+
+    /**
+     * 列出指定 server 下插件注册的设置项（设置页「插件设置」分区数据源）。
+     *
+     * @returns 设置项列表；无该 server 运行时或未加载插件时为空列表。
+     */
+    listPluginSettingsItems(): readonly PluginSettingsContribution[];
 
     /**
      * 为指定 server 绑定 domain registry host bridge。

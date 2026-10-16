@@ -11,6 +11,7 @@ import ThreadRootCard from "./ThreadRootCard.vue";
 import MessageContentHost from "@/features/chat/message-flow/message/presentation/components/MessageContentHost.vue";
 import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 import type { useThreadPanelModel } from "./useThreadPanelModel";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 
@@ -41,7 +42,7 @@ const replyVirtualizer = useVirtualizer(
       <div class="cp-threadPanel">
         <div class="cp-threadPanel__header">
           <h3>{{ t("thread") }}</h3>
-          <button class="cp-threadPanel__close" @click="$emit('close')">&times;</button>
+          <button class="cp-threadPanel__close" @click="$emit('close')"><AppIcon name="close" /></button>
         </div>
 
         <div class="cp-threadPanel__body">

@@ -7,6 +7,7 @@
 import { ref, watch, nextTick, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { debounce } from "@/shared/utils/rateLimit";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 /** 搜索结果项接口。 */
 interface SearchResultItem {
@@ -192,13 +193,13 @@ function escapeRegex(s: string): string {
         :aria-label="t('close')"
         @click="emit('close')"
       >
-        &times;
+        <AppIcon name="close" />
       </button>
     </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="cp-searchPanel__state cp-searchPanel__state--loading">
-      <t-icon name="loading" />
+      <AppIcon name="loading" />
       {{ t("searching") }}
     </div>
 

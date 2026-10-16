@@ -10,7 +10,7 @@ import { mount } from "@vue/test-utils";
 import GroupNoticeBubble from "./GroupNoticeBubble.vue";
 
 /**
- * 挂载渲染器（stub 掉 t-icon，避免依赖宿主 TDesign 全局注册）。
+ * 挂载渲染器（stub 掉 AppIcon，避免依赖宿主 TDesign 全局注册）。
  *
  * @param data - 插件消息 domain 数据。
  * @returns 组件 wrapper。
@@ -18,7 +18,7 @@ import GroupNoticeBubble from "./GroupNoticeBubble.vue";
 function mountBubble(data: unknown) {
   return mount(GroupNoticeBubble, {
     props: { data },
-    global: { stubs: { "t-icon": true } },
+    global: { stubs: { AppIcon: true } },
   });
 }
 

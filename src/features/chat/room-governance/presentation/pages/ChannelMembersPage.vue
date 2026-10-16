@@ -40,7 +40,6 @@ const {
       :error-message="pageError"
       @back="goBack"
     >
-      <template #back-label>{{ t("back") }}</template>
       <template #loading>{{ t("loading") }}</template>
       <template #default>
         <div v-for="m in members" :key="m.uid" class="cp-memberCard">

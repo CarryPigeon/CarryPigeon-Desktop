@@ -8,6 +8,7 @@ import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import LabelBadge from "@/shared/ui/LabelBadge.vue";
+import BackButton from "@/shared/ui/BackButton.vue";
 import MonoTag from "@/shared/ui/MonoTag.vue";
 import type { PluginCatalogEntryLike } from "@/features/plugins/domain/types/pluginTypes";
 import { resolveLatestPluginCatalogVersion } from "@/features/plugins/domain/types/pluginTypes";
@@ -144,7 +145,7 @@ onMounted(handleMounted);
   <main class="cp-plugin-detail">
     <ErrorBoundary>
       <header class="cp-plugin-detail__head">
-        <button class="cp-plugin-detail__back" type="button" @click="router.back()">{{ t("back") }}</button>
+        <BackButton test-id="plugin-detail-back" @click="router.back()" />
         <div class="cp-plugin-detail__title">
           <div class="cp-plugin-detail__name">{{ plugin?.name || pluginId }}</div>
           <div class="cp-plugin-detail__meta">
@@ -283,23 +284,6 @@ onMounted(handleMounted);
   grid-template-columns: auto 1fr auto;
   gap: 12px;
   align-items: center;
-}
-
-.cp-plugin-detail__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-plugin-detail__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
 }
 
 .cp-plugin-detail__name {

@@ -2,7 +2,7 @@
   <div v-if="visible" class="group-notice-host">
     <div class="group-notice-panel">
       <div class="group-notice-panel__header">
-        <t-icon name="notification" />
+        <AppIcon name="loudspeaker" />
         <span class="group-notice-panel__title">{{ t("group_notice_panel_title") }}</span>
         <div class="group-notice-panel__actions">
           <t-button size="small" variant="outline" :loading="loading" @click="refresh(currentChannelId)">
@@ -65,6 +65,7 @@ import { getContext } from "../host/bridge";
 import { createLogger } from "../shared/logger";
 import { diffNewNotices, parseGroupNoticesResponse, type GroupNotice } from "../domain/groupNotice";
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const logger = createLogger("GroupNoticeHost");
 

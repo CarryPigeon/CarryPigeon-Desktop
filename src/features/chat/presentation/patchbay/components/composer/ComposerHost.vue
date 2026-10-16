@@ -21,6 +21,7 @@ import { addFiles, getAttachments, removeAttachment } from "@/features/chat/mess
 import { getMessageFlowCapabilities } from "@/features/chat/message-flow/api";
 import { createLogger } from "@/shared/utils/logger";
 import { readLocalFileAsBlob } from "@/shared/utils/readLocalFileAsBlob";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   domainId: string;
@@ -426,7 +427,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
           <div class="cp-reply__title">{{ props.replyTitle || t("reply") }}</div>
           <div class="cp-reply__snippet">{{ props.replySnippet || "—" }}</div>
         </div>
-        <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><t-icon name="close" /></button>
+        <button class="cp-reply__btn" type="button" :aria-label="t('close_reply')" @click="handleCancelReply"><AppIcon name="close" /></button>
       </div>
 
       <div v-if="props.quoteReplyDraft" class="cp-quoteBar">
@@ -435,7 +436,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
           <span class="cp-quoteBar__label">{{ t("quoting") }}</span>
           <span class="cp-quoteBar__preview">{{ props.quoteReplyDraft.preview }}</span>
         </div>
-        <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')">&times;</button>
+        <button class="cp-quoteBar__close" type="button" :aria-label="t('close_quote')" @click="$emit('cancel-quote-reply')"><AppIcon name="close" /></button>
       </div>
 
       <div v-if="props.error" class="cp-composer__error" role="alert">
@@ -510,21 +511,27 @@ function selectSystemMention(type: "everyone" | "here"): void {
           @update:modelValue="handleUpdateDraft"
           @paste="handlePaste"
         />
+        <!-- 内嵌发送按钮：覆盖在文本域右下角（z-index 高于文本层），padding-bottom 已预留其占位 -->
+        <button
+          class="cp-composer__send cp-composer__send--overlay"
+          type="button"
+          :disabled="!canSend || Boolean(props.sending)"
+          @click="handleSend"
+        >
+          {{ props.sending ? `${t('send')}…` : t("send") }}
+        </button>
       </template>
     </div>
 
-    <!-- 操作行：发送按钮 -->
-    <div class="cp-composer__actions">
+    <!-- 操作行：仅在需要提示文案时渲染（发送按钮已内嵌至输入区） -->
+    <div
+      v-if="isPluginComposerActive || (props.domainId.trim() !== 'Core:Text' && !isVoiceDomain)"
+      class="cp-composer__actions"
+    >
       <div v-if="isPluginComposerActive" class="cp-composer__hint">{{ t("sent_by_plugin") }}</div>
-      <div
-        v-else-if="props.domainId.trim() !== 'Core:Text' && !isVoiceDomain"
-        class="cp-composer__hint"
-      >
+      <div v-else class="cp-composer__hint">
         {{ t("no_composer_available") }}
       </div>
-      <button v-else-if="!isVoiceDomain" class="cp-composer__send" type="button" :disabled="!canSend || Boolean(props.sending)" @click="handleSend">
-        {{ props.sending ? `${t('send')}…` : t("send") }}
-      </button>
     </div>
 
     <!-- 链接预览 -->
@@ -595,8 +602,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
 }
 
 .cp-composer__tools :deep(button) {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -605,16 +612,23 @@ function selectSystemMention(type: "everyone" | "here"): void {
   color: var(--cp-text-muted);
   border-radius: 8px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   padding: 0;
   transition:
     background-color var(--cp-fast) var(--cp-ease),
     color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-composer__tools :deep(button:hover) {
+.cp-composer__tools :deep(button:hover):enabled {
   background: var(--cp-hover-bg);
   color: var(--cp-text);
+}
+
+/* 图标统一 18px（自绘内联 svg 与 AppIcon 字形共用同一尺寸契约） */
+.cp-composer__tools :deep(svg) {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .cp-composer__tools :deep(.cp-stickerBtn__text),
@@ -623,6 +637,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
 }
 
 .cp-composer__inputArea {
+  position: relative;
   margin-bottom: 6px;
 }
 
@@ -630,6 +645,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
   border: none;
   box-shadow: var(--cp-inset);
   background: var(--cp-panel);
+  /* 为右下角内嵌发送按钮预留空间：TDesign autosize 复制 padding 计算高度，故不会被文字占用 */
+  padding-bottom: 40px;
 }
 
 /* 聚焦态：改用 inset 光环，绘制在边框盒内部，不会被任何祖先的 overflow:hidden 裁掉左右两侧 */
@@ -655,6 +672,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
 .cp-composer__actions {
   display: flex;
   justify-content: flex-end;
+  margin-top: 6px;
   margin-bottom: 4px;
 }
 
@@ -687,6 +705,22 @@ function selectSystemMention(type: "everyone" | "here"): void {
 .cp-composer__send:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* 内嵌发送按钮：绝对定位贴文本域右下角，z-index 高于文本层；不透明底色保证与下层文字的可读性 */
+.cp-composer__send--overlay {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  background: color-mix(in oklab, var(--cp-panel) 92%, var(--cp-accent) 8%);
+  box-shadow: 0 2px 6px color-mix(in oklab, var(--cp-shadow) 45%, transparent);
+}
+
+.cp-composer__send--overlay:hover:enabled {
+  /* 绝对定位元素不做位移，避免 hover 时在文本域内跳动 */
+  transform: none;
+  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-panel));
 }
 
 .cp-reply {

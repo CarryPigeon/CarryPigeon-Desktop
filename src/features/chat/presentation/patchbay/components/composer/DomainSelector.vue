@@ -5,6 +5,7 @@
  */
 
 import { computed } from "vue";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   modelValue: string;
@@ -62,7 +63,7 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
   <div v-if="props.collapsed" class="cp-domain-collapsed" role="button" :tabindex="0" @click="$emit('toggleExpand')" @keydown.enter="$emit('toggleExpand')">
     <span class="cp-domain__dot" :style="activeOption ? { background: `var(${activeOption.colorVar})` } : {}" aria-hidden="true"></span>
     <span class="cp-domain-collapsed__label">{{ activeOption?.label ?? '' }}</span>
-    <span class="cp-domain-collapsed__arrow"><t-icon name="chevron-down" /></span>
+    <span class="cp-domain-collapsed__arrow"><AppIcon name="chevron-down" /></span>
   </div>
   <!-- 区块：<div> .cp-domain-selector (展开模式) -->
   <div

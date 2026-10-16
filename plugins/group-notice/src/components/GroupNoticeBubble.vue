@@ -1,7 +1,7 @@
 <template>
   <div class="group-notice-bubble" :class="`group-notice-bubble--${level}`">
     <div class="group-notice-bubble__header">
-      <t-icon name="notification" class="group-notice-bubble__icon" />
+      <AppIcon name="loudspeaker" class="group-notice-bubble__icon" />
       <span class="group-notice-bubble__title">{{ notice.title }}</span>
       <span class="group-notice-bubble__level">{{ levelLabel }}</span>
     </div>
@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { GroupNotice, GroupNoticeLevel } from "../domain/groupNotice";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 /**
  * 通用插件消息渲染契约（由宿主 MessageContentHost 的 plugin 分支传入）。

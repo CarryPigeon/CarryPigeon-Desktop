@@ -929,12 +929,12 @@ function cleanupTextInput() {
         />
         <div class="cp-screenshot-overlay__toolbar-actions">
           <button class="cp-screenshot-toolbar-btn cp-screenshot-toolbar-btn--cancel" @click="handleCancel" title="Cancel">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
           <button class="cp-screenshot-toolbar-btn cp-screenshot-toolbar-btn--confirm" @click="handleConfirm" title="Confirm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </button>

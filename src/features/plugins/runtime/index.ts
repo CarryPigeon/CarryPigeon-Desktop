@@ -6,6 +6,11 @@ export { applyPlugin, type AppliedPlugin, type ApplyPluginDeps } from "./applyPl
 export { createServerRuntime, type ServerRuntime, type ServerRuntimeOptions } from "./createServerContext";
 export { createDomainsRegistry, type DomainsRegistry } from "./domainsRegistry";
 export { createRuntimeGuard, isGuardDisposed, type RuntimeGuard } from "./guard";
+export {
+  createPluginSettingsRegistry,
+  PLUGIN_SETTINGS_ITEM_LIMIT_PER_PLUGIN,
+  type PluginSettingsRegistry,
+} from "./pluginSettingsRegistry";
 export { legacyToCordis, type PluginRuntimeModuleV1 } from "./legacyAdapter";
 export { loadPluginRuntimeModule, normalizePluginRuntimeModule, type LoadedPluginRuntime } from "./loadPluginModule";
 export {

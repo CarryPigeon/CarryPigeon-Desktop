@@ -6,6 +6,7 @@
 import { useI18n } from 'vue-i18n';
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
 import { invokeTauri } from '@/shared/tauri/invokeClient';
+import AppIcon from "@/shared/ui/AppIcon.vue";
 const { t } = useI18n();
 
 const props = defineProps<{
@@ -28,7 +29,7 @@ function handleOpenRelease(): void {
 <template>
   <div class="update-prompt-overlay">
     <div class="update-prompt-card">
-      <div class="update-prompt-icon"><t-icon name="refresh" size="40" /></div>
+      <div class="update-prompt-icon"><AppIcon name="refresh" :size="40" /></div>
       <h3 class="update-prompt-title">{{ t('updater_new_version', { version: props.version }) }}</h3>
       <p class="update-prompt-body">{{ t('updater_manual_hint') }}</p>
       <div class="update-prompt-actions">

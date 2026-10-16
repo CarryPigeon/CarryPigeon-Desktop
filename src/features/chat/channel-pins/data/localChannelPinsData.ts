@@ -82,18 +82,17 @@ export async function toggleChannelPinned(
 }
 
 /**
- * 使用系统默认程序打开置顶频道 JSON 文件。
+ * 覆盖某服务器下的置顶频道有序列表，返回写入后的完整状态。
  */
-export async function openChannelPinsFile(): Promise<void> {
-  await invokeTauri(TAURI_COMMANDS.channelPinsOpenFile);
-}
-
-/**
- * 读取置顶频道 JSON 文件绝对路径。Tauri 不可用时返回 `null`。
- */
-export async function getChannelPinsFilePath(): Promise<string | null> {
-  const path = await safeInvokeTauri<string>(TAURI_COMMANDS.channelPinsFilePath);
-  return typeof path === "string" && path.length > 0 ? path : null;
+export async function setChannelPinsOrder(
+  serverSocket: string,
+  channelIds: readonly string[],
+): Promise<ChannelPinsState> {
+  const raw = await invokeTauri<unknown>(TAURI_COMMANDS.channelPinsSetOrder, {
+    serverSocket,
+    channelIds,
+  });
+  return normalizeState(raw);
 }
 
 /**

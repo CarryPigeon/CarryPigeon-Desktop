@@ -11,6 +11,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+import BackButton from "@/shared/ui/BackButton.vue";
 import { useChannelInfoPage } from "@/features/chat/presentation/channel-info/useChannelInfoPage";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
@@ -33,7 +34,6 @@ const {
   cancelEdit,
   saveEdit,
   handleJoin,
-  openInPatchbay,
   goBack,
 } = useChannelInfoPage();
 
@@ -48,13 +48,10 @@ const membershipStatusText = computed(() =>
   <main class="cp-info">
     <ErrorBoundary>
       <header class="cp-info__head">
-        <button class="cp-info__back" type="button" @click="goBack">{{ t("go_back") }}</button>
+        <BackButton test-id="channel-info-back" @click="goBack" />
         <div class="cp-info__title">
           <div class="cp-info__name">{{ channelName }}</div>
           <div class="cp-info__sub">{{ t("channels") }}</div>
-        </div>
-        <div class="cp-info__headRight">
-          <button class="cp-info__btn" type="button" @click="openInPatchbay">{{ t("back_to_patchbay") }}</button>
         </div>
       </header>
 
@@ -110,6 +107,7 @@ const membershipStatusText = computed(() =>
   gap: 12px;
 }
 
+/* 头部：左返回（BackButton） / 中标题 两栏 */
 .cp-info__head {
   background: var(--cp-surface);
   backdrop-filter: blur(16px) saturate(1.08);
@@ -119,31 +117,9 @@ const membershipStatusText = computed(() =>
   box-shadow: var(--cp-shadow-soft);
   padding: 14px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 12px;
   align-items: center;
-}
-
-.cp-info__headRight {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.cp-info__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-info__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
 }
 
 .cp-info__name {

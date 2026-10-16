@@ -4,11 +4,12 @@
  * @description plugins｜组件：PluginCenterGridHeader。
  *
  * 职责：
- * - 渲染插件中心右侧内容区的头部（标题/服务端元信息/操作按钮）。
- * - 以事件形式向上抛出交互（刷新/跳转 Domains/返回 Chat）。
+ * - 渲染插件中心右侧内容区的头部（返回/标题/服务端元信息/操作按钮）。
+ * - 以事件形式向上抛出交互（刷新/跳转 Domains/返回上一页）。
  */
 
 import { useI18n } from "vue-i18n";
+import BackButton from "@/shared/ui/BackButton.vue";
 
 type Props = {
   /**
@@ -37,9 +38,9 @@ const emit = defineEmits<{
    */
   openDomains: [];
   /**
-   * 用户点击“返回 Patchbay”按钮。
+   * 用户点击“返回”按钮。
    */
-  backToChat: [];
+  back: [];
 }>();
 
 const { t } = useI18n();
@@ -59,16 +60,17 @@ function handleOpenDomains(): void {
 }
 
 /**
- * 返回 Chat（Patchbay）。
+ * 返回上一页（统一返回控件）。
  */
-function handleBackToChat(): void {
-  emit("backToChat");
+function handleBack(): void {
+  emit("back");
 }
 </script>
 
 <template>
-  <!-- 组件：PluginCenterGridHeader｜职责：渲染插件中心右侧头部（标题/元信息/操作按钮） -->
+  <!-- 组件：PluginCenterGridHeader｜职责：渲染插件中心右侧头部（返回/标题/元信息/操作按钮） -->
   <header class="cp-plugins__head">
+    <BackButton test-id="plugin-center-back" @click="handleBack" />
     <div class="cp-plugins__headLeft">
       <div class="cp-plugins__headTitle">{{ t("plugin_center") }}</div>
       <div class="cp-plugins__headMeta">
@@ -82,7 +84,6 @@ function handleBackToChat(): void {
     <div class="cp-plugins__headRight">
       <button class="cp-plugins__headBtn" type="button" @click="handleRefresh">{{ t("refresh") }}</button>
       <button class="cp-plugins__headBtn" type="button" @click="handleOpenDomains">{{ t("plugin_center_domains") }}</button>
-      <button class="cp-plugins__headBtn" type="button" @click="handleBackToChat">{{ t("back_to_patchbay") }}</button>
     </div>
   </header>
 </template>
@@ -92,10 +93,14 @@ function handleBackToChat(): void {
 .cp-plugins__head {
   padding: 14px 14px 12px 14px;
   border-bottom: 1px solid var(--cp-border-light);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
   gap: 12px;
+}
+
+.cp-plugins__headLeft {
+  min-width: 0;
 }
 
 .cp-plugins__headTitle {

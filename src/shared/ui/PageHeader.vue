@@ -4,7 +4,7 @@
  * @description 提供"返回 + 标题 + 副标题 + 右侧操作"一致布局；调用方通过 slot 注入操作区。
  */
 
-import { useI18n } from "vue-i18n";
+import BackButton from "@/shared/ui/BackButton.vue";
 
 defineOptions({ name: "PageHeader" });
 
@@ -26,32 +26,22 @@ const emit = defineEmits<{
   (e: "back"): void;
 }>();
 
-const { t } = useI18n();
-
 function onBack(): void {
   emit("back");
 }
-
-const resolvedBackLabel = (): string => {
-  if (props.backLabel.trim().length > 0) return props.backLabel;
-  return t("back");
-};
 </script>
 
 <template>
   <!-- 组件：PageHeader｜职责：页面顶部"返回 + 标题 + 副标题 + 操作"统一布局 -->
   <!-- 区块：<header> .cp-page-header -->
   <header class="cp-page-header">
-    <!-- 返回 -->
-    <button
+    <!-- 返回（统一共享控件 BackButton） -->
+    <BackButton
       v-if="props.back"
-      class="cp-page-header__back"
-      type="button"
-      data-testid="page-header-back"
+      :label="props.backLabel"
+      test-id="page-header-back"
       @click="onBack"
-    >
-      {{ resolvedBackLabel() }}
-    </button>
+    />
     <!-- 标题块 -->
     <div class="cp-page-header__title">
       <div class="cp-page-header__name">{{ props.title }}</div>
@@ -80,26 +70,6 @@ const resolvedBackLabel = (): string => {
   border: 1px solid var(--cp-border);
   border-radius: 18px;
   box-shadow: var(--cp-shadow-soft);
-}
-
-/* 返回按钮（pill，size 12px） */
-.cp-page-header__back {
-  @include button-size('sm');
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-page-header__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
 }
 
 /* 标题文字 */

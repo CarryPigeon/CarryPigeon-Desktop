@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 type Tool = "select" | "pen" | "arrow" | "rect" | "text" | "mosaic";
 
@@ -47,7 +48,7 @@ const presetWidths = [2, 4, 6, 10, 16];
         :aria-label="tool.label"
         @click="emit('toolChange', tool.id)"
       >
-        <t-icon :name="tool.icon" />
+        <AppIcon :name="tool.icon" />
       </button>
     </div>
 
@@ -92,7 +93,7 @@ const presetWidths = [2, 4, 6, 10, 16];
         :aria-label="t('annotation_tool_undo')"
         @click="emit('undo')"
       >
-        <t-icon name="rollback" />
+        <AppIcon name="rollback" />
       </button>
     </div>
   </div>

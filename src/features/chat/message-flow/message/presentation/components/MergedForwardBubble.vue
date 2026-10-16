@@ -6,6 +6,7 @@
 
 import { useI18n } from "vue-i18n";
 import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message/domain/messageModels";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   messageId: string;
@@ -28,7 +29,7 @@ function fmtTime(ms: number): string {
 <template>
   <div class="cp-mergedForward" role="button" tabindex="0" @click="emit('viewDetail')" @keydown.enter="emit('viewDetail')" @keydown.space.prevent="emit('viewDetail')">
     <div class="cp-mergedForward__header">
-      <span class="cp-mergedForward__icon">📋</span>
+      <span class="cp-mergedForward__icon"><AppIcon name="clipboard" /></span>
       <span class="cp-mergedForward__title">
         {{ t("forwarded_messages_count", { name: props.fromName, count: props.forwardedMessages.length }) }}
       </span>

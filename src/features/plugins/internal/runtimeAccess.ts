@@ -10,5 +10,6 @@ export {
   ensurePluginRuntimeLoaded,
   getAvailableMessageDomains,
   getPluginRuntimeCapabilities,
+  listPluginSettingsItems,
   resolveDomainPluginHint,
 } from "../application/runtimeService";

@@ -220,6 +220,52 @@ export type PluginRuntimeContract = {
 };
 
 /**
+ * 插件注册设置项的输入（宿主会额外注入 `pluginId` / `serverSocket`，插件无法伪造来源）。
+ *
+ * 说明：
+ * - `id` 在插件内唯一，规范化后须匹配 {@link PLUGIN_SETTINGS_ITEM_ID_PATTERN}；
+ * - `title` / `description` 由**插件自行本地化**（例如读取 `ctx.server.lang`），宿主不做翻译，
+ *   仅把声明文本用于设置页展示与搜索；
+ * - `component` 只负责控件本身（宿主提供卡片外壳、分组与错误边界）；
+ * - 注册随插件 fiber 自动反注册（`ctx.effect`），无需插件手动清理。
+ */
+export type PluginSettingsItemInput = {
+  /** 插件内唯一的设置项 id（锚点稳定标识，重复注册视为替换）。 */
+  id: string;
+  /** 设置项标题（必填，非空）。 */
+  title: string;
+  /** 补充说明（可选，参与搜索）。 */
+  description?: string;
+  /** 追加搜索关键词（可选；建议同时给出中英文同义词）。 */
+  keywords?: readonly string[];
+  /** 展示顺序，越小越靠前；缺省按 0 处理。 */
+  order?: number;
+  /** 设置项控件组件。 */
+  component: Component;
+};
+
+/**
+ * 插件设置项注册表中的记录（宿主注入来源信息）。
+ */
+export type PluginSettingsContribution = Omit<PluginSettingsItemInput, "keywords" | "order"> & {
+  /** 规范化后的关键词（trim + 去空 + 去重）。 */
+  readonly keywords: readonly string[];
+  /** 规范化后的排序值（非有限数按 0 处理）。 */
+  readonly order: number;
+  /** 注册该设置项的插件 id（宿主注入）。 */
+  readonly pluginId: string;
+  /** 归一化 server key（`normalizeServerKey`，宿主注入）。 */
+  readonly serverSocket: string;
+};
+
+/**
+ * 设置项 id 白名单：仅允许字母/数字与 `._:-`，长度 1–64。
+ *
+ * 目的：id 会作为 DOM 锚点值（`data-settings-item`）使用，限制字符集可避免选择器转义问题。
+ */
+export const PLUGIN_SETTINGS_ITEM_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+
+/**
  * 注入给插件的运行时上下文（Host API）。
  *
  * 说明：

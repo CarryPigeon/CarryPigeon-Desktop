@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { getNotificationCapabilities } from "../../api";
 import NotificationPanel from "./NotificationPanel.vue";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 const caps = getNotificationCapabilities();
@@ -28,7 +29,7 @@ function togglePanel(): void {
 <template>
   <div class="cp-notif-bell">
     <button class="cp-notif-bell__btn" @click="togglePanel" :title="t('notifications')">
-      <t-icon name="notification" class="cp-notif-bell__icon" />
+      <AppIcon name="notification" class="cp-notif-bell__icon" />
       <span v-if="unreadCount > 0" class="cp-notif-bell__badge">{{ unreadCount > 99 ? "99+" : unreadCount }}</span>
     </button>
     <NotificationPanel v-if="showPanel" @close="showPanel = false" />

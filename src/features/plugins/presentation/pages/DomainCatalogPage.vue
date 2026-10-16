@@ -14,6 +14,7 @@ import { computed, onMounted, ref, watch, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+import BackButton from "@/shared/ui/BackButton.vue";
 import { usePluginsServerWorkspace } from "@/features/plugins/integration/serverWorkspace";
 import { createDomainCatalogContext } from "@/features/plugins/presentation/composables/useDomainCatalogContext";
 import { debounce } from "@/shared/utils/rateLimit";
@@ -72,7 +73,7 @@ onMounted(() => {
   <main class="cp-domains">
     <ErrorBoundary>
       <header class="cp-domains__head">
-        <button class="cp-domains__back" type="button" @click="router.back()">{{ t("back") }}</button>
+        <BackButton test-id="domain-catalog-back" @click="router.back()" />
         <div class="cp-domains__title">
           <div class="cp-domains__name">{{ t("domain_catalog") }}</div>
           <div class="cp-domains__sub">{{ t("domain_catalog_sub") }}</div>
@@ -172,22 +173,6 @@ onMounted(() => {
   grid-template-columns: auto 1fr auto;
   gap: 12px;
   align-items: center;
-}
-
-.cp-domains__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-domains__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
 }
 
 .cp-domains__name {

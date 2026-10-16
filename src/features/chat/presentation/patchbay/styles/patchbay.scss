@@ -630,6 +630,11 @@
 .cp-center {
   display: flex;
   flex-direction: column;
+  /* 容器查询上下文：窄宽度下按本栏实测宽度收紧消息区（见文件末尾 @container 区块）。
+     安全性：本栏内无依赖更外层祖先的绝对定位后代 —— 虚拟行由各自 position: relative 包装层定位、
+     .cp-pinBadge 由 .cp-messageContent 定位、.cp-jumpBottom 为 sticky；.cp-center--dragOver 仅用 outline；
+     .cp-flash 在 MainPage 的 .cp-main 内、不属本栏。故 inline-size containment 不改变既有定位。 */
+  container-type: inline-size;
 }
 
 /* 顶部控制台栏 */
@@ -671,7 +676,9 @@
   flex: 1;
   min-height: 0;
   padding: 14px;
-  overflow: auto;
+  /* 消息区只纵向滚动：横向溢出属布局缺陷，若保留 auto 会在面板被压窄时冒出底部滚动条。 */
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -759,6 +766,11 @@
   grid-area: strip;
 }
 
+/* 消息行：domain 色条可见性（组内非首条不展示色条，仅保留 2px 槽位列宽） */
+.cp-msg__strip[data-visible="false"] {
+  visibility: hidden;
+}
+
 /* 消息行：mine 时头像对齐 */
 .cp-msg[data-mine="true"] .cp-msg__avatar {
   justify-content: flex-end;
@@ -805,6 +817,8 @@
 /* 元信息（meta）：组内非首条（仅保留“⋯”操作入口，收紧占位） */
 .cp-msg__meta[data-bare="true"] {
   margin-bottom: 2px;
+  /* 色条隐藏后由组内垂直间距承担视觉分隔；用 padding 让行底色随之延展 */
+  padding-bottom: 12px;
 }
 
 /* 元信息（meta）：发送者名称 */
@@ -815,9 +829,8 @@
   color: color-mix(in oklab, var(--cp-text) 92%, transparent);
 }
 
-/* 元信息（meta）：时间戳 + domain（等宽字体） */
-.cp-msg__time,
-.cp-msg__domain {
+/* 元信息（meta）：时间戳（等宽字体；domain 类型标签已移除，仅保留名字与时间） */
+.cp-msg__time {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: color-mix(in oklab, var(--cp-text-muted) 96%, transparent);
@@ -882,6 +895,8 @@
   font-size: 13px;
   line-height: 1.5;
   max-width: min(74ch, 100%);
+  /* 面板被压窄时允许收缩到可用宽度以下，避免把消息行撑破。 */
+  min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -894,6 +909,7 @@
   border-radius: 16px;
   padding: 10px;
   max-width: min(74ch, 100%);
+  min-width: 0;
 }
 
 /* 插件气泡：mine 强调色 */
@@ -918,6 +934,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
+  min-width: 0;
 }
 
 /* 引用预览：标签 */
@@ -935,6 +952,9 @@
   font-size: 12px;
   color: var(--cp-text);
   overflow-wrap: anywhere;
+  /* flex 子项默认 min-width: auto，不显式归零则不会收缩到内容宽度以下。 */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* 编辑器面板容器 */
@@ -992,73 +1012,53 @@
   padding: 6px 10px;
 }
 
-/* 顶部控制台”搜索”按钮 */
-.cp-topConsole__search {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
+/* 顶部控制台图标按钮（搜索 / 固定成员栏 / 频道设置）：
+   静态态不画外框（透明的 1px 边框只用来固定 32×32 命中区，避免 hover 出现时尺寸跳动），
+   仅悬停/聚焦时给底色与描边，与同排的插件工具栏入口、@提醒铃铛保持同一观感。 */
+.cp-topConsole__search,
+.cp-topConsole__pinMembers,
+.cp-topConsole__settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 8px;
   font-size: 14px;
+  line-height: 1;
   cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-topConsole__search:hover {
-  transform: translateY(-1px);
+.cp-topConsole__search:hover,
+.cp-topConsole__pinMembers:hover,
+.cp-topConsole__settings:hover {
   background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
 }
 
-.cp-topConsole__search:active {
-  transform: translateY(0);
-}
-
-/* 顶部控制台”固定成员栏”按钮 */
-.cp-topConsole__pinMembers {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-.cp-topConsole__pinMembers:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-}
+/* 固定成员栏：已固定用强调色图标表达，不再额外套一层可见外框 */
 .cp-topConsole__pinMembers[aria-pressed="true"] {
+  color: var(--cp-accent);
+}
+
+.cp-topConsole__pinMembers[aria-pressed="true"]:hover {
   border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
 }
 
 .cp-topConsole__pinMembers:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
 }
 
-/* 顶部控制台”设置”按钮 */
+/* 与最右侧的 @提醒铃铛留出间距 */
 .cp-topConsole__settings {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
   margin-right: 10px;
-}
-
-.cp-topConsole__settings:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-}
-
-.cp-topConsole__settings:active {
-  transform: translateY(0);
 }
 
 /* 频道设置菜单 */
@@ -1223,6 +1223,63 @@
 
 .cp-signalPane:not(:empty) {
   animation: cp-content-reveal 0.3s ease;
+}
+
+/* 窄宽度自适应：中间栏（.cp-center）被压窄时逐级收紧密度，避免消息区拥挤、发散的观感。
+   断点按 .cp-center 实测宽度（容器查询）判定，因此窗口不变、仅拖动 channel-message
+   resizer 把消息面板压窄时同样生效。面板 ≥521px 时以下规则均不命中，桌面观感与改动前一致。 */
+
+/* 一级收紧：面板 ≤520px */
+@container (max-width: 520px) {
+  .cp-signalPane {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .cp-topConsole {
+    padding: 10px;
+  }
+
+  /* 头像列 44px → 40px：AvatarBadge 固定 36px，保留 2px 呼吸；不再下调以免裁切头像 */
+  .cp-msg {
+    grid-template-columns: 40px 2px 1fr;
+    gap: 10px;
+  }
+
+  .cp-msg[data-mine="true"] {
+    grid-template-columns: 1fr 2px 40px;
+  }
+
+  .cp-msg__meta {
+    margin-bottom: 6px;
+  }
+
+  .cp-msg__meta[data-bare="true"] {
+    padding-bottom: 10px;
+  }
+}
+
+/* 二级收紧：面板 ≤400px */
+@container (max-width: 400px) {
+  .cp-signalPane {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .cp-msg {
+    gap: 8px;
+  }
+
+  /* 名称与时间必须同步缩小：.cp-msg__time 自带 font-size: 12px，只改 .cp-msg__meta
+     会导致时间比名字还大。同时收紧换行行距，避免极窄面板里被逐字挤压。 */
+  .cp-msg__from,
+  .cp-msg__time {
+    font-size: 11px;
+  }
+
+  .cp-msg__meta {
+    row-gap: 2px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

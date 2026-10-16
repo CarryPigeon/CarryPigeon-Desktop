@@ -152,7 +152,7 @@ function formatTime(ts: number): string {
 
 .cp-notif-panel__item-time {
   font-size: 11px;
-  color: var(--cp-text-tertiary);
+  color: var(--cp-text-light);
   margin-top: 4px;
 }
 </style>

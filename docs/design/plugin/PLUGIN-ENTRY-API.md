@@ -39,15 +39,57 @@ export function apply(ctx: Context): void {
 | `ctx.server` | 始终 | `{ serverSocket, serverId, getCid(), getUid(), lang }` |
 | `ctx.storage` | 始终 | `get/set`（按 serverId + pluginId 隔离） |
 | `ctx.domains` | 始终 | `renderer/composer/contract` 注册 |
-| `ctx.ui` | `ui` | `mountOverlay` / `registerToolbarAction` |
+| `ctx.ui` | `ui` | `mountOverlay` / `registerToolbarAction` / `registerSettingsItem` |
 | `ctx.network` | `network` | 同源 `fetch` |
 | `ctx.ai` | `ai` | `isConfigured` / `summarize` |
 | `ctx.messages` | `messages:read` / `messages:send` | 当前频道读取 + 发送 |
 | `ctx.ipc` | `invoke` / `events` | 受前缀白名单约束的 `invoke` / `onEvent` |
 
 生命周期：
-- 注册型资源（renderer/composer/overlay/toolbar/事件订阅）随插件 fiber 自动释放；
+- 注册型资源（renderer/composer/overlay/toolbar/settings item/事件订阅）随插件 fiber 自动释放；
 - 其他清理用 `ctx.on("dispose", fn)` 或 `ctx.effect(() => dispose)`。
+
+### 3.1 设置项注册（`ctx.ui.registerSettingsItem`）
+
+宿主设置页会为每个**已启用**插件聚合一个「插件设置」分区，并提供统一的左侧搜索（可搜到插件设置项的标题/说明/关键词）。插件只提供「元数据 + 控件组件」，卡片外壳、分组与错误边界由宿主负责。
+
+```ts
+import { defineComponent, h, ref } from "vue";
+
+export function apply(ctx: Context) {
+  const Mode = defineComponent({
+    name: "MyPluginModeSetting",
+    setup() {
+      const mode = ref("auto");
+      return () =>
+        h("div", {}, [
+          h("button", { onClick: () => (mode.value = "auto") }, "自动"),
+          h("button", { onClick: () => (mode.value = "server") }, "仅服务端"),
+        ]);
+    },
+  });
+
+  const cancel = ctx.ui?.registerSettingsItem?.({
+    id: "backend",                 // 插件内唯一；^[A-Za-z0-9._:-]{1,64}$
+    title: ctx.server.lang === "zh_cn" ? "后端选择" : "Backend",  // 由插件自行本地化
+    description: "选择请求所走的通道",
+    keywords: ["backend", "后端", "server", "服务端"],  // 追加搜索词（建议中英同义词）
+    order: 10,                     // 越小越靠前
+    component: Mode,
+  });
+  // cancel() 可提前反注册；不调用则随插件 fiber 销毁自动反注册。
+}
+```
+
+约定与边界：
+- **权限**：需要 manifest 声明 `ui` 权限（未授权时 `ctx.ui` 为 `undefined`）。
+- **作用域**：设置项归属「当前 server」——只在注册它的 server 运行时内可见；停用/卸载插件或切换 server 后立即从设置页与搜索结果中消失。
+- **id**：`^[A-Za-z0-9._:-]{1,64}$`；同插件内重复注册视为替换（旧的反注册函数不会误删新项）；单插件最多 **20** 项，超出忽略并记日志。
+- **文案**：宿主不翻译插件声明文本，插件需自行按 `ctx.server.lang` 本地化；`title`/`description`/`keywords` 会参与宿主搜索匹配。
+- **持久化**：设置项自身的取值请用 `ctx.storage`（按 serverId + pluginId 隔离），宿主不保存插件设置值。
+- **兼容性**：旧宿主（无该方法）上直接调用会抛出并导致插件加载失败，建议
+  `if (typeof ctx.ui?.registerSettingsItem === "function") { ... }` 守卫，或提升 `plugin.json` 的 `min_host_version`。
+- **样例**：内置 `ai-summary` 插件用该能力提供「AI 摘要后端」（自动 / 仅客户端 AI / 仅服务端）。
 
 ## 4. 兼容性边界
 

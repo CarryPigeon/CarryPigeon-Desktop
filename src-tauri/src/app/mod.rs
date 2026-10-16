@@ -358,6 +358,7 @@ pub fn run() -> anyhow::Result<()> {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(crate::features::voice_call::di::commands::VoiceCallService::new())
         .manage(crate::features::voice_message::di::commands::VoiceRecorderState(
             std::sync::Mutex::new(None),
@@ -460,12 +461,11 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::emoji::di::commands::copy_emoji,
             crate::features::emoji::di::commands::write_temp_emoji_file,
             crate::features::emoji::di::commands::get_emoji_image_path,
-            // channel_pins（置顶频道：本地 JSON 持久化 + 文件变更热加载）
+            // channel_pins（置顶频道：本地 JSON 持久化 + 文件变更热加载，编辑走应用内弹窗）
             crate::features::channel_pins::di::commands::channel_pins_get,
             crate::features::channel_pins::di::commands::channel_pins_set,
             crate::features::channel_pins::di::commands::channel_pins_toggle,
-            crate::features::channel_pins::di::commands::channel_pins_file_path,
-            crate::features::channel_pins::di::commands::channel_pins_open_file,
+            crate::features::channel_pins::di::commands::channel_pins_set_order,
             // screenshot
             crate::features::screenshot::di::commands::start_screenshot,
             crate::features::screenshot::di::commands::get_screenshot_data,

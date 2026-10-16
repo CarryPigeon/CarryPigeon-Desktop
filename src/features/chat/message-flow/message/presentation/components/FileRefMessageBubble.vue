@@ -14,6 +14,8 @@ import { readAuthToken } from "@/shared/utils/localState";
 import { downloadFile, getDownloadTasks, resumeDownload } from "@/shared/file-transfer";
 import { createLogger } from "@/shared/utils/logger";
 import DownloadProgress from "@/features/chat/message-flow/download/presentation/components/DownloadProgress.vue";
+import AppIcon from "@/shared/ui/AppIcon.vue";
+import { fileTypeIconName } from "@/shared/ui/icons/fileTypeIcon";
 
 const props = defineProps<{
   /**
@@ -70,20 +72,13 @@ function formatFileSize(bytes: number | undefined): string {
 }
 
 /**
- * 基于 mime type 选择文件图标。
+ * 选择文件类型图标（自绘注册表 key）。
  *
  * @param mimeType - 文件 mime type。
- * @returns 对应 emoji 图标。
+ * @returns `AppIcon` 图标名。
  */
 function getFileIcon(mimeType: string | undefined): string {
-  const mime = mimeType?.toLowerCase() ?? "";
-  if (mime.startsWith("image/")) return "🖼️";
-  if (mime.startsWith("video/")) return "🎬";
-  if (mime.startsWith("audio/")) return "🎵";
-  if (mime.includes("pdf")) return "📄";
-  if (mime.includes("zip") || mime.includes("rar") || mime.includes("tar") || mime.includes("gz")) return "📦";
-  if (mime.includes("text/") || mime.includes("document")) return "📝";
-  return "📎";
+  return fileTypeIconName(mimeType);
 }
 
 const showDownloadProgress = ref(false);
@@ -130,7 +125,7 @@ function handleDismissTask(): void {
       <img v-if="previewUrl" :src="previewUrl" :alt="props.filename" class="cp-fileBubble__img" />
     </div>
     <div class="cp-fileBubble__info">
-      <div class="cp-fileBubble__icon">{{ getFileIcon(props.mimeType) }}</div>
+      <div class="cp-fileBubble__icon"><AppIcon :name="getFileIcon(props.mimeType)" /></div>
       <div class="cp-fileBubble__meta">
         <div class="cp-fileBubble__name">{{ props.filename }}</div>
         <div v-if="props.sizeBytes" class="cp-fileBubble__size">{{ formatFileSize(props.sizeBytes) }}</div>

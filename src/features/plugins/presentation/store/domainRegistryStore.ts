@@ -19,6 +19,7 @@ import { createLogger } from "@/shared/utils/logger";
 import { normalizeServerKey } from "@/shared/serverKey";
 import type { DomainBinding, DomainRegistryHostBridge } from "@/features/plugins/contracts/domainRegistry";
 import { getPluginInstallQueryPort, getPluginLifecycleCommandPort } from "@/features/plugins/di/plugins.di";
+import type { PluginSettingsContribution } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 import type { PluginRuntimeEntry } from "@/features/plugins/domain/types/pluginTypes";
 import { getRuntimeEntry, getRuntimeEntryForVersion } from "@/features/plugins/presentation/runtime/pluginRuntime";
 import { createPluginRuntimeError } from "@/features/plugins/presentation/runtime/pluginRuntimeError";
@@ -44,6 +45,8 @@ type DomainRegistryStore = {
   loadedById: Record<string, LoadedPluginRuntime>;
   runtimeById: Record<string, PluginRuntimeEntry>;
   bindingByDomain: Record<string, DomainBinding>;
+  /** 当前 server 插件注册的设置项（Vue 响应式投影，供设置页消费）。 */
+  pluginSettingsItems: PluginSettingsContribution[];
   loading: Ref<boolean>;
   error: Ref<string>;
   ensureLoaded(): Promise<void>;
@@ -141,6 +144,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
   const loadedById = reactive<Record<string, LoadedPluginRuntime>>({});
   const runtimeById = reactive<Record<string, PluginRuntimeEntry>>({});
   const bindingByDomain = reactive<Record<string, DomainBinding>>({});
+  const pluginSettingsItems = reactive<PluginSettingsContribution[]>([]);
   const loading = ref(false);
   const error = ref("");
   const runtimeLoadingDisabled = false;
@@ -179,6 +183,21 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     }
   }
 
+  /**
+   * 从共享注册表刷新设置项投影。
+   *
+   * 说明：`component` 是插件传入的组件定义，必须 `markRaw`，否则放进响应式数组后
+   * 渲染 `<component :is>` 会触发「Component made reactive」并带来无意义的深度代理。
+   */
+  function refreshSettingsItems(): void {
+    const list = serverRuntime.settingsRegistry.list();
+    pluginSettingsItems.splice(
+      0,
+      pluginSettingsItems.length,
+      ...list.map((item) => ({ ...item, component: markRaw(item.component) })),
+    );
+  }
+
   async function enableLoadedRuntime(runtime: PluginRuntimeEntry, loaded: LoadedPluginRuntime): Promise<void> {
     const id = runtime.pluginId;
     // 幂等：先清理同 id 的旧实例
@@ -188,6 +207,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     const applied = await applyPlugin(serverRuntime.ctx, {
       serverSocket: key,
       registry: serverRuntime.registry,
+      settingsRegistry: serverRuntime.settingsRegistry,
       uiBridge: chatPluginUiBridge,
       messagesReader: chatPluginMessagesBridge,
       sendMessage: async (payload) => {
@@ -207,6 +227,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     loadedById[id] = markRaw(loaded);
     runtimeById[id] = runtime;
     refreshBindings();
+    refreshSettingsItems();
   }
 
   /**
@@ -228,7 +249,9 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
       delete loadedById[id];
       delete runtimeById[id];
       serverRuntime.registry.unregister(id);
+      serverRuntime.settingsRegistry.unregister(id);
       refreshBindings();
+      refreshSettingsItems();
       throw e;
     }
   }
@@ -251,7 +274,10 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
       }
     }
     serverRuntime.registry.unregister(id);
+    // 设置项兜底清理：正常路径由插件 fiber 的 effect 反注册，这里防御半初始化/异常路径残留。
+    serverRuntime.settingsRegistry.unregister(id);
     refreshBindings();
+    refreshSettingsItems();
   }
 
   /**
@@ -302,6 +328,7 @@ export function useDomainRegistryStore(serverSocket: string): DomainRegistryStor
     loadedById,
     runtimeById,
     bindingByDomain,
+    pluginSettingsItems,
     loading,
     error,
     ensureLoaded,

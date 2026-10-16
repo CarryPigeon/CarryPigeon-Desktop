@@ -16,16 +16,19 @@ name = "carrypigeon_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.5.1", features = [] }
+tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
 # tokio
 tokio = { version = "1.48.0", features = ["rt-multi-thread", "sync", "net", "io-util", "time", "macros", "fs"] }
 
 # tauri
-tauri = { version = "2.11.2", features = [ "tray-icon" ] }
-tauri-plugin-opener = "2.5.4"
-tauri-plugin-notification = "2"
+# 以下 crate 版本须与 npm 侧 @tauri-apps/* 的 major/minor 保持一致，否则 tauri build 直接报版本不匹配
+tauri = { version = "2.12.2", features = [ "tray-icon" ] }
+tauri-plugin-opener = "2.7.0"
+tauri-plugin-notification = "2.5.1"
+# 剪贴板读取（统一右键菜单的「粘贴」）
+tauri-plugin-clipboard-manager = "2.4.1"
 
 # 日志输出
 tracing = "0.1.40"

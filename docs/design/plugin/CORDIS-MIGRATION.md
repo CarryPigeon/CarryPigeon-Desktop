@@ -217,7 +217,7 @@ export function applyPlugin(
 | --- | --- | --- |
 | （永远） | `storage` | `pluginsStorageGet` / `pluginsStorageSet`（按 serverId + pluginId 隔离） |
 | （永远） | `domains` | 写入共享 `DomainsRegistry`，dispose 时清空 |
-| `ui` | `ui` | `chatPluginUiBridge`（overlay / toolbar） |
+| `ui` | `ui` | `chatPluginUiBridge`（overlay / toolbar）+ 共享 `PluginSettingsRegistry`（`registerSettingsItem`，设置页「插件设置」分区） |
 | `network` | `network` | `pluginsNetworkFetch`（Rust 侧同源强制） |
 | `ai` | `ai` | `getAiCapabilities()`（密钥宿主代持） |
 | `messages:read` | `messages.readCurrentChannel` / `messages.loadMoreHistory` | `chatPluginMessagesBridge` |

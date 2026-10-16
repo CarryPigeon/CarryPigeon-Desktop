@@ -107,6 +107,21 @@
   “参与消息集合指纹 + 末条消息 id + 参与条数”指纹，集合指纹由消息 id 计算，不含正文）。
 - 未声明该权限时宿主不注入 `host.messages`，插件应提示用户升级/重新安装插件而不是静默失败。
 
+### 5.4 设置项注册（已实现）
+
+若插件声明 `ui` 权限，除 overlay / 工具栏入口外，还可通过 `ctx.ui.registerSettingsItem({ id, title, description?, keywords?, order?, component })`
+把设置项注册到宿主设置页的「插件设置」分区；宿主负责卡片外壳、按插件分组、错误边界与左侧搜索索引。
+
+实现要点：
+
+- **注册表**：每个 server 一份 `PluginSettingsRegistry`（`runtime/pluginSettingsRegistry.ts`，纯数据、不依赖 Vue），
+  由 `domainRegistryStore` 投影为响应式 `pluginSettingsItems`（组件统一 `markRaw`），设置页经
+  `plugins/api → forServer(socket).listPluginSettingsItems()` 消费；
+- **作用域**：设置项归属当前 server（`normalizeServerKey`），停用/卸载插件或切换 server 后立即消失；
+- **生命周期**：注册经 `ctx.effect` 绑定插件 fiber，fiber 销毁自动反注册；store 停用插件时另有 `unregister` 兜底；
+- **搜索**：宿主用「标题 + 说明 + 关键词 + 分区名 + 插件 id」建立索引，插件需自行本地化文案并给出中英关键词；
+- **取值**：插件设置值由插件用 `ctx.storage` 自行持久化，宿主不代管。
+
 ## 6. required gate（客户端行为）
 
 - 连接服务器后，若发现 required 插件未满足：

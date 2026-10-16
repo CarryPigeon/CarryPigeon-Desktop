@@ -6,11 +6,14 @@
 
 import { ref, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEmojiManageModel } from "../composables/useEmojiManageModel";
 import { createLogger } from "@/shared/utils/logger";
 import { getAccountCapabilities } from "@/features/account/api";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import PageHeader from '@/shared/ui/PageHeader.vue';
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const logger = createLogger("emoji");
 
@@ -20,6 +23,7 @@ function getCurrentChatUserId(): string {
 }
 
 const { t } = useI18n();
+const router = useRouter();
 const { emojis, loading, loadEmojis, addEmoji, deleteEmoji, getImagePath } = useEmojiManageModel();
 
 const nameInput = ref("");
@@ -134,7 +138,12 @@ function extractNameFromPath(filePath: string): string {
 <template>
   <ErrorBoundary>
     <div class="cp-emojiManage">
-      <h2 class="cp-emojiManage__title">{{ t("custom_emoji") }}</h2>
+      <PageHeader
+        :title="t('custom_emoji')"
+        back
+        data-testid="emoji-manage-header"
+        @back="router.back()"
+      />
 
       <div class="cp-emojiManage__add">
         <input
@@ -184,7 +193,7 @@ function extractNameFromPath(filePath: string): string {
             :title="t('delete')"
             @click="handleDelete(emoji.id)"
           >
-            &times;
+            <AppIcon name="close" />
           </button>
         </div>
 
@@ -202,18 +211,14 @@ function extractNameFromPath(filePath: string): string {
 <style scoped lang="scss">
 .cp-emojiManage {
   padding: 14px;
-}
-
-.cp-emojiManage__title {
-  font-size: 18px;
-  margin-bottom: 16px;
-  color: var(--cp-text);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .cp-emojiManage__add {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
 }
 
 .cp-emojiManage__input {

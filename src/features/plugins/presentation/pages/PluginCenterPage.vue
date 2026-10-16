@@ -416,8 +416,8 @@ function onGlobalKeydown(e: KeyboardEvent): void {
           :server-id="serverId"
           :modules-count="filtered.length"
           @refresh="ensureData"
-          @open-domains="router.push('/domains')"
-          @back-to-chat="router.push('/chat')"
+          @open-domains="router.push('/plugins/domain-catalog')"
+          @back="router.back()"
         />
 
         <PluginCenterCatalogGrid

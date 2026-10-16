@@ -2,9 +2,6 @@
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
-use tauri::AppHandle;
-use tauri_plugin_opener::OpenerExt;
-
 use crate::features::channel_pins::data::store;
 use crate::features::channel_pins::domain::model::ChannelPinsStateV1;
 use crate::shared::error::{CommandResult, to_command_error};
@@ -53,30 +50,18 @@ pub async fn channel_pins_toggle(
         })
 }
 
-/// 返回置顶频道 JSON 文件绝对路径。
+/// 覆盖某服务器下的置顶频道有序列表（应用内编辑器保存入口）。
 #[tauri::command]
-pub async fn channel_pins_file_path() -> CommandResult<String> {
-    Ok(store::pins_file_path().to_string_lossy().to_string())
-}
-
-/// 使用系统默认程序打开置顶频道 JSON 文件。
-#[tauri::command]
-pub async fn channel_pins_open_file(app_handle: AppHandle) -> CommandResult<()> {
-    if let Err(error) = store::ensure_file_exists().await {
-        return Err(to_command_error(
-            "CHANNEL_PINS_OPEN_FAILED",
-            "error.channel_pins_open_failed",
-            error,
-        ));
-    }
-    let path = store::pins_file_path();
-    app_handle
-        .opener()
-        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+pub async fn channel_pins_set_order(
+    server_socket: String,
+    channel_ids: Vec<String>,
+) -> CommandResult<ChannelPinsStateV1> {
+    store::set_order(&server_socket, &channel_ids)
+        .await
         .map_err(|e| {
             to_command_error(
-                "CHANNEL_PINS_OPEN_FAILED",
-                "error.channel_pins_open_failed",
+                "CHANNEL_PINS_SAVE_FAILED",
+                "error.channel_pins_save_failed",
                 e,
             )
         })

@@ -9,6 +9,7 @@ import type { ChannelPinsState } from "@/features/chat/channel-pins/data/localCh
 const dataMock = {
   loadChannelPins: vi.fn(),
   toggleChannelPinned: vi.fn(),
+  setChannelPinsOrder: vi.fn(),
   listenChannelPinsFileChanged: vi.fn(),
 };
 
@@ -16,6 +17,8 @@ vi.mock("@/features/chat/channel-pins/data/localChannelPinsData", () => ({
   loadChannelPins: () => dataMock.loadChannelPins(),
   toggleChannelPinned: (serverSocket: string, channelId: string) =>
     dataMock.toggleChannelPinned(serverSocket, channelId),
+  setChannelPinsOrder: (serverSocket: string, channelIds: readonly string[]) =>
+    dataMock.setChannelPinsOrder(serverSocket, channelIds),
   listenChannelPinsFileChanged: (handler: (state: ChannelPinsState) => void) =>
     dataMock.listenChannelPinsFileChanged(handler),
 }));
@@ -57,6 +60,25 @@ describe("useChannelPinStore", () => {
 
     expect(dataMock.toggleChannelPinned).toHaveBeenCalledWith("srv", "c9");
     expect(store.isPinned("srv", "c9")).toBe(true);
+  });
+
+  it("setPinnedOrder persists the whole ordered list and applies the returned state", async () => {
+    dataMock.setChannelPinsOrder.mockResolvedValue({
+      schemaVersion: 1,
+      servers: { srv: ["c2", "c1"] },
+    });
+    const store = await freshStore();
+    await store.setPinnedOrder("srv", ["c2", "c1"]);
+
+    expect(dataMock.setChannelPinsOrder).toHaveBeenCalledWith("srv", ["c2", "c1"]);
+    expect(store.pinnedIds("srv")).toEqual(["c2", "c1"]);
+  });
+
+  it("setPinnedOrder ignores a blank server socket", async () => {
+    const store = await freshStore();
+    await store.setPinnedOrder("", ["c1"]);
+
+    expect(dataMock.setChannelPinsOrder).not.toHaveBeenCalled();
   });
 
   it("hot reload updates state when the local file changes", async () => {

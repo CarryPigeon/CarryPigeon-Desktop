@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppIcon from "@/shared/ui/AppIcon.vue";
 /**
  * @fileoverview MessageFailedIndicator.vue
  * @description 消息发送失败指示器和重试按钮。
@@ -15,7 +16,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="cp-failedIndicator">
-    <span class="cp-failedIndicator__icon"><t-icon name="error-circle" /></span>
+    <span class="cp-failedIndicator__icon"><AppIcon name="error-circle" /></span>
     <span class="cp-failedIndicator__text">{{ error || $t("send_failed") }}</span>
     <button class="cp-failedIndicator__btn" @click="emit('retry', messageId)">
       {{ $t("retry") }}

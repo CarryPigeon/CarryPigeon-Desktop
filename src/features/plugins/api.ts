@@ -24,6 +24,7 @@ import {
   ensurePluginRuntimeLoaded as ensurePluginRuntimeLoadedInternal,
   getAvailableMessageDomains as getAvailableMessageDomainsInternal,
   getPluginRuntimeCapabilities as getPluginRuntimeCapabilitiesInternal,
+  listPluginSettingsItems as listPluginSettingsItemsInternal,
   resolveDomainPluginHint as resolveDomainPluginHintInternal,
 } from "./internal/runtimeAccess";
 import type { PluginsCapabilities } from "./api-types";
@@ -65,6 +66,9 @@ export function createPluginsCapabilities(): PluginsCapabilities {
         },
         getRuntimeCapabilities() {
           return getPluginRuntimeCapabilitiesInternal(serverSocket);
+        },
+        listPluginSettingsItems() {
+          return listPluginSettingsItemsInternal(serverSocket);
         },
         attachHostBridge(bridge) {
           attachPluginHostBridgeInternal(serverSocket, bridge);

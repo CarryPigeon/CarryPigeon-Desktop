@@ -17,6 +17,8 @@ import type {
 } from "@/features/plugins/api-types";
 import type { Context } from "@/features/plugins/sdk";
 import { bindContext, unbindContext } from "../host/bridge";
+import { resetBackendPreferenceForTests } from "../host/backendPreference";
+import { SUMMARIZE_BACKEND_STORAGE_KEY, type SummarizeBackend } from "../domain/summarizeBackend";
 import { computeScopeFingerprint } from "../domain/summarizeScope";
 import AiSummaryHost from "./AiSummaryHost.vue";
 
@@ -171,7 +173,7 @@ async function mountHost(): Promise<{
   bindStubContext();
   const wrapper = mount(AiSummaryHost, {
     global: {
-      stubs: { "t-icon": true, "t-button": ButtonStub, "t-date-range-picker": RangePickerStub },
+      stubs: { AppIcon: true, "t-button": ButtonStub, "t-date-range-picker": RangePickerStub },
     },
   });
   const vm = wrapper.vm as unknown as {
@@ -264,6 +266,8 @@ describe("AiSummaryHost", () => {
     readCalls = 0;
     loadMoreCalls = 0;
     fetchImpl = async () => okResponse("默认总结", 2);
+    // 后端偏好是模块级状态：每个用例重置，避免相互污染。
+    resetBackendPreferenceForTests();
     bindStubContext();
   });
 
@@ -576,6 +580,78 @@ describe("AiSummaryHost", () => {
       expect(wrapper.text()).toContain("默认总结");
       // 旧宿主上不展示客户端 AI 引导，避免误导
       expect(wrapper.text()).not.toContain("设置 → AI 服务");
+    });
+  });
+
+  describe("后端设置项（AI 摘要后端）", () => {
+    /**
+     * 预设后端偏好（写入插件存储，模拟设置项已保存）。
+     *
+     * @param mode - 目标后端档位。
+     */
+    function persistBackend(mode: SummarizeBackend): void {
+      storage.set(SUMMARIZE_BACKEND_STORAGE_KEY, mode);
+    }
+
+    it("server 档：即使客户端 AI 已配置也走服务端，且不展示客户端 AI 引导", async () => {
+      persistBackend("server");
+      aiImpl = async () => ({
+        ok: true,
+        summary: "客户端总结",
+        messageCount: 2,
+        provider: "DeepSeek",
+        model: "deepseek-flash",
+      });
+      const { wrapper, summarize } = await mountHost();
+
+      await summarize("c1");
+
+      expect(aiCalls).toHaveLength(0);
+      expect(fetchCalls).toHaveLength(1);
+      expect(wrapper.text()).toContain("默认总结");
+      expect(wrapper.text()).toContain("来源：聊天服务端 /api/ai/summarize");
+      expect(wrapper.text()).not.toContain("设置 → AI 服务");
+    });
+
+    it("client 档：已配置客户端 AI 时只走客户端，不请求服务端", async () => {
+      persistBackend("client");
+      aiImpl = async () => ({
+        ok: true,
+        summary: "客户端总结",
+        messageCount: 2,
+        provider: "DeepSeek",
+        model: "deepseek-flash",
+      });
+      const { wrapper, summarize } = await mountHost();
+
+      await summarize("c1");
+
+      expect(aiCalls).toHaveLength(1);
+      expect(fetchCalls).toHaveLength(0);
+      expect(wrapper.text()).toContain("客户端总结");
+    });
+
+    it("client 档：客户端 AI 未配置时不回退服务端，给出可操作提示", async () => {
+      persistBackend("client");
+      aiImpl = async () => ({ ok: false, code: "not-configured", error: "not configured" });
+      const { wrapper, summarize } = await mountHost();
+
+      await summarize("c1");
+
+      expect(aiCalls).toHaveLength(1);
+      expect(fetchCalls).toHaveLength(0);
+      expect(wrapper.text()).toContain("当前为「仅客户端 AI」");
+    });
+
+    it("auto 档：未配置客户端 AI 时回退服务端（保持历史行为）", async () => {
+      persistBackend("auto");
+      aiImpl = async () => ({ ok: false, code: "not-configured", error: "not configured" });
+      const { wrapper, summarize } = await mountHost();
+
+      await summarize("c1");
+
+      expect(fetchCalls).toHaveLength(1);
+      expect(wrapper.text()).toContain("默认总结");
     });
   });
 

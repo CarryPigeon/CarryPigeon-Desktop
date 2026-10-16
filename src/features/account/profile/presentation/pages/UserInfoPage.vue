@@ -8,6 +8,7 @@ import { computed, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
+import BackButton from "@/shared/ui/BackButton.vue";
 import { getAccountCapabilities } from "@/features/account/api";
 import { getCurrentUserCapabilities } from "@/features/account/current-user/api";
 import { getServerConnectionCapabilities } from "@/features/server-connection/api";
@@ -289,7 +290,7 @@ async function handleSaveEdit(): Promise<void> {
       <header class="cp-info__hero" :style="heroStyle">
         <div class="cp-info__hero-overlay"></div>
         <div class="cp-info__hero-top">
-          <button class="cp-info__back" type="button" @click="router.back()">{{ t("back") }}</button>
+          <BackButton test-id="user-info-back" @click="router.back()" />
           <button v-if="isOwnProfile && !isEditing" class="cp-info__edit" type="button" @click="handleStartEdit">{{ t("profile_edit") }}</button>
           <button v-else-if="isOwnProfile" class="cp-info__edit" type="button" @click="handleCancelEdit">{{ t("cancel") }}</button>
         </div>
@@ -333,7 +334,7 @@ async function handleSaveEdit(): Promise<void> {
           <div v-if="formError" class="cp-info__status cp-info__status--error">{{ formError }}</div>
           <div v-if="formSuccess" class="cp-info__status cp-info__status--success">{{ formSuccess }}</div>
           <div class="cp-info__editActions">
-            <button class="cp-info__back" type="button" @click="handleCancelEdit">{{ t("cancel") }}</button>
+            <button class="cp-info__cancel" type="button" @click="handleCancelEdit">{{ t("cancel") }}</button>
             <button class="cp-info__edit" :disabled="isSaving" type="button" @click="handleSaveEdit">
               {{ isSaving ? t("profile_saving") : t("save") }}
             </button>
@@ -459,7 +460,7 @@ async function handleSaveEdit(): Promise<void> {
   flex: 1 1 auto;
 }
 
-.cp-info__back,
+.cp-info__cancel,
 .cp-info__edit,
 .cp-info__smallBtn {
   border: 1px solid var(--cp-border);
@@ -475,7 +476,7 @@ async function handleSaveEdit(): Promise<void> {
     border-color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-info__back:hover,
+.cp-info__cancel:hover,
 .cp-info__edit:hover,
 .cp-info__smallBtn:hover {
   transform: translateY(-1px);

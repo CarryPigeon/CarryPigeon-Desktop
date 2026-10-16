@@ -16,6 +16,7 @@ import {
   type BookmarkEntry,
 } from "../storage/localBookmarkStorage";
 import AppIcon from "@/shared/ui/AppIcon.vue";
+import BackButton from "@/shared/ui/BackButton.vue";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import EmptyState from "@/shared/ui/EmptyState.vue";
 
@@ -88,9 +89,7 @@ function fmtTime(ms: number): string {
   <ErrorBoundary>
     <div class="cp-savedMessages">
       <header class="cp-savedMessages__header">
-        <button class="cp-savedMessages__back" type="button" @click="router.push('/chat')">
-          <t-icon name="chevron-left" /> {{ t("back") }}
-        </button>
+        <BackButton test-id="saved-messages-back" @click="router.push('/chat')" />
         <h1 class="cp-savedMessages__title"><AppIcon name="bookmark" :size="16" :stroke-width="1.75" /> {{ t("saved_messages") }}</h1>
         <button
           v-if="bookmarks.length > 0"
@@ -147,7 +146,7 @@ function fmtTime(ms: number): string {
               :title="t('remove_bookmark')"
               @click.stop="handleRemove(entry.messageId)"
             >
-              <t-icon name="close" />
+              <AppIcon name="close" />
             </button>
           </div>
         </li>
@@ -171,24 +170,6 @@ function fmtTime(ms: number): string {
   padding: 12px 16px;
   border-bottom: 1px solid var(--cp-border);
   flex-shrink: 0;
-}
-
-.cp-savedMessages__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--cp-accent);
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.1s;
-}
-
-.cp-savedMessages__back:hover {
-  background: color-mix(in oklab, var(--cp-accent) 10%, transparent);
 }
 
 .cp-savedMessages__title {

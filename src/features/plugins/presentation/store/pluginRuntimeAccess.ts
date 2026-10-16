@@ -5,6 +5,7 @@
  */
 
 import type { DomainBinding, DomainRegistryHostBridge } from "@/features/plugins/contracts/domainRegistry";
+import type { PluginSettingsContribution } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 import { useDomainRegistryStore } from "./domainRegistryStore";
 
 export type PluginRuntimeAccess = {
@@ -15,6 +16,7 @@ export type PluginRuntimeAccess = {
   getBinding(domain: string): DomainBinding | null;
   getContextForPlugin(pluginId: string): unknown;
   getContextForDomain(domain: string): unknown;
+  listSettingsItems(): readonly PluginSettingsContribution[];
   setHostBridge(bridge: DomainRegistryHostBridge | null): void;
 };
 
@@ -44,6 +46,9 @@ export function usePluginRuntimeAccess(serverSocket: string): PluginRuntimeAcces
     },
     getContextForDomain(domain: string): unknown {
       return registry.getContextForDomain(domain);
+    },
+    listSettingsItems(): readonly PluginSettingsContribution[] {
+      return registry.pluginSettingsItems;
     },
     setHostBridge(bridge: DomainRegistryHostBridge | null): void {
       registry.setHostBridge(bridge);

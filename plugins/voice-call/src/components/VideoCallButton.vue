@@ -5,13 +5,14 @@
     :title="t('video_call')"
     @click="$emit('start')"
   >
-    <t-icon name="camera" class="voice-call-icon" />
+    <AppIcon name="camera" class="voice-call-icon" />
   </button>
 </template>
 
 <script setup lang="ts">
 import type { CallState } from "../domain/contracts";
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 defineProps<{
   callState: CallState;

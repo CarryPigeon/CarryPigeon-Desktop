@@ -12,6 +12,7 @@ import { ref, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { TAURI_COMMANDS } from "@/shared/tauri/commands";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 
@@ -134,9 +135,9 @@ onUnmounted(() => {
     :aria-label="state === 'idle' ? t('voice_record_start') : state === 'recording' ? t('voice_record_stop') : t('voice_record_processing')"
     @click="toggleRecording"
   >
-    <t-icon v-if="state === 'idle'" name="microphone" class="cp-voiceRecorder__icon" />
-    <t-icon v-else-if="state === 'recording'" name="microphone" class="cp-voiceRecorder__icon cp-voiceRecorder__icon--recording" />
-    <t-icon v-else name="loading" class="cp-voiceRecorder__icon" />
+    <AppIcon v-if="state === 'idle'" name="microphone" class="cp-voiceRecorder__icon" />
+    <AppIcon v-else-if="state === 'recording'" name="microphone" class="cp-voiceRecorder__icon cp-voiceRecorder__icon--recording" />
+    <AppIcon v-else name="loading" class="cp-voiceRecorder__icon" />
     <span v-if="state === 'recording'" class="cp-voiceRecorder__timer">
       {{ formatDuration(elapsedMs) }}
     </span>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CarryPigeon 站点图标：与 src/shared/ui/AppLogo.vue 同一自绘几何（信封 + 鸽翼）。
+  favicon 无法使用 currentColor，故显式写入品牌色并加重线宽以保证 16px 下可辨识。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#fffdf8" />
+  <g
+    transform="translate(4 4)"
+    fill="none"
+    stroke="#0f766e"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M8.5 5.6c2.6 2.1 5.8 2.6 9.6 1.6" />
+    <path d="M3.5 9h17v10.5h-17z" />
+    <path d="m3.5 10 8.5 5.8 8.5-5.8" />
+  </g>
+</svg>

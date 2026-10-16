@@ -4,13 +4,15 @@
  * @description Patchbay 左侧频道栏：服务器上下文、必需插件 gate、频道筛选与列表。
  */
 
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
-import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
+import ContextMenuSurface from "@/shared/ui/contextMenu/ContextMenuSurface.vue";
+import ContextMenuItem from "@/shared/ui/contextMenu/ContextMenuItem.vue";
 import CategoryGroupHeader from "@/features/chat/presentation/patchbay/components/rails/CategoryGroupHeader.vue";
 import type { ChannelRailModel } from "@/features/chat/presentation/patchbay/view-models/useChannelRailModel";
 import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummary";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   model: ChannelRailModel;
@@ -26,38 +28,19 @@ const serverMenuOpen = ref(false);
 const serverMenuAnchor = ref<HTMLElement | null>(null);
 
 /**
- * 浮动菜单定位：打开后测量菜单真实尺寸并钳制到视口内，避免被窗口边界裁切。
- * 替代原先基于 MENU_WIDTH / MENU_HEIGHT_ESTIMATE 的估算逻辑。
+ * 服务器菜单锚点坐标：定位与视口钳制由 `ContextMenuSurface` 统一负责。
  */
-const { setMenuEl: setServerMenuEl, menuStyle: serverMenuStyle, schedulePlacement: scheduleServerMenuPlacement } =
-  useFloatingMenu({
-    x: () => serverMenuAnchor.value?.getBoundingClientRect().right ?? 0,
-    y: () => (serverMenuAnchor.value?.getBoundingClientRect().bottom ?? 0) + 4,
-    open: () => serverMenuOpen.value,
-  });
+const serverMenuX = computed(() => serverMenuAnchor.value?.getBoundingClientRect().right ?? 0);
+const serverMenuY = computed(() => (serverMenuAnchor.value?.getBoundingClientRect().bottom ?? 0) + 4);
 
 function openServerMenu(): void {
   serverMenuOpen.value = true;
-  scheduleServerMenuPlacement();
 }
 
 function handleMenu(action: () => void): void {
   serverMenuOpen.value = false;
   action();
 }
-
-/**
- * 全局快捷关闭：Esc 关闭服务器菜单。
- */
-function onGlobalKeydown(e: KeyboardEvent): void {
-  if (!serverMenuOpen.value) return;
-  if (e.key !== "Escape") return;
-  e.preventDefault();
-  serverMenuOpen.value = false;
-}
-
-onMounted(() => window.addEventListener("keydown", onGlobalKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown));
 
 /**
  * 频道分类分组。
@@ -180,48 +163,45 @@ onMounted(() => {
         :aria-label="t('more_actions')"
         @click.stop="openServerMenu"
       >
-        <t-icon name="more" />
+        <AppIcon name="more" />
       </button>
     </div>
 
     <!-- 服务器菜单 -->
-    <Teleport to="body">
-      <div
-        v-if="serverMenuOpen"
-        :ref="setServerMenuEl"
-        class="cp-serverMenu"
-        :style="serverMenuStyle"
-        role="menu"
-        :aria-label="t('more_actions')"
-        @click.stop
+    <ContextMenuSurface
+      :open="serverMenuOpen"
+      :x="serverMenuX"
+      :y="serverMenuY"
+      :min-width="200"
+      :aria-label="t('more_actions')"
+      @close="serverMenuOpen = false"
+    >
+      <ContextMenuItem @select="handleMenu(props.model.openPlugins)">
+        {{ t('server_info_menu_plugins') }}
+      </ContextMenuItem>
+      <ContextMenuItem
+        v-if="props.model.missingRequiredCount > 0"
+        danger
+        @select="handleMenu(props.model.openRequiredSetup)"
       >
-        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openPlugins)">
-          {{ t('server_info_menu_plugins') }}
-        </button>
-        <button
-          v-if="props.model.missingRequiredCount > 0"
-          class="cp-serverMenu__item danger"
-          type="button"
-          role="menuitem"
-          @click="handleMenu(props.model.openRequiredSetup)"
-        >
-          {{ t('server_info_menu_required_setup') }}
-        </button>
-        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openServerManager)">
-          {{ t('server_info_menu_server_manager') }}
-        </button>
-        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openFileManager)">
-          {{ t('server_info_menu_file_manager') }}
-        </button>
-        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openSettings)">
-          {{ t('server_info_menu_settings') }}
-        </button>
-        <button class="cp-serverMenu__item" type="button" role="menuitem" @click="handleMenu(props.model.openPinnedChannelsFile)">
-          {{ t('server_info_menu_edit_pinned_channels') }}
-        </button>
-      </div>
-      <div v-if="serverMenuOpen" class="cp-serverMenu__backdrop" @click="serverMenuOpen = false" />
-    </Teleport>
+        {{ t('server_info_menu_required_setup') }}
+      </ContextMenuItem>
+      <ContextMenuItem @select="handleMenu(props.model.openServerManager)">
+        {{ t('server_info_menu_server_manager') }}
+      </ContextMenuItem>
+      <ContextMenuItem @select="handleMenu(props.model.openFileManager)">
+        {{ t('server_info_menu_file_manager') }}
+      </ContextMenuItem>
+      <ContextMenuItem @select="handleMenu(props.model.openSettings)">
+        {{ t('server_info_menu_settings') }}
+      </ContextMenuItem>
+      <ContextMenuItem
+        :disabled="!props.model.socket"
+        @select="handleMenu(props.model.openPinnedChannelsEditor)"
+      >
+        {{ t('server_info_menu_edit_pinned_channels') }}
+      </ContextMenuItem>
+    </ContextMenuSurface>
 
     <!-- 区块：频道搜索 + 已加入/发现 Tab -->
     <div class="cp-channelSearch">
@@ -319,8 +299,8 @@ onMounted(() => {
                 <span class="cp-channelRow__meta">
                   <span class="cp-channel__name">
                     {{ c.name }}
-                    <span v-if="group.id === '__pinned__'" class="cp-channel__pin-icon" :title="t('channel_pinned')">📌</span>
-                    <span v-if="props.model.isChannelMuted(c.id)" class="cp-channel__muted-icon" title="muted">🔇</span>
+                    <span v-if="group.id === '__pinned__'" class="cp-channel__pin-icon" :title="t('channel_pinned')"><AppIcon name="pin" /></span>
+                    <span v-if="props.model.isChannelMuted(c.id)" class="cp-channel__muted-icon" title="muted"><AppIcon name="bell-off" /></span>
                   </span>
                   <span class="cp-channelRow__brief">{{ c.brief }}</span>
                   <span v-if="c.memberCount != null" class="cp-channelRow__count">{{ t("channel_member_count", { n: c.memberCount }) }}</span>
@@ -347,7 +327,7 @@ onMounted(() => {
                   :aria-label="t('channel_info')"
                   @click.stop="props.model.openChannelInfo(c.id)"
                 >
-                  <t-icon name="info-circle" />
+                  <AppIcon name="info-circle" />
                 </button>
               </div>
             </article>
@@ -417,69 +397,6 @@ onMounted(() => {
 .cp-serverCard__menuBtn:hover {
   background: var(--cp-hover-bg);
   color: var(--cp-text);
-}
-.cp-serverMenu {
-  position: fixed;
-  z-index: 9999;
-  min-width: 180px;
-  border: 1px solid color-mix(in oklab, var(--cp-info) 18%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-panel) 92%, rgba(0, 0, 0, 0.05));
-  border-radius: 16px;
-  box-shadow: var(--cp-shadow);
-  padding: 8px;
-  backdrop-filter: blur(10px);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cp-serverMenu__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-}
-
-.cp-serverMenu__item {
-  width: 100%;
-  display: flex;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 10px 10px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--cp-text);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-serverMenu__item:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-border);
-}
-
-.cp-serverMenu__item:active {
-  transform: translateY(0);
-}
-
-.cp-serverMenu__item.danger {
-  color: color-mix(in oklab, var(--cp-danger) 72%, var(--cp-text));
-}
-
-.cp-serverMenu__item.danger:hover {
-  border-color: color-mix(in oklab, var(--cp-danger) 26%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
-}
-
-.cp-serverMenu__item:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 40%, var(--cp-border));
-  outline-offset: 2px;
 }
 
 .cp-channelRow__count {

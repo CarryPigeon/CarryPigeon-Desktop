@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+### 新增功能
+- **设置页左栏搜索**：设置页左栏新增搜索框（原生输入 + 内联 SVG 放大镜，样式与设置页玻璃面板一致），有查询时结果列表替换分区导航，支持 `↑`/`↓` 移动、`Enter` 跳转、`Esc` / 清空按钮恢复导航；点击结果滚动到目标并短暂高亮。搜索基于单一真源 `src/features/settings/presentation/settingsCatalog.ts`（内置 21 项索引 + 模板 `data-settings-item` 锚点，单测校验二者不漂移），匹配「标题 / 说明 / 追加关键词 / 分区名 / 插件 id」，空格分词取 AND。
+- **插件可向设置页添加设置项（`ctx.ui.registerSettingsItem`）**：新增插件能力，插件在 `apply` 内注册 `{ id, title, description?, keywords?, order?, component }`（需 `ui` 权限）；宿主按 server 维护纯数据注册表 `runtime/pluginSettingsRegistry.ts`，由 `domainRegistryStore` 投影为响应式 `pluginSettingsItems`（组件统一 `markRaw`），设置页新增「插件设置」分区（按插件分组、单项独立 `ErrorBoundary`、宿主提供卡片外壳），并经 `plugins/api → forServer(socket).listPluginSettingsItems()` 跨 feature 只读消费；插件停用/卸载或切换 server 后设置项立即消失。设置值由插件用 `ctx.storage` 自行持久化。
+- **内置 ai-summary 插件改用插件设置提供「AI 摘要后端」**：新增 `plugins/ai-summary/src/domain/summarizeBackend.ts`（纯逻辑）与设置项控件，可选「自动（优先客户端 AI，未配置回退服务端，保持历史行为）/ 仅客户端 AI（未配置时提示且不静默回退）/ 仅服务端（忽略客户端 AI 配置）」，偏好经 `ctx.storage` 按 server 持久化；面板在请求前载入该偏好，且「仅服务端」档不再展示客户端 AI 引导。
+
+### UX 改进
+- **设置页右侧改为分区 Tab 切换**：左栏导航由「滚动定位 + `IntersectionObserver` 滚动高亮」改为 Tab（`role="tablist"` / `role="tab"` + `aria-selected`），点击任一导航项只切换右栏当前分区面板（非当前面板 `v-show` 隐藏但保持挂载，插件设置项控件与「AI 服务」不在切换时重新挂载/重打 IPC），并把右栏滚动复位到顶部，不再对整页 `scrollIntoView`；搜索跳转改为「先切到目标分区 Tab，再在面板内滚动 + 高亮」。「插件设置」（当前 server 无插件设置项）与「关于」（应用信息未就绪）导航项不出现，保证每个导航项都有已渲染面板；分区集合变化后当前 Tab 不存在时自动回退到「通用」。
+- **置顶频道改为应用内可视化编辑**：服务器卡菜单「编辑置顶频道」不再用系统默认程序打开本机 `channel-pins.json`，改为打开应用内弹窗，支持搜索频道、置顶 / 取消置顶、拖拽或方向按钮排序，并一次性保存整份有序列表；顺序即频道栏置顶分组的展示顺序，用户无需再手动编辑 JSON。新增 Rust `channel_pins_set_order` 命令与 `channel_pin_order` 纯逻辑校验，移除 `channel_pins_file_path` / `channel_pins_open_file` 与对应错误文案。
+- **内置插件入口图标更贴合语义**：`theme` 工具栏入口 `palette` → `contrast`（面向亮/暗/跟随系统的外观切换，不再被误读为配色）、`group-notice` `notification` → `loudspeaker`（避免与宿主 `@提醒` 铃铛同形）、`ai-summary` `city-12` → `ai-article`（AI 摘要文档）；插件面板标题与群公告气泡图标同步更新。
+- **右键菜单统一为应用风格并屏蔽 WebView2 原生菜单**：新增 `src/shared/ui/contextMenu/*`（`ContextMenuSurface` / `ContextMenuItem` / `ContextMenuSeparator` / `ContextMenuLabel` / `ContextMenuHost`）与 `src/shared/utils/contextMenu.ts`；在 `App.vue` 挂载全局宿主，右键输入框给出「撤销 / 重做 / 剪切 / 复制 / 粘贴 / 全选」（带快捷键提示与置灰规则），选中文本给出「复制 / 全选」，其余位置仅屏蔽原生菜单。既有消息 / 频道 / 服务器 / 服务器 DND / 文件列表 5 处菜单迁移到同一套基元（简洁实心面板：`--cp-surface` + 圆角 14px + `--cp-shadow-float`，面板 z-index 10050），并补齐此前仅被引用、从未定义的 `--cp-shadow-float` token。「粘贴」走官方剪贴板插件（新增 `tauri-plugin-clipboard-manager` 依赖与 `clipboard-manager:allow-read-text` 权限），规避 WebView2 默认拒绝 `clipboard-read` 的问题；dev 构建保留 `Shift + 右键` 原生菜单逃生舱。
+- **聊天消息区窄宽度自适应（面板被压窄时更协调）**：消息区不再横向滚动（`.cp-signalPane` 由 `overflow: auto` 改为 `overflow-x: hidden` + `overflow-y: auto`，此前内容超宽会在消息区底部冒出横向滚动条），中间栏 `.cp-center` 建立容器查询上下文并按面板实测宽度做两级密度降级（≤520px：内边距 14→10px、头像列 44→40px、行间距 12→10px、meta 下边距 8→6px；≤400px：内边距→8px、行间距→8px、名称与时间同步 12→11px 且允许换行），窗口缩放与仅拖动 channel-message resizer 压窄面板同样生效，面板 ≥521px 时观感与改动前一致。同时补齐可收缩链修复引用卡片被右缘裁切：`.cp-quoteReply__preview` 等 `nowrap` flex 子项此前缺 `min-width: 0`（flex 默认 `min-width: auto` 拒绝收缩），导致 `text-overflow: ellipsis` 永不触发、卡片直接撑破消息行；并为 `.cp-messageContent` / `.cp-bubble` / `.cp-pluginBubble` / `.cp-replyMini` 补 `min-width: 0` 与 `max-width: 100%`，新增样式契约测试 `patchbayNarrowLayout.test.ts` 钉住上述关键声明。
+
+### 国际化
+- 新增设置搜索与插件设置分区中英文键值（搜索占位/清空/结果计数/空态、插件设置分区标题与副标题、插件来源标签）。
+- ai-summary 插件新增后端设置项中英文文案（档位标签与逐档说明、保存失败、仅客户端 AI 未配置提示）。
+
 ## [0.6.0] - 2026-10-03
 
 ### 新增功能

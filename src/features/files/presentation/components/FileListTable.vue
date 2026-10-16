@@ -4,10 +4,13 @@
  * @description files｜文件列表表格组件（增强版：排序表头、多选、右键菜单）。
  */
 
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import AppIcon from "@/shared/ui/AppIcon.vue";
-import { useFloatingMenu } from "@/shared/ui/useFloatingMenu";
+import { fileTypeIconName } from "@/shared/ui/icons/fileTypeIcon";
+import ContextMenuSurface from "@/shared/ui/contextMenu/ContextMenuSurface.vue";
+import ContextMenuItem from "@/shared/ui/contextMenu/ContextMenuItem.vue";
+import ContextMenuSeparator from "@/shared/ui/contextMenu/ContextMenuSeparator.vue";
 import type { FileRecord, FileSortField, SortOrder } from "../../domain/contracts";
 
 const props = defineProps<{
@@ -40,13 +43,8 @@ const contextMenu = ref<{ visible: boolean; x: number; y: number; file: FileReco
 });
 
 /**
- * 浮动菜单定位：打开后测量菜单尺寸并钳制到视口内，避免被窗口边界裁切。
+ * 浮动菜单定位：由 `ContextMenuSurface` 统一测量并钳制到视口内。
  */
-const { setMenuEl, menuStyle, schedulePlacement } = useFloatingMenu({
-  x: () => contextMenu.value.x,
-  y: () => contextMenu.value.y,
-  open: () => contextMenu.value.visible,
-});
 
 const columns: { field: FileSortField | null; label: string; sortable: boolean }[] = [
   { field: null, label: "", sortable: false },
@@ -73,20 +71,11 @@ function handleRowClick(file: FileRecord): void {
 function handleContextMenu(event: MouseEvent, file: FileRecord): void {
   event.preventDefault();
   contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, file };
-  schedulePlacement();
 }
 
 function closeContextMenu(): void {
   contextMenu.value.visible = false;
 }
-
-onMounted(() => {
-  document.addEventListener("click", closeContextMenu);
-});
-
-onUnmounted(() => {
-  document.removeEventListener("click", closeContextMenu);
-});
 
 function isAllSelected(): boolean {
   return props.files.length > 0 && props.files.every((f) => props.selectedIds.has(f.id));
@@ -102,13 +91,14 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/**
+ * 选择文件类型图标（自绘注册表 key）。
+ *
+ * @param mimeType - 文件 mime type。
+ * @returns `AppIcon` 图标名。
+ */
 function getTypeIcon(mimeType: string): string {
-  if (mimeType.startsWith("image/")) return "🖼️";
-  if (mimeType.startsWith("video/")) return "🎬";
-  if (mimeType.startsWith("audio/")) return "🎵";
-  if (mimeType.includes("pdf")) return "📄";
-  if (mimeType.includes("zip") || mimeType.includes("rar") || mimeType.includes("gzip")) return "📦";
-  return "📎";
+  return fileTypeIconName(mimeType);
 }
 
 function formatTime(iso: string): string {
@@ -156,7 +146,7 @@ function formatTime(iso: string): string {
           @change="emit('toggleSelect', file.id)"
         />
       </span>
-      <span class="cp-fileTable__icon">{{ getTypeIcon(file.mimeType) }}</span>
+      <span class="cp-fileTable__icon"><AppIcon :name="getTypeIcon(file.mimeType)" /></span>
       <div class="cp-fileTable__meta">
         <span class="cp-fileTable__name">{{ file.filename }}</span>
         <span v-if="file.channelName" class="cp-fileTable__channel">{{ file.channelName }}</span>
@@ -166,40 +156,38 @@ function formatTime(iso: string): string {
       <span class="cp-fileTable__cell">{{ file.uploaderName || "-" }}</span>
       <span class="cp-fileTable__actions">
         <button class="cp-fileTable__actionBtn" type="button" :title="t('download')" @click.stop="emit('download', file)">
-          <t-icon name="download" />
+          <AppIcon name="download" />
         </button>
       </span>
     </div>
   </div>
 
   <!-- Context Menu -->
-  <Teleport to="body">
-    <div
-      v-if="contextMenu.visible"
-      :ref="setMenuEl"
-      class="cp-contextMenu"
-      :style="menuStyle"
-      @click.stop="closeContextMenu"
-    >
-      <div class="cp-contextMenu__item" @click="contextMenu.file && emit('preview', contextMenu.file)">
-        <t-icon name="browse" /> {{ t("file_preview") }}
-      </div>
-      <div class="cp-contextMenu__item" @click="contextMenu.file && emit('download', contextMenu.file)">
-        <t-icon name="download" /> {{ t("download") }}
-      </div>
-      <div class="cp-contextMenu__divider" />
-      <div class="cp-contextMenu__item" @click="contextMenu.file && emit('openChannel', contextMenu.file)">
-        <t-icon name="chat" /> {{ t("file_open_channel") }}
-      </div>
-      <div class="cp-contextMenu__item" @click="contextMenu.file && emit('copyLink', contextMenu.file)">
-        <t-icon name="link" /> {{ t("file_copy_link") }}
-      </div>
-      <div class="cp-contextMenu__divider" />
-      <div class="cp-contextMenu__item cp-contextMenu__item--danger" @click="contextMenu.file && emit('delete', contextMenu.file)">
-        <t-icon name="delete" /> {{ t("file_delete") }}
-      </div>
-    </div>
-  </Teleport>
+  <ContextMenuSurface
+    :open="contextMenu.visible"
+    :x="contextMenu.x"
+    :y="contextMenu.y"
+    :min-width="180"
+    @close="closeContextMenu"
+  >
+    <ContextMenuItem @select="contextMenu.file && emit('preview', contextMenu.file)">
+      <AppIcon name="browse" /> {{ t("file_preview") }}
+    </ContextMenuItem>
+    <ContextMenuItem @select="contextMenu.file && emit('download', contextMenu.file)">
+      <AppIcon name="download" /> {{ t("download") }}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem @select="contextMenu.file && emit('openChannel', contextMenu.file)">
+      <AppIcon name="chat" /> {{ t("file_open_channel") }}
+    </ContextMenuItem>
+    <ContextMenuItem @select="contextMenu.file && emit('copyLink', contextMenu.file)">
+      <AppIcon name="link" /> {{ t("file_copy_link") }}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem danger @select="contextMenu.file && emit('delete', contextMenu.file)">
+      <AppIcon name="delete" /> {{ t("file_delete") }}
+    </ContextMenuItem>
+  </ContextMenuSurface>
 </template>
 
 <style scoped lang="scss">
@@ -341,45 +329,5 @@ function formatTime(iso: string): string {
 .cp-fileTable__actionBtn:hover {
   background: var(--cp-hover-bg);
   color: var(--cp-text);
-}
-</style>
-
-<!-- Context Menu Styles (unscoped, teleported) -->
-<style lang="scss">
-.cp-contextMenu {
-  position: fixed;
-  z-index: 9999;
-  min-width: 160px;
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-border);
-  border-radius: 10px;
-  box-shadow: var(--cp-shadow-strong);
-  padding: 4px 0;
-  overflow: hidden;
-}
-
-.cp-contextMenu__item {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--cp-text);
-  cursor: pointer;
-  transition: background var(--cp-fast) var(--cp-ease);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cp-contextMenu__item:hover {
-  background: var(--cp-hover-bg);
-}
-
-.cp-contextMenu__item--danger {
-  color: #e74c3c;
-}
-
-.cp-contextMenu__divider {
-  height: 1px;
-  background: var(--cp-border);
-  margin: 4px 8px;
 }
 </style>

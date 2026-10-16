@@ -29,7 +29,9 @@ function makeIcon(name: string): Component {
     render: () => h(Icon, { name }),
   });
 }
-const NoticeIcon = makeIcon("notification");
+// loudspeaker（广播喇叭）：贴合「群公告 / 群通知」语义，并与宿主工具栏的
+// @提醒铃铛（notification）区分开，避免同一排出现两个同形图标。
+const NoticeIcon = makeIcon("loudspeaker");
 
 export function apply(ctx: Context): void {
   bindContext(ctx);

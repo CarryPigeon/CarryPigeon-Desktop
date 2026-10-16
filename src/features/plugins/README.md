@@ -82,7 +82,16 @@
 1. `domainRegistryStore.ensureLoaded()` 读取已安装且启用的插件。
 2. 通过 runtime gateway 获取 entry 信息。
 3. 动态 import `app://plugins/...` 模块并规范化导出。
-4. 注册 domains（renderer/composer/contract）供 chat 消费。
+4. 注册 domains（renderer/composer/contract）供 chat 消费，并把插件注册的设置项
+   （`ctx.ui.registerSettingsItem`）投影为响应式 `pluginSettingsItems` 供 settings 消费。
+
+### 插件设置项（settings 消费）
+
+1. 插件在 `apply` 内调用 `ctx.ui.registerSettingsItem({ id, title, keywords?, order?, component })`（需 `ui` 权限）；
+2. `createUiService` 写入该 server 的 `PluginSettingsRegistry`（`runtime/pluginSettingsRegistry.ts`，纯数据，fiber 销毁自动反注册）；
+3. `domainRegistryStore.refreshSettingsItems()` 把注册表投影为响应式数组（组件 `markRaw`）；
+4. settings 的 `usePluginSettings()` 通过 `capabilities.forServer(socket).listPluginSettingsItems()` 读取当前 server 的设置项，
+   渲染到设置页「插件设置」分区并纳入左侧搜索索引。
 
 ## 主要文件
 
@@ -99,6 +108,7 @@
   - 操作常量：`src/features/plugins/presentation/store/pluginInstallOperations.ts`
   - 安装态 selectors：`src/features/plugins/presentation/store/pluginInstallSelectors.ts`
 - 注册表 store：`src/features/plugins/presentation/store/domainRegistryStore.ts`
+- 设置项注册表（纯数据）：`src/features/plugins/runtime/pluginSettingsRegistry.ts`
 - 运行时编排：`src/features/plugins/presentation/runtime/pluginRuntime.ts`
 
 ## 公共 API 设计约定
@@ -109,6 +119,8 @@
 - server-scoped 能力统一通过 `capabilities.forServer(serverSocket)` 绑定上下文，避免在根公开面重复透传 `serverSocket`。
 - 运行时采用 `capabilities.runtime.acquireLease()`，而不是根级 `startRuntime()`。
 - 运行时只读查询统一使用 `capabilities.forServer(serverSocket).getRuntimeCapabilities()`，避免把普通查询函数命名成 Vue composable。
+- 插件向宿主 UI 的注册（overlay / 工具栏 / 设置项）统一走 `ctx.ui`（`ui` 权限门控）；设置项注册表按 server 隔离，
+  跨 feature 只读消费入口为 `capabilities.forServer(serverSocket).listPluginSettingsItems()`。
 - 稳定性修复不应顺手扩大公共 API：事件订阅、typed config/preferences、publisher trust、catalog 搜索/分页等能力需要单独设计与计划，避免把内部 store 或命令细节泄漏为跨 feature 契约。
 
 ## 相关文档

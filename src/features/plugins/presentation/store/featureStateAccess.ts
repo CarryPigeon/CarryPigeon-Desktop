@@ -121,6 +121,9 @@ export function createPluginsRuntimeStateAccess(serverSocket: string): PluginsRu
     getContextForDomain(domain) {
       return runtimeAccess.getContextForDomain(domain);
     },
+    listSettingsItems() {
+      return runtimeAccess.listSettingsItems();
+    },
     setHostBridge(bridge): void {
       runtimeAccess.setHostBridge(bridge);
     },

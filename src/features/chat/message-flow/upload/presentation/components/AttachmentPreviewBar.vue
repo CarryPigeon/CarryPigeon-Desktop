@@ -9,6 +9,7 @@
  */
 
 import type { FileAttachment } from "../runtime/fileAttachmentStore";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 defineProps<{
   /**
@@ -94,7 +95,7 @@ function formatSize(bytes: number): string {
           :aria-label="`File: ${att.file.name} (${formatSize(att.file.size)})`"
         >
           <div class="cp-attachmentBar__fileIcon" aria-hidden="true">
-            <t-icon name="file" />
+            <AppIcon name="file" />
           </div>
           <div class="cp-attachmentBar__fileMeta">
             <div class="cp-attachmentBar__fileName">{{ att.file.name }}</div>
@@ -121,13 +122,13 @@ function formatSize(bytes: number): string {
             :title="att.error || 'Upload failed'"
             @click="emit('retry', att.id)"
           >
-            <t-icon name="refresh" />
+            <AppIcon name="refresh" />
           </button>
         </div>
 
         <!-- 完成状态标记 -->
         <div v-if="att.status === 'done'" class="cp-attachmentBar__done">
-          <t-icon name="check" />
+          <AppIcon name="check" />
         </div>
 
         <!-- 移除按钮（上传中隐藏） -->
@@ -138,7 +139,7 @@ function formatSize(bytes: number): string {
           :aria-label="`Remove ${att.file.name}`"
           @click.stop="emit('remove', att.id)"
         >
-          <t-icon name="close" />
+          <AppIcon name="close" />
         </button>
       </div>
     </div>

@@ -17,6 +17,7 @@ import ConnectionToast from "@/features/chat/presentation/patchbay/components/ov
 import CreateChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/CreateChannelDialog.vue";
 import DeleteChannelDialog from "@/features/chat/presentation/patchbay/components/dialogs/DeleteChannelDialog.vue";
 import ChannelInfoDialog from "@/features/chat/presentation/channel-info/ChannelInfoDialog.vue";
+import PinnedChannelsDialog from "@/features/chat/presentation/patchbay/components/dialogs/PinnedChannelsDialog.vue";
 import "@/features/chat/public/styles";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
@@ -361,6 +362,17 @@ onBeforeUnmount(() => {
         :channel-name="page.channelInfoDialog.channelName"
         :channel-brief="page.channelInfoDialog.channelBrief"
         @update:visible="page.channelInfoDialog.close"
+      />
+
+      <!-- 区块：置顶频道编辑弹窗（服务器卡菜单入口，应用内完成置顶/取消/排序） -->
+      <PinnedChannelsDialog
+        :visible="page.pinnedChannelsDialog.visible"
+        :server-name="page.pinnedChannelsDialog.serverName"
+        :channels="page.channels"
+        :pinned-ids="page.pinnedChannelsDialog.pinnedIds"
+        :saving="page.pinnedChannelsDialog.saving"
+        @update:visible="page.pinnedChannelsDialog.close"
+        @confirm="page.pinnedChannelsDialog.handleConfirm"
       />
 
       <ConnectionToast

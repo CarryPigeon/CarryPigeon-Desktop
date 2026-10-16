@@ -20,6 +20,7 @@ import type {
   PluginMessagesApi,
   PluginOverlayMountHandle,
   PluginRuntimeContract,
+  PluginSettingsItemInput,
 } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 
 /** 宿主网络能力的响应形状（由 Rust 受控 fetch 返回）。 */
@@ -71,7 +72,7 @@ export type PluginMessagesService = PluginMessagesApi & {
   send(payload: PluginComposerPayload): Promise<void>;
 };
 
-/** 全局 UI 挂载能力（overlay / 工具栏入口）。 */
+/** 全局 UI 挂载能力（overlay / 工具栏入口 / 设置项注册）。 */
 export type PluginUiService = {
   mountOverlay(
     component: Component,
@@ -84,6 +85,15 @@ export type PluginUiService = {
     order?: number;
     onClick: (ctx: PluginChatContext) => void;
   }): () => void;
+  /**
+   * 注册一个设置项到宿主设置页（「插件设置」分区），返回反注册函数。
+   *
+   * 说明：
+   * - 需要在 manifest 声明 `ui` 权限；
+   * - 设置项按插件 fiber 生命周期自动反注册（停用/卸载插件即从设置页消失）；
+   * - `title` / `description` 由插件自行本地化（例如 `ctx.server.lang`），宿主仅用于展示与搜索。
+   */
+  registerSettingsItem(input: PluginSettingsItemInput): () => void;
 };
 
 /** 受限 IPC 能力（命令/事件前缀白名单来自已校验的 plugin.json）。 */

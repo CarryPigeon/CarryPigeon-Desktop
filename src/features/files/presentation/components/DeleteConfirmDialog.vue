@@ -5,6 +5,7 @@
  */
 
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -23,7 +24,7 @@ const { t } = useI18n();
   <Teleport to="body">
     <div v-if="visible" class="cp-deleteOverlay" @click.self="emit('cancel')">
       <div class="cp-deleteDialog">
-        <div class="cp-deleteDialog__icon"><t-icon name="delete" size="32" /></div>
+        <div class="cp-deleteDialog__icon"><AppIcon name="delete" :size="32" /></div>
         <div class="cp-deleteDialog__title">{{ t("file_delete_confirm_title") }}</div>
         <div class="cp-deleteDialog__msg">
           {{ t("file_delete_confirm_message", { count }) }}

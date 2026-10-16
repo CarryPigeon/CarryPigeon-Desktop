@@ -43,6 +43,7 @@ public/plugins/
 .tmp-crops/
 .tmp-fonttest/
 .tmp-replypreview/
+.tmp-menu-preview/
 docs/superpowers/
 .superpowers/
 .worktrees/

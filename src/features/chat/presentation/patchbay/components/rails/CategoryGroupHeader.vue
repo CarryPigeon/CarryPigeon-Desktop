@@ -4,6 +4,7 @@
  * @description Patchbay 频道栏分类分组标题：显示分类名称、频道计数、折叠/展开切换。
  */
 import { computed } from "vue";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   /** 分类分组 ID。 */
@@ -48,7 +49,7 @@ function handleToggle(): void {
     @keydown.space.prevent="handleToggle"
   >
     <span class="cp-categoryHeader__arrow" :data-collapsed="collapsed">
-      <t-icon name="chevron-down" />
+      <AppIcon name="chevron-down" />
     </span>
     <span class="cp-categoryHeader__name">{{ displayName }}</span>
     <span class="cp-categoryHeader__count">{{ count }}</span>

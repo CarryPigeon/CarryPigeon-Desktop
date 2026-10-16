@@ -45,7 +45,6 @@ const {
       :error-message="pageError"
       @back="goBack"
     >
-      <template #back-label>{{ t("back") }}</template>
       <template #loading>{{ t("loading") }}</template>
       <template #actions>
           <button class="cp-bans__btn primary" type="button" :disabled="!canOpenAddBanDialog" @click="openAddBanDialog">{{ t("add_ban") }}</button>

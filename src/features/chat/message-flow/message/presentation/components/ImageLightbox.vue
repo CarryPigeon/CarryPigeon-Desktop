@@ -341,7 +341,7 @@ watch(
             title="Rotate 90°"
             @click="rotateClockwise"
           >
-            <t-icon name="refresh" />
+            <AppIcon name="refresh" />
           </button>
           <button
             v-if="currentImage?.url"
@@ -352,7 +352,7 @@ watch(
             :disabled="isDownloading"
             @click="downloadImage"
           >
-            <t-icon :name="isDownloading ? 'loading' : 'download'" />
+            <AppIcon :name="isDownloading ? 'loading' : 'download'" />
           </button>
           <button
             class="cp-lightbox__closeBtn"
@@ -360,7 +360,7 @@ watch(
             aria-label="Close lightbox"
             @click="close"
           >
-            <t-icon name="close" />
+            <AppIcon name="close" />
           </button>
         </div>
       </div>
@@ -375,7 +375,7 @@ watch(
           aria-label="Previous image"
           @click="prev"
         >
-          <t-icon name="chevron-left" />
+          <AppIcon name="chevron-left" />
         </button>
 
         <!-- 媒体容器 -->
@@ -416,7 +416,7 @@ watch(
           aria-label="Next image"
           @click="next"
         >
-          <t-icon name="chevron-right" />
+          <AppIcon name="chevron-right" />
         </button>
       </div>
 

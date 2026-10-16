@@ -44,7 +44,7 @@ describe("MessageContextMenu 菜单形态", () => {
   it("默认（消息本体）形态渲染消息动作且不含跳转项", () => {
     const wrapper = mountMenu();
 
-    const labels = wrapper.findAll(".cp-msgmenu__item").map((item) => item.text());
+    const labels = wrapper.findAll(".cp-menu__item").map((item) => item.text());
     expect(labels).toContain("回复");
     expect(labels).toContain("多选");
     expect(labels).not.toContain("跳转到被回复的消息");
@@ -53,10 +53,10 @@ describe("MessageContextMenu 菜单形态", () => {
   it("引用块形态仅渲染跳转项", async () => {
     const wrapper = mountMenu({ mode: "reference" });
 
-    const labels = wrapper.findAll(".cp-msgmenu__item").map((item) => item.text());
+    const labels = wrapper.findAll(".cp-menu__item").map((item) => item.text());
     expect(labels).toEqual(["跳转到被回复的消息"]);
 
-    await wrapper.find(".cp-msgmenu__item").trigger("click");
+    await wrapper.find(".cp-menu__item").trigger("click");
 
     expect(wrapper.emitted("action")?.[0]).toEqual(["jump"]);
     expect(wrapper.emitted("close")).toHaveLength(1);

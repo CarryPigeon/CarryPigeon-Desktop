@@ -4,7 +4,7 @@
  * @description 设置页（主题偏好、运行时预览与相关入口）。
  */
 
-import { computed, ref, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import MonoTag from "@/shared/ui/MonoTag.vue";
@@ -17,6 +17,7 @@ import { getAboutCapabilities } from "@/features/about/api";
 import type { AppInfo } from "@/features/about/api-types";
 import { checkForUpdate, type UpdateStatus } from "@/shared/updater/checkUpdate";
 import { useSettingsPageModel } from "@/features/settings/presentation/composables/useSettingsPageModel";
+import { usePluginSettings } from "@/features/settings/presentation/composables/usePluginSettings";
 import { DEFAULT_APP_THEME, type AppAccent, type AppThemePreference } from "@/features/settings/domain/types/SettingsTypes";
 import { DEFAULT_APP_LOCALE } from "@/shared/utils/locale";
 import {
@@ -29,6 +30,22 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 import PageHeader from '@/shared/ui/PageHeader.vue';
 import DiagnosticsPanel from "@/features/settings/presentation/components/DiagnosticsPanel.vue";
 import { AiProviderSettings } from "@/features/ai/components";
+import {
+  SETTINGS_CATALOG,
+  SETTINGS_PLUGINS_SECTION_ID,
+  SETTINGS_SECTIONS,
+  findSettingsAnchor,
+  settingsPluginItemAnchor,
+  settingsSectionAnchorId,
+  type SettingsSectionId,
+} from "@/features/settings/presentation/settingsCatalog";
+import {
+  buildSettingsSearchEntries,
+  filterSettingsSearchEntries,
+  normalizeSettingsSearchQuery,
+  type SettingsSearchEntry,
+} from "@/features/settings/presentation/settingsSearch";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -64,55 +81,145 @@ const {
   businessPreferencesError,
 } = useSettingsPageModel();
 
-const sectionIds = ["general", "business", "ai", "data", "about"] as const;
+// 插件设置项（当前 server）：用于「插件设置」分区渲染与搜索索引。
+const {
+  items: pluginSettingsItems,
+  groups: pluginSettingsGroups,
+  ensureLoaded: ensurePluginSettingsLoaded,
+} = usePluginSettings();
 
-type SectionId = (typeof sectionIds)[number];
+// 应用信息（「关于」分区数据源）；在 navSections 之前声明：该 Tab 需按数据就绪出现。
+const appInfo = ref<AppInfo | null>(null);
 
-const sectionNav = computed(() => [
-  { id: "general" as const, label: t("general"), subtitle: t("settings_nav_general_sub") },
-  { id: "business" as const, label: t("settings_business"), subtitle: t("settings_nav_business_sub") },
-  { id: "ai" as const, label: t("settings_ai_service"), subtitle: t("settings_ai_provider") },
-  { id: "data" as const, label: t("settings_data"), subtitle: t("settings_nav_data_sub") },
-  { id: "about" as const, label: t("menu_about"), subtitle: t("about_version") },
-]);
+// 分区导航/内容区顺序与文案来自 settingsCatalog（单一真源）；
+// 「插件设置」无插件设置项、「关于」未取得应用信息时不出现，保证每个导航项都有已渲染面板。
+const navSections = computed(() =>
+  SETTINGS_SECTIONS.filter((section) => {
+    if (section.id === SETTINGS_PLUGINS_SECTION_ID) return pluginSettingsGroups.value.length > 0;
+    if (section.id === "about") return appInfo.value !== null;
+    return true;
+  }),
+);
 
-const activeSectionId = ref<SectionId>("general");
+const sectionNav = computed(() =>
+  navSections.value.map((section) => ({
+    id: section.id,
+    label: t(section.labelKey),
+    subtitle: t(section.subtitleKey),
+  })),
+);
+
+const activeSectionId = ref<SettingsSectionId>("general");
 const settingsSectionsRef = ref<HTMLElement | null>(null);
-let sectionObserver: IntersectionObserver | null = null;
+
+/**
+ * 切换右侧分区面板（Tab 语义：一次只显示一个分区），并把面板滚动条复位到顶部。
+ *
+ * @param sectionId - 目标分区 id。
+ */
+async function setActiveSection(sectionId: SettingsSectionId): Promise<void> {
+  activeSectionId.value = sectionId;
+  await nextTick();
+  const container = settingsSectionsRef.value;
+  if (container) container.scrollTop = 0;
+}
+
+// 搜索：查询非空时用结果列表替换左栏导航（清空后恢复导航）。
+const searchQuery = ref("");
+const normalizedSearchQuery = computed(() => normalizeSettingsSearchQuery(searchQuery.value));
+const searchActive = computed(() => normalizedSearchQuery.value.length > 0);
+const activeResultIndex = ref(0);
+
+// 搜索索引 = 内置设置项索引 + 插件注册的设置项（标题/说明已本地化）。
+const searchEntries = computed(() =>
+  buildSettingsSearchEntries({
+    catalog: SETTINGS_CATALOG,
+    pluginItems: pluginSettingsItems.value,
+    sections: SETTINGS_SECTIONS,
+    translate: (key) => t(key),
+  }),
+);
+
+const searchResults = computed(() =>
+  filterSettingsSearchEntries(searchEntries.value, searchQuery.value),
+);
+
+let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 给跳转目标加一次性高亮（outline 不影响布局；scoped 样式对页面内元素有效）。
+ *
+ * @param el - 目标元素。
+ */
+function flashSettingItem(el: HTMLElement): void {
+  if (flashTimer) clearTimeout(flashTimer);
+  el.classList.add("cp-settings__flash");
+  flashTimer = setTimeout(() => {
+    el.classList.remove("cp-settings__flash");
+    flashTimer = null;
+  }, 1200);
+}
+
+/**
+ * 跳转到某个搜索结果：先把右栏切到该条目所属分区（Tab），再在面板内滚动 + 高亮。
+ *
+ * @param entry - 目标条目。
+ * @param index - 结果序号（用于同步键盘高亮；缺省不改）。
+ */
+async function jumpToResult(entry: SettingsSearchEntry, index = -1): Promise<void> {
+  if (index >= 0) activeResultIndex.value = index;
+  await setActiveSection(entry.sectionId);
+  const target =
+    findSettingsAnchor(entry.anchor) ??
+    document.getElementById(settingsSectionAnchorId(entry.sectionId));
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  flashSettingItem(target);
+}
+
+/** 键盘移动搜索结果高亮（循环）。 */
+function moveActiveResult(delta: number): void {
+  const total = searchResults.value.length;
+  if (total === 0) return;
+  activeResultIndex.value = (activeResultIndex.value + delta + total) % total;
+}
+
+/** 回车跳转到当前高亮结果（无高亮时取第一条）。 */
+async function jumpToActiveResult(): Promise<void> {
+  const index = Math.min(activeResultIndex.value, searchResults.value.length - 1);
+  const entry = searchResults.value[index] ?? searchResults.value[0];
+  if (entry) await jumpToResult(entry, Math.max(index, 0));
+}
+
+function clearSearch(): void {
+  searchQuery.value = "";
+  activeResultIndex.value = 0;
+}
+
+watch(normalizedSearchQuery, () => {
+  activeResultIndex.value = 0;
+});
+
+// 分区集合变化（「插件设置」/「关于」异步出现或消失）时校正当前 Tab，避免右栏空白。
+watch(
+  () => navSections.value.map((section) => section.id).join(","),
+  () => {
+    if (navSections.value.some((section) => section.id === activeSectionId.value)) return;
+    void setActiveSection(navSections.value[0]?.id ?? "general");
+  },
+);
 
 onMounted(() => {
-  const container = settingsSectionsRef.value;
-  if (!container) return;
-  sectionObserver = new IntersectionObserver(
-    (entries) => {
-      const visibility = new Map<string, number>();
-      for (const entry of entries) {
-        const id = entry.target.id.replace("settings-section-", "");
-        visibility.set(id, entry.intersectionRatio);
-      }
-      let bestId: SectionId = activeSectionId.value;
-      let bestRatio = 0;
-      for (const [id, ratio] of visibility) {
-        if (ratio > bestRatio && (sectionIds as readonly string[]).includes(id)) {
-          bestRatio = ratio;
-          bestId = id as SectionId;
-        }
-      }
-      if (bestRatio > 0) activeSectionId.value = bestId;
-    },
-    { root: container, threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] },
-  );
-  for (const id of sectionIds) {
-    const el = document.getElementById(`settings-section-${id}`);
-    if (el) sectionObserver.observe(el);
-  }
+  ensurePluginSettingsLoaded();
 });
 
 onBeforeUnmount(() => {
-  sectionObserver?.disconnect();
+  if (flashTimer) {
+    clearTimeout(flashTimer);
+    flashTimer = null;
+  }
 });
 
-const appInfo = ref<AppInfo | null>(null);
 const updateCheckState = ref<UpdateStatus | { kind: 'checking' }>({ kind: 'checking' });
 const diagnosticsMode = ref(false);
 const diagnosticsVisible = ref(false);
@@ -141,18 +248,6 @@ const dataStatus = ref<{ tone: "success" | "danger"; message: string } | null>(n
 const settingsError = computed(
   () => themeError.value || preferencesError.value || businessPreferencesError.value,
 );
-
-function goToSection(sectionId: SectionId): void {
-  activeSectionId.value = sectionId;
-  document.getElementById(`settings-section-${sectionId}`)?.scrollIntoView({
-    behavior: "smooth",
-    block: "start",
-  });
-}
-
-function openPatchbay(): void {
-  router.push("/chat");
-}
 
 function setDataStatus(tone: "success" | "danger", message: string): void {
   dataStatus.value = { tone, message };
@@ -259,37 +354,130 @@ async function handleResetDefaults(): Promise<void> {
         back
         data-testid="settings-header"
         @back="router.back()"
-      >
-        <template #actions>
-          <button class="cp-settings__btn" data-testid="settings-open-patchbay" type="button" @click="openPatchbay">
-            {{ t("settings_open_patchbay") }}
-          </button>
-        </template>
-      </PageHeader>
+      />
 
       <div v-if="settingsError" class="cp-settings__errBanner" role="alert">{{ settingsError }}</div>
 
-      <!-- 区块：`.cp-settings__layout`｜用途：左右布局容器（左侧纵向导航 + 右侧滚动内容） -->
+      <!-- 区块：`.cp-settings__layout`｜用途：左右布局容器（左侧纵向 Tab 导航 + 右侧当前分区面板） -->
       <div class="cp-settings__layout">
         <aside class="cp-settings__navWrap">
-          <nav class="cp-settings__nav" :aria-label="t('settings_sections')">
-        <button
-          v-for="section in sectionNav"
-          :key="section.id"
-          class="cp-settings__navBtn"
-          :data-active="activeSectionId === section.id"
-          :data-testid="`settings-nav-${section.id}`"
-          type="button"
-          @click="goToSection(section.id)"
-        >
-          <span class="cp-settings__navLabel">{{ section.label }}</span>
-          <span class="cp-settings__navSub">{{ section.subtitle }}</span>
-          </button>
-          </nav>
+          <div class="cp-settings__rail">
+            <!-- 区块：设置搜索｜用途：按标题/说明/关键词/分区名搜索内置与插件设置项 -->
+            <div class="cp-settings__search" role="search">
+              <svg
+                class="cp-settings__searchIcon"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.6-3.6" />
+              </svg>
+              <input
+                v-model="searchQuery"
+                class="cp-settings__searchInput"
+                type="text"
+                role="searchbox"
+                data-testid="settings-search-input"
+                :aria-label="t('settings_search_placeholder')"
+                :placeholder="t('settings_search_placeholder')"
+                :aria-controls="searchActive ? 'settings-search-results' : undefined"
+                @keydown.down.prevent="moveActiveResult(1)"
+                @keydown.up.prevent="moveActiveResult(-1)"
+                @keydown.enter.prevent="jumpToActiveResult()"
+                @keydown.esc.prevent="clearSearch()"
+              />
+              <button
+                v-if="searchActive"
+                class="cp-settings__searchClear"
+                data-testid="settings-search-clear"
+                type="button"
+                :aria-label="t('settings_search_clear')"
+                :title="t('settings_search_clear')"
+                @click="clearSearch()"
+              >
+                <AppIcon name="close" />
+              </button>
+            </div>
+
+            <!-- 区块：搜索结果｜用途：查询非空时替换分区导航 -->
+            <div
+              v-if="searchActive"
+              id="settings-search-results"
+              class="cp-settings__results"
+              role="listbox"
+              data-testid="settings-search-results"
+              :aria-label="t('settings_search_placeholder')"
+            >
+              <div class="cp-settings__resultsHead">
+                {{ t("settings_search_count", { n: searchResults.length }) }}
+              </div>
+              <div v-if="searchResults.length === 0" class="cp-settings__resultsEmpty">
+                {{ t("settings_search_empty") }}
+              </div>
+              <button
+                v-for="(entry, index) in searchResults"
+                :key="entry.anchor"
+                class="cp-settings__result"
+                type="button"
+                role="option"
+                :id="`settings-search-option-${index}`"
+                :data-active="index === activeResultIndex"
+                :aria-selected="index === activeResultIndex"
+                :data-testid="`settings-search-result-${entry.anchor}`"
+                @mousemove="activeResultIndex = index"
+                @click="jumpToResult(entry, index)"
+              >
+                <span class="cp-settings__resultTitle">{{ entry.title }}</span>
+                <span class="cp-settings__resultMeta">
+                  {{ entry.sectionLabel }}
+                  <template v-if="entry.sourceLabel">· {{ entry.sourceLabel }}</template>
+                </span>
+              </button>
+            </div>
+
+            <nav
+              v-else
+              class="cp-settings__nav"
+              role="tablist"
+              aria-orientation="vertical"
+              :aria-label="t('settings_sections')"
+            >
+              <button
+                v-for="section in sectionNav"
+                :key="section.id"
+                :id="`settings-nav-${section.id}`"
+                class="cp-settings__navBtn"
+                role="tab"
+                :aria-selected="activeSectionId === section.id"
+                :aria-controls="settingsSectionAnchorId(section.id)"
+                :data-active="activeSectionId === section.id"
+                :data-testid="`settings-nav-${section.id}`"
+                type="button"
+                @click="setActiveSection(section.id)"
+              >
+                <span class="cp-settings__navLabel">{{ section.label }}</span>
+                <span class="cp-settings__navSub">{{ section.subtitle }}</span>
+              </button>
+            </nav>
+          </div>
         </aside>
 
       <section ref="settingsSectionsRef" class="cp-settings__sections">
-        <section id="settings-section-general" class="cp-settings__section" data-testid="settings-section-general">
+        <section
+          id="settings-section-general"
+          v-show="activeSectionId === 'general'"
+          class="cp-settings__section"
+          role="tabpanel"
+          aria-labelledby="settings-nav-general"
+          data-testid="settings-section-general"
+        >
           <header class="cp-settings__sectionHead">
             <div>
               <div class="cp-settings__sectionName">{{ t("settings_general_preferences") }}</div>
@@ -300,7 +488,7 @@ async function handleResetDefaults(): Promise<void> {
           <div v-if="preferencesError" class="cp-settings__err">{{ preferencesError }}</div>
 
           <div class="cp-settings__grid">
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="general-theme">
               <div class="cp-settings__k">{{ t("settings_theme") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__seg">
@@ -336,7 +524,7 @@ async function handleResetDefaults(): Promise<void> {
               </div>
             </div>
 
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="general-accent">
               <div class="cp-settings__k">{{ t("settings_accent") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__seg">
@@ -364,7 +552,7 @@ async function handleResetDefaults(): Promise<void> {
               </div>
             </div>
 
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="general-language">
               <div class="cp-settings__k">{{ t("settings_language") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__seg">
@@ -394,13 +582,13 @@ async function handleResetDefaults(): Promise<void> {
             <div class="cp-settings__card">
               <div class="cp-settings__k">{{ t("settings_startup") }}</div>
               <div class="cp-settings__v">
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="general-auto-login">
                   <span class="cp-settings__muted">{{ t("auto_login") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-auto-login" :data-active="autoLogin" type="button" @click="toggleAutoLogin(!autoLogin)">
                     {{ autoLogin ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="general-auto-launch">
                   <span class="cp-settings__muted">{{ t("settings_auto_launch") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-auto-launch" :data-active="autoLaunch" type="button" @click="toggleAutoLaunch(!autoLaunch)">
                     {{ autoLaunch ? t("enabled") : t("disabled") }}
@@ -413,13 +601,13 @@ async function handleResetDefaults(): Promise<void> {
             <div class="cp-settings__card">
               <div class="cp-settings__k">{{ t("notifications") }}</div>
               <div class="cp-settings__v">
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="general-close-to-tray">
                   <span class="cp-settings__muted">{{ t("close_to_tray") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-close-to-tray" :data-active="closeToTray" type="button" @click="toggleCloseToTray(!closeToTray)">
                     {{ closeToTray ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="general-check-for-updates">
                   <span class="cp-settings__muted">{{ t("check_for_updates") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-check-for-updates" :data-active="checkForUpdates" type="button" @click="toggleCheckForUpdates(!checkForUpdates)">
                     {{ checkForUpdates ? t("enabled") : t("disabled") }}
@@ -441,14 +629,14 @@ async function handleResetDefaults(): Promise<void> {
                     <MonoTag :value="MOCK_MODE" title="VITE_MOCK_MODE" :copyable="true" />
                   </div>
                 </template>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="general-diagnostics-mode">
                   <span class="cp-settings__muted">{{ t("settings_diagnostics_mode") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-diagnostics-mode" :data-active="diagnosticsMode" type="button" @click="toggleDiagnosticsMode(!diagnosticsMode)">
                     {{ diagnosticsMode ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
                 <div class="cp-settings__hint">{{ t("settings_diagnostics_mode_desc") }}</div>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="general-diagnostics-panel">
                   <span class="cp-settings__muted">{{ t("diagnostics_panel_title") }}</span>
                   <button
                     class="cp-settings__segBtn"
@@ -465,7 +653,14 @@ async function handleResetDefaults(): Promise<void> {
           </div>
         </section>
 
-        <section id="settings-section-business" class="cp-settings__section" data-testid="settings-section-business">
+        <section
+          id="settings-section-business"
+          v-show="activeSectionId === 'business'"
+          class="cp-settings__section"
+          role="tabpanel"
+          aria-labelledby="settings-nav-business"
+          data-testid="settings-section-business"
+        >
           <header class="cp-settings__sectionHead">
             <div>
               <div class="cp-settings__sectionName">{{ t("settings_business_settings") }}</div>
@@ -478,26 +673,26 @@ async function handleResetDefaults(): Promise<void> {
               <div class="cp-settings__k">{{ t("settings_feature_settings") }}</div>
               <div v-if="businessPreferencesError" class="cp-settings__err">{{ businessPreferencesError }}</div>
               <div class="cp-settings__v">
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="business-email-notifications">
                   <span class="cp-settings__muted">{{ t("email_notifications") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-email-notifications" :data-active="emailNotifications" type="button" @click="toggleEmailNotifications(!emailNotifications)">
                     {{ emailNotifications ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="business-desktop-notifications">
                   <span class="cp-settings__muted">{{ t("desktop_notifications") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-desktop-notifications" :data-active="desktopNotifications" type="button" @click="toggleDesktopNotifications(!desktopNotifications)">
                     {{ desktopNotifications ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="business-global-dnd">
                   <span class="cp-settings__muted">{{ t("global_dnd") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-global-dnd" :data-active="globalDnd" type="button" @click="toggleGlobalDnd(!globalDnd)">
                     {{ globalDnd ? t("enabled") : t("disabled") }}
                   </button>
                 </div>
                 <div class="cp-settings__hint">{{ t("global_dnd_desc") }}</div>
-                <div class="cp-settings__row">
+                <div class="cp-settings__row" data-settings-item="business-notification-sound">
                   <span class="cp-settings__muted">{{ t("notification_sound") }}</span>
                   <button class="cp-settings__segBtn" data-testid="settings-notification-sound" :data-active="notificationSound" type="button" @click="toggleNotificationSound(!notificationSound)">
                     {{ notificationSound ? t("enabled") : t("disabled") }}
@@ -508,7 +703,14 @@ async function handleResetDefaults(): Promise<void> {
           </div>
         </section>
 
-        <section id="settings-section-ai" class="cp-settings__section" data-testid="settings-section-ai">
+        <section
+          id="settings-section-ai"
+          v-show="activeSectionId === 'ai'"
+          class="cp-settings__section"
+          role="tabpanel"
+          aria-labelledby="settings-nav-ai"
+          data-testid="settings-section-ai"
+        >
           <header class="cp-settings__sectionHead">
             <div>
               <div class="cp-settings__sectionName">{{ t("settings_ai_service") }}</div>
@@ -517,7 +719,7 @@ async function handleResetDefaults(): Promise<void> {
           </header>
 
           <div class="cp-settings__grid">
-            <div class="cp-settings__card wide">
+            <div class="cp-settings__card wide" data-settings-item="ai-provider">
               <ErrorBoundary>
                 <AiProviderSettings />
               </ErrorBoundary>
@@ -525,7 +727,14 @@ async function handleResetDefaults(): Promise<void> {
           </div>
         </section>
 
-        <section id="settings-section-data" class="cp-settings__section" data-testid="settings-section-data">
+        <section
+          id="settings-section-data"
+          v-show="activeSectionId === 'data'"
+          class="cp-settings__section"
+          role="tabpanel"
+          aria-labelledby="settings-nav-data"
+          data-testid="settings-section-data"
+        >
           <header class="cp-settings__sectionHead">
             <div>
               <div class="cp-settings__sectionName">{{ t("settings_data_management") }}</div>
@@ -534,7 +743,7 @@ async function handleResetDefaults(): Promise<void> {
           </header>
 
           <div class="cp-settings__grid">
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="data-import-export">
               <div class="cp-settings__k">{{ t("settings_import_export_reset") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__hint">{{ t("settings_import_export_hint") }}</div>
@@ -548,7 +757,7 @@ async function handleResetDefaults(): Promise<void> {
               </div>
             </div>
 
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="data-entrypoints">
               <div class="cp-settings__k">{{ t("settings_entrypoints") }}</div>
               <div class="cp-settings__v">
                 <button class="cp-settings__btn" data-testid="settings-open-server-manager" type="button" @click="router.push('/servers')">
@@ -571,7 +780,57 @@ async function handleResetDefaults(): Promise<void> {
           </div>
         </section>
 
-        <section v-if="appInfo" id="settings-section-about" class="cp-settings__section" data-testid="settings-section-about">
+        <!-- 区块：插件设置｜用途：插件通过 ctx.ui.registerSettingsItem 注册的设置项（无项时不渲染） -->
+        <section
+          v-if="pluginSettingsGroups.length > 0"
+          id="settings-section-plugins"
+          v-show="activeSectionId === 'plugins'"
+          class="cp-settings__section"
+          role="tabpanel"
+          aria-labelledby="settings-nav-plugins"
+          data-testid="settings-section-plugins"
+        >
+          <header class="cp-settings__sectionHead">
+            <div>
+              <div class="cp-settings__sectionName">{{ t("settings_plugins_section") }}</div>
+              <div class="cp-settings__sectionSub">{{ t("settings_plugins_section_sub") }}</div>
+            </div>
+          </header>
+
+          <div class="cp-settings__grid">
+            <div v-for="group in pluginSettingsGroups" :key="group.pluginId" class="cp-settings__card wide">
+              <div class="cp-settings__k">{{ t("settings_plugin_source", { id: group.pluginId }) }}</div>
+              <div class="cp-settings__v">
+                <div
+                  v-for="item in group.items"
+                  :key="item.id"
+                  class="cp-settings__pluginItem"
+                  :data-settings-item="settingsPluginItemAnchor(item.pluginId, item.id)"
+                  :data-testid="`settings-plugin-item-${item.pluginId}-${item.id}`"
+                >
+                  <div class="cp-settings__pluginHead">
+                    <span class="cp-settings__pluginTitle">{{ item.title }}</span>
+                  </div>
+                  <div v-if="item.description" class="cp-settings__hint">{{ item.description }}</div>
+                  <!-- 单个插件控件抛错只降级该项，不影响其余设置 -->
+                  <ErrorBoundary>
+                    <component :is="item.component" />
+                  </ErrorBoundary>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          v-if="appInfo"
+          id="settings-section-about"
+          v-show="activeSectionId === 'about'"
+          class="cp-settings__section"
+          role="tabpanel"
+          aria-labelledby="settings-nav-about"
+          data-testid="settings-section-about"
+        >
           <header class="cp-settings__sectionHead">
             <div>
               <div class="cp-settings__sectionName">{{ t("menu_about") }}</div>
@@ -579,7 +838,7 @@ async function handleResetDefaults(): Promise<void> {
             </div>
           </header>
           <div class="cp-settings__grid">
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="about-version">
               <div class="cp-settings__k">{{ t("about_version") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__row">
@@ -588,7 +847,7 @@ async function handleResetDefaults(): Promise<void> {
                 </div>
               </div>
             </div>
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="about-check-updates">
               <div class="cp-settings__k">{{ t("check_for_updates") }}</div>
               <div class="cp-settings__v">
                 <button class="cp-settings__btn" data-testid="settings-check-update-now" type="button" @click="handleCheckUpdate" :disabled="updateCheckState.kind === 'checking'">
@@ -602,7 +861,7 @@ async function handleResetDefaults(): Promise<void> {
                 <div v-else-if="updateCheckState.kind === 'error'" class="cp-settings__err">{{ updateCheckState.message }}</div>
               </div>
             </div>
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="about-tech-stack">
               <div class="cp-settings__k">{{ t("about_tech_stack") }}</div>
               <div class="cp-settings__v">
                 <div v-for="item in appInfo.techStack" :key="item" class="cp-settings__row">
@@ -610,7 +869,7 @@ async function handleResetDefaults(): Promise<void> {
                 </div>
               </div>
             </div>
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="about-license">
               <div class="cp-settings__k">{{ t("about_license") }}</div>
               <div class="cp-settings__v">
                 <div class="cp-settings__row">
@@ -618,7 +877,7 @@ async function handleResetDefaults(): Promise<void> {
                 </div>
               </div>
             </div>
-            <div class="cp-settings__card">
+            <div class="cp-settings__card" data-settings-item="about-credits">
               <div class="cp-settings__k">{{ t("about_credits") }}</div>
               <div class="cp-settings__v">
                 <div v-for="credit in appInfo.credits" :key="credit.name" class="cp-settings__row">
@@ -711,13 +970,13 @@ async function handleResetDefaults(): Promise<void> {
 /* 选择器：`.cp-settings__navWrap`｜用途：左侧固定宽纵向导航侧栏 */
 .cp-settings__navWrap {
   flex: 0 0 auto;
-  width: 220px;
+  width: 240px;
   overflow: auto;
   display: flex;
 }
 
-/* 选择器：`.cp-settings__nav`｜用途：设置 section 纵向导航 */
-.cp-settings__nav {
+/* 选择器：`.cp-settings__rail`｜用途：左栏面板容器（搜索框固定在上，导航/结果列表滚动） */
+.cp-settings__rail {
   background: var(--cp-surface);
   backdrop-filter: blur(16px) saturate(1.08);
   -webkit-backdrop-filter: blur(16px) saturate(1.08);
@@ -729,6 +988,139 @@ async function handleResetDefaults(): Promise<void> {
   flex: 1;
   gap: 10px;
   padding: 10px;
+  min-height: 0;
+}
+
+/* 选择器：`.cp-settings__search`｜用途：设置搜索输入框容器（与设置页面板风格一致） */
+.cp-settings__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
+  border-radius: 14px;
+  padding: 8px 10px;
+  transition: border-color var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-settings__search:focus-within {
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-hover-bg);
+}
+
+.cp-settings__searchIcon {
+  color: var(--cp-text-muted);
+}
+
+/* 选择器：`.cp-settings__searchInput`｜用途：原生搜索输入（无边框，融入面板底色） */
+.cp-settings__searchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cp-text);
+  font-size: 12px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.cp-settings__searchInput::placeholder {
+  color: var(--cp-text-muted);
+}
+
+/* 选择器：`.cp-settings__searchClear`｜用途：清空搜索按钮 */
+.cp-settings__searchClear {
+  border: 0;
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 999px;
+  transition: color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-settings__searchClear:hover {
+  color: var(--cp-text);
+}
+
+/* 选择器：`.cp-settings__results`｜用途：搜索结果列表（查询非空时替换导航） */
+.cp-settings__results {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-settings__resultsHead {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  padding: 2px 4px;
+}
+
+.cp-settings__resultsEmpty {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  padding: 6px 4px;
+  line-height: 1.45;
+}
+
+/* 选择器：`.cp-settings__result`｜用途：搜索结果行（键盘/鼠标高亮） */
+.cp-settings__result {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  transition: background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-settings__result:hover,
+.cp-settings__result[data-active="true"] {
+  background: var(--cp-highlight-bg);
+  border-color: var(--cp-highlight-border-strong);
+}
+
+.cp-settings__resultTitle {
+  font-size: 12px;
+  color: var(--cp-text);
+}
+
+.cp-settings__resultMeta {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+}
+
+/* 选择器：`.cp-settings__flash`｜用途：搜索结果跳转后的一次性高亮（outline 不影响布局） */
+.cp-settings__flash {
+  outline: 2px solid var(--cp-highlight-border-strong);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* 选择器：`.cp-settings__nav`｜用途：设置 section 纵向导航 */
+.cp-settings__nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* 窄窗口回退：导航回到顶部横向可换行排列 */
@@ -745,6 +1137,11 @@ async function handleResetDefaults(): Promise<void> {
   .cp-settings__nav {
     flex-direction: row;
     flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .cp-settings__results {
+    max-height: 240px;
   }
 }
 
@@ -787,7 +1184,7 @@ async function handleResetDefaults(): Promise<void> {
   line-height: 1.35;
 }
 
-/* 选择器：`.cp-settings__sections`｜用途：可滚动 section 容器 */
+/* 选择器：`.cp-settings__sections`｜用途：右侧 Tab 面板容器（一次只显示一个分区，超高时容器内滚动） */
 .cp-settings__sections {
   background: var(--cp-surface);
   backdrop-filter: blur(16px) saturate(1.08);
@@ -801,11 +1198,12 @@ async function handleResetDefaults(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  scroll-behavior: smooth;
   padding-right: 2px;
 }
 
+/* 选择器：`.cp-settings__section`｜用途：单个设置分区面板（非当前 Tab 面板由 v-show 隐藏） */
 .cp-settings__section {
+  flex: 0 0 auto;
   border: 1px solid var(--cp-border);
   background: var(--cp-surface);
   border-radius: 18px;
@@ -924,6 +1322,29 @@ async function handleResetDefaults(): Promise<void> {
   font-size: 12px;
   color: var(--cp-text-muted);
   line-height: 1.45;
+}
+
+/* 选择器：`.cp-settings__pluginItem`｜用途：单个插件设置项（标题 + 说明 + 插件控件） */
+.cp-settings__pluginItem {
+  border: 1px solid var(--cp-border-light);
+  background: var(--cp-panel-muted);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-settings__pluginHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cp-settings__pluginTitle {
+  font-size: 12px;
+  color: var(--cp-text);
 }
 
 /* 选择器：`.cp-settings__placeholder`｜用途：暂未实现的 section 占位说明 */

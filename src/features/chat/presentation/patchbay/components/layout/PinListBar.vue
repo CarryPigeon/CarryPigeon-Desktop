@@ -103,7 +103,7 @@ function fmtTime(ms: number): string {
         :aria-expanded="expanded"
         :aria-label="expanded ? t('collapse') : t('expand')"
       >
-        <t-icon :name="expanded ? 'chevron-up' : 'chevron-down'" />
+        <AppIcon :name="expanded ? 'chevron-up' : 'chevron-down'" />
       </button>
     </div>
 
@@ -135,7 +135,7 @@ function fmtTime(ms: number): string {
           :title="t('unpin_message')"
           @click.stop="handleUnpin(entry.pin.messageId)"
         >
-          <t-icon name="close" />
+          <AppIcon name="close" />
         </button>
       </div>
     </div>
@@ -147,7 +147,7 @@ function fmtTime(ms: number): string {
       :title="t('close')"
       @click="handleDismiss"
     >
-      <t-icon name="close" />
+      <AppIcon name="close" />
     </button>
   </div>
 

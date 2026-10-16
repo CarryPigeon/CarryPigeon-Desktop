@@ -8,6 +8,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { getDownloadTasks, getCurrentTaskId } from "@/shared/file-transfer/downloadStore";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 
@@ -31,7 +32,7 @@ const show = computed(() => currentTask.value != null && (isActive.value || isEr
   <Transition name="cp-toast">
     <div v-if="show && currentTask" class="cp-downloadToast" :class="{ 'cp-downloadToast--error': isError }">
       <span class="cp-downloadToast__icon">
-        <t-icon :name="isError ? 'close-circle' : 'download'" />
+        <AppIcon :name="isError ? 'close-circle' : 'download'" />
       </span>
       <span class="cp-downloadToast__text">
         {{ isError ? t("download_failed") : t("file_downloading") }}

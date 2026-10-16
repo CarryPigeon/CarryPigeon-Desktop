@@ -2,7 +2,7 @@
   <Transition name="voice-banner-slide">
     <div v-if="visible" class="voice-call-banner">
       <div class="voice-call-banner__content">
-        <t-icon name="call" class="voice-call-banner__icon" />
+        <AppIcon name="call" class="voice-call-banner__icon" />
         <div class="voice-call-banner__info">
           <span class="voice-call-banner__title">{{ t("voice_call_caller_invite", { name: callerName }) }}</span>
           <span v-if="ringRemainingSecs > 0" class="voice-call-banner__countdown">
@@ -24,6 +24,7 @@
 
 <script setup lang="ts">
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 defineProps<{
   callerName: string;

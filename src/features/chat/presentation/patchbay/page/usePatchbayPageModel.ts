@@ -57,7 +57,7 @@ import type { ChannelSummary } from "@/features/chat/shared-kernel/channelSummar
 import { useObservedCapabilitySnapshot } from "@/shared/utils/useObservedCapabilitySnapshot";
 import { useChannelMuteStore, type NotificationLevel } from "../view-models/useChannelMuteStore";
 import { useChannelPinStore } from "../view-models/useChannelPinStore";
-import { openChannelPinsFile } from "@/features/chat/channel-pins/data/localChannelPinsData";
+import { usePinnedChannelsDialog } from "../interactions/usePinnedChannelsDialog";
 import { useServerRailModel } from "../view-models/useServerRailModel";
 import { useChannelContextMenu, type ChannelContextAction } from "../interactions/useChannelContextMenu";
 import { currentServerSocket } from "@/features/server-connection/api";
@@ -108,6 +108,8 @@ type PatchbayPageRawModel = {
   channelDialogs: PatchbayChannelDialogsModel;
   /** 频道信息应用内弹窗。 */
   channelInfoDialog: ReturnType<typeof useChannelInfoDialog>;
+  /** 置顶频道编辑弹窗（应用内完成置顶/取消/排序）。 */
+  pinnedChannelsDialog: ReturnType<typeof usePinnedChannelsDialog>;
   channels: ComputedRef<readonly ChannelSummary[]>;
   linkPreview: Ref<ChatLinkPreview | null>;
   fetchLinkPreview(url: string): Promise<void>;
@@ -348,6 +350,23 @@ export function usePatchbayPageModel(): PatchbayPageModel {
 
   const channelMuteStore = useChannelMuteStore();
   const channelPinStore = useChannelPinStore();
+
+  // 置顶频道编辑器弹窗：应用内完成置顶 / 取消置顶 / 排序，用户无需手动编辑本机 JSON。
+  const pinnedChannelsDialog = usePinnedChannelsDialog({
+    currentServerSocket: () => currentServerSocket.value ?? "",
+    currentServerName: () => serverInfo.value?.name ?? "",
+    pinnedIds: (serverSocket) => channelPinStore.pinnedIds(serverSocket),
+    setPinnedOrder: (serverSocket, channelIds) =>
+      channelPinStore.setPinnedOrder(serverSocket, channelIds),
+    notifySaved: () => {
+      void toast.success(t("channel_pins_editor_saved"));
+    },
+    notifySaveFailed: () => {
+      void toast.error(t("channel_pins_editor_save_failed"));
+    },
+    onError: logAsyncError,
+  });
+
   const serverRailModel = useServerRailModel();
   const channelContextMenu = useChannelContextMenu({
     isMuted: (channelId) => channelMuteStore.isMuted(channelId),
@@ -450,11 +469,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openServerManager: handleOpenServerManager,
     openFileManager: handleOpenFileManager,
     openSettings: handleOpenSettings,
-    openPinnedChannelsFile: () => {
-      void openChannelPinsFile().catch((error) => {
-        logger.error("Action: chat_open_channel_pins_file_failed", { error: String(error) });
-        toast.error(t("channel_pin_update_failed"));
-      });
+    openPinnedChannelsEditor: () => {
+      pinnedChannelsDialog.open();
     },
     applyJoin: (channelId: string) => roomGovernance.forChannel(channelId).applyJoin(),
     onAsyncError: logAsyncError,
@@ -883,6 +899,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     channelSettingsMenu,
     channelDialogs,
     channelInfoDialog,
+    pinnedChannelsDialog,
     linkPreview,
     fetchLinkPreview,
     dismissLinkPreview,

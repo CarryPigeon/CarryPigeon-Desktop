@@ -1,7 +1,7 @@
 <template>
   <div class="call-record-bubble">
     <div class="call-record-bubble__header">
-      <t-icon name="call" class="call-record-bubble__icon" />
+      <AppIcon name="call" class="call-record-bubble__icon" />
       <span class="call-record-bubble__title">{{ t("voice_call") }}</span>
     </div>
     <div class="call-record-bubble__body">
@@ -20,7 +20,7 @@
     </div>
     <div class="call-record-bubble__footer">
       <button class="call-record-bubble__btn" @click="$emit('callback')">
-        <t-icon name="call" /> {{ t("voice_call_callback") }}
+        <AppIcon name="call" /> {{ t("voice_call_callback") }}
       </button>
     </div>
   </div>
@@ -30,6 +30,7 @@
 import { computed } from "vue";
 import type { CallKind, CallSummary } from "../domain/contracts";
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 /**
  * 通用插件消息渲染契约（由宿主 MessageContentHost 的 plugin 分支传入）。

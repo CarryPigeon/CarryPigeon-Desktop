@@ -34,7 +34,6 @@ const {
       :error-message="pageError"
       @back="goBack"
     >
-      <template #back-label>{{ t("back") }}</template>
       <template #loading>{{ t("loading") }}</template>
       <template #default>
         <div v-if="pendingApplications.length === 0" class="cp-apps__empty">{{ t("no_applications") }}</div>

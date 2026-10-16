@@ -5,6 +5,7 @@
  */
 
 import type { DomainCatalogItem } from "../domain/types/domainCatalogTypes";
+import type { PluginSettingsContribution } from "../domain/types/pluginRuntimeTypes";
 import type {
   InstalledPluginState,
   PluginCatalogEntryLike,
@@ -65,5 +66,7 @@ export type PluginsRuntimeStateAccess = {
   getBinding(domain: string): DomainBinding | null;
   getContextForPlugin(pluginId: string): unknown;
   getContextForDomain(domain: string): unknown;
+  /** 列出当前 server 下插件注册的设置项（Vue 响应式投影的只读视图）。 */
+  listSettingsItems(): readonly PluginSettingsContribution[];
   setHostBridge(bridge: DomainRegistryHostBridge | null): void;
 };

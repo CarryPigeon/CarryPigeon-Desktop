@@ -2,7 +2,7 @@
   <div v-if="visible" class="ai-summary-host">
     <div class="ai-summary-panel">
       <div class="ai-summary-panel__header">
-        <t-icon name="city-12" />
+        <AppIcon name="ai-article" />
         <span class="ai-summary-panel__title">{{ t("ai_summary_panel_title") }}</span>
         <t-button size="small" variant="text" @click="close">
           {{ t("ai_summary_close") }}
@@ -131,8 +131,10 @@ import type {
   PluginCurrentChannelMessagesSnapshot,
 } from "@/features/plugins/api-types";
 import { getContext } from "../host/bridge";
+import { ensureBackendLoaded, useBackendPreference } from "../host/backendPreference";
 import type { PluginAiService, PluginMessagesService } from "@/features/plugins/sdk";
 import { createLogger } from "../shared/logger";
+import { resolveBackendPlan, shouldFallbackToServer } from "../domain/summarizeBackend";
 import {
   buildChannelMessageLines,
   buildSummarizeRequestBody,
@@ -155,6 +157,7 @@ import {
   type ScopeTimeRange,
 } from "../domain/summarizeScope";
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const logger = createLogger("AiSummaryHost");
 
@@ -328,11 +331,14 @@ const sourceLabel = computed(() => {
 /**
  * 是否展示"可配置客户端 AI"的引导。
  *
- * 仅在本次走服务端回退、且插件确实拿到了 `host.ai` 能力（即宿主支持客户端 AI）
- * 时展示，避免对未升级宿主或无该权限的场景产生误导。
+ * 仅在本次走服务端回退、且插件确实拿到了 `host.ai` 能力（即宿主支持客户端 AI）、
+ * 且用户未显式选择「仅服务端」时展示，避免对未升级宿主/已明确选择服务端的场景产生误导。
  */
 const showConfigureHint = computed(
-  () => source.value?.kind === "server" && getHostAi() !== undefined,
+  () =>
+    source.value?.kind === "server" &&
+    getHostAi() !== undefined &&
+    useBackendPreference().value !== "server",
 );
 
 /**
@@ -552,11 +558,11 @@ async function readSnapshot(
 /**
  * 执行总结请求。
  *
- * 顺序：
- * 1. 客户端 AI（`host.ai.summarize`，用户自配 provider，密钥由宿主代持）；
- * 2. 未配置客户端 AI（`not-configured`）→ 回退服务端 `/api/ai/summarize`；
- * 3. 已配置但调用失败 → 直接给出可操作提示，**不静默回退**（否则用户会误以为
- *    自己配的模型在生效）。
+ * 顺序（受「AI 摘要后端」设置项控制，见 `domain/summarizeBackend.ts`）：
+ * 1. `client` / `auto`：客户端 AI（`host.ai.summarize`，用户自配 provider，密钥由宿主代持）；
+ * 2. `auto` 且未配置客户端 AI（`not-configured`）→ 回退服务端 `/api/ai/summarize`；
+ * 3. `client` 且未配置 → 给出可操作提示，**不回退**（否则用户会误以为自选模型在生效）；
+ * 4. `server` → 直接走服务端端点。
  *
  * @param channelId - 频道 id。
  * @param messages - 参与总结的频道消息（已按范围收敛）。
@@ -567,8 +573,11 @@ async function requestSummary(
 ): Promise<void> {
   loading.value = true;
   try {
+    // 载入用户选择的总结后端（失败时保持 auto，即历史行为）。
+    const backendMode = await ensureBackendLoaded();
     const ai = getHostAi();
-    if (ai) {
+    const plan = resolveBackendPlan(backendMode, ai !== undefined);
+    if (plan.useClient && ai) {
       const client = await ai.summarize({ channelId, messages: buildChannelMessageLines(messages) });
       if (client.ok) {
         result.value = {
@@ -581,12 +590,15 @@ async function requestSummary(
         await saveResult(client.summary, messages.length, messages, source.value);
         return;
       }
-      if (client.code !== "not-configured") {
+      if (!shouldFallbackToServer(client.code, plan)) {
         logger.warn("ai_summary_client_failed", { code: client.code, status: client.status ?? -1 });
-        errorText.value = clientFailureText(client.code, client.error, client.status, client.provider);
+        errorText.value =
+          client.code === "not-configured"
+            ? t("ai_summary_client_required_missing")
+            : clientFailureText(client.code, client.error, client.status, client.provider);
         return;
       }
-      // not-configured：用户选择跟随服务端，继续走下面的服务端端点。
+      // not-configured 且允许回退：继续走下面的服务端端点。
     }
 
     // 服务端端点：网络能力由 "network" 权限注入；相对路径会被宿主拼接到当前 server origin。

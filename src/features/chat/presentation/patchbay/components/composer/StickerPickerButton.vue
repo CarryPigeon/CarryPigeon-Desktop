@@ -80,7 +80,7 @@ function onEmojiSelect(emoji: string): void {
     }"
   >
     <button class="cp-stickerBtn" type="button">
-      <span class="cp-stickerBtn__icon"><AppIcon name="smile" :size="16" /></span>
+      <span class="cp-stickerBtn__icon"><AppIcon name="smile" :size="18" /></span>
       <span class="cp-stickerBtn__text">{{ t("emoji") || "表情" }}</span>
     </button>
     <template #content>
@@ -97,20 +97,12 @@ function onEmojiSelect(emoji: string): void {
 .cp-stickerBtn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
   cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-stickerBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
 }
 
 .cp-stickerBtn__icon {
@@ -118,7 +110,8 @@ function onEmojiSelect(emoji: string): void {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  color: var(--cp-text);
+  /* 跟随宿主按钮的 color（默认 muted、hover 提亮），避免与其它工具栏图标亮度不一致 */
+  color: inherit;
 }
 
 .cp-stickerBtn__text {

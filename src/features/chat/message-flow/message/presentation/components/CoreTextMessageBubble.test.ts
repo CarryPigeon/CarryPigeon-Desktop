@@ -22,7 +22,7 @@ function mountBubble(props: Record<string, unknown> = {}) {
       // 断言按钮 aria-label 时使用真实文案。
       plugins: [createI18n({ legacy: false, locale: "zh_cn", messages: { zh_cn } })],
       // vitest 未启用 TDesign 自动导入解析器，桩掉图标组件即可（不影响按钮行为断言）。
-      stubs: { "t-icon": true },
+      stubs: { AppIcon: true },
     },
   });
 }

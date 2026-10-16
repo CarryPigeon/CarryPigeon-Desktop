@@ -8,6 +8,7 @@
 import { Context } from "@cordisjs/core";
 import { createLogger } from "@/shared/utils/logger";
 import { createDomainsRegistry, type DomainsRegistry } from "./domainsRegistry";
+import { createPluginSettingsRegistry, type PluginSettingsRegistry } from "./pluginSettingsRegistry";
 import { createServerService } from "./services/server";
 
 const logger = createLogger("plugin-cordis-runtime");
@@ -28,6 +29,8 @@ export type ServerRuntime = {
   ctx: Context;
   /** 共享 domain 注册表。 */
   registry: DomainsRegistry;
+  /** 共享插件设置项注册表（供设置页「插件设置」分区消费）。 */
+  settingsRegistry: PluginSettingsRegistry;
   /** 销毁整棵 server runtime（级联清理全部插件 fiber）。 */
   dispose(): Promise<void>;
 };
@@ -38,6 +41,7 @@ export type ServerRuntime = {
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
   const ctx = new Context();
   const registry = createDomainsRegistry();
+  const settingsRegistry = createPluginSettingsRegistry(options.serverSocket);
   ctx.set(
     "server",
     createServerService({
@@ -73,6 +77,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
   return {
     ctx,
     registry,
+    settingsRegistry,
     async dispose(): Promise<void> {
       try {
         ctx.scope.dispose();

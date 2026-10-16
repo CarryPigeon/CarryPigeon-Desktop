@@ -42,6 +42,17 @@ const zhCn: Dict = {
     "当前使用服务端总结；如需改用自选模型，请到「设置 → AI 服务」配置客户端 AI provider。",
   ai_summary_incomplete_config: "客户端 AI 配置不完整（缺少 base URL 或模型名），请到「设置 → AI 服务」补全",
   ai_summary_api_key_missing: "已选择 {provider}，但尚未配置 API Key（设置 → AI 服务）",
+  ai_summary_settings_title: "AI 摘要后端",
+  ai_summary_settings_desc: "选择生成总结所走的通道；可在「设置 → 插件设置」中修改。",
+  ai_summary_backend_auto: "自动",
+  ai_summary_backend_client: "仅客户端 AI",
+  ai_summary_backend_server: "仅服务端",
+  ai_summary_backend_hint_auto: "优先使用客户端 AI（设置 → AI 服务）：未配置时自动回退聊天服务端。",
+  ai_summary_backend_hint_client: "只使用客户端 AI；未配置或调用失败时给出提示，不会偷偷回退服务端。",
+  ai_summary_backend_hint_server: "只使用聊天服务端 /api/ai/summarize，忽略客户端 AI 配置。",
+  ai_summary_backend_save_failed: "后端偏好保存失败，请稍后重试。",
+  ai_summary_client_required_missing:
+    "当前为「仅客户端 AI」，但尚未配置客户端 AI provider，请到「设置 → AI 服务」配置，或把后端改为「自动」/「仅服务端」",
 };
 
 const en: Dict = {
@@ -87,6 +98,17 @@ const en: Dict = {
   ai_summary_incomplete_config:
     "Client AI is incomplete (missing base URL or model). Finish it in Settings → AI service.",
   ai_summary_api_key_missing: "{provider} is selected but no API key is configured (Settings → AI service)",
+  ai_summary_settings_title: "AI summary backend",
+  ai_summary_settings_desc: "Pick the channel used to generate summaries; editable in Settings → Plugin settings.",
+  ai_summary_backend_auto: "Auto",
+  ai_summary_backend_client: "Client AI only",
+  ai_summary_backend_server: "Server only",
+  ai_summary_backend_hint_auto: "Prefer client AI (Settings → AI service); fall back to the chat server when it is not configured.",
+  ai_summary_backend_hint_client: "Use client AI only; when it is not configured or fails, show a hint instead of silently falling back.",
+  ai_summary_backend_hint_server: "Use the chat server /api/ai/summarize only; ignore the client AI configuration.",
+  ai_summary_backend_save_failed: "Failed to save the backend preference. Try again later.",
+  ai_summary_client_required_missing:
+    "Backend is “Client AI only” but no client AI provider is configured. Configure it in Settings → AI service, or switch the backend to “Auto” / “Server only”.",
 };
 
 const messages: Record<string, Dict> = { zh_cn: zhCn, en };

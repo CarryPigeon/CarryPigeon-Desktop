@@ -4,6 +4,8 @@
  * @description chat/room-governance｜presentation component：治理子页面共享页面骨架。
  */
 
+import BackButton from "@/shared/ui/BackButton.vue";
+
 defineProps<{
   channelName: string;
   subtitle: string;
@@ -19,9 +21,7 @@ const emit = defineEmits<{
 <template>
   <main class="cp-governancePage">
     <header class="cp-governancePage__head">
-      <button class="cp-governancePage__back" type="button" @click="emit('back')">
-        <slot name="back-label">Back</slot>
-      </button>
+      <BackButton test-id="governance-back" @click="emit('back')" />
       <div class="cp-governancePage__title">
         <div class="cp-governancePage__name">{{ channelName }}</div>
         <div class="cp-governancePage__sub">{{ subtitle }}</div>
@@ -64,22 +64,6 @@ const emit = defineEmits<{
   grid-template-columns: auto 1fr auto;
   gap: 12px;
   align-items: center;
-}
-
-.cp-governancePage__back {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-governancePage__back:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
 }
 
 .cp-governancePage__title {

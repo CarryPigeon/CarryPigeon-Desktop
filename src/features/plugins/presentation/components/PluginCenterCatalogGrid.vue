@@ -15,6 +15,7 @@ import type {
   PluginCatalogEntryLike,
   PluginProgress,
 } from "@/features/plugins/domain/types/pluginTypes";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 type PluginCatalogViewEntry = PluginCatalogEntryLike;
 type InstalledStateView = InstalledPluginStateLike;
 type PluginProgressView = PluginProgress;
@@ -97,7 +98,7 @@ function isLocked(): boolean {
   <div v-else-if="loading" class="cp-plugins__state loading">{{ t("loading_catalog") }}</div>
   <div v-else-if="error" class="cp-plugins__state err">{{ t("plugins_load_failed") }}: {{ error }}</div>
   <div v-else-if="plugins.length === 0" class="cp-plugins__state empty">
-    <div class="cp-emptyHint__icon">🔌</div>
+    <div class="cp-emptyHint__icon"><AppIcon name="plug" /></div>
     <div class="cp-emptyHint__title">{{ t("plugins_empty") }}</div>
     <div class="cp-emptyHint__desc">{{ t("plugins_empty_hint") }}</div>
   </div>

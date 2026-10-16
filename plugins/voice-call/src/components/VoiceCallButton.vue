@@ -5,13 +5,14 @@
     :title="conference ? t('voice_call_conference') : t('voice_call_start')"
     @click="$emit('start')"
   >
-    <t-icon :name="conference ? 'usergroup' : 'call'" class="voice-call-icon" />
+    <AppIcon :name="conference ? 'usergroup' : 'call'" class="voice-call-icon" />
   </button>
 </template>
 
 <script setup lang="ts">
 import type { CallState } from "../domain/contracts";
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 defineProps<{
   callState: CallState;

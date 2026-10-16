@@ -36,7 +36,7 @@
           aria-label="更换背景图片"
           @click="handleEditBackground"
         >
-          <t-icon name="camera" />
+          <AppIcon name="camera" />
         </button>
         <input
           ref="fileInputRef"
@@ -80,7 +80,7 @@
               aria-label="复制邮箱"
               @click="handleCopyEmail"
             >
-              <t-icon :name="copiedEmail ? 'check' : 'copy'" />
+              <AppIcon :name="copiedEmail ? 'check' : 'copy'" />
             </button>
           </div>
           <div v-else-if="loading" class="cp-user-profile-popover__email-skeleton"></div>
@@ -93,7 +93,7 @@
               aria-label="复制用户 ID"
               @click="handleCopyUid"
             >
-              <t-icon :name="copiedUid ? 'check' : 'copy'" />
+              <AppIcon :name="copiedUid ? 'check' : 'copy'" />
             </button>
           </div>
 
@@ -154,6 +154,7 @@ import { ensureValidAccessToken } from "@/shared/net/auth/api";
 
 import type { UserPublic } from "@/features/account/profile/domain/types/UserTypes";
 import type { UserProfilePopoverProps } from "./UserProfilePopover.props";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 defineOptions({
   name: "UserProfilePopover",

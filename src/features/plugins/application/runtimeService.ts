@@ -5,7 +5,9 @@
  */
 
 import type { DomainBinding, DomainRegistryHostBridge } from "../contracts/domainRegistry";
+import type { PluginSettingsContribution } from "../domain/types/pluginRuntimeTypes";
 import { createPluginsRuntimeStateAccess, createPluginsWorkspaceStateAccess } from "../di/plugins.di";
+import { dedupeAsyncByKey } from "@/shared/utils/asyncDedupe";
 
 export type AvailablePluginMessageDomain = {
   id: string;
@@ -24,12 +26,17 @@ export type PluginRuntimeCapabilities = {
   getBinding(domain: string): DomainBinding | null;
   getContextForPlugin(pluginId: string): unknown;
   getContextForDomain(domain: string): unknown;
+  listSettingsItems(): readonly PluginSettingsContribution[];
 };
 
 export async function ensurePluginRuntimeLoaded(serverSocket: string): Promise<void> {
   const socket = String(serverSocket ?? "").trim();
   if (!socket) return;
-  await createPluginsRuntimeStateAccess(socket).ensureLoaded();
+  // 并发去重：设置页与聊天页可能同时触发同一 server 的运行时加载，重复执行会
+  // 走「先 disable 再 enable」造成无谓的插件重载。
+  await dedupeAsyncByKey(`plugins:runtime:ensureLoaded:${socket}`, () =>
+    createPluginsRuntimeStateAccess(socket).ensureLoaded(),
+  );
 }
 
 export function getPluginRuntimeCapabilities(serverSocket: string): PluginRuntimeCapabilities {
@@ -44,7 +51,22 @@ export function getPluginRuntimeCapabilities(serverSocket: string): PluginRuntim
     getContextForDomain(domain) {
       return runtime.getContextForDomain(domain);
     },
+    listSettingsItems() {
+      return runtime.listSettingsItems();
+    },
   };
+}
+
+/**
+ * 列出指定 server 下插件注册的设置项。
+ *
+ * @param serverSocket - 目标 server socket。
+ * @returns 设置项列表（只读视图；无该 server 运行时 → 空列表）。
+ */
+export function listPluginSettingsItems(serverSocket: string): readonly PluginSettingsContribution[] {
+  const socket = String(serverSocket ?? "").trim();
+  if (!socket) return [];
+  return createPluginsRuntimeStateAccess(socket).listSettingsItems();
 }
 
 export function attachPluginHostBridge(serverSocket: string, bridge: DomainRegistryHostBridge): void {

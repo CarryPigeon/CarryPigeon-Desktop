@@ -11,6 +11,7 @@
 
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import { addFiles } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
 
 const props = defineProps<{
@@ -76,7 +77,8 @@ function handleFileChange(e: Event): void {
       @change="handleFileChange"
     />
     <button class="cp-fileUpload__btn" type="button" @click="handleClick">
-      <span class="cp-fileUpload__icon">+</span>
+      <!-- 自绘回形针图标（取自统一注册表），与表情/截图按钮同风格 -->
+      <AppIcon name="paperclip" :size="18" />
       <span class="cp-fileUpload__text">{{ t("attach_file") }}</span>
     </button>
   </div>
@@ -95,25 +97,18 @@ function handleFileChange(e: Event): void {
 .cp-fileUpload__btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
   cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-fileUpload__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
 }
 
 .cp-fileUpload__icon {
-  font-size: 14px;
-  font-weight: bold;
+  display: block;
+  flex-shrink: 0;
 }
 
 .cp-fileUpload__text {

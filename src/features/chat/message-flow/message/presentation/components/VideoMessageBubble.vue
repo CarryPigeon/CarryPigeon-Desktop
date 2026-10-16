@@ -16,14 +16,14 @@
       />
       <!-- 点击放大提示 -->
       <div class="video-expand-hint">
-        <span>⛶</span>
+        <span><AppIcon name="maximize" /></span>
       </div>
     </div>
 
     <!-- 错误状态 -->
     <div v-if="loadState === 'error'" class="video-error">
       <div class="error-content">
-        <div class="error-icon"><t-icon name="error-circle" size="24" /></div>
+        <div class="error-icon"><AppIcon name="error-circle" :size="24" /></div>
         <p class="error-message">{{ t("video_load_failed") }}</p>
         <button v-if="retryCount < maxRetries" @click="retryLoad" class="retry-button">
           {{ t("retry") }} ({{ retryCount + 1 }}/{{ maxRetries }})
@@ -42,6 +42,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 interface Props {
   url: string;

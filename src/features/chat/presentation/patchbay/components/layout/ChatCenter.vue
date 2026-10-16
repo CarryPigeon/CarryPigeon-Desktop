@@ -37,6 +37,7 @@ import SkeletonMessageList from "@/shared/ui/SkeletonMessageList.vue";
 import SearchPanel from "@/features/chat/presentation/patchbay/components/search/SearchPanel.vue";
 import PinListBar from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
 import { useVirtualizer } from '@tanstack/vue-virtual';
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 type VirtualMessageItem = ChatMessage;
 
@@ -157,7 +158,8 @@ const virtualizerOptions = computed(() => ({
     const m = item.m;
     if (!m) return 52;
     if (m.kind === 'image' || m.kind === 'video') return 220;
-    let base = item.isGroupStart ? 52 : 32;
+    // 组内后续消息隐藏 domain 色条，但保留组内垂直间距，基准高度相应上浮。
+    let base = item.isGroupStart ? 52 : 44;
     if (m.replyToId) base += 28;
     return base;
   },
@@ -503,7 +505,7 @@ function getReplyText(m: VirtualMessageItem): string {
           :disabled="!canToggleMembersRail"
           @click="props.onToggleMembersRail"
         >
-          <t-icon :name="props.membersRailOpen ? 'pin-filled' : 'pin'" />
+          <AppIcon :name="props.membersRailOpen ? 'pin-filled' : 'pin'" />
         </button>
         <button
           v-if="props.model.currentChannelId"
@@ -513,7 +515,7 @@ function getReplyText(m: VirtualMessageItem): string {
           :aria-label="t('search_messages')"
           :title="t('search_messages')"
         >
-          <t-icon name="search" />
+          <AppIcon name="search" />
         </button>
         <button
           v-if="props.model.currentChannelId"
@@ -522,7 +524,7 @@ function getReplyText(m: VirtualMessageItem): string {
           @click="props.onOpenChannelSettingsMenu"
           :title="t('channel_settings')"
         >
-          <t-icon name="setting" />
+          <AppIcon name="setting" />
         </button>
         <MentionInboxBell />
       </div>
@@ -564,7 +566,7 @@ function getReplyText(m: VirtualMessageItem): string {
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
       <!-- 区块：空状态（无频道选中） -->
       <div v-if="!props.model.currentChannelId" class="cp-emptyState">
-        <div class="cp-emptyState__icon">💬</div>
+        <div class="cp-emptyState__icon"><AppIcon name="message-square" /></div>
         <div class="cp-emptyState__title">{{ t("select_channel") }}</div>
       </div>
 
@@ -573,7 +575,7 @@ function getReplyText(m: VirtualMessageItem): string {
 
       <!-- 区块：空状态（消息已加载但无消息） -->
       <div v-else-if="virtualListItems.length === 0 && !props.model.loadingMoreMessages" class="cp-emptyState">
-        <div class="cp-emptyState__icon">📭</div>
+        <div class="cp-emptyState__icon"><AppIcon name="inbox" /></div>
         <div class="cp-emptyState__title">{{ t("no_messages") }}</div>
         <div class="cp-emptyState__desc">{{ t("no_messages_hint") }}</div>
       </div>
@@ -612,7 +614,7 @@ function getReplyText(m: VirtualMessageItem): string {
               :data-mentioned="props.model.isMentioned(virtualListItems[vr.index].m)"
               tabindex="0"
               role="article"
-              :aria-label="`message ${virtualListItems[vr.index].m.domain.label} from ${virtualListItems[vr.index].m.from.name}`"
+              :aria-label="`message from ${virtualListItems[vr.index].m.from.name} at ${props.model.fmtGroupHeadTime(virtualListItems[vr.index].m.timeMs, virtualListItems[vr.index].showDate)}`"
               @contextmenu="!virtualListItems[vr.index].m.recalledAt && props.onMessageContextMenu($event, virtualListItems[vr.index].m.id)"
             >
               <!-- 区块：多选复选框 -->
@@ -633,13 +635,13 @@ function getReplyText(m: VirtualMessageItem): string {
                   <AvatarBadge :name="virtualListItems[vr.index].m.from.name" :avatar-url="virtualListItems[vr.index].m.from.avatarUrl" :size="36" />
                 </UserProfilePopover>
               </div>
-              <!-- 区块：domain 色条列 -->
-              <div class="cp-msg__strip">
+              <!-- 区块：domain 色条列（仅 group-start 可见；组内后续消息隐藏色条，仅保留槽位列宽） -->
+              <div class="cp-msg__strip" :data-visible="virtualListItems[vr.index].isGroupStart">
                 <SignalStrip :color-var="virtualListItems[vr.index].m.domain.colorVar" />
               </div>
               <!-- 区块：内容列（meta + bubble/card） -->
               <div class="cp-msg__body">
-                <!-- 区块：meta 行（仅分组首条展示名字/时间/类型；组内其余条只保留“⋯”操作入口） -->
+                <!-- 区块：meta 行（仅分组首条展示名字/时间，不展示消息类型；组内其余条只保留“⋯”操作入口） -->
                 <div
                   class="cp-msg__meta"
                   :data-compact="!virtualListItems[vr.index].isGroupStart"
@@ -649,10 +651,8 @@ function getReplyText(m: VirtualMessageItem): string {
                     <span class="cp-msg__from">{{ virtualListItems[vr.index].m.from.name }}</span>
                     <span class="cp-msg__dot"></span>
                     <span class="cp-msg__time">{{ props.model.fmtGroupHeadTime(virtualListItems[vr.index].m.timeMs, virtualListItems[vr.index].showDate) }}</span>
-                    <span class="cp-msg__dot"></span>
-                    <span class="cp-msg__domain">{{ virtualListItems[vr.index].m.domain.label }}</span>
                   </template>
-                  <button v-if="!virtualListItems[vr.index].m.recalledAt" class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)">⋯</button>
+                  <button v-if="!virtualListItems[vr.index].m.recalledAt" class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)"><AppIcon name="more" /></button>
                 </div>
 
                 <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->
@@ -682,7 +682,7 @@ function getReplyText(m: VirtualMessageItem): string {
         :title="t('jump_to_bottom')"
         @click="props.onJumpToBottom"
       >
-        <t-icon name="arrow-down" />
+        <AppIcon name="arrow-down" />
       </button>
     </div>
 

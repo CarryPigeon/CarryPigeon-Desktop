@@ -16,10 +16,10 @@
           :aria-label="hangupLabel"
           @click.stop="$emit('hangup')"
         >
-          <t-icon name="close" />
+          <AppIcon name="close" />
         </button>
         <span class="voice-call-panel__toggle">
-          <t-icon :name="minimized ? 'chevron-up' : 'chevron-down'" />
+          <AppIcon :name="minimized ? 'chevron-up' : 'chevron-down'" />
         </span>
       </div>
 
@@ -29,8 +29,8 @@
           <img v-if="p.avatarUrl" class="voice-call-panel__participant-avatar" :src="p.avatarUrl" alt="" />
           <AvatarBadge v-else :name="p.displayName || p.userId" :size="26" />
           <span class="voice-call-panel__participant-name">{{ p.displayName || p.userId }}</span>
-          <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><t-icon name="microphone-1" /></span>
-          <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon"><t-icon name="sound" /></span>
+          <span v-if="p.isMuted" class="voice-call-panel__participant-icon"><AppIcon name="microphone-1" /></span>
+          <span v-if="p.isSpeaking" class="voice-call-panel__participant-icon"><AppIcon name="sound" /></span>
           <span class="voice-call-panel__participant-level">
             <span class="voice-call-panel__level-bar" :style="{ width: (p.audioLevel * 100) + '%' }"></span>
           </span>
@@ -53,7 +53,7 @@
           :aria-label="isMuted ? t('voice_call_unmute') : t('voice_call_mute')"
           @click="$emit('toggleMute')"
         >
-          <t-icon name="microphone" />
+          <AppIcon name="microphone" />
         </button>
         <button
           type="button"
@@ -63,7 +63,7 @@
           :aria-label="isNoiseSuppressionOn ? t('voice_call_noise_off') : t('voice_call_noise_on')"
           @click="$emit('toggleNoiseSuppression')"
         >
-          <t-icon name="sound-mute" />
+          <AppIcon name="sound-mute" />
         </button>
         <button
           type="button"
@@ -73,7 +73,7 @@
           :aria-label="cameraEnabled ? t('voice_call_camera_off') : t('voice_call_camera_on')"
           @click="$emit('toggleCamera')"
         >
-          <t-icon name="camera" />
+          <AppIcon name="camera" />
         </button>
         <button
           type="button"
@@ -83,7 +83,7 @@
           :aria-label="isSharing ? t('voice_call_screen_share_stop') : t('voice_call_screen_share_start')"
           @click="$emit('toggleScreenShare')"
         >
-          <t-icon name="share" />
+          <AppIcon name="share" />
         </button>
         <select
           class="voice-call-panel__device-select"
@@ -122,7 +122,7 @@
           :aria-label="hangupLabel"
           @click="$emit('hangup')"
         >
-          <t-icon name="close" />
+          <AppIcon name="close" />
         </button>
       </div>
     </div>
@@ -135,6 +135,7 @@ import AvatarBadge from "./AvatarBadge.vue";
 import type { CallState, AudioDeviceInfo, CallParticipant } from "../domain/contracts";
 import VideoGrid from "./VideoGrid.vue";
 import { t } from "../i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{
   state: CallState;

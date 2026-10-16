@@ -1,7 +1,8 @@
 //! channel_pins｜数据层：本地 JSON 持久化与热加载监听。
 //!
 //! 文件位置：`{app_data_dir}/channel-pins.json`
-//! 热加载：后台任务按固定间隔轮询文件指纹，变化后解析并向前端广播事件。
+//! 编辑路径：前端置顶频道编辑器通过命令写入整份有序列表，用户无需手动编辑 JSON。
+//! 热加载：后台任务按固定间隔轮询文件指纹，变化后解析并向前端广播事件（外部改动仍会同步）。
 //!
 //! 约定：注释中文，日志英文（tracing）。
 
@@ -99,7 +100,47 @@ async fn save_state(state: &ChannelPinsStateV1) -> Result<()> {
     Ok(())
 }
 
-/// 确保置顶文件存在（首次访问时写入默认空结构，便于用户手动编辑）。
+/// 归一化置顶频道 ID 列表：去除首尾空白、丢弃空串、按首次出现去重。
+fn normalize_channel_ids(channel_ids: &[String]) -> Vec<String> {
+    let mut normalized: Vec<String> = Vec::with_capacity(channel_ids.len());
+    for raw in channel_ids {
+        let id = raw.trim();
+        if id.is_empty() || normalized.iter().any(|existing| existing.as_str() == id) {
+            continue;
+        }
+        normalized.push(id.to_string());
+    }
+    normalized
+}
+
+/// 覆盖指定服务器的置顶频道有序列表，返回写入后的完整状态。
+///
+/// 归一化后为空表示该服务器不再有任何置顶频道，直接移除对应记录。
+/// `server_socket` 为空时不做任何写入，原样返回当前状态。
+pub async fn set_order(server_socket: &str, channel_ids: &[String]) -> Result<ChannelPinsStateV1> {
+    let server = server_socket.trim();
+    let mut state = load_state().unwrap_or_default();
+    if server.is_empty() {
+        return Ok(state);
+    }
+
+    let normalized = normalize_channel_ids(channel_ids);
+    if normalized.is_empty() {
+        state.servers.remove(server);
+    } else {
+        state.servers.insert(server.to_string(), normalized);
+    }
+
+    save_state(&state).await?;
+    tracing::info!(
+        action = "app_channel_pins_order_updated",
+        server = %server,
+        count = state.servers.get(server).map(|ids| ids.len()).unwrap_or(0)
+    );
+    Ok(state)
+}
+
+/// 确保置顶文件存在（首次访问时写入默认空结构，应用内编辑器与外部工具都可读写）。
 pub async fn ensure_file_exists() -> Result<()> {
     if pins_file_path().exists() {
         return Ok(());
@@ -247,6 +288,69 @@ mod tests {
             state.servers.get("socket://a"),
             Some(&vec!["c1".to_string()])
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn set_order_persists_in_given_order() {
+        let _guard = test_lock().await;
+        let dir = use_temp_app_dir("order");
+
+        let ids = vec!["c3".to_string(), "c1".to_string(), "c2".to_string()];
+        let state = set_order("socket://a", &ids).await.expect("set order");
+        assert_eq!(
+            state.servers.get("socket://a"),
+            Some(&vec!["c3".to_string(), "c1".to_string(), "c2".to_string()])
+        );
+
+        let reloaded = load_state().expect("reload state");
+        assert_eq!(
+            reloaded.servers.get("socket://a"),
+            Some(&vec!["c3".to_string(), "c1".to_string(), "c2".to_string()])
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn set_order_dedupes_and_drops_blanks() {
+        let _guard = test_lock().await;
+        let dir = use_temp_app_dir("order-normalize");
+
+        let ids = vec![
+            " c1 ".to_string(),
+            "".to_string(),
+            "c1".to_string(),
+            "c2".to_string(),
+            "   ".to_string(),
+        ];
+        let state = set_order("socket://a", &ids).await.expect("set order");
+        assert_eq!(
+            state.servers.get("socket://a"),
+            Some(&vec!["c1".to_string(), "c2".to_string()])
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn set_order_empty_clears_entry() {
+        let _guard = test_lock().await;
+        let dir = use_temp_app_dir("order-clear");
+
+        let _ = set_order("socket://a", &["c1".to_string()])
+            .await
+            .expect("pin first");
+        let state = set_order("socket://a", &[]).await.expect("clear order");
+        assert_eq!(state.servers.get("socket://a"), None);
+
+        // 空 socket 不写入，也不清空既有记录。
+        let state = set_order("   ", &["c9".to_string()])
+            .await
+            .expect("blank socket");
+        assert_eq!(state.servers.get("   "), None);
+        assert_eq!(state.servers.len(), 0);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

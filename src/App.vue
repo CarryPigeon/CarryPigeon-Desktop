@@ -3,16 +3,29 @@
  * @fileoverview 应用根组件（路由容器）。
  */
 defineOptions({ name: "App" });
+import { computed } from 'vue';
+import { ConfigProvider as TConfigProvider } from 'tdesign-vue-next';
 import StartupShell from '@/app/bootstrap/StartupShell.vue';
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
+import ContextMenuHost from '@/shared/ui/contextMenu/ContextMenuHost.vue';
+import { TD_ICON_OVERRIDES } from '@/shared/ui/icons/tdIconOverrides';
+
+/**
+ * TDesign 全局配置：把组件内置图标（输入框清除、密码显隐、对话框/抽屉关闭、Toast 状态、
+ * 分页箭头）替换为应用自绘图标，保证界面内不再出现非自绘字形。
+ */
+const tdGlobalConfig = computed(() => ({ icon: TD_ICON_OVERRIDES }));
 </script>
 
 <template>
-  <ErrorBoundary>
-    <StartupShell>
-      <router-view></router-view>
-    </StartupShell>
-  </ErrorBoundary>
+  <t-config-provider :global-config="tdGlobalConfig">
+    <ErrorBoundary>
+      <StartupShell>
+        <router-view></router-view>
+      </StartupShell>
+      <ContextMenuHost />
+    </ErrorBoundary>
+  </t-config-provider>
 </template>
 
 <style lang="scss">
@@ -71,6 +84,8 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   /* 阴影层级（Elevation） */
   --cp-shadow: 0 18px 52px rgba(20, 32, 29, 0.14);
   --cp-shadow-soft: 0 8px 22px rgba(20, 32, 29, 0.10);
+  /* 浮层阴影（菜单/气泡等 fixed 浮层） */
+  --cp-shadow-float: 0 14px 38px rgba(20, 32, 29, 0.16);
   --cp-ring: 0 0 0 3px rgba(15, 118, 110, 0.22);
   --cp-inset: inset 0 1px 0 rgba(255, 253, 248, 0.65);
   --cp-elev-1: var(--cp-shadow-soft);
@@ -205,6 +220,8 @@ import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
   /* 阴影层级（Elevation） */
   --cp-shadow: 0 18px 56px rgba(0, 0, 0, 0.56);
   --cp-shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.40);
+  /* 浮层阴影（菜单/气泡等 fixed 浮层） */
+  --cp-shadow-float: 0 16px 40px rgba(0, 0, 0, 0.52);
   --cp-elev-1: var(--cp-shadow-soft);
   --cp-elev-2: var(--cp-shadow);
 
@@ -578,11 +595,7 @@ select.cp-field {
   -webkit-backdrop-filter: blur(18px);
 }
 
-/* 组件库（TDesign）：图标基线统一 */
-t-icon {
-  font-size: 1em;
-  vertical-align: -0.15em;
-}
+/* 组件库（TDesign）：图标基线统一已由自绘 AppIcon 契约承担（见 shared/ui/AppIcon.vue） */
 
 .t-dialog__mask {
   backdrop-filter: blur(10px);

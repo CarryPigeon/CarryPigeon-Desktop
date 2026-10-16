@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
  * @fileoverview 应用图标组件（AppIcon.vue）。
- * @description Lucide 风格的 stroke-only SVG 图标，作为 TDesign `<t-icon>` 缺失时的补充；
- * 走 currentColor 与 cp-text 主题色，视觉与 ScreenshotButton 等内联 SVG 一致。
+ * @description 应用图标唯一入口：Lucide 风格 stroke-only SVG，走 currentColor 与 cp-text 主题色，
+ * 视觉与文本输入区工具栏图标（ScreenshotButton / FileUploadButton / StickerPickerButton）完全一致。
+ * 尺寸默认 `1em`（跟随容器 font-size，与历史 `<t-icon>` 行为一致），需要固定像素时显式传 `:size`。
  */
 
 import { computed } from "vue";
-import { LUCIDE_SPRITE } from "./icons/lucide-sprite";
+import { ICON_STROKE_WIDTH, LUCIDE_SPRITE } from "./icons/lucide-sprite";
 
 const props = withDefaults(
   defineProps<{
@@ -16,8 +17,8 @@ const props = withDefaults(
     title?: string;
   }>(),
   {
-    size: 16,
-    strokeWidth: 1.75,
+    size: "1em",
+    strokeWidth: ICON_STROKE_WIDTH,
     title: "",
   },
 );

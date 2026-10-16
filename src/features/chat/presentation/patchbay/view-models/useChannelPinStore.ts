@@ -9,6 +9,7 @@ import { createLogger } from "@/shared/utils/logger";
 import {
   listenChannelPinsFileChanged,
   loadChannelPins,
+  setChannelPinsOrder,
   toggleChannelPinned,
   type ChannelPinsState,
 } from "@/features/chat/channel-pins/data/localChannelPinsData";
@@ -27,6 +28,8 @@ export type ChannelPinStore = {
   pinnedIds(serverSocket: string): readonly string[];
   /** 切换置顶状态并持久化到本机 JSON。 */
   togglePin(serverSocket: string, channelId: string): Promise<void>;
+  /** 覆盖指定服务器的置顶有序列表并持久化（应用内编辑器保存入口）。 */
+  setPinnedOrder(serverSocket: string, channelIds: readonly string[]): Promise<void>;
   /** 重新从本机文件加载。 */
   refresh(): Promise<void>;
   /** 加载并订阅文件热加载事件（幂等）。 */
@@ -111,11 +114,29 @@ export function useChannelPinStore(): ChannelPinStore {
     }
   }
 
+  async function setPinnedOrder(
+    serverSocket: string,
+    channelIds: readonly string[],
+  ): Promise<void> {
+    if (!serverSocket) return;
+    try {
+      applyState(await setChannelPinsOrder(serverSocket, channelIds));
+    } catch (error) {
+      logger.error("Action: chat_channel_pins_order_save_failed", {
+        serverSocket,
+        count: channelIds.length,
+        error: String(error),
+      });
+      throw error;
+    }
+  }
+
   storeInstance = {
     pinnedByServer,
     isPinned,
     pinnedIds,
     togglePin,
+    setPinnedOrder,
     refresh,
     start,
     stop,
