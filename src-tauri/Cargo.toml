@@ -63,12 +63,14 @@ tokio-native-tls = "0.3.1"
 
 # wasm支持（48.0.3 起修复 RUSTSEC-2026-0316；46.x 分支无修复补丁，故跨大版本升级）
 # 48.0.5 起修复 RUSTSEC-2026-0325 / 0326 / 0327（wasmtime GC 与 component 回调缺陷）
-wasmtime = { version = "48.0.5", features = ["component-model"] }
+# 48.0.6 起修复 RUSTSEC-2026-0353 ~ 0364（component-model / async 相关 panic 与资源限制缺陷）
+wasmtime = { version = "48.0.6", features = ["component-model"] }
 hex = "0.4.3"
 getrandom = "0.4.2"
 
 # zip 解压（插件包安装）
-zip = "8.6.0"
+# 9.0.4 起修复 RUSTSEC-2026-0367 / 0368 / 0369（解压时 SUID/SGID 保留、符号链接目标与权限穿越）
+zip = "9.0.4"
 async-trait = "0.1.89"
 
 # 国际化

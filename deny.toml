@@ -25,9 +25,6 @@ allow = [
 multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
-skip = [
-    { name = "zip", reason = "zip 8.x used directly for plugin package extraction; multiple versions allowed." },
-]
 
 [sources]
 unknown-registry = "warn"

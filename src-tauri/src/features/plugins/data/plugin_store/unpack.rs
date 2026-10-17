@@ -198,7 +198,11 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
             if f.is_dir() {
                 continue;
             }
-            let normalized = normalize_zip_name(f.name());
+            // zip 9 起 entry 名解码可能失败（非法编码/无效 UTF-8），必须显式处理。
+            let entry_name = f
+                .name()
+                .with_context(|| format!("Failed to decode zip entry name at index {i}"))?;
+            let normalized = normalize_zip_name(entry_name.as_ref());
             if normalized.is_empty() {
                 continue;
             }
@@ -231,7 +235,11 @@ pub(super) async fn unpack_plugin_zip(bytes: Vec<u8>, write_root: PathBuf) -> an
 
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
-            let normalized = normalize_zip_name(file.name());
+            // zip 9 起 entry 名解码可能失败（非法编码/无效 UTF-8），必须显式处理。
+            let entry_name = file
+                .name()
+                .with_context(|| format!("Failed to decode zip entry name at index {i}"))?;
+            let normalized = normalize_zip_name(entry_name.as_ref());
             if normalized.is_empty() {
                 continue;
             }
