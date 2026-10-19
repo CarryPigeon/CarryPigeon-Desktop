@@ -56,18 +56,21 @@ function fmtTime(ms: number): string {
 </template>
 
 <style scoped lang="scss">
+/* 样式：MergedForwardBubble｜规格：内嵌卡片（卡片圆角 + 行分隔），hover 只变描边/底色 */
 .cp-mergedForward {
-  border: 1px solid var(--cp-border, #313244);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--cp-panel, #1e1e2e) 70%, transparent);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-card);
+  background: var(--cp-panel);
   overflow: hidden;
   max-width: 380px;
   cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease);
 
   &:hover {
-    border-color: var(--cp-accent, #5865f2);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--cp-accent, #5865f2) 30%, transparent);
+    border-color: var(--cp-highlight-border);
+    background: var(--cp-highlight-bg);
   }
 }
 .cp-mergedForward__header {
@@ -75,10 +78,10 @@ function fmtTime(ms: number): string {
   align-items: center;
   gap: 6px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--cp-border-light, rgba(49, 50, 68, 0.4));
+  border-bottom: 1px solid var(--cp-border-light);
   font-size: 13px;
-  color: var(--cp-text-secondary, #a6adc8);
-  background: color-mix(in oklab, var(--cp-primary) 6%, transparent);
+  color: var(--cp-text-muted);
+  background: var(--cp-panel-muted);
 }
 .cp-mergedForward__icon {
   flex-shrink: 0;
@@ -90,9 +93,9 @@ function fmtTime(ms: number): string {
 .cp-mergedForward__comment {
   padding: 8px 12px;
   font-size: 13px;
-  color: var(--cp-text, #cdd6f4);
-  border-bottom: 1px solid var(--cp-border-light, rgba(49, 50, 68, 0.4));
-  background: color-mix(in oklab, var(--cp-bg, #11111b) 50%, transparent);
+  color: var(--cp-text);
+  border-bottom: 1px solid var(--cp-border-light);
+  background: var(--cp-panel-muted);
 }
 .cp-mergedForward__messages {
   display: flex;
@@ -100,9 +103,9 @@ function fmtTime(ms: number): string {
 }
 .cp-mergedForward__msg {
   padding: 8px 12px;
-  border-bottom: 1px solid var(--cp-border-light, rgba(49, 50, 68, 0.2));
+  border-top: 1px solid var(--cp-border-light);
 
-  &:last-child { border-bottom: none; }
+  &:first-child { border-top: none; }
 }
 .cp-mergedForward__msgMeta {
   display: flex;
@@ -113,15 +116,15 @@ function fmtTime(ms: number): string {
 .cp-mergedForward__msgAuthor {
   font-size: 12px;
   font-weight: 600;
-  color: var(--cp-text, #cdd6f4);
+  color: var(--cp-text);
 }
 .cp-mergedForward__msgTime {
   font-size: 10px;
-  color: var(--cp-text-muted, #a6adc8);
+  color: var(--cp-text-muted);
 }
 .cp-mergedForward__msgPreview {
   font-size: 12px;
-  color: var(--cp-text-secondary, #a6adc8);
+  color: var(--cp-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

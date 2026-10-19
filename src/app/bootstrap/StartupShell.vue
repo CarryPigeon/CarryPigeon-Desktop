@@ -42,7 +42,7 @@ function handleRetry(): void {
     <div class="startup-logo"><AppLogo :size="40" /></div>
     <p class="startup-text">{{ t('startup_failed') }}</p>
     <p class="startup-hint">{{ t('startup_failed_hint') }}</p>
-    <button class="cp-field startup-retry-btn" @click="handleRetry">
+    <button class="startup-retry-btn" @click="handleRetry">
       {{ t('startup_retry') }}
     </button>
   </div>
@@ -105,14 +105,11 @@ function handleRetry(): void {
 }
 
 .startup-retry-btn {
+  @include cp-pill-button(primary);
+
   width: auto;
+  min-height: 36px;
   padding: 0 32px;
   margin-top: 12px;
-  cursor: pointer;
-  border-radius: 999px;
-  background: var(--cp-accent);
-  color: #fff;
-  border: none;
-  &:hover { background: var(--cp-accent-hover); }
 }
 </style>

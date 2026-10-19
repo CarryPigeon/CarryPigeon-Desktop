@@ -384,12 +384,13 @@ function openLink(url: string): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：CoreTextMessageBubble｜规格：引用块/链接卡统一圆角与 token，domain 色条与布局不变 */
 .cp-quoteReply {
   display: flex;
   gap: 8px;
   margin-bottom: 6px;
   padding: 4px 0;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   min-width: 0;
 }
 /* 可跳转提示：右键菜单中的「跳转到被回复的消息」。 */
@@ -402,7 +403,7 @@ function openLink(url: string): void {
 .cp-quoteReply__bar {
   width: 3px;
   border-radius: 2px;
-  background: var(--cp-info, #89b4fa);
+  background: var(--cp-info);
   flex-shrink: 0;
 }
 .cp-quoteReply__content {
@@ -413,13 +414,13 @@ function openLink(url: string): void {
   min-width: 0;
 }
 .cp-quoteReply__sender {
-  color: var(--cp-info, #89b4fa);
+  color: var(--cp-info);
   font-weight: 600;
   font-size: 12px;
   white-space: nowrap;
 }
 .cp-quoteReply__preview {
-  color: var(--cp-text-secondary, #a6adc8);
+  color: var(--cp-text-muted);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -435,7 +436,7 @@ function openLink(url: string): void {
   gap: 8px;
   border-left: 3px solid color-mix(in oklab, var(--cp-info) 55%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-info) 8%, transparent);
-  border-radius: 10px;
+  border-radius: var(--cp-radius-control);
   padding: 8px 10px;
   margin-bottom: 8px;
   min-width: 0;
@@ -466,7 +467,7 @@ function openLink(url: string): void {
   margin-left: auto;
   padding: 2px 6px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   background: transparent;
   color: color-mix(in oklab, var(--cp-info) 72%, var(--cp-text-muted));
   cursor: pointer;
@@ -481,7 +482,7 @@ function openLink(url: string): void {
   color: var(--cp-text);
 }
 .cp-jumpRef:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline: 2px solid var(--cp-highlight-border-strong);
   outline-offset: 1px;
 }
 /* 单行引用条（quote / 迷你回复）内按行高垂直居中。 */
@@ -517,14 +518,14 @@ function openLink(url: string): void {
   color: color-mix(in oklab, var(--cp-info) 70%, var(--cp-text));
 }
 .cp-mention--everyone {
-  color: var(--cp-danger, #e34);
+  color: var(--cp-danger);
   font-weight: 700;
-  background: color-mix(in oklab, var(--cp-danger) 10%, transparent);
+  background: var(--cp-danger-bg);
 }
 .cp-mention--here {
-  color: var(--cp-warning);
+  color: var(--cp-warn);
   font-weight: 600;
-  background: color-mix(in oklab, var(--cp-warning) 10%, transparent);
+  background: var(--cp-warn-bg);
 }
 .cp-forwardedFrom {
   display: flex;
@@ -532,7 +533,7 @@ function openLink(url: string): void {
   gap: 4px;
   margin-bottom: 4px;
   font-size: 11px;
-  color: var(--cp-text-muted, #a6adc8);
+  color: var(--cp-text-muted);
 }
 .cp-forwardedFrom__icon {
   flex-shrink: 0;
@@ -545,7 +546,7 @@ function openLink(url: string): void {
 
 .cp-bubble__edited {
   font-size: 11px;
-  color: var(--cp-text-muted, #888);
+  color: var(--cp-text-muted);
   margin-left: 6px;
 }
 
@@ -553,11 +554,16 @@ function openLink(url: string): void {
 .cp-linkPreviewInMsg {
   margin-top: 6px;
   border: 1px solid var(--cp-border);
-  border-radius: 10px;
+  border-radius: var(--cp-radius-control);
   padding: 10px;
   background: var(--cp-panel-muted);
   cursor: pointer;
   max-width: 360px;
+  transition: border-color var(--cp-fast) var(--cp-ease);
+
+  &:hover {
+    border-color: var(--cp-highlight-border);
+  }
 }
 .cp-linkPreviewInMsg__body {
   display: flex;
@@ -596,7 +602,7 @@ function openLink(url: string): void {
 .cp-linkPreviewInMsg__thumb {
   width: 60px;
   height: 60px;
-  border-radius: 6px;
+  border-radius: var(--cp-radius-sm);
   object-fit: cover;
   flex-shrink: 0;
 }

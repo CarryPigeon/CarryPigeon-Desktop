@@ -1,150 +1,3 @@
-<template>
-  <div class="cp-ai">
-    <div class="cp-ai__status" :data-state="statusState">
-      <span class="cp-ai__dot" />
-      <span class="cp-ai__statusText">{{ statusText }}</span>
-    </div>
-
-    <div class="cp-ai__row">
-      <label class="cp-ai__label" for="cp-ai-provider">{{ t("settings_ai_provider") }}</label>
-      <select
-        id="cp-ai-provider"
-        class="cp-ai__control"
-        data-testid="ai-provider"
-        :value="config.providerId"
-        @change="onProviderChange"
-      >
-        <option v-for="preset in presets" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
-      </select>
-    </div>
-    <div v-if="presetHint" class="cp-ai__hint">{{ presetHint }}</div>
-
-    <template v-if="isClientProvider">
-      <div class="cp-ai__row">
-        <label class="cp-ai__label" for="cp-ai-base-url">{{ t("settings_ai_base_url") }}</label>
-        <input
-          id="cp-ai-base-url"
-          v-model.trim="config.baseUrl"
-          class="cp-ai__control"
-          data-testid="ai-base-url"
-          type="text"
-          spellcheck="false"
-          placeholder="https://api.example.com/v1"
-        />
-      </div>
-
-      <div class="cp-ai__row">
-        <label class="cp-ai__label" for="cp-ai-model">{{ t("settings_ai_model") }}</label>
-        <div class="cp-ai__inline">
-          <input
-            id="cp-ai-model"
-            v-model.trim="config.model"
-            class="cp-ai__control"
-            data-testid="ai-model"
-            type="text"
-            spellcheck="false"
-            :placeholder="t('settings_ai_model_placeholder')"
-          />
-          <button
-            class="cp-ai__btn"
-            data-testid="ai-fetch-models"
-            type="button"
-            :disabled="fetchingModels"
-            @click="fetchModels"
-          >
-            {{ fetchingModels ? t("settings_ai_fetching") : t("settings_ai_fetch_models") }}
-          </button>
-        </div>
-      </div>
-      <div v-if="models.length > 0" class="cp-ai__row">
-        <label class="cp-ai__label" for="cp-ai-model-pick">{{ t("settings_ai_model_pick") }}</label>
-        <select id="cp-ai-model-pick" class="cp-ai__control" @change="onModelPick">
-          <option value="">{{ t("settings_ai_model_pick_placeholder") }}</option>
-          <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
-        </select>
-      </div>
-
-      <div class="cp-ai__row">
-        <label class="cp-ai__label" for="cp-ai-key">{{ t("settings_ai_api_key") }}</label>
-        <div class="cp-ai__inline">
-          <input
-            id="cp-ai-key"
-            v-model="apiKeyInput"
-            class="cp-ai__control"
-            data-testid="ai-api-key"
-            type="password"
-            autocomplete="off"
-            spellcheck="false"
-            :placeholder="t('settings_ai_api_key_placeholder')"
-          />
-          <button
-            class="cp-ai__btn cp-ai__btn--primary"
-            data-testid="ai-save-key"
-            type="button"
-            :disabled="savingKey || apiKeyInput.trim() === ''"
-            @click="saveKey"
-          >
-            {{ t("settings_ai_save_key") }}
-          </button>
-          <button
-            class="cp-ai__btn"
-            data-testid="ai-clear-key"
-            type="button"
-            :disabled="savingKey || !secretConfigured"
-            @click="clearKey"
-          >
-            {{ t("settings_ai_clear_key") }}
-          </button>
-        </div>
-        <div class="cp-ai__hint">
-          {{ secretConfigured ? t("settings_ai_api_key_saved") : t("settings_ai_api_key_not_set") }} ·
-          {{ t("settings_ai_secret_hint") }}
-        </div>
-      </div>
-
-      <details class="cp-ai__advanced">
-        <summary class="cp-ai__summary">{{ t("settings_ai_advanced") }}</summary>
-        <div class="cp-ai__row">
-          <label class="cp-ai__label" for="cp-ai-temp">{{ t("settings_ai_temperature") }}</label>
-          <input
-            id="cp-ai-temp"
-            v-model.number="config.temperature"
-            class="cp-ai__control"
-            type="number"
-            min="0"
-            max="2"
-            step="0.1"
-          />
-        </div>
-        <div class="cp-ai__row">
-          <label class="cp-ai__label" for="cp-ai-timeout">{{ t("settings_ai_timeout") }}</label>
-          <input
-            id="cp-ai-timeout"
-            v-model.number="config.timeoutMs"
-            class="cp-ai__control"
-            type="number"
-            min="1000"
-            max="120000"
-            step="1000"
-          />
-        </div>
-        <div class="cp-ai__row">
-          <label class="cp-ai__label" for="cp-ai-prompt">{{ t("settings_ai_system_prompt") }}</label>
-          <textarea
-            id="cp-ai-prompt"
-            v-model="config.systemPrompt"
-            class="cp-ai__control cp-ai__control--area"
-            rows="3"
-            :placeholder="t('settings_ai_system_prompt_placeholder')"
-          />
-        </div>
-      </details>
-    </template>
-
-    <div v-if="message" class="cp-ai__msg" :data-tone="message.tone">{{ message.text }}</div>
-  </div>
-</template>
-
 <script setup lang="ts">
 /**
  * @fileoverview AI 服务设置卡片（provider 选择 / 密钥 / 模型拉取）。
@@ -166,6 +19,7 @@ import {
   type AiProviderId,
   type ClientAiStatus,
 } from "../../api";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const { t } = useI18n();
 const ai = getAiCapabilities();
@@ -340,119 +194,363 @@ onMounted(() => {
   void refreshStatus();
 });
 </script>
+<template>
+  <!-- 组件：AiProviderSettings｜职责：AI 服务设置（服务来源 / 密钥 / 模型 / 高级参数） -->
+  <div class="cp-ai">
+    <!-- 区块：状态胶囊｜用途：展示当前 AI 配置是否可用 -->
+    <div class="cp-ai__status" :data-state="statusState">
+      <span class="cp-ai__dot" />
+      <span class="cp-ai__statusText">{{ statusText }}</span>
+    </div>
+
+    <!-- 区块：服务来源 -->
+    <div class="cp-ai__row">
+      <label class="cp-ai__label" for="cp-ai-provider">{{ t("settings_ai_provider") }}</label>
+      <div class="cp-ai__controlWrap">
+        <select
+          id="cp-ai-provider"
+          class="cp-ai__control cp-field cp-ai__select"
+          data-testid="ai-provider"
+          :value="config.providerId"
+          @change="onProviderChange"
+        >
+          <option v-for="preset in presets" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
+        </select>
+        <AppIcon class="cp-ai__selectIcon" name="chevron-down" :size="14" />
+      </div>
+    </div>
+    <div v-if="presetHint" class="cp-ai__hint cp-ai__hint--outside">{{ presetHint }}</div>
+
+    <template v-if="isClientProvider">
+      <div class="cp-ai__row">
+        <label class="cp-ai__label" for="cp-ai-base-url">{{ t("settings_ai_base_url") }}</label>
+        <input
+          id="cp-ai-base-url"
+          v-model.trim="config.baseUrl"
+          class="cp-ai__control cp-field"
+          data-testid="ai-base-url"
+          type="text"
+          spellcheck="false"
+          placeholder="https://api.example.com/v1"
+        />
+      </div>
+
+      <div class="cp-ai__row">
+        <label class="cp-ai__label" for="cp-ai-model">{{ t("settings_ai_model") }}</label>
+        <div class="cp-ai__inline">
+          <input
+            id="cp-ai-model"
+            v-model.trim="config.model"
+            class="cp-ai__control cp-field"
+            data-testid="ai-model"
+            type="text"
+            spellcheck="false"
+            :placeholder="t('settings_ai_model_placeholder')"
+          />
+          <button
+            class="cp-ai__btn"
+            data-testid="ai-fetch-models"
+            type="button"
+            :disabled="fetchingModels"
+            @click="fetchModels"
+          >
+            {{ fetchingModels ? t("settings_ai_fetching") : t("settings_ai_fetch_models") }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="models.length > 0" class="cp-ai__row">
+        <label class="cp-ai__label" for="cp-ai-model-pick">{{ t("settings_ai_model_pick") }}</label>
+        <div class="cp-ai__controlWrap">
+          <select id="cp-ai-model-pick" class="cp-ai__control cp-field cp-ai__select" @change="onModelPick">
+            <option value="">{{ t("settings_ai_model_pick_placeholder") }}</option>
+            <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
+          </select>
+          <AppIcon class="cp-ai__selectIcon" name="chevron-down" :size="14" />
+        </div>
+      </div>
+
+      <div class="cp-ai__row">
+        <label class="cp-ai__label" for="cp-ai-key">{{ t("settings_ai_api_key") }}</label>
+        <div class="cp-ai__inline">
+          <input
+            id="cp-ai-key"
+            v-model="apiKeyInput"
+            class="cp-ai__control cp-field"
+            data-testid="ai-api-key"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            :placeholder="t('settings_ai_api_key_placeholder')"
+          />
+          <button
+            class="cp-ai__btn cp-ai__btn--primary"
+            data-testid="ai-save-key"
+            type="button"
+            :disabled="savingKey || apiKeyInput.trim() === ''"
+            @click="saveKey"
+          >
+            {{ t("settings_ai_save_key") }}
+          </button>
+          <button
+            class="cp-ai__btn"
+            data-testid="ai-clear-key"
+            type="button"
+            :disabled="savingKey || !secretConfigured"
+            @click="clearKey"
+          >
+            {{ t("settings_ai_clear_key") }}
+          </button>
+        </div>
+        <div class="cp-ai__hint">
+          {{ secretConfigured ? t("settings_ai_api_key_saved") : t("settings_ai_api_key_not_set") }} ·
+          {{ t("settings_ai_secret_hint") }}
+        </div>
+      </div>
+
+      <details class="cp-ai__advanced">
+        <summary class="cp-ai__summary">{{ t("settings_ai_advanced") }}</summary>
+        <div class="cp-ai__advancedBody">
+          <div class="cp-ai__row">
+            <label class="cp-ai__label" for="cp-ai-temp">{{ t("settings_ai_temperature") }}</label>
+            <input
+              id="cp-ai-temp"
+              v-model.number="config.temperature"
+              class="cp-ai__control cp-field"
+              type="number"
+              min="0"
+              max="2"
+              step="0.1"
+            />
+          </div>
+          <div class="cp-ai__row">
+            <label class="cp-ai__label" for="cp-ai-timeout">{{ t("settings_ai_timeout") }}</label>
+            <input
+              id="cp-ai-timeout"
+              v-model.number="config.timeoutMs"
+              class="cp-ai__control cp-field"
+              type="number"
+              min="1000"
+              max="120000"
+              step="1000"
+            />
+          </div>
+          <div class="cp-ai__row cp-ai__row--area">
+            <label class="cp-ai__label" for="cp-ai-prompt">{{ t("settings_ai_system_prompt") }}</label>
+            <textarea
+              id="cp-ai-prompt"
+              v-model="config.systemPrompt"
+              class="cp-ai__control cp-field"
+              rows="3"
+              :placeholder="t('settings_ai_system_prompt_placeholder')"
+            />
+          </div>
+        </div>
+      </details>
+    </template>
+
+    <div v-if="message" class="cp-ai__msg" :data-tone="message.tone">{{ message.text }}</div>
+  </div>
+</template>
 
 <style scoped lang="scss">
-// AI 服务设置卡片：沿用宿主 CSS 变量，避免引入额外主题依赖。
+/* 样式：AiProviderSettings（沿用宿主 `--cp-*` token，与设置页行式布局对齐） */
 .cp-ai {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+}
 
-  &__status {
-    display: inline-flex;
-    align-items: center;
+/* 状态胶囊 */
+.cp-ai__status {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+.cp-ai__status[data-state="ready"] {
+  border-color: color-mix(in oklab, var(--cp-accent) 45%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-accent) 10%, transparent);
+  color: var(--cp-accent);
+}
+
+.cp-ai__dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+/* 表单行：标签列 + 控件列 */
+.cp-ai__row {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.cp-ai__row--area {
+  align-items: start;
+}
+
+.cp-ai__label {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--cp-text-muted);
+}
+
+/* 控件统一复用全局 `.cp-field`，此处只约束宽度 */
+.cp-ai__control {
+  width: 100%;
+  min-width: 0;
+}
+
+.cp-ai__controlWrap {
+  position: relative;
+  min-width: 0;
+}
+
+.cp-ai__select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px !important;
+  cursor: pointer;
+}
+
+.cp-ai__selectIcon {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  color: var(--cp-text-muted);
+  pointer-events: none;
+}
+
+.cp-ai__inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cp-ai__inline .cp-ai__control {
+  flex: 1;
+  width: auto;
+}
+
+/* 行内提示（居中行内第三列时跨满整行） */
+.cp-ai__hint {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+.cp-ai__row > .cp-ai__hint {
+  grid-column: 1 / -1;
+  padding-left: 160px;
+  margin-top: 2px;
+}
+
+.cp-ai__hint--outside {
+  padding-left: 160px;
+  margin-top: -8px;
+}
+
+.cp-ai__btn {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-ai__btn:hover:not(:disabled) {
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+.cp-ai__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cp-ai__btn--primary {
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
+}
+
+/* 高级参数 */
+.cp-ai__advanced {
+  border-top: 1px solid var(--cp-border-light);
+  padding-top: 12px;
+}
+
+.cp-ai__summary {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+}
+
+.cp-ai__summary:hover {
+  color: var(--cp-text);
+}
+
+.cp-ai__advancedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+/* 结果提示 */
+.cp-ai__msg {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cp-ai__msg[data-tone="ok"] {
+  color: var(--cp-accent);
+}
+
+.cp-ai__msg[data-tone="error"] {
+  color: var(--cp-danger);
+}
+
+/* 窄窗口：标签与控件上下堆叠 */
+@media (max-width: 720px) {
+  .cp-ai__row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     gap: 6px;
-    align-self: flex-start;
-    padding: 3px 10px;
-    border: 1px solid var(--cp-border);
-    border-radius: 999px;
-    font-size: 12px;
-    color: var(--cp-text-muted, #999);
-
-    &[data-state="ready"] {
-      border-color: var(--cp-accent, #0052d9);
-      color: var(--cp-accent, #0052d9);
-    }
   }
 
-  &__dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentcolor;
+  .cp-ai__row > .cp-ai__hint,
+  .cp-ai__hint--outside {
+    padding-left: 0;
+    margin-top: 0;
   }
 
-  &__row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  &__label {
-    font-size: 12px;
-    color: var(--cp-text-muted, #999);
-  }
-
-  &__control {
-    width: 100%;
-    padding: 5px 8px;
-    border: 1px solid var(--cp-border);
-    border-radius: 4px;
-    background: var(--cp-surface);
-    color: var(--cp-text);
-    font-size: 13px;
-
-    &--area {
-      resize: vertical;
-      font-family: inherit;
-    }
-  }
-
-  &__inline {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-
-  &__btn {
-    flex: 0 0 auto;
-    padding: 5px 10px;
-    border: 1px solid var(--cp-border);
-    border-radius: 4px;
-    background: var(--cp-surface);
-    color: var(--cp-text);
-    font-size: 12px;
-    cursor: pointer;
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    &--primary {
-      border-color: var(--cp-accent, #0052d9);
-      color: var(--cp-accent, #0052d9);
-    }
-  }
-
-  &__hint {
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--cp-text-muted, #999);
-  }
-
-  &__advanced {
-    border-top: 1px solid var(--cp-border);
-    padding-top: 8px;
-  }
-
-  &__summary {
-    font-size: 12px;
-    color: var(--cp-text-muted, #999);
-    cursor: pointer;
-    margin-bottom: 8px;
-  }
-
-  &__msg {
-    font-size: 12px;
-
-    &[data-tone="ok"] {
-      color: var(--cp-accent, #0052d9);
-    }
-
-    &[data-tone="error"] {
-      color: var(--td-error-color, #d54941);
-    }
+  .cp-ai__inline {
+    flex-wrap: wrap;
   }
 }
 </style>

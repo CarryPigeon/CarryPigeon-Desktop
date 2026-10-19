@@ -32,24 +32,42 @@ defineEmits<{
 </template>
 
 <style scoped>
+/* 样式：LinkPreviewCard｜规格：内嵌卡片（1px 弱化边框 + 弱化底，不叠加阴影） */
 .cp-linkPreview {
   position: relative;
-  border: 1px solid var(--cp-border);
-  border-radius: 12px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
   padding: 10px;
   margin-top: 8px;
   background: var(--cp-panel-muted);
 }
 .cp-linkPreview__dismiss {
   position: absolute;
-  top: 4px; right: 4px;
-  border: none;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius-sm);
   background: transparent;
   color: var(--cp-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   z-index: 1;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+.cp-linkPreview__dismiss:hover {
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
+  color: var(--cp-text);
 }
 .cp-linkPreview__body {
   display: flex;
@@ -71,7 +89,8 @@ defineEmits<{
 .cp-linkPreview__title {
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.35;
+  color: var(--cp-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -88,7 +107,7 @@ defineEmits<{
 .cp-linkPreview__thumb {
   width: 72px;
   height: 72px;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   object-fit: cover;
   flex-shrink: 0;
 }

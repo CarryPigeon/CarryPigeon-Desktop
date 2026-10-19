@@ -193,17 +193,17 @@ async function handleOpenInChat(): Promise<void> {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ChannelInfoDialog｜规格：弹窗内分组（分隔线）+ 胶囊按钮 + 状态胶囊 */
 .cp-infoDialog {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+/* 字段标签：本地化文案，不做大写变换 */
 .cp-infoDialog__k {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--cp-text-muted);
 }
 
@@ -244,6 +244,7 @@ async function handleOpenInChat(): Promise<void> {
   }
 }
 
+/* 成员身份状态胶囊：已加入用 accent（连接/开启状态） */
 .cp-infoDialog__pill {
   display: inline-flex;
   align-items: center;
@@ -256,41 +257,18 @@ async function handleOpenInChat(): Promise<void> {
   font-family: var(--cp-font-mono);
 
   &[data-ok="true"] {
-    border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-    background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel-muted));
+    border-color: color-mix(in oklab, var(--cp-accent) 40%, var(--cp-border));
+    background: var(--cp-accent-soft);
     color: var(--cp-text);
   }
 }
 
+/* 按钮：统一胶囊控件 */
 .cp-infoDialog__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    opacity var(--cp-fast) var(--cp-ease);
-
-  &:hover:not(:disabled) {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: var(--cp-highlight-border);
-  }
+  @include cp-pill-button;
 
   &.primary {
-    border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-    background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
+    @include cp-pill-button(primary);
   }
 }
 
@@ -301,7 +279,6 @@ async function handleOpenInChat(): Promise<void> {
 }
 
 .cp-infoDialog__error {
-  font-size: 12px;
-  color: var(--cp-danger, #b3261e);
+  @include cp-inline-status(danger);
 }
 </style>

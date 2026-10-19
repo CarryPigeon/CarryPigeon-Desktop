@@ -21,14 +21,14 @@ const props = withDefaults(
 </template>
 
 <style scoped lang="scss">
-/* 样式：SignalStrip｜2px 垂直 domain 色条（高度跟随消息行） */
+/* 样式：SignalStrip｜2px 垂直 domain 色条（高度跟随消息行；外圈用边框 token 提亮） */
 .cp-signal-strip {
   display: block;
   width: 2px;
   height: 100%;
   min-height: 18px;
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.10);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--cp-border) 60%, transparent);
   flex: 0 0 auto;
 }
 </style>

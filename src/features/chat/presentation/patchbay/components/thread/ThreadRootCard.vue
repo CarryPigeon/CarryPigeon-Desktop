@@ -18,12 +18,12 @@ defineProps<{ message: ChatMessageRecord }>();
 
 <style scoped>
 .cp-threadRoot {
-  padding: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--cp-border);
-  border-radius: 14px;
+  border-radius: var(--cp-radius-card);
   background: var(--cp-panel-muted);
   margin-bottom: 12px;
 }
 .cp-threadRoot__sender { font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--cp-text); }
-.cp-threadRoot__text { font-size: 13px; color: var(--cp-text); }
+.cp-threadRoot__text { font-size: 13px; line-height: 1.5; color: var(--cp-text); }
 </style>

@@ -186,7 +186,7 @@ export default defineConfig(({ command }) => {
       preprocessorOptions: {
         scss: {
           api: "modern-compiler",
-          additionalData: `@use "@/styles/button-size" as *;\n`,
+          additionalData: `@use "@/styles/button-size" as *;\n@use "@/styles/ui" as *;\n`,
         },
       },
     },

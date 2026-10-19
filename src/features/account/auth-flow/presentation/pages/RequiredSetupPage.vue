@@ -163,38 +163,30 @@ const {
 </template>
 
 <style scoped lang="scss">
-/* RequiredSetupPage styles */
+/* 样式：RequiredSetupPage｜规格：页面骨架（banner + body + footer 三段玻璃面板） */
 /* Page wrapper (banner + body + footer) */
 .cp-required {
-  height: 100%;
-  padding: 14px;
+  @include cp-page;
+
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 12px;
 }
 
-/* Banner (power latch status) */
+/* Banner (power latch status)：一级玻璃面板 */
 .cp-required__banner {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
+  @include cp-glass-panel;
+
   padding: 14px;
   transition:
     border-color var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    transform 220ms var(--cp-ease);
+    transform var(--cp-slow) var(--cp-ease);
   animation: cp-latch-alert 380ms ease-out 1;
 }
 
-/* Banner variant when latch is closed */
+/* Banner variant when latch is closed：就绪状态用 accent 描边 */
 .cp-required__banner[data-ok="true"] {
-  border-color: var(--cp-border);
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border-color: color-mix(in oklab, var(--cp-accent) 32%, var(--cp-border));
   animation: none;
 }
 
@@ -202,12 +194,10 @@ const {
   animation: cp-latch-close 520ms cubic-bezier(0.22, 1, 0.36, 1) 1;
 }
 
-/* Banner mono title */
+/* Banner mono title：固定英文标签使用统一微标签 */
 .cp-required__mono {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-size: 12px;
+  @include cp-section-label;
+
   color: var(--cp-text);
 }
 
@@ -231,21 +221,20 @@ const {
   align-items: center;
 }
 
-/* Hint panel (why blocked / missing server_id) */
+/* Hint panel (why blocked / missing server_id)：内嵌弱化卡片 */
 .cp-required__hint {
+  @include cp-card;
+
   margin-top: 12px;
-  border: 1px dashed rgba(148, 163, 184, 0.26);
-  background: var(--cp-panel-muted);
-  border-radius: 18px;
   padding: 12px;
+  border-style: dashed;
+  background: var(--cp-panel-muted);
 }
 
-/* Hint title */
+/* Hint title：本地化文案，不做大写变换 */
 .cp-required__hintTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--cp-text);
 }
 
@@ -265,14 +254,10 @@ const {
   flex-wrap: wrap;
 }
 
-/* Body panel (required list container) */
+/* Body panel (required list container)：一级玻璃面板 */
 .cp-required__body {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  @include cp-glass-panel;
+
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -316,7 +301,7 @@ const {
   width: 4px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.5);
+  background: var(--cp-text-light);
 }
 
 /* Loading/error state */
@@ -328,7 +313,7 @@ const {
 
 /* Error state variant */
 .cp-required__state.err {
-  color: rgba(248, 113, 113, 0.92);
+  color: var(--cp-danger);
 }
 
 /* Required items grid */
@@ -337,17 +322,15 @@ const {
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
+  gap: var(--cp-page-gap);
   min-height: 0;
 }
 
-/* Required item card */
+/* Required item card：内嵌卡片 */
 .cp-required__item {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
+  @include cp-card;
+
   padding: 14px;
-  box-shadow: var(--cp-shadow-soft);
 }
 
 /* Required item ok variant */
@@ -404,15 +387,12 @@ const {
   line-height: 1.4;
 }
 
-/* Item error box */
+/* Item error box：危险状态条 */
 .cp-required__itemErr {
+  @include cp-inline-status(danger);
+
   margin-top: 10px;
-  border: 1px dashed rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.10);
-  border-radius: 14px;
-  padding: 10px;
   font-size: 12px;
-  color: var(--cp-text);
 }
 
 /* Item actions row */
@@ -423,48 +403,27 @@ const {
   gap: 10px;
 }
 
-/* Item button */
+/* Item button：胶囊控件 */
 .cp-required__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-/* Item button hover */
-.cp-required__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Item button primary */
+/* Item button primary：安装/启用属于“开启”语义，使用 accent */
 .cp-required__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  border-color: color-mix(in oklab, var(--cp-accent) 40%, var(--cp-border));
+  background: var(--cp-accent-soft);
 }
 
 /* Item button primary hover */
-.cp-required__btn.primary:hover {
-  border-color: color-mix(in oklab, var(--cp-accent) 42%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+.cp-required__btn.primary:hover:enabled {
+  border-color: color-mix(in oklab, var(--cp-accent) 58%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-accent) 20%, transparent);
 }
 
-/* Footer actions row */
+/* Footer actions row：一级玻璃面板 */
 .cp-required__footer {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
+  @include cp-glass-panel;
+
   padding: 14px;
   display: flex;
   gap: 10px;
@@ -473,33 +432,19 @@ const {
 
 /* Footer button */
 .cp-required__footerBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 10px 14px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-/* Footer button hover */
-.cp-required__footerBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Footer primary */
+/* Footer primary：打开插件中心为主操作，使用 highlight */
 .cp-required__footerBtn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
 }
 
 /* Footer primary hover */
 .cp-required__footerBtn.primary:hover {
-  border-color: color-mix(in oklab, var(--cp-accent) 42%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg-strong);
 }
 
 @keyframes cp-latch-alert {
@@ -524,7 +469,7 @@ const {
   }
   45% {
     transform: scale(1.008);
-    box-shadow: 0 16px 40px color-mix(in oklab, var(--cp-accent) 20%, transparent);
+    box-shadow: 0 16px 40px var(--cp-accent-shadow);
   }
   100% {
     transform: scale(1);

@@ -34,24 +34,11 @@ import { addFiles as addImageFiles } from "@/features/chat/message-flow/upload/p
 import { createLogger } from "@/shared/utils/logger";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import SkeletonMessageList from "@/shared/ui/SkeletonMessageList.vue";
+import EmptyState from "@/shared/ui/EmptyState.vue";
 import SearchPanel from "@/features/chat/presentation/patchbay/components/search/SearchPanel.vue";
 import PinListBar from "@/features/chat/presentation/patchbay/components/layout/PinListBar.vue";
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import AppIcon from "@/shared/ui/AppIcon.vue";
-
-type VirtualMessageItem = ChatMessage;
-
-/**
- * 虚拟滚动项目类型。
- */
-interface VirtualListItem {
-  kind: 'message' | 'separator';
-  key: string;
-  m: VirtualMessageItem;
-  isGroupStart: boolean;
-  /** 组首时间戳是否需要带日期前缀（跨自然日）。 */
-  showDate: boolean;
-}
 
 const props = defineProps<{
   model: ChatCenterModel;
@@ -128,25 +115,12 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", updateWindowWidth);
 });
 
-
 const signalPaneEl = ref<HTMLElement | null>(null);
 
 /**
- * 将 messageRows 展平为虚拟滚动可消费的平坦列表。
- * 每个原始消息行要么是普通消息，要么可能在此之前插入一条未读分隔符。
+ * 虚拟滚动数据源：消息行投影（组首 / 跨日标记已由 view-model 计算）。
  */
-const virtualListItems = computed<VirtualListItem[]>(() => {
-  const items: VirtualListItem[] = [];
-  const rows = props.model.messageRows;
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (row.isUnreadStart) {
-      items.push({ kind: 'separator', key: `sep-${row.m.id}`, m: row.m, isGroupStart: false, showDate: false });
-    }
-    items.push({ kind: 'message', key: row.m.id, m: row.m, isGroupStart: row.isGroupStart, showDate: row.showDate });
-  }
-  return items;
-});
+const virtualListItems = computed(() => props.model.messageRows);
 
 /** @tanstack/vue-virtual 虚拟滚动实例。 */
 const virtualizerOptions = computed(() => ({
@@ -154,9 +128,8 @@ const virtualizerOptions = computed(() => ({
   getScrollElement: () => signalPaneEl.value,
   estimateSize: (index: number) => {
     const item = virtualListItems.value[index];
-    if (!item || item.kind === 'separator') return 36;
+    if (!item) return 52;
     const m = item.m;
-    if (!m) return 52;
     if (m.kind === 'image' || m.kind === 'video') return 220;
     // 组内后续消息隐藏 domain 色条，但保留组内垂直间距，基准高度相应上浮。
     let base = item.isGroupStart ? 52 : 44;
@@ -223,7 +196,7 @@ async function revealMessageInViewport(messageId: string): Promise<void> {
   const mid = String(messageId ?? "").trim();
   if (!mid) return;
   await nextTick();
-  const index = virtualListItems.value.findIndex((item) => item.kind === "message" && item.m.id === mid);
+  const index = virtualListItems.value.findIndex((item) => item.m.id === mid);
   if (index < 0) return;
   virtualizer.value.scrollToIndex(index, { align: "center" });
   await nextTick();
@@ -473,7 +446,7 @@ function handleRetryMessage(messageId: string): void {
 /** 将 retry 方法代理到 model 上，供模板直接调用。 */
 const retryMessage = handleRetryMessage;
 
-function getReplyText(m: VirtualMessageItem): string {
+function getReplyText(m: ChatMessage): string {
   return m.replyToId ? props.model.formatReplyMiniText(props.model.currentChannelId, m.replyToId) : '';
 }
 </script>
@@ -565,20 +538,22 @@ function getReplyText(m: VirtualMessageItem): string {
     />
     <div ref="signalPaneEl" class="cp-signalPane" role="log" aria-label="messages" aria-live="polite" @scroll="props.onSignalScroll">
       <!-- 区块：空状态（无频道选中） -->
-      <div v-if="!props.model.currentChannelId" class="cp-emptyState">
-        <div class="cp-emptyState__icon"><AppIcon name="message-square" /></div>
-        <div class="cp-emptyState__title">{{ t("select_channel") }}</div>
-      </div>
+      <EmptyState v-if="!props.model.currentChannelId" class="cp-emptyState" :title="t('select_channel')">
+        <template #icon><AppIcon name="message-square" :size="24" /></template>
+      </EmptyState>
 
       <!-- 区块：加载骨架（频道已选中、消息加载中） -->
       <SkeletonMessageList v-else-if="virtualListItems.length === 0 && !props.model.currentChannelHasMore" />
 
       <!-- 区块：空状态（消息已加载但无消息） -->
-      <div v-else-if="virtualListItems.length === 0 && !props.model.loadingMoreMessages" class="cp-emptyState">
-        <div class="cp-emptyState__icon"><AppIcon name="inbox" /></div>
-        <div class="cp-emptyState__title">{{ t("no_messages") }}</div>
-        <div class="cp-emptyState__desc">{{ t("no_messages_hint") }}</div>
-      </div>
+      <EmptyState
+        v-else-if="virtualListItems.length === 0 && !props.model.loadingMoreMessages"
+        class="cp-emptyState"
+        :title="t('no_messages')"
+        :description="t('no_messages_hint')"
+      >
+        <template #icon><AppIcon name="inbox" :size="24" /></template>
+      </EmptyState>
 
       <!-- 区块：游标分页（加载更早历史） -->
       <div v-if="props.model.currentChannelHasMore" class="cp-historyMore">
@@ -601,10 +576,8 @@ function getReplyText(m: VirtualMessageItem): string {
           :ref="(el: unknown) => { if (el && (el as Element).parentNode) virtualizer.measureElement(el as Element); }"
           :style="{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }"
         >
-          <!-- 未读边界 -->
-          <div v-if="virtualListItems[vr.index]?.kind === 'separator'" class="cp-unreadSep" role="separator" :aria-label="t('unread')">{{ t("unread") }}</div>
           <!-- 区块：消息行 -->
-          <template v-else-if="virtualListItems[vr.index]?.kind === 'message'">
+          <template v-if="virtualListItems[vr.index]">
             <div
               class="cp-msg"
               :data-message-id="virtualListItems[vr.index].m.id"
@@ -751,9 +724,10 @@ function getReplyText(m: VirtualMessageItem): string {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ChatCenter｜规格：消息行状态色（提及/定位高亮/编辑/拖拽）+ 空状态容器 */
 .cp-msg[data-mentioned="true"] {
-  background: color-mix(in oklab, var(--cp-warning) 10%, transparent);
-  border-radius: 14px;
+  background: var(--cp-warn-bg);
+  border-radius: var(--cp-radius);
 }
 /* 消息行：定位高亮通过 transition 平滑淡出（高亮由模型在跳转后定时清除） */
 .cp-msg {
@@ -762,21 +736,22 @@ function getReplyText(m: VirtualMessageItem): string {
     outline-color var(--cp-fast) var(--cp-ease);
 }
 .cp-msg[data-highlighted="true"] {
-  background: color-mix(in oklab, var(--cp-primary) 12%, transparent);
-  border-radius: 14px;
-  outline: 2px solid var(--cp-primary);
+  background: var(--cp-highlight-bg);
+  border-radius: var(--cp-radius);
+  outline: 2px solid var(--cp-highlight);
   outline-offset: -2px;
 }
 .cp-msg[data-editing="true"] {
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 8%, transparent);
-  border-radius: 14px;
-  outline: 1.5px dashed var(--cp-accent, #5865f2);
+  background: var(--cp-accent-soft);
+  border-radius: var(--cp-radius);
+  outline: 1.5px dashed var(--cp-accent);
   outline-offset: -1.5px;
 }
+/* 拖拽上传：accent 语义色（进行中状态），outline 不参与布局 */
 .cp-center--dragOver {
-  outline: 3px dashed var(--cp-accent, #5865f2);
+  outline: 3px dashed var(--cp-accent);
   outline-offset: -3px;
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 4%, transparent);
+  background: var(--cp-accent-soft);
 }
 
 .cp-msg__checkbox {
@@ -786,33 +761,8 @@ function getReplyText(m: VirtualMessageItem): string {
   flex-shrink: 0;
 }
 
-/* 空状态 */
+/* 空状态：排版由 shared EmptyState 统一承担，这里只负责在消息区内居中 */
 .cp-emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 48px 24px;
-  text-align: center;
-  min-height: 200px;
-}
-
-.cp-emptyState__icon {
-  font-size: 40px;
-  line-height: 1;
-  opacity: 0.6;
-}
-
-.cp-emptyState__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--cp-text);
-}
-
-.cp-emptyState__desc {
-  font-size: 13px;
-  color: var(--cp-text-muted);
-  max-width: 280px;
+  margin: auto;
 }
 </style>

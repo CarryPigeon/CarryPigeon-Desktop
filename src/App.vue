@@ -123,6 +123,25 @@ const tdGlobalConfig = computed(() => ({ icon: TD_ICON_OVERRIDES }));
   --cp-radius-sm: 10px;
   --cp-radius: 14px;
   --cp-radius-lg: 18px;
+  --cp-radius-card: 16px;
+  --cp-radius-control: 12px;
+
+  /* 页面骨架与玻璃面板（设置页视觉语言的全局基准） */
+  --cp-page-pad: 14px;
+  --cp-page-gap: 12px;
+  --cp-glass-blur: blur(16px) saturate(1.08);
+  --cp-section-head-gap: 20px;
+
+  /* 状态底色/描边：由状态色 + 面板/边框色派生，亮/暗主题自动跟随 */
+  --cp-danger-bg: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
+  --cp-danger-border: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
+  --cp-warn-bg: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel));
+  --cp-warn-border: color-mix(in oklab, var(--cp-warn) 30%, var(--cp-border));
+  --cp-success-bg: color-mix(in oklab, var(--cp-success) 10%, var(--cp-panel));
+  --cp-success-border: color-mix(in oklab, var(--cp-success) 30%, var(--cp-border));
+  --cp-info-bg: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
+  --cp-info-border: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
+
   --cp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --cp-fast: 160ms;
   --cp-slow: 320ms;
@@ -584,6 +603,85 @@ select.cp-field {
 .t-textarea__inner.t-is-disabled {
   background: var(--cp-field-bg-disabled) !important;
   border-color: var(--cp-border-light) !important;
+}
+
+/* 组件库（TDesign）：下拉/选择器与输入框同一字段规格 */
+.t-select,
+.t-select__wrap,
+.t-select-input {
+  border-radius: var(--cp-radius-control) !important;
+  border-color: var(--cp-field-border) !important;
+  background: var(--cp-field-bg) !important;
+  box-shadow: var(--cp-inset) !important;
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease);
+}
+
+.t-select:hover,
+.t-select-input:hover {
+  border-color: var(--cp-field-border-hover) !important;
+  background: var(--cp-field-bg-hover) !important;
+}
+
+.t-select.t-is-focused,
+.t-select-input.t-is-focused,
+.t-select-input--focused {
+  border-color: var(--cp-focus-border) !important;
+  box-shadow: var(--cp-focus-ring, var(--cp-ring)) !important;
+}
+
+.t-select .t-input {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 组件库（TDesign）：抽屉统一为玻璃面板。
+   注意：`.t-drawer` 是覆盖全屏的定位根节点（关闭时仍存在，仅 content 隐藏），
+   不能给它加背景/模糊，否则关闭态会盖住整页；玻璃只加在内容面板上。 */
+.t-drawer {
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.t-drawer__content-wrapper {
+  background: var(--cp-panel) !important;
+  border-color: var(--cp-border) !important;
+  box-shadow: var(--cp-shadow) !important;
+  backdrop-filter: var(--cp-glass-blur);
+  -webkit-backdrop-filter: var(--cp-glass-blur);
+}
+
+.t-drawer--right .t-drawer__content-wrapper {
+  border-left: 1px solid var(--cp-border);
+}
+
+.t-drawer__header {
+  font-family: var(--cp-font-display);
+  letter-spacing: -0.02em;
+  color: var(--cp-text);
+}
+
+.t-drawer__body {
+  color: var(--cp-text);
+}
+
+/* 组件库（TDesign）：浮层/气泡统一实心面板（避免半透明透出下层内容） */
+.t-popup__content {
+  background: var(--cp-panel-solid) !important;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius) !important;
+  box-shadow: var(--cp-shadow-float) !important;
+  color: var(--cp-text);
+}
+
+/* 组件库（TDesign）：按钮统一圆角/字体，颜色仍走 TDesign 语义 */
+.t-button {
+  border-radius: 999px !important;
+  font-family: var(--cp-font-body);
 }
 
 /* 组件库（TDesign）：对话框风格与应用一致 */

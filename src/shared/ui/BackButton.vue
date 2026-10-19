@@ -74,15 +74,15 @@ function onClick(): void {
   border-radius: 999px;
   cursor: pointer;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-back-btn:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
+  color: var(--cp-text);
 }
 
 .cp-back-btn:focus-visible {

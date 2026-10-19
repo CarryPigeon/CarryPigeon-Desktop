@@ -242,61 +242,41 @@ function escapeRegex(s: string): string {
 </template>
 
 <style scoped lang="scss">
+/* 样式：SearchPanel｜规格：聊天面板内统一工具条（字段 + 图标按钮 + 结果行） */
 .cp-searchPanel {
-  border-bottom: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 6px 8px;
+  background: var(--cp-panel-muted);
   max-height: 240px;
   overflow: hidden;
 }
 
+/* 搜索行：输入字段占满，关闭按钮为图标按钮 */
 .cp-searchPanel__row {
   display: flex;
   align-items: center;
   gap: 8px;
 
-  /* 搜索输入框适配深色主题（覆盖 TDesign 默认浅色） */
   :deep(.t-input) {
-    background: var(--cp-panel-muted);
-    border-color: var(--cp-border);
-  }
-
-  :deep(.t-input__wrap) {
-    background: transparent;
-  }
-
-  :deep(.t-input .t-input__inner) {
-    color: var(--cp-text);
-    caret-color: var(--cp-text);
-  }
-
-  :deep(.t-input::placeholder),
-  :deep(.t-input .t-input__inner::placeholder) {
-    color: var(--cp-text-muted);
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
 .cp-searchPanel__close {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  color: var(--cp-text-muted);
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
+  @include cp-icon-button;
 
-  &:hover {
-    color: var(--cp-text);
-  }
+  flex: 0 0 auto;
 }
 
+/* 状态区：错误用状态条，其余为静默说明 */
 .cp-searchPanel__state {
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .cp-searchPanel__state--loading {
@@ -306,36 +286,36 @@ function escapeRegex(s: string): string {
 }
 
 .cp-searchPanel__state--error {
-  color: var(--cp-danger, #e34);
+  @include cp-inline-status(danger);
 
-  .cp-searchPanel__errorText {
-    margin-right: 8px;
-  }
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .cp-searchPanel__state--empty {
   color: var(--cp-text-muted);
+  padding: 6px 2px;
 }
 
+/* 重试：胶囊按钮（主操作语义用 highlight） */
 .cp-searchPanel__retry {
-  background: none;
-  border: 1px solid var(--cp-accent, #5865f2);
-  color: var(--cp-accent, #5865f2);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
-  cursor: pointer;
+  @include cp-pill-button(primary);
 
-  &:hover {
-    background: color-mix(in oklab, var(--cp-accent) 10%, transparent);
-  }
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  flex: 0 0 auto;
 }
 
+/* 结果列表：设置页行列表语言 */
 .cp-searchPanel__results {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
   overflow-y: auto;
+  min-height: 0;
   max-height: 160px;
 }
 
@@ -344,50 +324,61 @@ function escapeRegex(s: string): string {
   flex-direction: column;
   gap: 2px;
   padding: 6px 8px;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius-sm);
   background: transparent;
-  border-radius: 6px;
   cursor: pointer;
   text-align: left;
   font-size: 13px;
+  color: var(--cp-text);
   outline: none;
-
-  &:focus-visible {
-    outline: 2px solid var(--cp-accent, #5865f2);
-    outline-offset: -2px;
-  }
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 
   &:hover {
-    background: color-mix(in oklab, var(--cp-accent) 8%, transparent);
+    background: var(--cp-hover-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--cp-highlight-border-strong);
+    outline-offset: -2px;
   }
 }
 
+/* 键盘/鼠标激活项：高亮底 + 高亮描边 + 左侧细条 */
 .cp-searchPanel__result--active {
-  background: color-mix(in oklab, var(--cp-accent) 12%, transparent);
+  background: var(--cp-highlight-bg);
+  border-color: var(--cp-highlight-border);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
 }
 
 .cp-searchPanel__resultSender {
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--cp-text);
 }
 
+/* 频道标签：等宽、弱化，不抢主色 */
 .cp-searchPanel__resultChannel {
+  font-family: var(--cp-font-mono);
   font-size: 11px;
-  color: var(--cp-accent, #5865f2);
-  font-weight: 500;
+  line-height: 1.4;
+  color: var(--cp-text-muted);
   margin-bottom: 1px;
 }
 
 .cp-searchPanel__resultPreview {
+  font-size: 12px;
   color: var(--cp-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 
   :deep(mark) {
-    background: color-mix(in oklab, var(--cp-warning, #ffd000) 40%, transparent);
+    background: color-mix(in oklab, var(--cp-warn) 32%, transparent);
     color: inherit;
-    border-radius: 2px;
+    border-radius: 3px;
     padding: 0 1px;
   }
 }

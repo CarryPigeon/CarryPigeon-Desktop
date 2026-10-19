@@ -53,11 +53,22 @@
 
 ### 3. 分区切换（左栏 Tab 导航）
 
-设置页右栏是 Tab 面板容器（`.cp-settings__sections`），左栏导航即 `role="tablist"`（每项 `role="tab"`，选中态由 `data-active` + `aria-selected` 表达）：
+设置页右栏是 Tab 面板容器（`.cp-settings__sections`），左栏导航即 `role="tablist"`（每项 `role="tab"`，选中态由 `data-active` + `aria-selected` 表达）。导航为「图标 + 名称」单行项，分区副标题通过 `title` 提示与右栏分区头展示：
 
 - 一次只显示当前分区的面板（`v-show`）；非当前面板隐藏但**保持挂载**，插件设置项控件与 `AiProviderSettings` 不会在切换时重新挂载或重新打 IPC；
 - 点击导航项调用 `setActiveSection()`：切换面板后把容器 `scrollTop` 复位到顶部；不再对整页做 `scrollIntoView`，原先基于 `IntersectionObserver` 的滚动高亮已移除；
 - 「插件设置」（当前 server 无插件设置项时）与「关于」（应用信息未就绪时）导航项不出现，保证每个导航项都有已渲染面板；分区集合变化后若当前 Tab 已不存在，自动回退到第一个分区（`general`）。
+
+### 3.1 布局与展示组件
+
+设置页展示层复用 `src/shared/ui` 的统一组件（均为纯展示、无业务/i18n 依赖）：
+
+- `shared/ui/panel/PanelGroup.vue`：分组卡（组标题/说明/脚注 + 行容器），支持 `padded` 内容区与 `headAction` / `footer` 插槽；
+- `shared/ui/panel/PanelRow.vue`：设置行（左侧标签 + 说明，右侧 `control` 插槽），根节点透传 `data-settings-item` 锚点（搜索跳转/高亮兼容）；
+- `shared/ui/panel/PanelSwitch.vue`：`role="switch"` 布尔开关，替代旧的「已启用/已禁用」胶囊按钮；
+- `shared/ui/SectionHead.vue`：分区头（图标瓦片 + 标题 + 副标题 + 操作槽）。
+
+右栏内容列 `max-width: 880px` 居中；断点：≤1180px 收窄内边距、≤900px 左右布局改为纵向（导航横向换行）、≤640px 设置行上下堆叠。颜色一律使用 `--cp-*` token（选中态用 highlight、开关开启用 accent）。「检查更新」初始为 `idle`（按钮可用），仅检查期间进入 `checking` 并禁用。
 
 ### 4. 设置搜索
 
@@ -98,6 +109,10 @@
 - `src/features/settings/domain/usecases/SetTheme.ts`
 - `src/features/settings/data/localStorageSettingsPort.ts`
 - `src/features/settings/presentation/settingsCatalog.ts`
+- `src/shared/ui/panel/PanelGroup.vue`
+- `src/shared/ui/panel/PanelRow.vue`
+- `src/shared/ui/panel/PanelSwitch.vue`
+- `src/shared/ui/SectionHead.vue`
 - `src/features/settings/presentation/settingsSearch.ts`
 - `src/features/settings/presentation/composables/useSettingsPageModel.ts`
 - `src/features/settings/presentation/composables/usePluginSettings.ts`

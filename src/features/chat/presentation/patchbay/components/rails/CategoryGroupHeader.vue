@@ -57,14 +57,16 @@ function handleToggle(): void {
 </template>
 
 <style scoped>
-/* 频道分类分组标题 */
+/* 样式：CategoryGroupHeader｜规格：设置页分组头（微标签 + 计数胶囊，安静 hover） */
 .cp-categoryHeader {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 4px 8px 2px;
+  font-family: var(--cp-font-display);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: var(--cp-text-muted);
   cursor: pointer;
   user-select: none;
@@ -75,9 +77,16 @@ function handleToggle(): void {
   color: var(--cp-text);
 }
 
+.cp-categoryHeader:focus-visible {
+  outline: 2px solid var(--cp-highlight-border-strong);
+  outline-offset: -2px;
+  border-radius: var(--cp-radius-sm);
+}
+
 .cp-categoryHeader--uncategorized {
   font-weight: 400;
   font-style: italic;
+  color: var(--cp-text-light);
 }
 
 /* 折叠/展开箭头 */
@@ -100,12 +109,14 @@ function handleToggle(): void {
   white-space: nowrap;
 }
 
-/* 频道计数 */
+/* 频道计数（等宽微标签胶囊） */
 .cp-categoryHeader__count {
+  font-family: var(--cp-font-mono);
   font-size: 10px;
   font-weight: 400;
-  color: var(--cp-text-light);
-  background: var(--cp-hover-bg);
+  color: var(--cp-text-muted);
+  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border-light);
   border-radius: 999px;
   padding: 0 6px;
   line-height: 16px;

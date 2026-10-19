@@ -44,6 +44,7 @@ void error;
 </template>
 
 <style scoped lang="scss">
+/* 样式：AuthedThumb｜规格：鉴权缩略图占位（面板底 + 状态色） */
 .cp-authedThumb__img {
   display: block;
   width: 100%;
@@ -58,11 +59,11 @@ void error;
   width: 100%;
   height: 100%;
   font-size: 11px;
-  color: var(--cp-text-muted, #888);
-  background: var(--cp-panel-muted, #f5f5f5);
+  color: var(--cp-text-muted);
+  background: var(--cp-panel-muted);
 }
 
 .cp-authedThumb__placeholder--err {
-  color: var(--cp-danger, #e53935);
+  color: var(--cp-danger);
 }
 </style>

@@ -65,7 +65,7 @@ const displayState = computed<ConnectionState>(() =>
 </template>
 
 <style scoped lang="scss">
-/* 样式：ConnectionPill */
+/* 样式：ConnectionPill｜规格：状态胶囊（LED 保留状态色，hover 只变色不移位） */
 /* 选择器：`.cp-connection-pill`｜用途：状态胶囊容器（LED + 文案 + 可选动作） */
 .cp-connection-pill {
   display: inline-flex;
@@ -86,7 +86,7 @@ const displayState = computed<ConnectionState>(() =>
   height: 10px;
   border-radius: 999px;
   background: var(--cp-domain-unknown);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-domain-unknown) 18%, transparent);
   flex: 0 0 auto;
 }
 
@@ -99,21 +99,21 @@ const displayState = computed<ConnectionState>(() =>
 /* 选择器：`.cp-connection-pill[data-state="reconnecting"] .cp-led`｜用途：重连中 LED（琥珀色 + 呼吸） */
 .cp-connection-pill[data-state="reconnecting"] .cp-led {
   background: var(--cp-warn);
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-warn) 18%, transparent);
   animation: cp-led-breathe 1.25s var(--cp-ease) infinite;
 }
 
 /* 选择器：`.cp-connection-pill[data-state="offline"] .cp-led`｜用途：离线 LED（红色 + 闪烁） */
 .cp-connection-pill[data-state="offline"] .cp-led {
   background: var(--cp-danger);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-danger) 18%, transparent);
   animation: cp-led-blink 1.4s var(--cp-ease) infinite;
 }
 
 /* 选择器：`.cp-connection-pill[data-state="idle"] .cp-led`｜用途：未尝试连接（中性灰，无动画） */
 .cp-connection-pill[data-state="idle"] .cp-led {
   background: var(--cp-domain-unknown);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-domain-unknown) 18%, transparent);
 }
 
 /* 选择器：`.cp-connection-text`｜用途：文案容器（label/detail 垂直堆叠 + 截断） */
@@ -146,28 +146,16 @@ const displayState = computed<ConnectionState>(() =>
 
 /* 选择器：`.cp-connection-action`｜用途：可选动作按钮（例如 Retry） */
 .cp-connection-action {
-  margin-left: 6px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button(primary);
 
-  /* 选择器：`.cp-connection-action:hover`｜用途：悬停上浮 + 高亮边框 */
-  &:hover {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
-  }
+  min-height: 24px;
+  padding: 0 10px;
+  margin-left: 6px;
+  font-size: 11.5px;
+  flex: 0 0 auto;
 
   &:focus-visible {
-    outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+    outline: 2px solid var(--cp-highlight-border-strong);
     outline-offset: 2px;
   }
 }

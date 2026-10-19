@@ -8,7 +8,6 @@
 
 import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 import { isSameUserId } from "@/features/chat/shared-kernel/userId";
-import { isMessageAfterReadMarker } from "@/features/chat/presentation/utils/readMarker";
 
 /**
  * 消息分组窗口：半天（12 小时）。
@@ -23,18 +22,8 @@ export const MESSAGE_GROUP_WINDOW_MS = 12 * 60 * 60 * 1000;
 export type MessageRowProjection = {
   /** 是否为分组首条（决定名字 / 头像 / 时间戳是否渲染）。 */
   isGroupStart: boolean;
-  /** 是否为未读边界（该条消息之前插入未读分隔符）。 */
-  isUnreadStart: boolean;
   /** 组首时间戳是否需要带上日期（与上一条消息不在同一自然日）。 */
   showDate: boolean;
-};
-
-/**
- * 读标记投影输入。
- */
-export type ReadMarkerProjectionInput = {
-  lastReadTimeMs: number;
-  lastReadMessageId: string;
 };
 
 /**
@@ -60,19 +49,13 @@ export function isSameCalendarDay(a: number, b: number): boolean {
  * 规则：
  * - 列表首条（无上一条）恒为组首；
  * - 发送者变化（按归一化 userId 比较）或时间差 ≥ {@link MESSAGE_GROUP_WINDOW_MS} 时为组首；
- * - 未读边界条强制为组首，避免未读分隔符后出现「无头像无名字」的孤行；
  * - 组首与上一条消息不在同一自然日时标记 `showDate`。
  *
  * @param messages - 按时间正序排列的消息列表。
- * @param readMarker - 当前会话读标记。
  * @returns 与 `messages` 等长的行投影数组。
  */
-export function projectMessageRows(
-  messages: readonly ChatMessage[],
-  readMarker: ReadMarkerProjectionInput,
-): MessageRowProjection[] {
+export function projectMessageRows(messages: readonly ChatMessage[]): MessageRowProjection[] {
   const rows: MessageRowProjection[] = [];
-  const { lastReadTimeMs, lastReadMessageId } = readMarker;
 
   for (let idx = 0; idx < messages.length; idx += 1) {
     const m = messages[idx];
@@ -80,18 +63,9 @@ export function projectMessageRows(
 
     const sameSender = prev ? isSameUserId(prev.from.id, m.from.id) : false;
     const closeInTime = prev ? Math.abs(m.timeMs - prev.timeMs) < MESSAGE_GROUP_WINDOW_MS : false;
-    const isGroupStart = !(sameSender && closeInTime);
-
-    const isUnread = isMessageAfterReadMarker(m.timeMs, m.id, lastReadTimeMs, lastReadMessageId);
-    const prevUnread = prev
-      ? isMessageAfterReadMarker(prev.timeMs, prev.id, lastReadTimeMs, lastReadMessageId)
-      : false;
-    const isUnreadStart = isUnread && !prevUnread;
 
     rows.push({
-      // 未读边界条自身需要可见的头像与名字，因此强制开启新组。
-      isGroupStart: isGroupStart || isUnreadStart,
-      isUnreadStart,
+      isGroupStart: !(sameSender && closeInTime),
       showDate: prev ? !isSameCalendarDay(prev.timeMs, m.timeMs) : false,
     });
   }

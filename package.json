@@ -26,6 +26,7 @@
         "lint:feature:boundaries": "bash scripts/check-feature-boundaries.sh",
         "lint:docs": "node scripts/check-markup-style-docs.mjs",
         "lint:color:literals": "node scripts/check-color-literals.mjs",
+        "lint:tokens": "node scripts/check-css-tokens.mjs",
         "lint:rust:std": "bash scripts/check-rust-standards.sh",
         "lint:logs:std": "bash scripts/check-log-standards.sh",
         "test": "vitest run",

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @fileoverview FileToolbar.vue
- * @description files｜文件工具栏：排序下拉、批量操作栏。
+ * @description files｜文件工具栏：排序控件、批量操作栏。
  */
 
 import { useI18n } from "vue-i18n";
@@ -39,24 +39,30 @@ function handleSortOrderToggle(): void {
 </script>
 
 <template>
+  <!-- 组件：FileToolbar｜职责：排序字段 + 排序方向 + 批量操作 -->
   <div class="cp-fileToolbar">
     <div class="cp-fileToolbar__sort">
       <span class="cp-fileToolbar__label">{{ t("file_sort_label") }}:</span>
-      <select class="cp-fileToolbar__select" :value="sortBy" @change="handleSortFieldChange">
-        <option v-for="field in sortFields" :key="field.value" :value="field.value">
-          {{ field.label }}
-        </option>
-      </select>
+      <span class="cp-fileToolbar__field">
+        <select class="cp-fileToolbar__select" :value="sortBy" @change="handleSortFieldChange">
+          <option v-for="field in sortFields" :key="field.value" :value="field.value">
+            {{ field.label }}
+          </option>
+        </select>
+        <AppIcon class="cp-fileToolbar__chevron" name="chevron-down" :size="13" />
+      </span>
       <button
         class="cp-fileToolbar__orderBtn"
         type="button"
         :title="sortOrder === 'asc' ? t('file_sort_asc') : t('file_sort_desc')"
+        :aria-label="sortOrder === 'asc' ? t('file_sort_asc') : t('file_sort_desc')"
         @click="handleSortOrderToggle"
       >
-        <AppIcon :name="sortOrder === 'asc' ? 'sort-asc' : 'sort-desc'" :size="12" :stroke-width="2" />
+        <AppIcon :name="sortOrder === 'asc' ? 'sort-asc' : 'sort-desc'" :size="13" :stroke-width="2" />
       </button>
     </div>
 
+    <!-- 批量操作：选中后出现，胶囊按钮与高亮底一致 -->
     <div v-if="selectedCount > 0" class="cp-fileToolbar__batch">
       <span class="cp-fileToolbar__count">{{ t("file_selected_count", { count: selectedCount }) }}</span>
       <button class="cp-fileToolbar__batchBtn cp-fileToolbar__batchBtn--danger" type="button" @click="emit('batchDelete')">
@@ -70,6 +76,7 @@ function handleSortOrderToggle(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：文件工具栏｜规格：字段化排序控件 + highlight 选中态批量条 */
 .cp-fileToolbar {
   display: flex;
   align-items: center;
@@ -79,9 +86,9 @@ function handleSortOrderToggle(): void {
 }
 
 .cp-fileToolbar__sort {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .cp-fileToolbar__label {
@@ -89,71 +96,101 @@ function handleSortOrderToggle(): void {
   color: var(--cp-text-muted);
 }
 
-.cp-fileToolbar__select {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  outline: none;
-  cursor: pointer;
-}
-
-.cp-fileToolbar__orderBtn {
+/* 排序字段：与搜索字段同一套 field token */
+.cp-fileToolbar__field {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  line-height: 1;
+  height: 34px;
+  padding: 0 28px 0 12px;
+  border: 1px solid var(--cp-field-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-field-bg);
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-fileToolbar__orderBtn:hover {
-  border-color: var(--cp-highlight-border);
+.cp-fileToolbar__field:hover {
+  border-color: var(--cp-field-border-hover);
+  background: var(--cp-field-bg-hover);
+}
+
+.cp-fileToolbar__field:focus-within {
+  border-color: var(--cp-focus-border);
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
+}
+
+.cp-fileToolbar__select {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cp-text);
+  font-family: var(--cp-font-body);
+  font-size: 12.5px;
+  line-height: 1.4;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cp-fileToolbar__select:focus-visible {
+  box-shadow: none;
+}
+
+.cp-fileToolbar__chevron {
+  position: absolute;
+  right: 9px;
+  pointer-events: none;
+  color: var(--cp-text-muted);
+}
+
+/* 排序方向：统一图标按钮规格 */
+.cp-fileToolbar__orderBtn {
+  @include cp-icon-button;
 }
 
 .cp-fileToolbar__batch {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-border);
+  padding: 3px 5px 3px 12px;
+  border: 1px solid var(--cp-highlight-border);
   border-radius: 999px;
+  background: var(--cp-highlight-bg);
 }
 
 .cp-fileToolbar__count {
   font-size: 12px;
+  font-weight: 600;
   color: var(--cp-text);
-  font-weight: 500;
+  white-space: nowrap;
 }
 
 .cp-fileToolbar__batchBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  cursor: pointer;
-}
+  @include cp-pill-button;
 
-.cp-fileToolbar__batchBtn:hover {
-  border-color: var(--cp-highlight-border);
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
 }
 
 .cp-fileToolbar__batchBtn--danger {
-  color: #e74c3c;
-  border-color: #e74c3c;
+  @include cp-pill-button(danger);
+
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
 }
 
-.cp-fileToolbar__batchBtn--danger:hover {
-  background: #e74c3c10;
+/* 响应式：窄窗口批量条换行占满 */
+@media (max-width: 640px) {
+  .cp-fileToolbar__batch {
+    width: 100%;
+    flex-wrap: wrap;
+    border-radius: var(--cp-radius-control);
+    padding: 6px 8px;
+  }
 }
 </style>

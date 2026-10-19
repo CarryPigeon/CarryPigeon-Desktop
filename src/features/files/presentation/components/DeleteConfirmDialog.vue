@@ -21,10 +21,11 @@ const { t } = useI18n();
 </script>
 
 <template>
+  <!-- 组件：DeleteConfirmDialog｜职责：删除确认（危险状态 token + 玻璃浮层） -->
   <Teleport to="body">
     <div v-if="visible" class="cp-deleteOverlay" @click.self="emit('cancel')">
-      <div class="cp-deleteDialog">
-        <div class="cp-deleteDialog__icon"><AppIcon name="delete" :size="32" /></div>
+      <div class="cp-deleteDialog" role="dialog" aria-modal="true" :aria-label="t('file_delete_confirm_title')">
+        <div class="cp-deleteDialog__icon"><AppIcon name="delete" :size="24" /></div>
         <div class="cp-deleteDialog__title">{{ t("file_delete_confirm_title") }}</div>
         <div class="cp-deleteDialog__msg">
           {{ t("file_delete_confirm_message", { count }) }}
@@ -41,78 +42,83 @@ const { t } = useI18n();
 </template>
 
 <style scoped lang="scss">
+/* 样式：删除确认弹窗｜规格：面板实底浮层 + danger 状态 token + 胶囊按钮 */
 .cp-deleteOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 10000;
 }
 
 .cp-deleteDialog {
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-border);
-  border-radius: 16px;
+  width: min(400px, 92vw);
   padding: 24px;
-  max-width: 380px;
-  width: 90%;
   text-align: center;
-  box-shadow: var(--cp-shadow-strong);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-panel-solid);
+  box-shadow: var(--cp-shadow-float);
 }
 
+/* 图标瓦片：danger 底色/描边 */
 .cp-deleteDialog__icon {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 14px;
+  border: 1px solid var(--cp-danger-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-danger-bg);
   color: var(--cp-danger);
-  margin-bottom: 12px;
 }
 
 .cp-deleteDialog__title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--cp-text);
   margin-bottom: 8px;
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  color: var(--cp-text);
 }
 
 .cp-deleteDialog__msg {
-  font-size: 13px;
-  color: var(--cp-text-muted);
   margin-bottom: 20px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--cp-text-muted);
 }
 
 .cp-deleteDialog__actions {
   display: flex;
-  gap: 10px;
   justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .cp-deleteDialog__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 20px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-.cp-deleteDialog__btn:hover {
-  border-color: var(--cp-highlight-border);
-}
-
+/* 危险主操作：实底 danger token（hover 用透明度混合保持主题无关） */
 .cp-deleteDialog__btn--danger {
-  color: #fff;
-  background: #e74c3c;
-  border-color: #e74c3c;
+  @include cp-pill-button(danger);
+
+  border-color: var(--cp-danger);
+  background: var(--cp-danger);
+  color: var(--cp-panel-solid);
 }
 
-.cp-deleteDialog__btn--danger:hover {
-  background: #c0392b;
-  border-color: #c0392b;
+.cp-deleteDialog__btn--danger:hover:not(:disabled) {
+  border-color: var(--cp-danger);
+  background: color-mix(in oklab, var(--cp-danger) 88%, transparent);
+  color: var(--cp-panel-solid);
 }
 </style>

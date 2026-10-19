@@ -157,37 +157,35 @@ function fmtTime(ms: number): string {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：PinListBar｜规格：频道面板内工具条（胶囊头部 + 图标按钮，无位移 hover） */
 .cp-pinListBar {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--cp-surface);
-  border-bottom: 1px solid var(--cp-border);
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--cp-panel-muted);
   font-size: 12px;
   position: relative;
 }
 
 .cp-pinListBar--loading {
-  padding: 6px 12px;
-  color: var(--cp-text-muted);
-}
-
-.cp-pinListBar__header {
-  display: flex;
   align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  padding-right: 4px;
-  border-right: 1px solid var(--cp-border);
+  padding: 4px 8px;
   color: var(--cp-text-muted);
 }
 
-.cp-pinListBar__header:hover {
-  color: var(--cp-text);
+/* 折叠/展开头：胶囊按钮（pin 图标 + 计数 + chevron） */
+.cp-pinListBar__header {
+  @include cp-pill-button;
+
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--cp-text-muted);
 }
 
 .cp-pinListBar__icon {
@@ -199,26 +197,26 @@ function fmtTime(ms: number): string {
 }
 
 .cp-pinListBar__count {
-  font-weight: 500;
-  font-size: 11px;
+  font-weight: 600;
+  font-size: 11.5px;
 }
 
 .cp-pinListBar__toggle {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  padding: 0 2px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--cp-text-muted);
+  padding: 0;
+  cursor: pointer;
 }
 
 .cp-pinListBar__items {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
   max-height: 28px;
   overflow: hidden;
@@ -228,18 +226,19 @@ function fmtTime(ms: number): string {
   max-height: none;
 }
 
+/* 置顶行：行底色 hover，不做位移 */
 .cp-pinListBar__item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 2px 8px;
-  border-radius: 4px;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: var(--cp-radius-sm);
   cursor: pointer;
-  transition: background-color 0.1s;
+  transition: background-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-pinListBar__item:hover {
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 8%, transparent);
+  background: var(--cp-hover-bg);
 }
 
 .cp-pinListBar__itemPreview {
@@ -280,49 +279,40 @@ function fmtTime(ms: number): string {
   text-overflow: ellipsis;
 }
 
+/* 取消置顶：图标按钮，hover 才显示 */
 .cp-pinListBar__itemUnpin {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  cursor: pointer;
+  @include cp-icon-button;
+
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
   font-size: 11px;
-  color: var(--cp-text-muted);
-  padding: 2px;
-  border-radius: 2px;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.1s, color 0.1s;
+  transition:
+    opacity var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+
+  &:hover:not(:disabled) {
+    color: var(--cp-danger);
+    background: var(--cp-danger-bg);
+    border-color: var(--cp-danger-border);
+  }
 }
 
-.cp-pinListBar__item:hover .cp-pinListBar__itemUnpin {
+.cp-pinListBar__item:hover .cp-pinListBar__itemUnpin,
+.cp-pinListBar__itemUnpin:focus-visible {
   opacity: 1;
 }
 
-.cp-pinListBar__itemUnpin:hover {
-  color: var(--cp-danger);
-  background: color-mix(in oklab, var(--cp-danger) 10%, transparent);
-}
-
+/* 关闭工具条：图标按钮 */
 .cp-pinListBar__dismiss {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--cp-text-muted);
-  padding: 2px 4px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  opacity: 0.5;
-  transition: opacity 0.1s;
-}
+  @include cp-icon-button;
 
-.cp-pinListBar__dismiss:hover {
-  opacity: 1;
-  color: var(--cp-text);
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 </style>

@@ -145,6 +145,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
+/* 样式：VoiceMessageRecorder｜规格：胶囊按钮（hover 只变色），录制/处理用状态 token */
 .cp-voiceRecorder {
   display: inline-flex;
   align-items: center;
@@ -157,12 +158,13 @@ onUnmounted(() => {
   font-size: 12px;
   cursor: pointer;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease);
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 
-  &:hover:enabled {
-    transform: translateY(-1px);
+  &:hover:not(:disabled) {
     background: var(--cp-hover-bg);
+    border-color: var(--cp-highlight-border);
   }
 
   &:disabled {
@@ -171,13 +173,13 @@ onUnmounted(() => {
   }
 
   &--recording {
-    border-color: var(--cp-danger);
-    background: color-mix(in oklab, var(--cp-danger) 12%, var(--cp-panel-muted));
+    border-color: var(--cp-danger-border);
+    background: var(--cp-danger-bg);
   }
 
   &--processing {
-    border-color: var(--cp-warning);
-    background: color-mix(in oklab, var(--cp-warning) 12%, var(--cp-panel-muted));
+    border-color: var(--cp-warn-border);
+    background: var(--cp-warn-bg);
   }
 
   &__icon {
@@ -197,5 +199,4 @@ onUnmounted(() => {
     text-align: center;
   }
 }
-
 </style>

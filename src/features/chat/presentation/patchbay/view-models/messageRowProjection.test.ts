@@ -2,7 +2,7 @@
  * @fileoverview messageRowProjection.test.ts
  * @description chat｜view-model：消息分组投影纯函数验证。
  *
- * 覆盖：半天分组窗口、发送者归一化比较、未读边界强制成组、跨自然日时间戳格式化。
+ * 覆盖：半天分组窗口、发送者归一化比较、跨自然日时间戳格式化。
  */
 
 import { describe, expect, it } from "vitest";
@@ -42,76 +42,46 @@ function localTime(year: number, month: number, day: number, hour: number, minut
   return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
 }
 
-const READ_NONE = { lastReadTimeMs: 0, lastReadMessageId: "" };
-
 describe("projectMessageRows 分组窗口", () => {
   it("同一发送者在半天内连续发送时，只有首条是组首", () => {
     const base = localTime(2024, 6, 10, 9, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "m1", timeMs: base }),
-        makeMessage({ id: "m2", timeMs: base + 11 * 60 * 60 * 1000 }),
-      ],
-      READ_NONE,
-    );
+    const rows = projectMessageRows([
+      makeMessage({ id: "m1", timeMs: base }),
+      makeMessage({ id: "m2", timeMs: base + 11 * 60 * 60 * 1000 }),
+    ]);
 
     expect(rows.map((r) => r.isGroupStart)).toEqual([true, false]);
   });
 
   it("时间差达到半天时开启新组", () => {
     const base = localTime(2024, 6, 10, 9, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "m1", timeMs: base }),
-        makeMessage({ id: "m2", timeMs: base + MESSAGE_GROUP_WINDOW_MS }),
-      ],
-      READ_NONE,
-    );
+    const rows = projectMessageRows([
+      makeMessage({ id: "m1", timeMs: base }),
+      makeMessage({ id: "m2", timeMs: base + MESSAGE_GROUP_WINDOW_MS }),
+    ]);
 
     expect(rows.map((r) => r.isGroupStart)).toEqual([true, true]);
   });
 
   it("发送者变化时开启新组（忽略 u: 前缀与大小写差异）", () => {
     const base = localTime(2024, 6, 10, 9, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "m1", timeMs: base, from: { id: "u-1", name: "Operator" } }),
-        makeMessage({ id: "m2", timeMs: base + 1000, from: { id: "U:U-1", name: "Operator" } }),
-        makeMessage({ id: "m3", timeMs: base + 2000, from: { id: "u-2", name: "Relay" } }),
-      ],
-      READ_NONE,
-    );
+    const rows = projectMessageRows([
+      makeMessage({ id: "m1", timeMs: base, from: { id: "u-1", name: "Operator" } }),
+      makeMessage({ id: "m2", timeMs: base + 1000, from: { id: "U:U-1", name: "Operator" } }),
+      makeMessage({ id: "m3", timeMs: base + 2000, from: { id: "u-2", name: "Relay" } }),
+    ]);
 
     expect(rows.map((r) => r.isGroupStart)).toEqual([true, false, true]);
   });
 
   it("发送者 id 为空串时各自成组", () => {
     const base = localTime(2024, 6, 10, 9, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "m1", timeMs: base, from: { id: "", name: "System" } }),
-        makeMessage({ id: "m2", timeMs: base + 1000, from: { id: "", name: "System" } }),
-      ],
-      READ_NONE,
-    );
+    const rows = projectMessageRows([
+      makeMessage({ id: "m1", timeMs: base, from: { id: "", name: "System" } }),
+      makeMessage({ id: "m2", timeMs: base + 1000, from: { id: "", name: "System" } }),
+    ]);
 
     expect(rows.map((r) => r.isGroupStart)).toEqual([true, true]);
-  });
-});
-
-describe("projectMessageRows 未读边界", () => {
-  it("未读起始条强制为组首，并标记 isUnreadStart", () => {
-    const base = localTime(2024, 6, 10, 9, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "1", timeMs: base }),
-        makeMessage({ id: "2", timeMs: base + 60 * 1000 }),
-      ],
-      { lastReadTimeMs: base, lastReadMessageId: "1" },
-    );
-
-    expect(rows[0]).toMatchObject({ isGroupStart: true, isUnreadStart: false });
-    expect(rows[1]).toMatchObject({ isGroupStart: true, isUnreadStart: true, showDate: false });
   });
 
   it("不修改传入的消息数组", () => {
@@ -122,7 +92,7 @@ describe("projectMessageRows 未读边界", () => {
     ];
     const snapshot = JSON.parse(JSON.stringify(messages));
 
-    projectMessageRows(messages, READ_NONE);
+    projectMessageRows(messages);
 
     expect(messages).toEqual(snapshot);
   });
@@ -132,26 +102,20 @@ describe("projectMessageRows 跨自然日标记", () => {
   it("与上一条消息不在同一自然日时标记 showDate", () => {
     const dayOne = localTime(2024, 6, 10, 23, 50);
     const dayTwo = localTime(2024, 6, 11, 8, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "m1", timeMs: dayOne }),
-        makeMessage({ id: "m2", timeMs: dayTwo, from: { id: "u-2", name: "Relay" } }),
-      ],
-      READ_NONE,
-    );
+    const rows = projectMessageRows([
+      makeMessage({ id: "m1", timeMs: dayOne }),
+      makeMessage({ id: "m2", timeMs: dayTwo, from: { id: "u-2", name: "Relay" } }),
+    ]);
 
     expect(rows.map((r) => r.showDate)).toEqual([false, true]);
   });
 
   it("同一天内不标记 showDate", () => {
     const base = localTime(2024, 6, 10, 9, 0);
-    const rows = projectMessageRows(
-      [
-        makeMessage({ id: "m1", timeMs: base }),
-        makeMessage({ id: "m2", timeMs: base + 13 * 60 * 60 * 1000 }),
-      ],
-      READ_NONE,
-    );
+    const rows = projectMessageRows([
+      makeMessage({ id: "m1", timeMs: base }),
+      makeMessage({ id: "m2", timeMs: base + 13 * 60 * 60 * 1000 }),
+    ]);
 
     expect(rows.map((r) => r.showDate)).toEqual([false, false]);
     expect(rows[1].isGroupStart).toBe(true);

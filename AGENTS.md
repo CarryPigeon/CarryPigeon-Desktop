@@ -23,6 +23,7 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
 
 - On Windows, `pnpm run lint` skips bash-dependent checks (`lint:feature:boundaries`, `lint:logs:std`, `lint:rust:std`). Run them via Git Bash or WSL.
 - Feature boundary violations are enforced by `scripts/check-feature-boundaries.sh`.
+- Undefined `--cp-*` CSS tokens are rejected by `pnpm run lint:tokens` (uses `scripts/check-css-tokens.mjs`; define tokens in `src/App.vue`).
 
 ## Architecture
 

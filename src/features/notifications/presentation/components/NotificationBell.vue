@@ -37,40 +37,33 @@ function togglePanel(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：NotificationBell｜规格：顶栏图标按钮 + 危险色未读徽标 */
 .cp-notif-bell {
   position: relative;
 }
 
 .cp-notif-bell__btn {
-  position: relative;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 6px;
-  color: var(--cp-text);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
+  @include cp-icon-button;
 
-  &:hover {
-    background: var(--cp-hover);
-  }
+  position: relative;
 }
 
 .cp-notif-bell__icon {
   font-size: 20px;
 }
 
+/* 未读徽标：危险色底 + 反色文字（徽标文字色无对应 token，保留白色以在状态色上可读） */
 .cp-notif-bell__badge {
   position: absolute;
   top: 0;
   right: 0;
-  background: var(--cp-danger, #e34d59);
+  background: var(--cp-danger);
   color: #fff;
   font-size: 10px;
+  line-height: 1;
   min-width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;

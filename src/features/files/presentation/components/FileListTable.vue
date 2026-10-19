@@ -108,20 +108,26 @@ function formatTime(iso: string): string {
 </script>
 
 <template>
+  <!-- 组件：FileListTable｜职责：文件列表（11px 表头 / 48px 行高 / 细分隔线 / 选中 highlight） -->
   <div v-if="files.length === 0 && !loading" class="cp-fileTable__empty">
-    {{ t("file_list_empty") }}
+    <span class="cp-fileTable__emptyIcon"><AppIcon name="file" :size="22" /></span>
+    <span class="cp-fileTable__emptyText">{{ t("file_list_empty") }}</span>
   </div>
   <div v-else class="cp-fileTable">
+    <!-- 表头：与数据行同列宽；首列空标签用于对齐文件类型图标 -->
     <div class="cp-fileTable__header">
       <span class="cp-fileTable__checkbox" @click="handleSelectAll">
         <input type="checkbox" :checked="isAllSelected()" />
       </span>
-      <span class="cp-fileTable__headerCell cp-fileTable__headerCell--icon" />
       <span
-        v-for="col in columns"
-        :key="col.label"
+        v-for="(col, index) in columns"
+        :key="col.label || `col-${index}`"
         class="cp-fileTable__headerCell"
-        :class="{ 'cp-fileTable__headerCell--sortable': col.sortable }"
+        :class="{
+          'cp-fileTable__headerCell--sortable': col.sortable,
+          'cp-fileTable__headerCell--icon': index === 0,
+          'cp-fileTable__headerCell--name': col.field === 'filename',
+        }"
         @click="col.sortable && col.field && handleHeaderClick(col.field)"
       >
         {{ col.label }}
@@ -155,7 +161,13 @@ function formatTime(iso: string): string {
       <span class="cp-fileTable__cell">{{ formatTime(file.uploadedAt) }}</span>
       <span class="cp-fileTable__cell">{{ file.uploaderName || "-" }}</span>
       <span class="cp-fileTable__actions">
-        <button class="cp-fileTable__actionBtn" type="button" :title="t('download')" @click.stop="emit('download', file)">
+        <button
+          class="cp-fileTable__actionBtn"
+          type="button"
+          :title="t('download')"
+          :aria-label="t('download')"
+          @click.stop="emit('download', file)"
+        >
           <AppIcon name="download" />
         </button>
       </span>
@@ -191,34 +203,74 @@ function formatTime(iso: string): string {
 </template>
 
 <style scoped lang="scss">
+/* 样式：文件列表表格｜规格：微标签表头 + 48px 行 + 细分隔线 + 选中 highlight */
 .cp-fileTable__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 56px 20px;
   text-align: center;
-  padding: 40px 20px;
-  color: var(--cp-text-muted);
-  font-size: 13px;
 }
 
+.cp-fileTable__emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
+}
+
+.cp-fileTable__emptyText {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+/* 表头：11px uppercase / 0.08em；与数据行共用列宽 */
 .cp-fileTable__header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--cp-border);
+  min-height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--cp-border-light);
+  font-family: var(--cp-font-display);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--cp-text-muted);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--cp-text-muted);
 }
 
 .cp-fileTable__headerCell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   cursor: default;
-  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-fileTable__headerCell--icon {
+  flex: 0 0 32px;
+}
+
+.cp-fileTable__headerCell--name {
+  flex: 2 1 0;
 }
 
 .cp-fileTable__headerCell--sortable {
   cursor: pointer;
   user-select: none;
+  transition: color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-fileTable__headerCell--sortable:hover {
@@ -228,32 +280,38 @@ function formatTime(iso: string): string {
 .cp-fileTable__sortIcon {
   display: inline-flex;
   align-items: center;
-  font-size: 10px;
   margin-left: 2px;
-  vertical-align: -1px;
 }
 
+/* 复选框列与图标列固定宽度，保证表头/行对齐 */
 .cp-fileTable__checkbox {
-  width: 36px;
-  flex-shrink: 0;
+  width: 26px;
+  flex: 0 0 26px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.cp-fileTable__checkbox input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--cp-accent);
+  cursor: pointer;
+}
+
+/* 数据行：48px、层叠细分隔线、hover 只变底色 */
 .cp-fileTable__row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  min-height: 44px;
-  border-bottom: 1px solid var(--cp-border);
-  transition: background var(--cp-fast) var(--cp-ease);
+  min-height: 48px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--cp-border-light);
   cursor: pointer;
-}
-
-.cp-fileTable__row:last-child {
-  border-bottom: none;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
 }
 
 .cp-fileTable__row:hover {
@@ -261,73 +319,79 @@ function formatTime(iso: string): string {
 }
 
 .cp-fileTable__row--selected {
-  background: var(--cp-accent-bg, rgba(59, 130, 246, 0.08));
+  background: var(--cp-highlight-bg);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
+}
+
+.cp-fileTable__row--selected:hover {
+  background: var(--cp-highlight-bg-strong);
 }
 
 .cp-fileTable__icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  width: 32px;
-  text-align: center;
+  flex: 0 0 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-text-muted);
 }
 
 .cp-fileTable__meta {
-  flex: 2;
+  flex: 2 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .cp-fileTable__name {
   font-size: 13px;
-  color: var(--cp-text);
   font-weight: 500;
+  line-height: 1.4;
+  color: var(--cp-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* 频道 chip：等宽字体小徽标 */
 .cp-fileTable__channel {
-  font-size: 10px;
-  color: var(--cp-text-muted);
-  background: var(--cp-panel-muted);
-  padding: 1px 6px;
-  border-radius: 999px;
   align-self: flex-start;
+  max-width: 100%;
+  padding: 1px 7px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
+  font-family: var(--cp-font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cp-fileTable__cell {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 12px;
-  color: var(--cp-text);
+  color: var(--cp-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .cp-fileTable__actions {
-  flex-shrink: 0;
-  width: 40px;
-  text-align: center;
-}
-
-.cp-fileTable__actionBtn {
+  flex: 0 0 40px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: var(--cp-text-muted);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: background var(--cp-fast) var(--cp-ease);
+  justify-content: flex-end;
 }
 
-.cp-fileTable__actionBtn:hover {
-  background: var(--cp-hover-bg);
-  color: var(--cp-text);
+/* 操作：统一图标按钮规格 */
+.cp-fileTable__actionBtn {
+  @include cp-icon-button;
+
+  width: 30px;
+  height: 30px;
 }
 </style>

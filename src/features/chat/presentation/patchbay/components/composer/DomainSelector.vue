@@ -93,38 +93,39 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：DomainSelector */
+/* 样式：DomainSelector｜规格：设置页胶囊控件（静态描边，hover/激活只变底色/描边/字色） */
 /* 选择器：`.cp-domain-selector` —— domain 选项胶囊的容器。 */
 .cp-domain-selector {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* 选择器：`.cp-domain` —— domain 选项按钮（未激活）。 */
 .cp-domain {
+  min-height: 32px;
+  padding: 0 12px;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text-muted);
   border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease),
     color var(--cp-fast) var(--cp-ease);
 }
 
-/* 选择器：`.cp-domain:hover` —— hover 抬升 + 强调边框。 */
+/* 选择器：`.cp-domain:hover` —— hover 只变底色/描边/字色，不做位移。 */
 .cp-domain:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
+  color: var(--cp-text);
 }
 
 /* 选择器：`.cp-domain[data-active="true"]` —— 激活态 domain 选中样式。 */
@@ -136,10 +137,10 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
 
 /* 选择器：`.cp-domain__dot` —— 左侧颜色圆点（domain 色）。 */
 .cp-domain__dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-border) 70%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--cp-border) 70%, transparent);
 }
 
 /* 选择器：`.cp-domain__label` —— domain 文案（不换行）。 */
@@ -147,21 +148,27 @@ function handleOptionKeydown(e: KeyboardEvent, index: number): void {
   white-space: nowrap;
 }
 
+/* 折叠态选择器：与工具栏胶囊按钮同高 */
 .cp-domain-collapsed {
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 0 10px;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
-  border-radius: 6px;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: var(--cp-text);
-  transition: background-color var(--cp-fast) var(--cp-ease);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 }
 .cp-domain-collapsed:hover {
   background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
 }
 .cp-domain-collapsed__label {
   white-space: nowrap;

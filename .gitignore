@@ -44,6 +44,7 @@ public/plugins/
 .tmp-fonttest/
 .tmp-replypreview/
 .tmp-menu-preview/
+.tmp-ui-review/
 docs/superpowers/
 .superpowers/
 .worktrees/

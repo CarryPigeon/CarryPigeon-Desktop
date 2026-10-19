@@ -62,13 +62,13 @@ const { t } = useI18n();
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；卡片包含标题/标签区、预览区与安装引导按钮。 */
+/* 样式：UnknownDomainCard｜布局与变量说明：卡片包含标题/标签区、预览区与安装引导按钮；
+   降级态用 dashed 边框 + panel-muted 底，安装按钮为主操作（highlight）。 */
 .cp-unpatched {
-  border: 1px dashed rgba(148, 163, 184, 0.34);
+  border: 1px dashed var(--cp-border);
   background: var(--cp-panel-muted);
-  border-radius: 16px;
+  border-radius: var(--cp-radius-card);
   padding: 12px;
-  box-shadow: var(--cp-shadow-soft);
 }
 
 .cp-unpatched__top {
@@ -125,6 +125,7 @@ const { t } = useI18n();
   min-width: 0;
 }
 
+/* 未接通线缆示意：颜色取自 domain 未知识别色 */
 .cp-unpatched__cable {
   display: inline-flex;
   align-items: center;
@@ -135,14 +136,20 @@ const { t } = useI18n();
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.42);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+  background: color-mix(in oklab, var(--cp-domain-unknown) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-domain-unknown) 12%, transparent);
 }
 
 .cp-unpatched__cableDash {
   width: 56px;
   height: 1px;
-  background: repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.62), rgba(148, 163, 184, 0.62) 6px, transparent 6px, transparent 12px);
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--cp-domain-unknown) 62%, transparent),
+    color-mix(in oklab, var(--cp-domain-unknown) 62%, transparent) 6px,
+    transparent 6px,
+    transparent 12px
+  );
   opacity: 0.8;
 }
 
@@ -152,33 +159,12 @@ const { t } = useI18n();
   justify-content: flex-end;
 }
 
+/* 安装引导：胶囊按钮；primary 用 highlight 主操作语义 */
 .cp-unpatched__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
+  @include cp-pill-button;
 
-.cp-unpatched__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-unpatched__btn.primary {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-}
-
-.cp-unpatched__btn.primary:hover {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg-strong);
+  &.primary {
+    @include cp-pill-button(primary);
+  }
 }
 </style>

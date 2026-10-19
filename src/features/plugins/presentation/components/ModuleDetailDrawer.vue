@@ -278,38 +278,38 @@ function handleClose(): void {
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；抽屉内为纵向分区（lock/sub/section/actions）。 */
+/* 样式：插件详情抽屉｜规格：微标签分区 + 内嵌分组卡 + 胶囊按钮（与设置页一致） */
 .cp-drawer {
-  padding: 14px 14px 18px 14px;
-  color: var(--cp-text);
   position: relative;
+  padding: 16px 16px 20px;
+  color: var(--cp-text);
 }
 
 .cp-drawer--empty {
   color: var(--cp-text-muted);
+  font-size: 13px;
 }
 
+/* 锁定提示：warn 状态条 */
 .cp-drawer__lock {
-  border: 1px dashed color-mix(in oklab, var(--cp-warn) 32%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel-muted));
-  border-radius: 16px;
-  padding: 12px;
   margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--cp-warn-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-warn-bg);
 }
 
 .cp-drawer__lockTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text);
+  @include cp-section-label;
+
+  color: var(--cp-warn);
 }
 
 .cp-drawer__lockSub {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
-  line-height: 1.4;
 }
 
 .cp-drawer__sub {
@@ -321,18 +321,20 @@ function handleClose(): void {
 }
 
 .cp-drawer__tagline {
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
-  font-size: 12px;
-  line-height: 1.35;
 }
 
 .cp-drawer__badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
   justify-content: flex-end;
+  gap: 6px;
 }
 
+/* 分区：细线分隔 + 微标签 */
 .cp-drawer__section {
   margin-top: 14px;
   padding-top: 12px;
@@ -340,44 +342,41 @@ function handleClose(): void {
 }
 
 .cp-drawer__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
+
   margin-bottom: 8px;
 }
 
 .cp-drawer__row {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cp-drawer__pill {
   padding: 6px 10px;
-  border-radius: 999px;
   border: 1px solid var(--cp-border);
+  border-radius: 999px;
   background: var(--cp-panel-muted);
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .cp-drawer__ports {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
 .cp-drawer__port {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-border) 70%, transparent);
+  box-shadow: 0 0 0 3px var(--cp-border-light);
 }
 
 .cp-drawer__portsText {
@@ -385,6 +384,7 @@ function handleClose(): void {
   color: var(--cp-text-muted);
 }
 
+/* 权限行：内嵌分组卡（high/medium 用状态 token） */
 .cp-perms {
   display: flex;
   flex-direction: column;
@@ -393,18 +393,18 @@ function handleClose(): void {
 
 .cp-perm {
   display: grid;
-  grid-template-columns: 96px 1fr auto;
-  gap: 10px;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
   align-items: center;
-  padding: 10px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--cp-border);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
   background: var(--cp-panel-muted);
 }
 
 .cp-perm__key {
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--cp-text-muted);
 }
 
@@ -414,32 +414,34 @@ function handleClose(): void {
 }
 
 .cp-perm__risk {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  @include cp-section-label;
+
   font-size: 11px;
-  color: var(--cp-text-muted);
 }
 
 .cp-perm[data-risk="high"] {
-  border-color: color-mix(in oklab, var(--cp-danger) 28%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
+  border-color: var(--cp-danger-border);
+  background: var(--cp-danger-bg);
 }
 
 .cp-perm[data-risk="medium"] {
-  border-color: color-mix(in oklab, var(--cp-warn) 28%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel-muted));
+  border-color: var(--cp-warn-border);
+  background: var(--cp-warn-bg);
 }
 
+/* 上次错误：danger 状态条 */
 .cp-drawer__error {
-  border: 1px dashed rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.10);
-  border-radius: 14px;
-  padding: 10px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--cp-danger-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-danger-bg);
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text);
+  overflow-wrap: anywhere;
 }
 
+/* installed 三列键值：内嵌分组卡 */
 .cp-drawer__kv {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -447,15 +449,16 @@ function handleClose(): void {
 }
 
 .cp-kv {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  border-radius: 14px;
   padding: 10px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
 }
 
 .cp-kv__k {
-  font-size: 11px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
+
+  font-size: 10.5px;
 }
 
 .cp-kv__v {
@@ -463,34 +466,22 @@ function handleClose(): void {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text);
+  overflow-wrap: anywhere;
 }
 
-.cp-drawer__actions {
-  margin-top: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
+/* 版本切换：分段控件（与设置页分段同规格） */
 .cp-versions {
+  @include cp-segmented;
+
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
 }
 
 .cp-version {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 10px;
+  @include cp-segmented-item;
+
   font-family: var(--cp-font-mono);
   font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-version:disabled {
@@ -498,49 +489,27 @@ function handleClose(): void {
   cursor: not-allowed;
 }
 
-.cp-version:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
+.cp-drawer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
 }
 
-.cp-version[data-active="true"] {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel-muted));
-}
-
+/* 动作按钮：主操作 highlight、其余默认 */
 .cp-drawer__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
+  @include cp-pill-button;
+
+  min-height: 30px;
+  padding: 0 12px;
   font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-
-  &:hover {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: var(--cp-highlight-border);
-  }
-}
-
-.cp-drawer__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .cp-drawer__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  @include cp-pill-button(primary);
 
-  &:hover {
-    border-color: rgba(34, 197, 94, 0.42);
-    background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
-  }
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 </style>

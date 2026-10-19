@@ -173,6 +173,7 @@ async function toggleCurrentChannel(): Promise<void> {
 </template>
 
 <style scoped lang="scss">
+/* 样式：MentionInboxPanel｜规格：18px 玻璃浮层 + 行分隔 + 统一控件 token */
 .cp-mention-panel {
   position: fixed;
   inset: 0;
@@ -180,66 +181,68 @@ async function toggleCurrentChannel(): Promise<void> {
 }
 
 .cp-mention-panel__inner {
+  @include cp-glass-panel;
+
   position: absolute;
   top: 48px;
   right: 12px;
   width: 360px;
   max-height: 480px;
-  background: var(--cp-panel);
-  border: 1px solid var(--cp-border);
-  border-radius: 12px;
-  box-shadow: var(--cp-shadow-strong);
+  box-shadow: var(--cp-shadow-float);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+/* 浮层头：标题 + 全部已读 */
 .cp-mention-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--cp-border);
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--cp-border-light);
 }
 
 .cp-mention-panel__title {
-  font-weight: 600;
-  font-size: 15px;
+  font-family: var(--cp-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--cp-text);
 }
 
 .cp-mention-panel__mark-all {
+  border: 0;
   background: none;
-  border: none;
+  padding: 0;
   color: var(--cp-accent);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  transition: color var(--cp-fast) var(--cp-ease);
 
   &:hover {
     text-decoration: underline;
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--cp-highlight-border-strong);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
+/* 筛选工具条：分段控件 */
 .cp-mention-panel__filters {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--cp-border);
+  @include cp-segmented;
+
+  margin: 10px 12px;
+  align-self: flex-start;
 }
 
 .cp-mention-panel__filter {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-
-  &[data-active="true"] {
-    border-color: var(--cp-highlight-border-strong, var(--cp-accent));
-    background: var(--cp-highlight-bg, var(--cp-accent-bg, rgba(64, 128, 255, 0.12)));
-    color: var(--cp-text);
-  }
+  @include cp-segmented-item;
 
   &:disabled {
     opacity: 0.5;
@@ -248,28 +251,36 @@ async function toggleCurrentChannel(): Promise<void> {
 }
 
 .cp-mention-panel__empty {
-  padding: 32px;
+  padding: 32px 16px;
   text-align: center;
-  color: var(--cp-text-secondary);
-  font-size: 14px;
+  color: var(--cp-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .cp-mention-panel__list {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
+/* 列表行：相邻行细分隔线；未读行用设置页选中语言（高亮底 + 左侧细条） */
 .cp-mention-panel__item {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: start;
   width: 100%;
   padding: 0;
-  border-bottom: 1px solid var(--cp-border);
+  border-top: 1px solid var(--cp-border-light);
   position: relative;
 
+  &:first-child {
+    border-top: 0;
+  }
+
   &--unread {
-    background: var(--cp-accent-bg, rgba(64, 128, 255, 0.06));
+    background: var(--cp-highlight-bg);
+    box-shadow: inset 2px 0 0 var(--cp-highlight);
   }
 }
 
@@ -277,26 +288,30 @@ async function toggleCurrentChannel(): Promise<void> {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 12px 16px;
+  padding: 14px 16px;
   cursor: pointer;
   border: 0;
   background: transparent;
   color: inherit;
+  transition: background-color var(--cp-fast) var(--cp-ease);
 
   &:hover {
-    background: var(--cp-hover);
+    background: var(--cp-hover-bg);
   }
 }
 
 .cp-mention-panel__item-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--cp-text);
   margin-bottom: 2px;
 }
 
 .cp-mention-panel__item-summary {
-  font-size: 13px;
-  color: var(--cp-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--cp-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -309,21 +324,32 @@ async function toggleCurrentChannel(): Promise<void> {
 }
 
 .cp-mention-panel__item-read {
+  @include cp-pill-button;
+
+  min-height: 26px;
+  padding: 0 10px;
   margin: 12px 12px 0 0;
-  border: 0;
-  background: none;
-  font-size: 12px;
-  color: var(--cp-accent);
-  cursor: pointer;
+  font-size: 11.5px;
 }
 
 .cp-mention-panel__more {
   width: 100%;
   border: 0;
+  border-top: 1px solid var(--cp-border-light);
   background: transparent;
-  color: var(--cp-text);
+  color: var(--cp-accent);
   padding: 10px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+
+  &:hover:not(:disabled) {
+    background: var(--cp-hover-bg);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 }
 </style>

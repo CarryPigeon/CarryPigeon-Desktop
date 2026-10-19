@@ -5,6 +5,7 @@
  */
 
 import { useI18n } from "vue-i18n";
+import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useChannelAuditLogsPage } from "@/features/chat/audit-logs/presentation/page-models/useChannelAuditLogsPage";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
@@ -41,8 +42,9 @@ const {
     >
       <template #loading>{{ t("loading") }}</template>
       <template #actions>
+        <!-- 筛选字段化：原生字段使用全局 .cp-field 规格 -->
         <div class="cp-audit__filters">
-          <select v-model="actionFilter" class="cp-audit__select" :aria-label="t('audit_filter_action')">
+          <select v-model="actionFilter" class="cp-audit__select cp-field" :aria-label="t('audit_filter_action')">
             <option value="">{{ t("audit_action_all") }}</option>
             <option v-for="action in actionOptions" :key="action" :value="action">
               {{ actionLabel(action) }}
@@ -50,7 +52,7 @@ const {
           </select>
           <input
             v-model="actorFilter"
-            class="cp-audit__input"
+            class="cp-audit__input cp-field"
             type="text"
             :placeholder="t('audit_filter_actor_placeholder')"
             :aria-label="t('audit_filter_actor')"
@@ -61,14 +63,17 @@ const {
       </template>
       <template #default>
         <div v-if="items.length === 0" class="cp-audit__empty">{{ t("audit_logs_empty") }}</div>
-        <article v-for="item in items" :key="item.auditId" class="cp-auditCard">
-          <div class="cp-auditCard__head">
-            <div class="cp-auditCard__action">{{ actionLabel(item.action) }}</div>
-            <div class="cp-auditCard__time">{{ formatTime(item.createdAt) }}</div>
-          </div>
-          <div class="cp-auditCard__meta">{{ t("audit_actor") }}: {{ item.actorUserId || "—" }}</div>
-          <pre class="cp-auditCard__details">{{ formatDetails(item.details) }}</pre>
-        </article>
+        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
+        <PanelGroup v-else>
+          <article v-for="item in items" :key="item.auditId" class="cp-auditCard">
+            <div class="cp-auditCard__head">
+              <div class="cp-auditCard__action">{{ actionLabel(item.action) }}</div>
+              <div class="cp-auditCard__time">{{ formatTime(item.createdAt) }}</div>
+            </div>
+            <div class="cp-auditCard__meta">{{ t("audit_actor") }}: {{ item.actorUserId || "—" }}</div>
+            <pre class="cp-auditCard__details">{{ formatDetails(item.details) }}</pre>
+          </article>
+        </PanelGroup>
         <button
           v-if="hasMore"
           class="cp-audit__more"
@@ -84,20 +89,30 @@ const {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ChannelAuditLogsPage｜规格：筛选字段化（cp-field）+ 分组行 + 胶囊按钮 */
 .cp-audit__empty {
   padding: 24px;
   text-align: center;
+  font-size: 13px;
   color: var(--cp-text-muted);
 }
 
+/* 审计行：分组容器内的一行；相邻行 1px 细分隔线 */
 .cp-auditCard {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 12px 14px;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-auditCard + .cp-auditCard {
+  border-top: 1px solid var(--cp-border-light);
+}
+
+/* 行 hover 只变底色，不做位移 */
+.cp-auditCard:hover {
+  background: var(--cp-hover-bg);
 }
 
 .cp-auditCard__head {
@@ -108,7 +123,7 @@ const {
 }
 
 .cp-auditCard__action {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--cp-text);
 }
@@ -119,53 +134,54 @@ const {
   color: var(--cp-text-muted);
 }
 
+/* actor 为标识符：等宽字体 */
+.cp-auditCard__meta {
+  font-family: var(--cp-font-mono);
+}
+
 .cp-auditCard__details {
   margin: 0;
-  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-panel-muted);
+  font-family: var(--cp-font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--cp-text-secondary);
+  color: var(--cp-text-muted);
 }
 
 .cp-audit__more {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
+  @include cp-pill-button;
+
   align-self: center;
 }
 
+/* 筛选区：字段 + 胶囊应用按钮 */
 .cp-audit__filters {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   justify-content: flex-end;
 }
 
 .cp-audit__select,
 .cp-audit__input {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  color: var(--cp-text);
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 12px;
+  width: auto;
+}
+
+.cp-audit__select {
+  min-width: 132px;
 }
 
 .cp-audit__input {
-  min-width: 140px;
+  width: 168px;
 }
 
 .cp-audit__apply {
-  border: 1px solid var(--cp-accent);
-  background: var(--cp-accent);
-  color: #fff;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
+  @include cp-pill-button(primary);
 }
 </style>

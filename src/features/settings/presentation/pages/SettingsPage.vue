@@ -29,6 +29,10 @@ import type { SettingsSchemaEnvelopeV1 } from "@/features/settings/api-types";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 import PageHeader from '@/shared/ui/PageHeader.vue';
 import DiagnosticsPanel from "@/features/settings/presentation/components/DiagnosticsPanel.vue";
+import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
+import PanelRow from "@/shared/ui/panel/PanelRow.vue";
+import PanelSwitch from "@/shared/ui/panel/PanelSwitch.vue";
+import SectionHead from "@/shared/ui/SectionHead.vue";
 import { AiProviderSettings } from "@/features/ai/components";
 import {
   SETTINGS_CATALOG,
@@ -84,18 +88,28 @@ const {
 // 插件设置项（当前 server）：用于「插件设置」分区渲染与搜索索引。
 const {
   items: pluginSettingsItems,
-  groups: pluginSettingsGroups,
+  groups: pluginPanelGroups,
   ensureLoaded: ensurePluginSettingsLoaded,
 } = usePluginSettings();
 
 // 应用信息（「关于」分区数据源）；在 navSections 之前声明：该 Tab 需按数据就绪出现。
 const appInfo = ref<AppInfo | null>(null);
 
+// 分区图标（均取自 shared/ui/icons/lucide-sprite；AppIcon 为应用内唯一图标入口）。
+const SECTION_ICONS: Record<SettingsSectionId, string> = {
+  general: "setting",
+  business: "notification",
+  ai: "ai-article",
+  data: "package",
+  plugins: "plug",
+  about: "info-circle",
+};
+
 // 分区导航/内容区顺序与文案来自 settingsCatalog（单一真源）；
 // 「插件设置」无插件设置项、「关于」未取得应用信息时不出现，保证每个导航项都有已渲染面板。
 const navSections = computed(() =>
   SETTINGS_SECTIONS.filter((section) => {
-    if (section.id === SETTINGS_PLUGINS_SECTION_ID) return pluginSettingsGroups.value.length > 0;
+    if (section.id === SETTINGS_PLUGINS_SECTION_ID) return pluginPanelGroups.value.length > 0;
     if (section.id === "about") return appInfo.value !== null;
     return true;
   }),
@@ -106,6 +120,7 @@ const sectionNav = computed(() =>
     id: section.id,
     label: t(section.labelKey),
     subtitle: t(section.subtitleKey),
+    icon: SECTION_ICONS[section.id],
   })),
 );
 
@@ -220,7 +235,9 @@ onBeforeUnmount(() => {
   }
 });
 
-const updateCheckState = ref<UpdateStatus | { kind: 'checking' }>({ kind: 'checking' });
+/** 更新检查状态：idle 表示尚未检查（进入页面时按钮应可用，而不是一直处于 checking）。 */
+type UpdateCheckState = UpdateStatus | { kind: "checking" } | { kind: "idle" };
+const updateCheckState = ref<UpdateCheckState>({ kind: "idle" });
 const diagnosticsMode = ref(false);
 const diagnosticsVisible = ref(false);
 
@@ -234,7 +251,7 @@ onMounted(() => {
 });
 
 async function handleCheckUpdate(): Promise<void> {
-  updateCheckState.value = { kind: 'checking' };
+  updateCheckState.value = { kind: "checking" };
   updateCheckState.value = await checkForUpdate();
 }
 
@@ -344,7 +361,7 @@ async function handleResetDefaults(): Promise<void> {
 </script>
 
 <template>
-  <!-- 页面：SettingsPage｜职责：设置中心 shell（general / business / data） -->
+  <!-- 页面：SettingsPage｜职责：设置中心 shell（general / business / ai / data / plugins / about） -->
   <!-- 区块：<main> .cp-settings -->
   <main class="cp-settings">
     <ErrorBoundary>
@@ -364,21 +381,7 @@ async function handleResetDefaults(): Promise<void> {
           <div class="cp-settings__rail">
             <!-- 区块：设置搜索｜用途：按标题/说明/关键词/分区名搜索内置与插件设置项 -->
             <div class="cp-settings__search" role="search">
-              <svg
-                class="cp-settings__searchIcon"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.75"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.6-3.6" />
-              </svg>
+              <AppIcon class="cp-settings__searchIcon" name="search" :size="15" />
               <input
                 v-model="searchQuery"
                 class="cp-settings__searchInput"
@@ -402,7 +405,7 @@ async function handleResetDefaults(): Promise<void> {
                 :title="t('settings_search_clear')"
                 @click="clearSearch()"
               >
-                <AppIcon name="close" />
+                <AppIcon name="close" :size="14" />
               </button>
             </div>
 
@@ -459,436 +462,568 @@ async function handleResetDefaults(): Promise<void> {
                 :aria-controls="settingsSectionAnchorId(section.id)"
                 :data-active="activeSectionId === section.id"
                 :data-testid="`settings-nav-${section.id}`"
+                :title="section.subtitle"
                 type="button"
                 @click="setActiveSection(section.id)"
               >
+                <AppIcon class="cp-settings__navIcon" :name="section.icon" :size="16" />
                 <span class="cp-settings__navLabel">{{ section.label }}</span>
-                <span class="cp-settings__navSub">{{ section.subtitle }}</span>
               </button>
             </nav>
           </div>
         </aside>
 
-      <section ref="settingsSectionsRef" class="cp-settings__sections">
-        <section
-          id="settings-section-general"
-          v-show="activeSectionId === 'general'"
-          class="cp-settings__section"
-          role="tabpanel"
-          aria-labelledby="settings-nav-general"
-          data-testid="settings-section-general"
-        >
-          <header class="cp-settings__sectionHead">
-            <div>
-              <div class="cp-settings__sectionName">{{ t("settings_general_preferences") }}</div>
-              <div class="cp-settings__sectionSub">{{ t("settings_general_preferences_sub") }}</div>
-            </div>
-          </header>
+        <section ref="settingsSectionsRef" class="cp-settings__sections">
+          <!-- 分区：通用偏好 -->
+          <section
+            id="settings-section-general"
+            v-show="activeSectionId === 'general'"
+            class="cp-settings__section"
+            role="tabpanel"
+            aria-labelledby="settings-nav-general"
+            data-testid="settings-section-general"
+          >
+            <div class="cp-settings__sectionBody">
+              <SectionHead
+                :icon="SECTION_ICONS.general"
+                :title="t('settings_general_preferences')"
+                :subtitle="t('settings_general_preferences_sub')"
+              />
 
-          <div v-if="preferencesError" class="cp-settings__err">{{ preferencesError }}</div>
+              <div v-if="preferencesError" class="cp-settings__err">{{ preferencesError }}</div>
 
-          <div class="cp-settings__grid">
-            <div class="cp-settings__card" data-settings-item="general-theme">
-              <div class="cp-settings__k">{{ t("settings_theme") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__seg">
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="theme === 'system'"
-                    data-testid="settings-theme-system"
-                    type="button"
-                    @click="pickTheme('system')"
-                  >
-                    {{ t("settings_theme_system") }}
-                  </button>
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="theme === 'dark'"
-                    data-testid="settings-theme-dark"
-                    type="button"
-                    @click="pickTheme('dark')"
-                  >
-                    {{ t("settings_theme_dark") }}
-                  </button>
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="theme === 'light'"
-                    data-testid="settings-theme-light"
-                    type="button"
-                    @click="pickTheme('light')"
-                  >
-                    {{ t("settings_theme_light") }}
-                  </button>
-                </div>
-                <div v-if="themeError" class="cp-settings__err">{{ themeError }}</div>
-              </div>
-            </div>
+              <PanelGroup :title="t('settings_group_appearance')">
+                <PanelRow :label="t('settings_theme')" data-settings-item="general-theme">
+                  <template v-if="themeError" #description>
+                    <div class="cp-settings__err">{{ themeError }}</div>
+                  </template>
+                  <template #control>
+                    <div class="cp-settings__seg" role="group" :aria-label="t('settings_theme')">
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="theme === 'system'"
+                        :aria-pressed="theme === 'system'"
+                        data-testid="settings-theme-system"
+                        type="button"
+                        @click="pickTheme('system')"
+                      >
+                        {{ t("settings_theme_system") }}
+                      </button>
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="theme === 'dark'"
+                        :aria-pressed="theme === 'dark'"
+                        data-testid="settings-theme-dark"
+                        type="button"
+                        @click="pickTheme('dark')"
+                      >
+                        {{ t("settings_theme_dark") }}
+                      </button>
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="theme === 'light'"
+                        :aria-pressed="theme === 'light'"
+                        data-testid="settings-theme-light"
+                        type="button"
+                        @click="pickTheme('light')"
+                      >
+                        {{ t("settings_theme_light") }}
+                      </button>
+                    </div>
+                  </template>
+                </PanelRow>
 
-            <div class="cp-settings__card" data-settings-item="general-accent">
-              <div class="cp-settings__k">{{ t("settings_accent") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__seg">
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="accent === 'default'"
-                    data-testid="settings-accent-default"
-                    type="button"
-                    @click="pickAccent('default')"
-                  >
-                    {{ t("settings_accent_default") }}
-                  </button>
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="accent === 'patchbay'"
-                    data-testid="settings-accent-patchbay"
-                    type="button"
-                    @click="pickAccent('patchbay')"
-                  >
-                    {{ t("settings_accent_patchbay") }}
-                  </button>
-                </div>
-                <div class="cp-settings__hint">{{ t("settings_accent_hint") }}</div>
-                <div v-if="accentError" class="cp-settings__err">{{ accentError }}</div>
-              </div>
-            </div>
+                <PanelRow :label="t('settings_accent')" data-settings-item="general-accent">
+                  <template #description>
+                    {{ t("settings_accent_hint") }}
+                    <div v-if="accentError" class="cp-settings__err">{{ accentError }}</div>
+                  </template>
+                  <template #control>
+                    <div class="cp-settings__seg" role="group" :aria-label="t('settings_accent')">
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="accent === 'default'"
+                        :aria-pressed="accent === 'default'"
+                        data-testid="settings-accent-default"
+                        type="button"
+                        @click="pickAccent('default')"
+                      >
+                        {{ t("settings_accent_default") }}
+                      </button>
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="accent === 'patchbay'"
+                        :aria-pressed="accent === 'patchbay'"
+                        data-testid="settings-accent-patchbay"
+                        type="button"
+                        @click="pickAccent('patchbay')"
+                      >
+                        {{ t("settings_accent_patchbay") }}
+                      </button>
+                    </div>
+                  </template>
+                </PanelRow>
 
-            <div class="cp-settings__card" data-settings-item="general-language">
-              <div class="cp-settings__k">{{ t("settings_language") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__seg">
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="language === 'zh_cn'"
-                    data-testid="settings-language-zh_cn"
-                    type="button"
-                    @click="selectLanguage('zh_cn')"
-                  >
-                    简体中文
-                  </button>
-                  <button
-                    class="cp-settings__segBtn"
-                    :data-active="language === 'en_us'"
-                    data-testid="settings-language-en_us"
-                    type="button"
-                    @click="selectLanguage('en_us')"
-                  >
-                    English
-                  </button>
-                </div>
-                <div class="cp-settings__hint">{{ t("settings_language_hint") }}</div>
-              </div>
-            </div>
+                <PanelRow
+                  :label="t('settings_language')"
+                  :description="t('settings_language_hint')"
+                  data-settings-item="general-language"
+                >
+                  <template #control>
+                    <div class="cp-settings__seg" role="group" :aria-label="t('settings_language')">
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="language === 'zh_cn'"
+                        :aria-pressed="language === 'zh_cn'"
+                        data-testid="settings-language-zh_cn"
+                        type="button"
+                        @click="selectLanguage('zh_cn')"
+                      >
+                        简体中文
+                      </button>
+                      <button
+                        class="cp-settings__segBtn"
+                        :data-active="language === 'en_us'"
+                        :aria-pressed="language === 'en_us'"
+                        data-testid="settings-language-en_us"
+                        type="button"
+                        @click="selectLanguage('en_us')"
+                      >
+                        English
+                      </button>
+                    </div>
+                  </template>
+                </PanelRow>
+              </PanelGroup>
 
-            <div class="cp-settings__card">
-              <div class="cp-settings__k">{{ t("settings_startup") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__row" data-settings-item="general-auto-login">
-                  <span class="cp-settings__muted">{{ t("auto_login") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-auto-login" :data-active="autoLogin" type="button" @click="toggleAutoLogin(!autoLogin)">
-                    {{ autoLogin ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__row" data-settings-item="general-auto-launch">
-                  <span class="cp-settings__muted">{{ t("settings_auto_launch") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-auto-launch" :data-active="autoLaunch" type="button" @click="toggleAutoLaunch(!autoLaunch)">
-                    {{ autoLaunch ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__hint">{{ t("settings_startup_hint") }}</div>
-              </div>
-            </div>
+              <PanelGroup :title="t('settings_group_launch')">
+                <PanelRow :label="t('auto_login')" data-settings-item="general-auto-login">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="autoLogin"
+                      :label="t('auto_login')"
+                      data-testid="settings-auto-login"
+                      @update:model-value="toggleAutoLogin"
+                    />
+                  </template>
+                </PanelRow>
+                <PanelRow :label="t('settings_auto_launch')" data-settings-item="general-auto-launch">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="autoLaunch"
+                      :label="t('settings_auto_launch')"
+                      data-testid="settings-auto-launch"
+                      @update:model-value="toggleAutoLaunch"
+                    />
+                  </template>
+                </PanelRow>
+                <PanelRow :label="t('close_to_tray')" data-settings-item="general-close-to-tray">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="closeToTray"
+                      :label="t('close_to_tray')"
+                      data-testid="settings-close-to-tray"
+                      @update:model-value="toggleCloseToTray"
+                    />
+                  </template>
+                </PanelRow>
+                <template #footer>{{ t("settings_startup_hint") }}</template>
+              </PanelGroup>
 
-            <div class="cp-settings__card">
-              <div class="cp-settings__k">{{ t("notifications") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__row" data-settings-item="general-close-to-tray">
-                  <span class="cp-settings__muted">{{ t("close_to_tray") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-close-to-tray" :data-active="closeToTray" type="button" @click="toggleCloseToTray(!closeToTray)">
-                    {{ closeToTray ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__row" data-settings-item="general-check-for-updates">
-                  <span class="cp-settings__muted">{{ t("check_for_updates") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-check-for-updates" :data-active="checkForUpdates" type="button" @click="toggleCheckForUpdates(!checkForUpdates)">
-                    {{ checkForUpdates ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-              </div>
-            </div>
+              <PanelGroup :title="t('settings_group_updates')">
+                <PanelRow :label="t('check_for_updates')" data-settings-item="general-check-for-updates">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="checkForUpdates"
+                      :label="t('check_for_updates')"
+                      data-testid="settings-check-for-updates"
+                      @update:model-value="toggleCheckForUpdates"
+                    />
+                  </template>
+                </PanelRow>
+              </PanelGroup>
 
-            <div class="cp-settings__card">
-              <div class="cp-settings__k">{{ t("settings_runtime") }}</div>
-              <div class="cp-settings__v">
-                <template v-if="isDev">
-                  <div class="cp-settings__row">
-                    <span class="cp-settings__muted">{{ t("settings_mock_api") }}</span>
+              <PanelGroup :title="t('settings_runtime')">
+                <PanelRow v-if="isDev" :label="t('settings_mock_api')">
+                  <template #control>
                     <MonoTag :value="IS_MOCK_ENABLED ? 'true' : 'false'" title="VITE_USE_MOCK_API" :copyable="true" />
-                  </div>
-                  <div class="cp-settings__row">
-                    <span class="cp-settings__muted">{{ t("settings_mock_mode") }}</span>
+                  </template>
+                </PanelRow>
+                <PanelRow v-if="isDev" :label="t('settings_mock_mode')">
+                  <template #control>
                     <MonoTag :value="MOCK_MODE" title="VITE_MOCK_MODE" :copyable="true" />
-                  </div>
-                </template>
-                <div class="cp-settings__row" data-settings-item="general-diagnostics-mode">
-                  <span class="cp-settings__muted">{{ t("settings_diagnostics_mode") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-diagnostics-mode" :data-active="diagnosticsMode" type="button" @click="toggleDiagnosticsMode(!diagnosticsMode)">
-                    {{ diagnosticsMode ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__hint">{{ t("settings_diagnostics_mode_desc") }}</div>
-                <div class="cp-settings__row" data-settings-item="general-diagnostics-panel">
-                  <span class="cp-settings__muted">{{ t("diagnostics_panel_title") }}</span>
-                  <button
-                    class="cp-settings__segBtn"
-                    type="button"
-                    :disabled="!diagnosticsMode && !isDev"
-                    @click="diagnosticsVisible = true"
-                  >
-                    {{ t("diagnostics_open_panel") }}
-                  </button>
-                </div>
-                <div class="cp-settings__hint">{{ t("settings_runtime_hint") }}</div>
-              </div>
+                  </template>
+                </PanelRow>
+                <PanelRow
+                  :label="t('settings_diagnostics_mode')"
+                  :description="t('settings_diagnostics_mode_desc')"
+                  data-settings-item="general-diagnostics-mode"
+                >
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="diagnosticsMode"
+                      :label="t('settings_diagnostics_mode')"
+                      data-testid="settings-diagnostics-mode"
+                      @update:model-value="toggleDiagnosticsMode"
+                    />
+                  </template>
+                </PanelRow>
+                <PanelRow :label="t('diagnostics_panel_title')" data-settings-item="general-diagnostics-panel">
+                  <template #control>
+                    <button
+                      class="cp-settings__btn"
+                      data-testid="settings-open-diagnostics-panel"
+                      type="button"
+                      :disabled="!diagnosticsMode && !isDev"
+                      @click="diagnosticsVisible = true"
+                    >
+                      {{ t("diagnostics_open_panel") }}
+                    </button>
+                  </template>
+                </PanelRow>
+                <template #footer>{{ t("settings_runtime_hint") }}</template>
+              </PanelGroup>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section
-          id="settings-section-business"
-          v-show="activeSectionId === 'business'"
-          class="cp-settings__section"
-          role="tabpanel"
-          aria-labelledby="settings-nav-business"
-          data-testid="settings-section-business"
-        >
-          <header class="cp-settings__sectionHead">
-            <div>
-              <div class="cp-settings__sectionName">{{ t("settings_business_settings") }}</div>
-              <div class="cp-settings__sectionSub">{{ t("settings_business_settings_sub") }}</div>
-            </div>
-          </header>
+          <!-- 分区：业务设置 -->
+          <section
+            id="settings-section-business"
+            v-show="activeSectionId === 'business'"
+            class="cp-settings__section"
+            role="tabpanel"
+            aria-labelledby="settings-nav-business"
+            data-testid="settings-section-business"
+          >
+            <div class="cp-settings__sectionBody">
+              <SectionHead
+                :icon="SECTION_ICONS.business"
+                :title="t('settings_business_settings')"
+                :subtitle="t('settings_business_settings_sub')"
+              />
 
-          <div class="cp-settings__grid">
-            <div class="cp-settings__card wide">
-              <div class="cp-settings__k">{{ t("settings_feature_settings") }}</div>
               <div v-if="businessPreferencesError" class="cp-settings__err">{{ businessPreferencesError }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__row" data-settings-item="business-email-notifications">
-                  <span class="cp-settings__muted">{{ t("email_notifications") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-email-notifications" :data-active="emailNotifications" type="button" @click="toggleEmailNotifications(!emailNotifications)">
-                    {{ emailNotifications ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__row" data-settings-item="business-desktop-notifications">
-                  <span class="cp-settings__muted">{{ t("desktop_notifications") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-desktop-notifications" :data-active="desktopNotifications" type="button" @click="toggleDesktopNotifications(!desktopNotifications)">
-                    {{ desktopNotifications ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__row" data-settings-item="business-global-dnd">
-                  <span class="cp-settings__muted">{{ t("global_dnd") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-global-dnd" :data-active="globalDnd" type="button" @click="toggleGlobalDnd(!globalDnd)">
-                    {{ globalDnd ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-                <div class="cp-settings__hint">{{ t("global_dnd_desc") }}</div>
-                <div class="cp-settings__row" data-settings-item="business-notification-sound">
-                  <span class="cp-settings__muted">{{ t("notification_sound") }}</span>
-                  <button class="cp-settings__segBtn" data-testid="settings-notification-sound" :data-active="notificationSound" type="button" @click="toggleNotificationSound(!notificationSound)">
-                    {{ notificationSound ? t("enabled") : t("disabled") }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <section
-          id="settings-section-ai"
-          v-show="activeSectionId === 'ai'"
-          class="cp-settings__section"
-          role="tabpanel"
-          aria-labelledby="settings-nav-ai"
-          data-testid="settings-section-ai"
-        >
-          <header class="cp-settings__sectionHead">
-            <div>
-              <div class="cp-settings__sectionName">{{ t("settings_ai_service") }}</div>
-              <div class="cp-settings__sectionSub">{{ t("settings_ai_service_sub") }}</div>
+              <PanelGroup :title="t('notifications')">
+                <PanelRow :label="t('email_notifications')" data-settings-item="business-email-notifications">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="emailNotifications"
+                      :label="t('email_notifications')"
+                      data-testid="settings-email-notifications"
+                      @update:model-value="toggleEmailNotifications"
+                    />
+                  </template>
+                </PanelRow>
+                <PanelRow :label="t('desktop_notifications')" data-settings-item="business-desktop-notifications">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="desktopNotifications"
+                      :label="t('desktop_notifications')"
+                      data-testid="settings-desktop-notifications"
+                      @update:model-value="toggleDesktopNotifications"
+                    />
+                  </template>
+                </PanelRow>
+                <PanelRow
+                  :label="t('global_dnd')"
+                  :description="t('global_dnd_desc')"
+                  data-settings-item="business-global-dnd"
+                >
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="globalDnd"
+                      :label="t('global_dnd')"
+                      data-testid="settings-global-dnd"
+                      @update:model-value="toggleGlobalDnd"
+                    />
+                  </template>
+                </PanelRow>
+                <PanelRow :label="t('notification_sound')" data-settings-item="business-notification-sound">
+                  <template #control>
+                    <PanelSwitch
+                      :model-value="notificationSound"
+                      :label="t('notification_sound')"
+                      data-testid="settings-notification-sound"
+                      @update:model-value="toggleNotificationSound"
+                    />
+                  </template>
+                </PanelRow>
+              </PanelGroup>
             </div>
-          </header>
+          </section>
 
-          <div class="cp-settings__grid">
-            <div class="cp-settings__card wide" data-settings-item="ai-provider">
-              <ErrorBoundary>
-                <AiProviderSettings />
-              </ErrorBoundary>
+          <!-- 分区：AI 服务 -->
+          <section
+            id="settings-section-ai"
+            v-show="activeSectionId === 'ai'"
+            class="cp-settings__section"
+            role="tabpanel"
+            aria-labelledby="settings-nav-ai"
+            data-testid="settings-section-ai"
+          >
+            <div class="cp-settings__sectionBody">
+              <SectionHead
+                :icon="SECTION_ICONS.ai"
+                :title="t('settings_ai_service')"
+                :subtitle="t('settings_ai_service_sub')"
+              />
+
+              <PanelGroup padded data-settings-item="ai-provider">
+                <ErrorBoundary>
+                  <AiProviderSettings />
+                </ErrorBoundary>
+              </PanelGroup>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section
-          id="settings-section-data"
-          v-show="activeSectionId === 'data'"
-          class="cp-settings__section"
-          role="tabpanel"
-          aria-labelledby="settings-nav-data"
-          data-testid="settings-section-data"
-        >
-          <header class="cp-settings__sectionHead">
-            <div>
-              <div class="cp-settings__sectionName">{{ t("settings_data_management") }}</div>
-              <div class="cp-settings__sectionSub">{{ t("settings_data_management_sub") }}</div>
-            </div>
-          </header>
+          <!-- 分区：数据管理 -->
+          <section
+            id="settings-section-data"
+            v-show="activeSectionId === 'data'"
+            class="cp-settings__section"
+            role="tabpanel"
+            aria-labelledby="settings-nav-data"
+            data-testid="settings-section-data"
+          >
+            <div class="cp-settings__sectionBody">
+              <SectionHead
+                :icon="SECTION_ICONS.data"
+                :title="t('settings_data_management')"
+                :subtitle="t('settings_data_management_sub')"
+              />
 
-          <div class="cp-settings__grid">
-            <div class="cp-settings__card" data-settings-item="data-import-export">
-              <div class="cp-settings__k">{{ t("settings_import_export_reset") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__hint">{{ t("settings_import_export_hint") }}</div>
-                <div v-if="dataStatus" class="cp-settings__statusInline" :data-tone="dataStatus.tone">{{ dataStatus.message }}</div>
-                <div class="cp-settings__rowWrap">
-                  <button class="cp-settings__btn" data-testid="settings-export" type="button" @click="handleExportSettings">{{ t("settings_export") }}</button>
-                  <button class="cp-settings__btn" data-testid="settings-import" type="button" @click="triggerImportDialog">{{ t("settings_import") }}</button>
-                  <button class="cp-settings__btn" data-testid="settings-reset-defaults" type="button" @click="handleResetDefaults">{{ t("settings_reset_defaults") }}</button>
-                </div>
-                <input ref="importFileInput" class="cp-settings__hiddenInput" type="file" accept="application/json,.json" @change="handleImportFileChange" />
-              </div>
-            </div>
+              <PanelGroup>
+                <PanelRow :label="t('settings_import_export_reset')" data-settings-item="data-import-export">
+                  <template #description>
+                    {{ t("settings_import_export_hint") }}
+                    <div
+                      v-if="dataStatus"
+                      class="cp-settings__statusInline"
+                      :data-tone="dataStatus.tone"
+                    >
+                      {{ dataStatus.message }}
+                    </div>
+                  </template>
+                  <template #control>
+                    <button
+                      class="cp-settings__btn cp-settings__btn--primary"
+                      data-testid="settings-export"
+                      type="button"
+                      @click="handleExportSettings"
+                    >
+                      {{ t("settings_export") }}
+                    </button>
+                    <button
+                      class="cp-settings__btn"
+                      data-testid="settings-import"
+                      type="button"
+                      @click="triggerImportDialog"
+                    >
+                      {{ t("settings_import") }}
+                    </button>
+                    <button
+                      class="cp-settings__btn cp-settings__btn--danger"
+                      data-testid="settings-reset-defaults"
+                      type="button"
+                      @click="handleResetDefaults"
+                    >
+                      {{ t("settings_reset_defaults") }}
+                    </button>
+                    <input
+                      ref="importFileInput"
+                      class="cp-settings__hiddenInput"
+                      type="file"
+                      accept="application/json,.json"
+                      @change="handleImportFileChange"
+                    />
+                  </template>
+                </PanelRow>
+              </PanelGroup>
 
-            <div class="cp-settings__card" data-settings-item="data-entrypoints">
-              <div class="cp-settings__k">{{ t("settings_entrypoints") }}</div>
-              <div class="cp-settings__v">
-                <button class="cp-settings__btn" data-testid="settings-open-server-manager" type="button" @click="router.push('/servers')">
-                  {{ t("settings_open_server_manager") }}
+              <PanelGroup :title="t('settings_entrypoints')" data-settings-item="data-entrypoints">
+                <button
+                  class="cp-settings__linkRow"
+                  data-testid="settings-open-server-manager"
+                  type="button"
+                  @click="router.push('/servers')"
+                >
+                  <span>{{ t("settings_open_server_manager") }}</span>
+                  <AppIcon class="cp-settings__linkRowIcon" name="chevron-right" :size="16" />
                 </button>
-                <button class="cp-settings__btn" data-testid="settings-open-plugin-center" type="button" @click="router.push('/plugins')">
-                  {{ t("settings_open_plugin_center") }}
+                <button
+                  class="cp-settings__linkRow"
+                  data-testid="settings-open-plugin-center"
+                  type="button"
+                  @click="router.push('/plugins')"
+                >
+                  <span>{{ t("settings_open_plugin_center") }}</span>
+                  <AppIcon class="cp-settings__linkRowIcon" name="chevron-right" :size="16" />
                 </button>
-                <button class="cp-settings__btn" data-testid="settings-open-required-setup" type="button" @click="router.push('/required-setup')">
-                  {{ t("settings_open_required_setup") }}
+                <button
+                  class="cp-settings__linkRow"
+                  data-testid="settings-open-required-setup"
+                  type="button"
+                  @click="router.push('/required-setup')"
+                >
+                  <span>{{ t("settings_open_required_setup") }}</span>
+                  <AppIcon class="cp-settings__linkRowIcon" name="chevron-right" :size="16" />
                 </button>
-                <button class="cp-settings__btn" data-testid="settings-open-file-manager" type="button" @click="router.push('/files')">
-                  {{ t("file_manager") }}
+                <button
+                  class="cp-settings__linkRow"
+                  data-testid="settings-open-file-manager"
+                  type="button"
+                  @click="router.push('/files')"
+                >
+                  <span>{{ t("file_manager") }}</span>
+                  <AppIcon class="cp-settings__linkRowIcon" name="chevron-right" :size="16" />
                 </button>
-                <button class="cp-settings__btn" data-testid="settings-open-emoji-manage" type="button" @click="router.push('/settings/emoji')">
-                  {{ t("manage_emojis") }}
+                <button
+                  class="cp-settings__linkRow"
+                  data-testid="settings-open-emoji-manage"
+                  type="button"
+                  @click="router.push('/settings/emoji')"
+                >
+                  <span>{{ t("manage_emojis") }}</span>
+                  <AppIcon class="cp-settings__linkRowIcon" name="chevron-right" :size="16" />
                 </button>
-              </div>
+              </PanelGroup>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- 区块：插件设置｜用途：插件通过 ctx.ui.registerSettingsItem 注册的设置项（无项时不渲染） -->
-        <section
-          v-if="pluginSettingsGroups.length > 0"
-          id="settings-section-plugins"
-          v-show="activeSectionId === 'plugins'"
-          class="cp-settings__section"
-          role="tabpanel"
-          aria-labelledby="settings-nav-plugins"
-          data-testid="settings-section-plugins"
-        >
-          <header class="cp-settings__sectionHead">
-            <div>
-              <div class="cp-settings__sectionName">{{ t("settings_plugins_section") }}</div>
-              <div class="cp-settings__sectionSub">{{ t("settings_plugins_section_sub") }}</div>
-            </div>
-          </header>
+          <!-- 分区：插件设置｜用途：插件通过 ctx.ui.registerSettingsItem 注册的设置项（无项时不渲染） -->
+          <section
+            v-if="pluginPanelGroups.length > 0"
+            id="settings-section-plugins"
+            v-show="activeSectionId === 'plugins'"
+            class="cp-settings__section"
+            role="tabpanel"
+            aria-labelledby="settings-nav-plugins"
+            data-testid="settings-section-plugins"
+          >
+            <div class="cp-settings__sectionBody">
+              <SectionHead
+                :icon="SECTION_ICONS.plugins"
+                :title="t('settings_plugins_section')"
+                :subtitle="t('settings_plugins_section_sub')"
+              />
 
-          <div class="cp-settings__grid">
-            <div v-for="group in pluginSettingsGroups" :key="group.pluginId" class="cp-settings__card wide">
-              <div class="cp-settings__k">{{ t("settings_plugin_source", { id: group.pluginId }) }}</div>
-              <div class="cp-settings__v">
-                <div
+              <PanelGroup
+                v-for="group in pluginPanelGroups"
+                :key="group.pluginId"
+                :title="t('settings_plugin_source', { id: group.pluginId })"
+                :uppercase="false"
+              >
+                <PanelRow
                   v-for="item in group.items"
                   :key="item.id"
-                  class="cp-settings__pluginItem"
+                  :label="item.title"
+                  :description="item.description"
+                  layout="stack"
                   :data-settings-item="settingsPluginItemAnchor(item.pluginId, item.id)"
                   :data-testid="`settings-plugin-item-${item.pluginId}-${item.id}`"
                 >
-                  <div class="cp-settings__pluginHead">
-                    <span class="cp-settings__pluginTitle">{{ item.title }}</span>
-                  </div>
-                  <div v-if="item.description" class="cp-settings__hint">{{ item.description }}</div>
-                  <!-- 单个插件控件抛错只降级该项，不影响其余设置 -->
-                  <ErrorBoundary>
-                    <component :is="item.component" />
-                  </ErrorBoundary>
-                </div>
-              </div>
+                  <template #control>
+                    <!-- 单个插件控件抛错只降级该项，不影响其余设置 -->
+                    <ErrorBoundary>
+                      <component :is="item.component" />
+                    </ErrorBoundary>
+                  </template>
+                </PanelRow>
+              </PanelGroup>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section
-          v-if="appInfo"
-          id="settings-section-about"
-          v-show="activeSectionId === 'about'"
-          class="cp-settings__section"
-          role="tabpanel"
-          aria-labelledby="settings-nav-about"
-          data-testid="settings-section-about"
-        >
-          <header class="cp-settings__sectionHead">
-            <div>
-              <div class="cp-settings__sectionName">{{ t("menu_about") }}</div>
-              <div class="cp-settings__sectionSub">{{ t("about_version") }} {{ appInfo.version }}</div>
+          <!-- 分区：关于 -->
+          <section
+            v-if="appInfo"
+            id="settings-section-about"
+            v-show="activeSectionId === 'about'"
+            class="cp-settings__section"
+            role="tabpanel"
+            aria-labelledby="settings-nav-about"
+            data-testid="settings-section-about"
+          >
+            <div class="cp-settings__sectionBody">
+              <SectionHead
+                :icon="SECTION_ICONS.about"
+                :title="t('menu_about')"
+                :subtitle="`${t('about_version')} ${appInfo.version}`"
+              />
+
+              <PanelGroup>
+                <PanelRow :label="t('about_version')" data-settings-item="about-version">
+                  <template #description>{{ appInfo.name }}</template>
+                  <template #control>
+                    <MonoTag :value="appInfo.version" title="version" />
+                  </template>
+                </PanelRow>
+
+                <PanelRow :label="t('check_for_updates')" data-settings-item="about-check-updates">
+                  <template #description>
+                    <template v-if="updateCheckState.kind === 'up_to_date'">
+                      {{ t("settings_up_to_date") }}
+                    </template>
+                    <template v-else-if="updateCheckState.kind === 'update_available'">
+                      {{ t("settings_update_available") }} v{{ updateCheckState.version }}
+                      <a
+                        :href="updateCheckState.releaseUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="cp-settings__link"
+                      >{{ t("updater_download_page") }}</a>
+                    </template>
+                    <span v-else-if="updateCheckState.kind === 'error'" class="cp-settings__err">
+                      {{ updateCheckState.message }}
+                    </span>
+                  </template>
+                  <template #control>
+                    <button
+                      class="cp-settings__btn"
+                      data-testid="settings-check-update-now"
+                      type="button"
+                      :disabled="updateCheckState.kind === 'checking'"
+                      @click="handleCheckUpdate"
+                    >
+                      {{ updateCheckState.kind === "checking" ? t("update_step_checking") : t("check_for_updates") }}
+                    </button>
+                  </template>
+                </PanelRow>
+
+                <PanelRow :label="t('about_tech_stack')" layout="stack" data-settings-item="about-tech-stack">
+                  <template #control>
+                    <div class="cp-settings__chips">
+                      <span v-for="item in appInfo.techStack" :key="item" class="cp-settings__chip">{{ item }}</span>
+                    </div>
+                  </template>
+                </PanelRow>
+
+                <PanelRow :label="t('about_license')" data-settings-item="about-license">
+                  <template #control>
+                    <span class="cp-settings__value">{{ appInfo.license }}</span>
+                  </template>
+                </PanelRow>
+
+                <PanelRow :label="t('about_credits')" layout="stack" data-settings-item="about-credits">
+                  <template #control>
+                    <div class="cp-settings__credits">
+                      <template v-for="credit in appInfo.credits" :key="credit.name">
+                        <a
+                          v-if="credit.url"
+                          :href="credit.url"
+                          target="_blank"
+                          rel="noopener"
+                          class="cp-settings__link"
+                        >{{ credit.name }}</a>
+                        <span v-else class="cp-settings__value">{{ credit.name }}</span>
+                      </template>
+                    </div>
+                  </template>
+                </PanelRow>
+              </PanelGroup>
             </div>
-          </header>
-          <div class="cp-settings__grid">
-            <div class="cp-settings__card" data-settings-item="about-version">
-              <div class="cp-settings__k">{{ t("about_version") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__row">
-                  <span class="cp-settings__muted">{{ appInfo.name }}</span>
-                  <MonoTag :value="appInfo.version" title="version" />
-                </div>
-              </div>
-            </div>
-            <div class="cp-settings__card" data-settings-item="about-check-updates">
-              <div class="cp-settings__k">{{ t("check_for_updates") }}</div>
-              <div class="cp-settings__v">
-                <button class="cp-settings__btn" data-testid="settings-check-update-now" type="button" @click="handleCheckUpdate" :disabled="updateCheckState.kind === 'checking'">
-                  {{ updateCheckState.kind === 'checking' ? t('checking') : t('check_for_updates') }}
-                </button>
-                <div v-if="updateCheckState.kind === 'up_to_date'" class="cp-settings__hint">{{ t('settings_up_to_date') }}</div>
-                <div v-else-if="updateCheckState.kind === 'update_available'" class="cp-settings__hint">
-                  {{ t('settings_update_available') }} v{{ updateCheckState.version }}
-                  <a :href="updateCheckState.releaseUrl" target="_blank" class="cp-settings__link" rel="noopener noreferrer">{{ t('updater_download_page') }}</a>
-                </div>
-                <div v-else-if="updateCheckState.kind === 'error'" class="cp-settings__err">{{ updateCheckState.message }}</div>
-              </div>
-            </div>
-            <div class="cp-settings__card" data-settings-item="about-tech-stack">
-              <div class="cp-settings__k">{{ t("about_tech_stack") }}</div>
-              <div class="cp-settings__v">
-                <div v-for="item in appInfo.techStack" :key="item" class="cp-settings__row">
-                  <span class="cp-settings__muted">{{ item }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="cp-settings__card" data-settings-item="about-license">
-              <div class="cp-settings__k">{{ t("about_license") }}</div>
-              <div class="cp-settings__v">
-                <div class="cp-settings__row">
-                  <span class="cp-settings__muted">{{ appInfo.license }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="cp-settings__card" data-settings-item="about-credits">
-              <div class="cp-settings__k">{{ t("about_credits") }}</div>
-              <div class="cp-settings__v">
-                <div v-for="credit in appInfo.credits" :key="credit.name" class="cp-settings__row">
-                  <a v-if="credit.url" :href="credit.url" target="_blank" rel="noopener" class="cp-settings__link">{{ credit.name }}</a>
-                  <span v-else class="cp-settings__muted">{{ credit.name }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          </section>
         </section>
-      </section>
       </div>
     </ErrorBoundary>
 
@@ -908,66 +1043,18 @@ async function handleResetDefaults(): Promise<void> {
 /* 样式：SettingsPage */
 /* 选择器：`.cp-settings`｜用途：页面容器（纵向布局） */
 .cp-settings {
-  height: 100%;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  @include cp-page;
 }
 
-/* 选择器：`.cp-settings__btn`｜用途：动作按钮（打开页面） */
-.cp-settings__btn {
-  @include button-size('md');
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* 选择器：`.cp-settings__btn:hover`｜用途：悬停上浮 + 高亮边框 */
-.cp-settings__btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-settings__btn:disabled {
-  opacity: 0.56;
-  cursor: not-allowed;
-}
-
-.cp-settings__btn--danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 40%, var(--cp-border));
-  color: var(--cp-danger);
-}
-
-.cp-settings__btn--danger:hover:not(:disabled) {
-  border-color: var(--cp-danger);
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
-}
-
-/* 选择器：`.cp-settings__errBanner`｜用途：全局错误提示条（仅出错时渲染） */
-.cp-settings__errBanner {
-  border: 1px solid color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--cp-danger);
-}
-
-/* 选择器：`.cp-settings__layout`｜用途：左右布局容器（左侧导航 + 右侧内容），窄窗口回退纵向 */
+/* 选择器：`.cp-settings__layout`｜用途：左右布局容器（左侧导航 + 右侧内容） */
 .cp-settings__layout {
   flex: 1;
   display: flex;
-  gap: 12px;
+  gap: 16px;
   min-height: 0;
 }
 
-/* 选择器：`.cp-settings__navWrap`｜用途：左侧固定宽纵向导航侧栏 */
+/* 选择器：`.cp-settings__navWrap`｜用途：左侧固定宽导航侧栏 */
 .cp-settings__navWrap {
   flex: 0 0 auto;
   width: 240px;
@@ -975,14 +1062,10 @@ async function handleResetDefaults(): Promise<void> {
   display: flex;
 }
 
-/* 选择器：`.cp-settings__rail`｜用途：左栏面板容器（搜索框固定在上，导航/结果列表滚动） */
+/* 选择器：`.cp-settings__rail`｜用途：左栏面板容器（搜索固定在上，导航/结果列表滚动） */
 .cp-settings__rail {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
+  @include cp-glass-panel;
+
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -991,25 +1074,31 @@ async function handleResetDefaults(): Promise<void> {
   min-height: 0;
 }
 
-/* 选择器：`.cp-settings__search`｜用途：设置搜索输入框容器（与设置页面板风格一致） */
+/* 选择器：`.cp-settings__search`｜用途：设置搜索输入框容器 */
 .cp-settings__search {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 38px;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
-  border-radius: 14px;
-  padding: 8px 10px;
-  transition: border-color var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
+  border-radius: 12px;
+  padding: 0 10px;
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
 }
 
 .cp-settings__search:focus-within {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-hover-bg);
+  border-color: var(--cp-focus-border);
+  background: var(--cp-field-bg);
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
 }
 
 .cp-settings__searchIcon {
   color: var(--cp-text-muted);
+  flex: 0 0 auto;
 }
 
 /* 选择器：`.cp-settings__searchInput`｜用途：原生搜索输入（无边框，融入面板底色） */
@@ -1019,7 +1108,7 @@ async function handleResetDefaults(): Promise<void> {
   border: 0;
   background: transparent;
   color: var(--cp-text);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
   outline: none;
 }
@@ -1030,19 +1119,23 @@ async function handleResetDefaults(): Promise<void> {
 
 /* 选择器：`.cp-settings__searchClear`｜用途：清空搜索按钮 */
 .cp-settings__searchClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--cp-text-muted);
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
-  padding: 0 2px;
-  border-radius: 999px;
-  transition: color var(--cp-fast) var(--cp-ease);
+  padding: 0;
+  transition: color var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-settings__searchClear:hover {
   color: var(--cp-text);
+  background: var(--cp-hover-bg);
 }
 
 /* 选择器：`.cp-settings__results`｜用途：搜索结果列表（查询非空时替换导航） */
@@ -1050,13 +1143,10 @@ async function handleResetDefaults(): Promise<void> {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--cp-panel-muted);
-  border: 1px solid var(--cp-border);
-  border-radius: 14px;
-  padding: 8px;
+  padding: 2px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .cp-settings__resultsHead {
@@ -1065,14 +1155,14 @@ async function handleResetDefaults(): Promise<void> {
   text-transform: uppercase;
   font-size: 11px;
   color: var(--cp-text-muted);
-  padding: 2px 4px;
+  padding: 6px 8px 4px;
 }
 
 .cp-settings__resultsEmpty {
   font-size: 12px;
   color: var(--cp-text-muted);
-  padding: 6px 4px;
-  line-height: 1.45;
+  padding: 8px;
+  line-height: 1.5;
 }
 
 /* 选择器：`.cp-settings__result`｜用途：搜索结果行（键盘/鼠标高亮） */
@@ -1080,8 +1170,8 @@ async function handleResetDefaults(): Promise<void> {
   border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text);
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 10px;
+  padding: 9px 10px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -1090,19 +1180,24 @@ async function handleResetDefaults(): Promise<void> {
   transition: background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-settings__result:hover,
+.cp-settings__result:hover {
+  background: var(--cp-hover-bg);
+}
+
 .cp-settings__result[data-active="true"] {
   background: var(--cp-highlight-bg);
-  border-color: var(--cp-highlight-border-strong);
+  border-color: var(--cp-highlight-border);
 }
 
 .cp-settings__resultTitle {
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--cp-text);
 }
 
 .cp-settings__resultMeta {
   font-size: 11px;
+  line-height: 1.4;
   color: var(--cp-text-muted);
 }
 
@@ -1118,13 +1213,277 @@ async function handleResetDefaults(): Promise<void> {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 10px;
+  gap: 2px;
   min-height: 0;
   overflow: auto;
+  padding: 2px;
 }
 
-/* 窄窗口回退：导航回到顶部横向可换行排列 */
-@media (max-width: 720px) {
+.cp-settings__navBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-settings__navBtn:hover {
+  background: var(--cp-hover-bg);
+  color: var(--cp-text);
+}
+
+/* 选中态：低饱和高亮底 + 左侧细条，避免整圈描边带来的“聚焦框”感 */
+.cp-settings__navBtn[data-active="true"] {
+  border-color: var(--cp-highlight-border);
+  background: var(--cp-highlight-bg);
+  color: var(--cp-text);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
+}
+
+.cp-settings__navIcon {
+  flex: 0 0 auto;
+  color: var(--cp-text-muted);
+}
+
+.cp-settings__navBtn[data-active="true"] .cp-settings__navIcon {
+  color: var(--cp-highlight);
+}
+
+.cp-settings__navLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 选择器：`.cp-settings__sections`｜用途：右侧 Tab 面板容器（一次只显示一个分区，超高时容器内滚动） */
+.cp-settings__sections {
+  @include cp-glass-panel;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 选择器：`.cp-settings__section`｜用途：单个设置分区（非当前 Tab 由 v-show 隐藏） */
+.cp-settings__section {
+  flex: 0 0 auto;
+  padding: 28px 32px 40px;
+  scroll-margin-top: 12px;
+}
+
+/* 选择器：`.cp-settings__sectionBody`｜用途：内容列（限制行宽，避免宽屏下标签与控件相距过远） */
+.cp-settings__sectionBody {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-settings__sectionBody > .cp-settings__err {
+  margin-bottom: 14px;
+}
+
+/* 选择器：`.cp-settings__seg`｜用途：连接式分段控件容器 */
+.cp-settings__seg {
+  @include cp-segmented;
+}
+
+/* 选择器：`.cp-settings__segBtn`｜用途：分段控件选项 */
+.cp-settings__segBtn {
+  @include cp-segmented-item;
+}
+
+/* 选择器：`.cp-settings__btn`｜用途：动作按钮（导入/导出/打开弹窗等） */
+.cp-settings__btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-settings__btn:hover:not(:disabled) {
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+.cp-settings__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cp-settings__btn--primary {
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
+}
+
+.cp-settings__btn--danger {
+  border-color: color-mix(in oklab, var(--cp-danger) 40%, var(--cp-border));
+  color: var(--cp-danger);
+}
+
+.cp-settings__btn--danger:hover:not(:disabled) {
+  border-color: var(--cp-danger);
+  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
+}
+
+/* 选择器：`.cp-settings__linkRow`｜用途：入口类整行按钮（标签 + chevron） */
+.cp-settings__linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 0;
+  border-top: 1px solid var(--cp-border-light);
+  background: transparent;
+  color: var(--cp-text);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-settings__linkRow:first-child {
+  border-top: 0;
+}
+
+.cp-settings__linkRow:hover {
+  background: var(--cp-hover-bg);
+}
+
+.cp-settings__linkRowIcon {
+  flex: 0 0 auto;
+  color: var(--cp-text-muted);
+}
+
+/* 选择器：`.cp-settings__hint`｜用途：帮助提示段落 */
+.cp-settings__hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+/* 选择器：`.cp-settings__errBanner`｜用途：全局错误提示条（仅出错时渲染） */
+.cp-settings__errBanner {
+  border: 1px solid color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--cp-danger);
+}
+
+/* 选择器：`.cp-settings__err`｜用途：内联错误提示 */
+.cp-settings__err {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cp-danger);
+}
+
+.cp-settings__statusInline {
+  margin-top: 8px;
+  border: 1px solid var(--cp-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cp-settings__statusInline[data-tone="success"] {
+  border-color: color-mix(in oklab, var(--cp-success) 28%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-success) 10%, var(--cp-panel));
+}
+
+.cp-settings__statusInline[data-tone="danger"] {
+  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
+}
+
+.cp-settings__link {
+  color: var(--cp-accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.cp-settings__link:hover {
+  text-decoration: underline;
+}
+
+.cp-settings__value {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--cp-text);
+}
+
+.cp-settings__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cp-settings__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
+  font-family: var(--cp-font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cp-settings__credits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.cp-settings__hiddenInput {
+  display: none;
+}
+
+/* 响应式：宽屏收窄分区内边距 */
+@media (max-width: 1180px) {
+  .cp-settings__section {
+    padding: 24px 24px 32px;
+  }
+}
+
+/* 响应式：窄窗口改为纵向布局，导航回到顶部横向换行 */
+@media (max-width: 900px) {
   .cp-settings__layout {
     flex-direction: column;
   }
@@ -1140,268 +1499,41 @@ async function handleResetDefaults(): Promise<void> {
     overflow: visible;
   }
 
+  .cp-settings__navBtn {
+    width: auto;
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .cp-settings__navBtn[data-active="true"] {
+    box-shadow: none;
+  }
+
   .cp-settings__results {
     max-height: 240px;
   }
+
+  .cp-settings__section {
+    padding: 20px 16px 28px;
+  }
 }
 
-.cp-settings__navBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  color: var(--cp-text-muted);
-  border-radius: 16px;
-  padding: 10px 12px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 180px;
-  text-align: left;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease), color var(--cp-fast) var(--cp-ease);
-}
+/* 响应式：极窄窗口压缩页面留白并让分段控件占满整行 */
+@media (max-width: 640px) {
+  .cp-settings {
+    padding: 10px;
+  }
 
-.cp-settings__navBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
+  .cp-settings__section {
+    padding: 16px 12px 24px;
+  }
 
-.cp-settings__navBtn[data-active="true"] {
-  color: var(--cp-text);
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-}
+  .cp-settings__seg {
+    width: 100%;
+  }
 
-.cp-settings__navLabel {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.06em;
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.cp-settings__navSub {
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-/* 选择器：`.cp-settings__sections`｜用途：右侧 Tab 面板容器（一次只显示一个分区，超高时容器内滚动） */
-.cp-settings__sections {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-right: 2px;
-}
-
-/* 选择器：`.cp-settings__section`｜用途：单个设置分区面板（非当前 Tab 面板由 v-show 隐藏） */
-.cp-settings__section {
-  flex: 0 0 auto;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
-  padding: 14px;
-  scroll-margin-top: 12px;
-}
-
-.cp-settings__sectionHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.cp-settings__sectionName {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 16px;
-  color: var(--cp-text);
-}
-
-.cp-settings__sectionSub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* 选择器：`.cp-settings__grid`｜用途：section 卡片区域 */
-.cp-settings__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
-}
-
-/* 选择器：`.cp-settings__card`｜用途：设置块卡片 */
-.cp-settings__card {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  padding: 12px;
-}
-
-.cp-settings__card.wide {
-  grid-column: 1 / -1;
-}
-
-/* 选择器：`.cp-settings__k`｜用途：卡片标签（大写） */
-.cp-settings__k {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* 选择器：`.cp-settings__v`｜用途：卡片内容容器 */
-.cp-settings__v {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* 选择器：`.cp-settings__row`｜用途：卡片内 key/value 行 */
-.cp-settings__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* 选择器：`.cp-settings__seg`｜用途：分段按钮容器 */
-.cp-settings__seg {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* 选择器：`.cp-settings__segBtn`｜用途：分段按钮（未激活） */
-.cp-settings__segBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease), color var(--cp-fast) var(--cp-ease);
-}
-
-/* 选择器：`.cp-settings__segBtn:hover`｜用途：悬停态 */
-.cp-settings__segBtn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cp-highlight-border);
-  background: var(--cp-hover-bg);
-}
-
-/* 选择器：`.cp-settings__segBtn[data-active="true"]`｜用途：激活态主题按钮 */
-.cp-settings__segBtn[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
-}
-
-/* 选择器：`.cp-settings__muted`｜用途：弱化标签文本 */
-.cp-settings__muted {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* 选择器：`.cp-settings__hint`｜用途：帮助提示段落 */
-.cp-settings__hint {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.45;
-}
-
-/* 选择器：`.cp-settings__pluginItem`｜用途：单个插件设置项（标题 + 说明 + 插件控件） */
-.cp-settings__pluginItem {
-  border: 1px solid var(--cp-border-light);
-  background: var(--cp-panel-muted);
-  border-radius: 14px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cp-settings__pluginHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.cp-settings__pluginTitle {
-  font-size: 12px;
-  color: var(--cp-text);
-}
-
-/* 选择器：`.cp-settings__placeholder`｜用途：暂未实现的 section 占位说明 */
-.cp-settings__placeholder {
-  margin-top: 10px;
-  border: 1px dashed var(--cp-border);
-  background: var(--cp-panel-muted);
-  border-radius: 16px;
-  padding: 12px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.5;
-}
-
-/* 选择器：`.cp-settings__err`｜用途：内联错误提示 */
-.cp-settings__err {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--cp-danger, #b3261e);
-  line-height: 1.45;
-}
-
-.cp-settings__rowWrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.cp-settings__hiddenInput {
-  display: none;
-}
-
-.cp-settings__statusInline {
-  border: 1px solid var(--cp-border);
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.cp-settings__statusInline[data-tone="success"] {
-  border-color: color-mix(in oklab, var(--cp-success) 24%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-success) 10%, var(--cp-panel));
-}
-
-.cp-settings__link {
-  color: var(--cp-accent);
-  text-decoration: none;
-  font-size: 12px;
-}
-
-.cp-settings__link:hover {
-  text-decoration: underline;
-}
-
-.cp-settings__statusInline[data-tone="danger"] {
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
+  .cp-settings__segBtn {
+    flex: 1 1 auto;
+  }
 }
 </style>

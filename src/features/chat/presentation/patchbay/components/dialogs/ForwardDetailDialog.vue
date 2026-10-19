@@ -73,87 +73,97 @@ function handleClose(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ForwardDetailDialog｜规格：引用块 + 分组行列表 + 胶囊按钮 */
 .cp-forwardDetail {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
 .cp-forwardDetail__header {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
-  color: var(--cp-text-secondary, #a6adc8);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--cp-text-muted);
 }
+
 .cp-forwardDetail__icon {
   flex-shrink: 0;
 }
+
 .cp-forwardDetail__title {
   font-weight: 500;
 }
+
+/* 转发附言：信息引用语义（info 状态条 + 左侧色条） */
 .cp-forwardDetail__comment {
   padding: 10px 12px;
   font-size: 13px;
-  color: var(--cp-text, #cdd6f4);
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--cp-bg, #11111b) 50%, transparent);
-  border-left: 3px solid var(--cp-accent, #5865f2);
   line-height: 1.5;
+  color: var(--cp-text);
+  border-radius: var(--cp-radius-control);
+  border: 1px solid var(--cp-info-border);
+  border-left: 3px solid var(--cp-info);
+  background: var(--cp-info-bg);
   word-break: break-word;
 }
+
+/* 消息列表：内嵌卡片 + 行分隔 */
 .cp-forwardDetail__messages {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--cp-border, #313244);
-  border-radius: 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
   overflow: hidden;
   max-height: 360px;
   overflow-y: auto;
 }
+
 .cp-forwardDetail__msg {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--cp-border-light, rgba(49, 50, 68, 0.2));
+  border-top: 1px solid var(--cp-border-light);
 
-  &:last-child { border-bottom: none; }
+  &:first-child {
+    border-top: none;
+  }
 }
+
 .cp-forwardDetail__msgMeta {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
 }
+
 .cp-forwardDetail__msgAuthor {
   font-size: 13px;
   font-weight: 600;
-  color: var(--cp-text, #cdd6f4);
+  color: var(--cp-text);
 }
+
 .cp-forwardDetail__msgTime {
   font-size: 11px;
-  color: var(--cp-text-muted, #a6adc8);
+  color: var(--cp-text-muted);
 }
+
 .cp-forwardDetail__msgPreview {
-  font-size: 13px;
-  color: var(--cp-text-secondary, #a6adc8);
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
   line-height: 1.5;
   word-break: break-word;
   white-space: pre-wrap;
 }
+
 .cp-forwardDetail__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
-.cp-forwardDetail__btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--cp-border, #313244);
-  background: transparent;
-  color: var(--cp-text, #cdd6f4);
-  font-size: 13px;
-  cursor: pointer;
 
-  &:hover {
-    background: var(--cp-hover-bg, rgba(255,255,255,0.04));
-  }
+.cp-forwardDetail__btn {
+  @include cp-pill-button;
 }
 </style>

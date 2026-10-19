@@ -6,6 +6,7 @@
 
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
+import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useChannelBansPage } from "@/features/chat/room-governance/presentation/page-models/useChannelBansPage";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
@@ -51,22 +52,25 @@ const {
       </template>
       <template #default>
         <div v-if="bans.length === 0" class="cp-bans__empty">{{ t("no_bans") }}</div>
-        <div v-for="b in bans" :key="b.uid" class="cp-banCard">
-          <AvatarBadge :name="b.nickname || b.uid" :size="40" />
-          <div class="cp-banCard__info">
-            <div class="cp-banCard__name">{{ b.nickname || b.uid }}</div>
-            <div class="cp-banCard__reason">
-              <span class="cp-banCard__label">{{ t("ban_reason") }}:</span>
-              {{ b.reason || "—" }}
+        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
+        <PanelGroup v-else>
+          <article v-for="b in bans" :key="b.uid" class="cp-banCard">
+            <AvatarBadge :name="b.nickname || b.uid" :size="40" />
+            <div class="cp-banCard__info">
+              <div class="cp-banCard__name">{{ b.nickname || b.uid }}</div>
+              <div class="cp-banCard__reason">
+                <span class="cp-banCard__label">{{ t("ban_reason") }}:</span>
+                {{ b.reason || "—" }}
+              </div>
+              <div class="cp-banCard__until">{{ t("ban_until") }}: {{ formatBanUntil(b.until) }}</div>
             </div>
-            <div class="cp-banCard__until">{{ t("ban_until") }}: {{ formatBanUntil(b.until) }}</div>
-          </div>
-          <div class="cp-banCard__actions">
-            <button v-if="canRemoveBan" class="cp-banCard__btn" type="button" @click="handleRemoveBan(b.uid)">
-              {{ t("remove_ban") }}
-            </button>
-          </div>
-        </div>
+            <div class="cp-banCard__actions">
+              <button v-if="canRemoveBan" class="cp-banCard__btn" type="button" @click="handleRemoveBan(b.uid)">
+                {{ t("remove_ban") }}
+              </button>
+            </div>
+          </article>
+        </PanelGroup>
       </template>
     </GovernancePageShell>
 
@@ -99,36 +103,33 @@ const {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ChannelBansPage｜规格：分组行（容器 + 分隔线 + hover）+ 胶囊按钮 */
 .cp-bans__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-.cp-bans__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-}
-
+/* 新增封禁为主操作：highlight */
 .cp-bans__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  @include cp-pill-button(primary);
 }
 
+/* 封禁行：分组容器内的一行；相邻行 1px 细分隔线 */
 .cp-banCard {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 12px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+  padding: 12px 14px;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-banCard + .cp-banCard {
+  border-top: 1px solid var(--cp-border-light);
+}
+
+/* 行 hover 只变底色，不做位移 */
+.cp-banCard:hover {
+  background: var(--cp-hover-bg);
 }
 
 .cp-banCard__info {
@@ -136,13 +137,13 @@ const {
 }
 
 .cp-banCard__name {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--cp-text);
-  font-weight: 500;
 }
 
 .cp-banCard__reason {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--cp-text);
   line-height: 1.4;
@@ -153,34 +154,23 @@ const {
 }
 
 .cp-banCard__until {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 11px;
   color: var(--cp-text-muted);
 }
 
 .cp-banCard__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-banCard__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
+  @include cp-pill-button;
 }
 
 .cp-bans__empty {
-  padding: 20px;
+  padding: 24px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--cp-text-muted);
 }
 
+/* 新增封禁表单：字段标签 + 胶囊操作 */
 .cp-addBan {
   display: flex;
   flex-direction: column;
@@ -194,10 +184,9 @@ const {
 }
 
 .cp-addBan__label {
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--cp-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .cp-addBan__actions {
@@ -207,28 +196,10 @@ const {
 }
 
 .cp-addBan__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-addBan__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
+  @include cp-pill-button;
 }
 
 .cp-addBan__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
-}
-
-.cp-addBan__btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  @include cp-pill-button(primary);
 }
 </style>

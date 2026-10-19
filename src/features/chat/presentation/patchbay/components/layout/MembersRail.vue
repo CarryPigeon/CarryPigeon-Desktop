@@ -20,7 +20,9 @@ const props = defineProps<{
   <!-- 组件：MembersRail｜职责：成员栏（只读成员列表） -->
   <!-- 区块：<aside> .cp-rail--members -->
   <aside class="cp-rail cp-rail--members">
-    <div class="cp-rail__title">{{ t("members") }}</div>
+    <div class="cp-rail__head">
+      <div class="cp-rail__title">{{ t("members") }}</div>
+    </div>
     <div v-if="props.model.members.length === 0" class="cp-rail__empty">{{ t("no_members") }}</div>
     <div v-else class="cp-memberList">
       <div v-for="u in props.model.members" :key="u.id" class="cp-member">

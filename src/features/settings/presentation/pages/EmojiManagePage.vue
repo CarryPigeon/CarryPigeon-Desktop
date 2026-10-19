@@ -145,16 +145,18 @@ function extractNameFromPath(filePath: string): string {
         @back="router.back()"
       />
 
-      <div class="cp-emojiManage__add">
+      <section class="cp-emojiManage__panel">
+        <div class="cp-emojiManage__body">
+          <div class="cp-emojiManage__add">
         <input
           v-model="nameInput"
           :placeholder="t('emoji_name')"
-          class="cp-emojiManage__input"
+          class="cp-emojiManage__input cp-field"
         />
         <input
           v-model="tagsInput"
           :placeholder="t('emoji_tags')"
-          class="cp-emojiManage__input"
+          class="cp-emojiManage__input cp-field"
         />
         <button
           class="cp-emojiManage__btn"
@@ -204,13 +206,28 @@ function extractNameFromPath(filePath: string): string {
           {{ t("no_custom_emojis") }}
         </div>
       </div>
+        </div>
+      </section>
     </div>
   </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">
+/* 样式：EmojiManagePage｜布局：PageHeader + 单玻璃面板（设置页风格） */
 .cp-emojiManage {
-  padding: 14px;
+  @include cp-page;
+}
+
+.cp-emojiManage__panel {
+  @include cp-glass-panel;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cp-emojiManage__body {
+  padding: 20px 24px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -219,31 +236,24 @@ function extractNameFromPath(filePath: string): string {
 .cp-emojiManage__add {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cp-emojiManage__input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-sm);
-  background: var(--cp-panel);
-  color: var(--cp-text);
-  font-size: 13px;
+  flex: 1 1 160px;
+  min-width: 160px;
+  width: auto;
 }
 
 .cp-emojiManage__btn {
-  padding: 8px 16px;
-  border-radius: var(--cp-radius-sm);
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  cursor: pointer;
-  font-size: 13px;
+  @include cp-pill-button;
+
+  min-height: 38px;
   white-space: nowrap;
 }
 
 .cp-emojiManage__btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -254,11 +264,11 @@ function extractNameFromPath(filePath: string): string {
 }
 
 .cp-emojiManage__item {
+  @include cp-card;
+
   position: relative;
   text-align: center;
-  padding: 8px;
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius);
+  padding: 10px;
 }
 
 .cp-emojiManage__img {
@@ -273,55 +283,57 @@ function extractNameFromPath(filePath: string): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border-light);
   border-radius: var(--cp-radius-sm);
+  background: var(--cp-panel-muted);
   font-size: 20px;
   color: var(--cp-text-muted);
 }
 
 .cp-emojiManage__name {
+  margin-top: 6px;
   font-size: 11px;
   color: var(--cp-text-muted);
-  margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cp-emojiManage__del {
+  @include cp-icon-button;
+
   position: absolute;
   top: 4px;
   right: 4px;
-  border: none;
-  background: var(--cp-hover-bg);
-  color: var(--cp-danger);
-  cursor: pointer;
-  font-size: 16px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
 
-.cp-emojiManage__del:hover {
-  background: var(--cp-danger);
-  color: white;
+  &:hover:not(:disabled) {
+    color: var(--cp-danger);
+    background: var(--cp-danger-bg);
+    border-color: var(--cp-danger-border);
+  }
 }
 
 .cp-emojiManage__empty {
-  color: var(--cp-text-muted);
-  font-size: 13px;
-  text-align: center;
   grid-column: 1 / -1;
-  padding: 24px;
+  padding: 28px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--cp-text-muted);
 }
 
 .cp-emojiManage__loading {
-  color: var(--cp-text-muted);
+  padding: 28px;
   text-align: center;
-  padding: 24px;
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+@media (max-width: 640px) {
+  .cp-emojiManage__body {
+    padding: 16px 12px 24px;
+  }
 }
 </style>

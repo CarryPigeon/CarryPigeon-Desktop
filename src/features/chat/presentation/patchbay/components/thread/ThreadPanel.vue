@@ -101,41 +101,90 @@ const replyVirtualizer = useVirtualizer(
   </teleport>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：ThreadPanel｜规格：模糊遮罩 + 18px 玻璃浮层 + 胶囊发送 */
 .cp-threadOverlay {
-  position: fixed; z-index: 80; inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex; justify-content: center; align-items: center;
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: color-mix(in oklab, var(--cp-bg) 48%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
+
 .cp-threadPanel {
-  width: 560px; max-height: 80vh;
-  background: var(--cp-panel); border-radius: 18px;
-  box-shadow: var(--cp-shadow);
-  display: flex; flex-direction: column;
+  @include cp-glass-panel;
+
+  width: 560px;
+  max-width: min(560px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
 .cp-threadPanel__header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px; border-bottom: 1px solid var(--cp-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--cp-border-light);
 }
-.cp-threadPanel__header h3 { font-size: 16px; margin: 0; color: var(--cp-text); }
+
+.cp-threadPanel__header h3 {
+  margin: 0;
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--cp-text);
+}
+
 .cp-threadPanel__close {
-  border: 1px solid var(--cp-border); background: var(--cp-panel-muted);
-  color: var(--cp-text); border-radius: 999px; width: 28px; height: 28px;
-  display: inline-grid; place-items: center; cursor: pointer;
-  font-size: 16px; line-height: 1;
+  @include cp-icon-button;
 }
-.cp-threadPanel__body { flex: 1; overflow-y: auto; padding: 16px 20px; }
-.cp-threadPanel__repliesScroll { margin-top: 4px; overflow-y: auto; max-height: 400px; }
-.cp-threadPanel__empty, .cp-threadPanel__loading { color: var(--cp-text-muted); font-size: 13px; text-align: center; padding: 24px; }
+
+.cp-threadPanel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+}
+
+.cp-threadPanel__repliesScroll {
+  margin-top: 4px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.cp-threadPanel__empty,
+.cp-threadPanel__loading {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
 .cp-threadPanel__composer {
-  display: flex; gap: 8px; align-items: flex-end;
-  padding: 12px 20px; border-top: 1px solid var(--cp-border);
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cp-border-light);
 }
-.cp-threadPanel__composer :deep(.t-textarea__inner) { min-height: 36px; }
+
+.cp-threadPanel__composer :deep(.t-textarea__inner) {
+  min-height: 36px;
+}
+
 .cp-threadPanel__send {
-  padding: 8px 16px; border-radius: 999px; flex-shrink: 0;
-  border: 1px solid var(--cp-accent-soft); background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
-  color: var(--cp-text); cursor: pointer; font-size: 12px;
+  @include cp-pill-button(primary);
+
+  flex-shrink: 0;
 }
+</style>
 .cp-threadPanel__send:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

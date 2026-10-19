@@ -142,24 +142,26 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：DiagnosticsPanel｜规格：设置页内嵌卡片 + 胶囊按钮 + mono 日志 */
 .cp-diagnostics {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--cp-page-gap);
 }
 
 .cp-diagnostics__section {
-  border: 1px solid var(--cp-border);
-  border-radius: 8px;
-  padding: 12px;
-  background: var(--cp-panel-muted);
+  @include cp-card;
+
+  padding: 14px 16px;
 }
 
 .cp-diagnostics__title {
   margin: 0 0 10px;
+  font-family: var(--cp-font-display);
+  font-weight: 700;
   font-size: 14px;
-  font-weight: 600;
+  color: var(--cp-text);
 }
 
 .cp-diagnostics__grid {
@@ -183,9 +185,11 @@ onBeforeUnmount(() => {
 .cp-diagnostics__value.is-normal {
   color: var(--cp-success);
 }
+
 .cp-diagnostics__value.is-warning {
   color: var(--cp-warning);
 }
+
 .cp-diagnostics__value.is-critical {
   color: var(--cp-danger);
 }
@@ -194,17 +198,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
 .cp-diagnostics__btn {
-  padding: 4px 10px;
-  border: 1px solid var(--cp-border);
-  border-radius: 6px;
-  background: var(--cp-surface);
-  color: var(--cp-text);
-  cursor: pointer;
-  font-size: 12px;
+  @include cp-pill-button;
 }
 
 .cp-diagnostics__btn:disabled {
@@ -215,12 +214,13 @@ onBeforeUnmount(() => {
 .cp-diagnostics__logs {
   max-height: 320px;
   overflow-y: auto;
-  background: var(--cp-bg);
-  border-radius: 6px;
-  padding: 8px;
-  font-family: ui-monospace, monospace;
+  padding: 10px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
+  font-family: var(--cp-font-mono);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .cp-diagnostics__logLine {
@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
 }
 
 .cp-diagnostics__muted {
-  color: var(--cp-text-muted);
   font-size: 12px;
+  color: var(--cp-text-muted);
 }
 </style>

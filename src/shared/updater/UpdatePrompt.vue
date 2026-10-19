@@ -34,7 +34,7 @@ function handleOpenRelease(): void {
       <p class="update-prompt-body">{{ t('updater_manual_hint') }}</p>
       <div class="update-prompt-actions">
         <button
-          class="cp-field update-prompt-btn update-prompt-btn--primary"
+          class="update-prompt-btn update-prompt-btn--primary"
           type="button"
           @click="handleOpenRelease"
         >
@@ -53,25 +53,25 @@ function handleOpenRelease(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：UpdatePrompt｜规格：模糊遮罩 + 18px 玻璃弹窗 + 胶囊按钮 */
 .update-prompt-overlay {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.48);
-  backdrop-filter: blur(8px);
+  background: color-mix(in oklab, var(--cp-bg) 48%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   z-index: 9999;
 }
 
 .update-prompt-card {
-  background: var(--cp-panel);
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-lg);
+  @include cp-glass-panel;
+
   padding: 32px;
   max-width: 420px;
   width: 90vw;
-  box-shadow: var(--cp-shadow);
   text-align: center;
 }
 
@@ -79,22 +79,28 @@ function handleOpenRelease(): void {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
   color: var(--cp-accent);
-  margin-bottom: 16px;
 }
 
 .update-prompt-title {
+  margin: 0 0 12px;
   font-family: var(--cp-font-display);
+  font-weight: 900;
   font-size: 18px;
   color: var(--cp-text);
-  margin: 0 0 12px;
 }
 
 .update-prompt-body {
-  font-size: 13px;
-  color: var(--cp-text-muted);
   margin: 0 0 24px;
+  font-size: 13px;
   line-height: 1.5;
+  color: var(--cp-text-muted);
 }
 
 .update-prompt-actions {
@@ -104,24 +110,13 @@ function handleOpenRelease(): void {
 }
 
 .update-prompt-btn {
-  border-radius: 999px;
-  padding: 10px 24px;
-  font-size: 13px;
-  cursor: pointer;
-  border: 1px solid var(--cp-border);
-  transition: background-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 
-  &--primary {
-    background: var(--cp-accent);
-    color: #fff;
-    border-color: var(--cp-accent);
-    &:hover { background: var(--cp-accent-hover); }
-  }
+  width: 100%;
+  min-height: 36px;
+}
 
-  &--secondary {
-    background: transparent;
-    color: var(--cp-text-muted);
-    &:hover { background: var(--cp-hover-bg); }
-  }
+.update-prompt-btn--primary {
+  @include cp-pill-button(primary);
 }
 </style>

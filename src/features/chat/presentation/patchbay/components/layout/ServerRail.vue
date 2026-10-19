@@ -153,7 +153,8 @@ function formatTime(epoch: number): string {
     </div>
     <div class="cp-rail__top-actions">
       <button class="cp-rail__btn" type="button" @click="emit('open-server-manager')">
-        {{ t("manage") }}
+        <AppIcon name="usergroup" :size="14" />
+        <span class="cp-rail__btnLabel">{{ t("manage") }}</span>
       </button>
     </div>
     <div v-if="props.racks.length === 0" class="cp-rail__empty">{{ t("no_servers") }}</div>
@@ -171,8 +172,14 @@ function formatTime(epoch: number): string {
       </button>
     </div>
     <div class="cp-rail__foot">
-      <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">{{ t("plugins") }}</button>
-      <button class="cp-rail__btn" type="button" @click="emit('open-settings')">{{ t("settings_title") }}</button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-plugins')">
+        <AppIcon name="plug" :size="14" />
+        <span class="cp-rail__btnLabel">{{ t("plugins") }}</span>
+      </button>
+      <button class="cp-rail__btn" type="button" @click="emit('open-settings')">
+        <AppIcon name="setting" :size="14" />
+        <span class="cp-rail__btnLabel">{{ t("settings_title") }}</span>
+      </button>
     </div>
     <ContextMenuSurface
       :open="dndMenuOpen"
@@ -204,35 +211,36 @@ function formatTime(epoch: number): string {
 </template>
 
 <style scoped lang="scss">
-.cp-rail__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 0 4px;
-}
-
+/* 样式：ServerRail｜规格：栏头图标按钮 + 顶部操作区行（行列表见全局 patchbay.scss） */
 .cp-dndBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  color: var(--cp-text-secondary);
-  border-radius: 8px;
-  padding: 2px 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-radius: var(--cp-radius-sm);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 
   &:hover {
     background: var(--cp-hover-bg);
+    border-color: var(--cp-border);
+    color: var(--cp-text);
   }
 
+  /* 免打扰开启属于「状态」语义，用 accent 而非 highlight */
   &--active {
-    background: var(--cp-accent-soft, rgba(64, 192, 192, 0.18));
-    border-color: var(--cp-accent);
+    background: var(--cp-accent-soft);
+    border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
     color: var(--cp-accent);
   }
 }
@@ -243,10 +251,17 @@ function formatTime(epoch: number): string {
 }
 
 .cp-rail__top-actions {
-  padding: 12px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 4px 6px 2px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1px;
+}
+
+/* 导航行文案：单行省略，避免长翻译撑破栏宽 */
+.cp-rail__btnLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

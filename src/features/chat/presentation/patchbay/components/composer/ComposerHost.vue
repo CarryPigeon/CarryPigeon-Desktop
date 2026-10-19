@@ -574,13 +574,12 @@ function selectSystemMention(type: "everyone" | "here"): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ComposerHost｜规格：内容区内嵌卡片（cp-card，不叠加阴影）+ 字段/胶囊/状态条 token */
 .cp-composer {
   position: relative;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  padding: 10px 10px 6px;
-  box-shadow: var(--cp-shadow-soft);
+  @include cp-card;
+
+  padding: 10px;
 }
 
 .cp-composer__toolbar {
@@ -598,29 +597,32 @@ function selectSystemMention(type: "everyone" | "here"): void {
 .cp-composer__tools {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
+/* 工具栏图标按钮：统一 32×32 / 10px 圆角 / 静态透明（cp-icon-button 规格） */
 .cp-composer__tools :deep(button) {
   width: 32px;
   height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text-muted);
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   cursor: pointer;
   font-size: 18px;
   padding: 0;
   transition:
     background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
     color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-composer__tools :deep(button:hover):enabled {
   background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
   color: var(--cp-text);
 }
 
@@ -641,10 +643,9 @@ function selectSystemMention(type: "everyone" | "here"): void {
   margin-bottom: 6px;
 }
 
+/* 文本域：字段 token 由全局 TDesign 基线统一，这里只保留内嵌发送按钮的占位与聚焦内环 */
 .cp-composer__inputArea :deep(.t-textarea__inner) {
-  border: none;
   box-shadow: var(--cp-inset);
-  background: var(--cp-panel);
   /* 为右下角内嵌发送按钮预留空间：TDesign autosize 复制 padding 计算高度，故不会被文字占用 */
   padding-bottom: 40px;
 }
@@ -664,7 +665,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
 .cp-composer__plugin {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
-  border-radius: 14px;
+  border-radius: var(--cp-radius-control);
   padding: 10px;
   box-shadow: var(--cp-inset);
 }
@@ -678,56 +679,60 @@ function selectSystemMention(type: "everyone" | "here"): void {
 
 .cp-composer__hint {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
   padding: 6px 8px;
 }
 
+/* 发送按钮：highlight = 主操作（设置页主按钮语义，不用品牌 accent） */
 .cp-composer__send {
-  border: 1px solid color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 6px 16px;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   cursor: pointer;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-composer__send:hover:enabled {
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--cp-accent) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+  background: var(--cp-highlight-bg-strong);
+  border-color: var(--cp-highlight-border-strong);
 }
 
 .cp-composer__send:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-/* 内嵌发送按钮：绝对定位贴文本域右下角，z-index 高于文本层；不透明底色保证与下层文字的可读性 */
+/* 内嵌发送按钮：绝对定位贴文本域右下角，z-index 高于文本层；不透明底保证与下层文字的可读性 */
 .cp-composer__send--overlay {
   position: absolute;
   right: 8px;
   bottom: 8px;
   z-index: 5;
-  background: color-mix(in oklab, var(--cp-panel) 92%, var(--cp-accent) 8%);
-  box-shadow: 0 2px 6px color-mix(in oklab, var(--cp-shadow) 45%, transparent);
+  background: color-mix(in oklab, var(--cp-highlight) 12%, var(--cp-panel));
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--cp-text) 10%, transparent);
 }
 
 .cp-composer__send--overlay:hover:enabled {
   /* 绝对定位元素不做位移，避免 hover 时在文本域内跳动 */
   transform: none;
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-panel));
+  background: color-mix(in oklab, var(--cp-highlight) 18%, var(--cp-panel));
 }
 
+/* 回复条：cp-inline-status(info) 语义 */
 .cp-reply {
-  border: 1px solid color-mix(in oklab, var(--cp-info) 20%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
-  border-radius: 16px;
-  padding: 10px 10px;
+  border: 1px solid var(--cp-info-border);
+  background: var(--cp-info-bg);
+  border-radius: var(--cp-radius-control);
+  padding: 8px 10px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -736,17 +741,15 @@ function selectSystemMention(type: "everyone" | "here"): void {
 }
 
 .cp-reply__title {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: color-mix(in oklab, var(--cp-text) 72%, transparent);
+  @include cp-section-label;
+
+  color: var(--cp-text-muted);
 }
 
 .cp-reply__snippet {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--cp-text);
   max-width: 56ch;
   white-space: nowrap;
@@ -754,55 +757,63 @@ function selectSystemMention(type: "everyone" | "here"): void {
   text-overflow: ellipsis;
 }
 
-.cp-reply__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
+/* 回复/引用条关闭按钮：设置页图标按钮（28px 紧凑版） */
+.cp-reply__btn,
+.cp-quoteBar__close {
   width: 28px;
   height: 28px;
-  display: inline-grid;
-  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-radius: var(--cp-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
+  flex-shrink: 0;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-reply__btn:hover {
-  transform: translateY(-1px);
+.cp-reply__btn:hover,
+.cp-quoteBar__close:hover {
   background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
+  border-color: var(--cp-border);
+  color: var(--cp-text);
 }
 
+/* 错误提示：cp-inline-status(danger) */
 .cp-composer__error {
-  border: 1px dashed color-mix(in oklab, var(--cp-danger) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
-  border-radius: 16px;
-  padding: 10px 10px;
-  font-size: 12px;
-  color: color-mix(in oklab, var(--cp-text) 90%, transparent);
+  @include cp-inline-status(danger);
+
   margin-bottom: 10px;
 }
 
+/* 引用草稿条：cp-inline-status(info) 语义 + 左侧高亮竖条 */
 .cp-quoteBar {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid color-mix(in oklab, var(--cp-info) 20%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
-  border-radius: 16px;
+  border: 1px solid var(--cp-info-border);
+  background: var(--cp-info-bg);
+  border-radius: var(--cp-radius-control);
   padding: 8px 10px;
   margin-bottom: 10px;
 }
+
 .cp-quoteBar__bar {
   width: 3px;
   border-radius: 2px;
-  background: var(--cp-info, #89b4fa);
+  background: var(--cp-highlight);
   flex-shrink: 0;
   align-self: stretch;
 }
+
 .cp-quoteBar__content {
   display: flex;
   gap: 6px;
@@ -810,14 +821,14 @@ function selectSystemMention(type: "everyone" | "here"): void {
   min-width: 0;
   flex: 1;
 }
+
 .cp-quoteBar__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: color-mix(in oklab, var(--cp-text) 72%, transparent);
+  @include cp-section-label;
+
+  color: var(--cp-text-muted);
   white-space: nowrap;
 }
+
 .cp-quoteBar__preview {
   font-size: 12px;
   color: var(--cp-text);
@@ -825,28 +836,8 @@ function selectSystemMention(type: "everyone" | "here"): void {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cp-quoteBar__close {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  width: 28px;
-  height: 28px;
-  display: inline-grid;
-  place-items: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-.cp-quoteBar__close:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-info) 26%, var(--cp-border));
-}
 
+/* 提及菜单：不透明浮层（菜单类）+ 行 hover 底色 */
 .cp-mentionMenu {
   position: absolute;
   z-index: 70;
@@ -856,9 +847,9 @@ function selectSystemMention(type: "everyone" | "here"): void {
   max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 14px;
-  box-shadow: var(--cp-shadow);
+  background: var(--cp-panel-solid);
+  border-radius: var(--cp-radius-card);
+  box-shadow: var(--cp-shadow-float);
   padding: 6px;
   margin-bottom: 6px;
 }
@@ -866,11 +857,11 @@ function selectSystemMention(type: "everyone" | "here"): void {
   width: 100%;
   display: block;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--cp-radius-sm);
   border: none;
   background: transparent;
   color: var(--cp-text);
-  font-size: 12px;
+  font-size: 12.5px;
   text-align: left;
   cursor: pointer;
 }
@@ -924,7 +915,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
 }
 
 .cp-composer__collapsedPlaceholder {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--cp-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -932,7 +923,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
 }
 
 .cp-composer__collapsed .cp-composer__send {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 

@@ -607,6 +607,7 @@ watch(
 </script>
 
 <style lang="scss" scoped>
+/* 样式：UserProfilePopover｜规格：浮层不透明（--cp-panel-solid）+ 18px 圆角 + 浮动阴影 */
 .cp-user-profile-popover-trigger {
   display: inline-block;
   cursor: pointer;
@@ -615,16 +616,19 @@ watch(
 .cp-user-profile-popover {
   position: absolute;
   z-index: 1000;
-  background: var(--cp-panel);
-  border-radius: 12px;
-  box-shadow: var(--cp-shadow);
+  background: var(--cp-panel-solid);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  box-shadow: var(--cp-shadow-float);
   overflow: hidden;
   transform-origin: top left;
   opacity: 0;
   transform: scale(0.95);
   pointer-events: none;
   visibility: hidden;
-  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  transition:
+    opacity var(--cp-fast) var(--cp-ease),
+    transform var(--cp-fast) var(--cp-ease);
 
   &.cp-user-profile-popover--visible {
     opacity: 1;
@@ -634,7 +638,9 @@ watch(
   }
 
   &.cp-user-profile-popover--opening {
-    transition: opacity 200ms ease-out, transform 200ms ease-out;
+    transition:
+      opacity 200ms var(--cp-ease),
+      transform 200ms var(--cp-ease);
   }
 
   &__background {
@@ -642,7 +648,7 @@ watch(
     width: 100%;
     height: 120px;
     overflow: hidden;
-    border-radius: 12px 12px 0 0;
+    border-radius: var(--cp-radius-lg) var(--cp-radius-lg) 0 0;
   }
 
   &__bg-image {
@@ -656,11 +662,11 @@ watch(
     width: 100%;
     height: 100%;
     background:
-      radial-gradient(circle at 18% 22%, color-mix(in oklab, var(--cp-highlight) 42%, transparent), transparent 34%),
+      radial-gradient(circle at 18% 22%, color-mix(in oklab, var(--cp-accent) 42%, transparent), transparent 34%),
       linear-gradient(
         135deg,
         color-mix(in oklab, var(--cp-accent) 62%, var(--cp-panel)) 0%,
-        color-mix(in oklab, var(--cp-primary) 54%, var(--cp-panel-muted)) 100%
+        color-mix(in oklab, var(--cp-accent-2) 54%, var(--cp-panel-muted)) 100%
       );
   }
 
@@ -693,7 +699,7 @@ watch(
   &__content {
     position: relative;
     padding: 60px 20px 20px;
-    background: var(--cp-panel);
+    background: var(--cp-panel-solid);
   }
 
   &__avatar-container {
@@ -707,11 +713,6 @@ watch(
     padding: 4px;
     box-shadow: var(--cp-shadow-soft);
     cursor: pointer;
-    transition: transform 0.2s;
-
-    &:hover {
-      transform: scale(1.05);
-    }
   }
 
   &__avatar {
@@ -767,26 +768,16 @@ watch(
     font-size: 12px;
     color: var(--cp-text-muted);
     line-height: 1.4;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: var(--cp-font-mono);
   }
 
+  /* 复制按钮：图标按钮规格（20×20 紧凑尺寸） */
   &__copy-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    @include cp-icon-button;
+
     width: 20px;
     height: 20px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: var(--cp-text-muted);
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-      background: var(--cp-hover);
-      color: var(--cp-text);
-    }
+    border-radius: 6px;
 
     :deep(svg) {
       width: 14px;
@@ -840,17 +831,7 @@ watch(
   }
 
   &__retry-btn {
-    padding: 4px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--cp-border);
-    background: transparent;
-    color: var(--cp-text);
-    font-size: 12px;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--cp-hover);
-    }
+    @include cp-pill-button;
   }
 
   &__actions {
@@ -859,25 +840,13 @@ watch(
     gap: 8px;
   }
 
+  /* 底部主操作按钮：highlight 胶囊 */
   &__action-btn {
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--cp-primary);
-    background: transparent;
-    color: var(--cp-primary);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-      background: var(--cp-primary);
-      color: var(--cp-panel);
-    }
+    @include cp-pill-button(primary);
   }
 
   &__arrow {
-    background: var(--cp-panel);
+    background: var(--cp-panel-solid);
 
     &::before {
       box-shadow: var(--cp-shadow-soft);

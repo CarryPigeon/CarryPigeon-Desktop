@@ -1,0 +1,201 @@
+/* 样式：统一界面语言 mixin｜职责：把设置页（悬浮玻璃面板）的页面骨架、面板、卡片、
+   标签与控件规格收敛为单一真源，供各 feature 的 scoped 样式复用。
+   边界：只产出声明，不产出选择器；所有颜色/圆角/间距均取自 App.vue 的 --cp-* token。 */
+
+/* 页面骨架：14px 留白 + 12px 节奏；滚动交给内部面板。 */
+@mixin cp-page {
+  height: 100%;
+  min-height: 0;
+  padding: var(--cp-page-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-page-gap);
+}
+
+/* 一级玻璃面板：页面/侧栏/内容区的外壳。 */
+@mixin cp-glass-panel($radius: var(--cp-radius-lg), $shadow: var(--cp-shadow-soft)) {
+  background: var(--cp-surface);
+  backdrop-filter: var(--cp-glass-blur);
+  -webkit-backdrop-filter: var(--cp-glass-blur);
+  border: 1px solid var(--cp-border);
+  border-radius: $radius;
+  box-shadow: $shadow;
+}
+
+/* 内嵌卡片/分组：不投影，保持设置页的层级关系。 */
+@mixin cp-card($radius: var(--cp-radius-card)) {
+  background: var(--cp-panel);
+  border: 1px solid var(--cp-border);
+  border-radius: $radius;
+}
+
+/* 分组/微标签：固定英文标签使用，用户内容禁止 uppercase。 */
+@mixin cp-section-label {
+  font-family: var(--cp-font-display);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cp-text-muted);
+}
+
+/* 分区标题（面板内主标题）。 */
+@mixin cp-section-title {
+  font-family: var(--cp-font-display);
+  font-weight: 900;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: var(--cp-text);
+}
+
+/* 胶囊按钮：tone 支持 default / primary / danger。 */
+@mixin cp-pill-button($tone: default) {
+  min-height: 32px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+
+  &:hover:not(:disabled) {
+    background: var(--cp-hover-bg);
+    border-color: var(--cp-highlight-border);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  @if $tone == primary {
+    border-color: var(--cp-highlight-border-strong);
+    background: var(--cp-highlight-bg);
+
+    &:hover:not(:disabled) {
+      background: var(--cp-highlight-bg-strong);
+      border-color: var(--cp-highlight-border-strong);
+    }
+  } @else if $tone == danger {
+    border-color: var(--cp-danger-border);
+    color: var(--cp-danger);
+
+    &:hover:not(:disabled) {
+      background: var(--cp-danger-bg);
+      border-color: var(--cp-danger-border);
+    }
+  }
+}
+
+/* 分段控件：容器 + 选项必须成对使用。 */
+@mixin cp-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
+}
+
+@mixin cp-segmented-item {
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+
+  &:hover {
+    background: var(--cp-hover-bg);
+    color: var(--cp-text);
+  }
+
+  &[data-active="true"] {
+    background: var(--cp-highlight-bg);
+    border-color: var(--cp-highlight-border);
+    color: var(--cp-text);
+  }
+}
+
+/* 图标按钮：静态无外框，悬停/聚焦才给反馈。 */
+@mixin cp-icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  color: var(--cp-text-muted);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+
+  &:hover:not(:disabled) {
+    background: var(--cp-hover-bg);
+    border-color: var(--cp-border);
+    color: var(--cp-text);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+/* 内联状态条：danger / warn / success / info。 */
+@mixin cp-inline-status($tone: info) {
+  padding: 9px 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-control);
+  font-size: 12px;
+  line-height: 1.5;
+
+  @if $tone == danger {
+    border-color: var(--cp-danger-border);
+    background: var(--cp-danger-bg);
+    color: var(--cp-danger);
+  } @else if $tone == warn {
+    border-color: var(--cp-warn-border);
+    background: var(--cp-warn-bg);
+    color: var(--cp-warn);
+  } @else if $tone == success {
+    border-color: var(--cp-success-border);
+    background: var(--cp-success-bg);
+    color: var(--cp-success);
+  } @else if $tone == info {
+    border-color: var(--cp-info-border);
+    background: var(--cp-info-bg);
+    color: var(--cp-text);
+  }
+}
+
+/* 列表行：统一 padding；相邻行分隔线由调用方按容器结构补齐。 */
+@mixin cp-list-row {
+  padding: 14px 16px;
+}

@@ -189,13 +189,14 @@ function formatTime(ts: number): string {
 </template>
 
 <style scoped lang="scss">
+/* 样式：CodeBlockReviewable｜规格：代码卡片 + 行 hover/选中 highlight + 胶囊按钮 */
 .cp-codeBlock {
-  background: var(--cp-panel, #1e1e2e);
-  border: 1px solid var(--cp-border, #313244);
-  border-radius: 8px;
+  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-control);
   margin: 6px 0;
   overflow: hidden;
-  font-family: ui-monospace, "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-family: var(--cp-font-mono);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -203,9 +204,9 @@ function formatTime(ts: number): string {
 .cp-codeBlock__lang {
   padding: 4px 10px;
   font-size: 11px;
-  color: var(--cp-text-muted, #a6adc8);
-  background: var(--cp-panel-muted, #181825);
-  border-bottom: 1px solid var(--cp-border, #313244);
+  color: var(--cp-text-muted);
+  background: var(--cp-panel);
+  border-bottom: 1px solid var(--cp-border-light);
   text-transform: uppercase;
 }
 
@@ -219,28 +220,29 @@ function formatTime(ts: number): string {
   align-items: start;
   padding: 0 10px 0 0;
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  transition: background-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-codeBlock__line:hover {
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 8%, transparent);
+  background: var(--cp-hover-bg);
 }
 
 .cp-codeBlock__line--active {
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 14%, transparent);
+  background: var(--cp-highlight-bg);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
 }
 
 .cp-codeBlock__lineNumber {
   text-align: right;
   padding: 0 10px;
-  color: var(--cp-text-muted, #6c7086);
+  color: var(--cp-text-light);
   user-select: none;
 }
 
 .cp-codeBlock__lineContent {
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--cp-text, #cdd6f4);
+  color: var(--cp-text);
 }
 
 .cp-codeBlock__commentBadge {
@@ -250,7 +252,8 @@ function formatTime(ts: number): string {
   margin-left: 8px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--cp-accent, #5865f2);
+  background: var(--cp-highlight);
+  /* 徽标反色文字固定白色，保证在 highlight 底色上可读 */
   color: #fff;
   font-size: 10px;
   font-weight: 600;
@@ -258,20 +261,21 @@ function formatTime(ts: number): string {
   text-align: center;
 }
 
+/* 评论/输入区：内嵌卡片 */
 .cp-codeBlock__comments,
 .cp-codeBlock__reviewInput {
   grid-column: 1 / -1;
   margin: 4px 10px 8px 46px;
   padding: 8px;
-  border-radius: 6px;
-  background: var(--cp-panel-muted, #181825);
-  border: 1px solid var(--cp-border, #313244);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-panel);
+  border: 1px solid var(--cp-border-light);
 }
 
 .cp-codeBlock__comment + .cp-codeBlock__comment {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--cp-border, #313244);
+  border-top: 1px solid var(--cp-border-light);
 }
 
 .cp-codeBlock__commentMeta {
@@ -283,16 +287,16 @@ function formatTime(ts: number): string {
 
 .cp-codeBlock__commentAuthor {
   font-weight: 600;
-  color: var(--cp-accent, #89b4fa);
+  color: var(--cp-highlight);
 }
 
 .cp-codeBlock__commentTime {
   font-size: 10px;
-  color: var(--cp-text-muted, #6c7086);
+  color: var(--cp-text-light);
 }
 
 .cp-codeBlock__commentText {
-  color: var(--cp-text, #cdd6f4);
+  color: var(--cp-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -302,22 +306,37 @@ function formatTime(ts: number): string {
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--cp-danger, #f38ba8);
+  color: var(--cp-danger);
   font-size: 11px;
   cursor: pointer;
 }
 
+/* 评论输入：统一字段 token */
 .cp-codeBlock__reviewTextarea {
   width: 100%;
   min-height: 48px;
-  padding: 6px 8px;
-  border: 1px solid var(--cp-border, #313244);
-  border-radius: 4px;
-  background: var(--cp-panel, #1e1e2e);
-  color: var(--cp-text, #cdd6f4);
+  padding: var(--cp-field-pad-y) var(--cp-field-pad-x);
+  border: 1px solid var(--cp-field-border);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-field-bg);
+  color: var(--cp-text);
   font-size: 12px;
+  line-height: 1.5;
   resize: vertical;
   outline: none;
+  box-shadow: var(--cp-inset);
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
+
+  &:hover {
+    border-color: var(--cp-field-border-hover);
+  }
+
+  &:focus {
+    border-color: var(--cp-focus-border);
+    box-shadow: var(--cp-focus-ring, var(--cp-ring));
+  }
 }
 
 .cp-codeBlock__reviewActions {
@@ -326,19 +345,16 @@ function formatTime(ts: number): string {
   margin-top: 6px;
 }
 
+/* 评论动作：胶囊按钮（发送 = 主操作 highlight） */
 .cp-codeBlock__reviewBtn {
-  padding: 4px 10px;
-  border: 1px solid var(--cp-border, #313244);
-  border-radius: 4px;
-  background: var(--cp-panel, #1e1e2e);
-  color: var(--cp-text, #cdd6f4);
-  font-size: 12px;
-  cursor: pointer;
+  @include cp-pill-button;
+
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
 }
 
 .cp-codeBlock__reviewBtn--primary {
-  background: var(--cp-accent, #5865f2);
-  border-color: var(--cp-accent, #5865f2);
-  color: #fff;
+  @include cp-pill-button(primary);
 }
 </style>

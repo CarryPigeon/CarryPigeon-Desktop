@@ -16,7 +16,7 @@ import {
   type BookmarkEntry,
 } from "../storage/localBookmarkStorage";
 import AppIcon from "@/shared/ui/AppIcon.vue";
-import BackButton from "@/shared/ui/BackButton.vue";
+import PageHeader from "@/shared/ui/PageHeader.vue";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 import EmptyState from "@/shared/ui/EmptyState.vue";
 
@@ -87,115 +87,102 @@ function fmtTime(ms: number): string {
 
 <template>
   <ErrorBoundary>
-    <div class="cp-savedMessages">
-      <header class="cp-savedMessages__header">
-        <BackButton test-id="saved-messages-back" @click="router.push('/chat')" />
-        <h1 class="cp-savedMessages__title"><AppIcon name="bookmark" :size="16" :stroke-width="1.75" /> {{ t("saved_messages") }}</h1>
-        <button
-          v-if="bookmarks.length > 0"
-          class="cp-savedMessages__clearAll"
-          type="button"
-          @click="handleClearAll"
-        >
-          {{ t("clear_all") }}
-        </button>
-      </header>
-
-      <div v-if="loading" class="cp-savedMessages__loading">
-        {{ t("loading") }}...
-      </div>
-
-      <EmptyState
-        v-else-if="sortedBookmarks.length === 0"
-        :title="t('no_saved_messages')"
-        :description="t('no_saved_messages_hint')"
+    <main class="cp-savedMessages">
+      <!-- 区块：页面头部｜用途：返回 + 标题 + 清空操作（保留 saved-messages-back 选择器） -->
+      <PageHeader
+        :title="t('saved_messages')"
+        back
+        back-test-id="saved-messages-back"
+        @back="router.push('/chat')"
       >
-        <template #icon>
-          <AppIcon name="bookmark" :size="40" :stroke-width="1.5" />
+        <template #actions>
+          <button
+            v-if="bookmarks.length > 0"
+            class="cp-savedMessages__clearAll"
+            type="button"
+            @click="handleClearAll"
+          >
+            {{ t("clear_all") }}
+          </button>
         </template>
-      </EmptyState>
+      </PageHeader>
 
-      <ul v-else class="cp-savedMessages__list">
-        <li
-          v-for="entry in sortedBookmarks"
-          :key="entry.messageId"
-          class="cp-savedMessages__item"
-          role="button"
-          tabindex="0"
-          @click="handleOpenBookmark(entry)"
-          @keydown.enter="handleOpenBookmark(entry)"
-          @keydown.space.prevent="handleOpenBookmark(entry)"
+      <!-- 区块：内容面板｜用途：一级玻璃面板承载收藏列表 / 空态 / 加载态 -->
+      <section class="cp-savedMessages__panel">
+        <div v-if="loading" class="cp-savedMessages__loading">
+          {{ t("loading") }}...
+        </div>
+
+        <EmptyState
+          v-else-if="sortedBookmarks.length === 0"
+          :title="t('no_saved_messages')"
+          :description="t('no_saved_messages_hint')"
         >
-          <div class="cp-savedMessages__itemBody">
-            <div class="cp-savedMessages__itemTop">
-              <span class="cp-savedMessages__itemSender">{{ entry.senderName || t("unknown") }}</span>
-              <span v-if="entry.channelName" class="cp-savedMessages__itemChannel">
-                #{{ entry.channelName }}
-              </span>
+          <template #icon>
+            <AppIcon name="bookmark" :size="40" :stroke-width="1.5" />
+          </template>
+        </EmptyState>
+
+        <ul v-else class="cp-savedMessages__list">
+          <li
+            v-for="entry in sortedBookmarks"
+            :key="entry.messageId"
+            class="cp-savedMessages__item"
+            role="button"
+            tabindex="0"
+            @click="handleOpenBookmark(entry)"
+            @keydown.enter="handleOpenBookmark(entry)"
+            @keydown.space.prevent="handleOpenBookmark(entry)"
+          >
+            <div class="cp-savedMessages__itemBody">
+              <div class="cp-savedMessages__itemTop">
+                <span class="cp-savedMessages__itemSender">{{ entry.senderName || t("unknown") }}</span>
+                <span v-if="entry.channelName" class="cp-savedMessages__itemChannel">
+                  #{{ entry.channelName }}
+                </span>
+              </div>
+              <div class="cp-savedMessages__itemPreview">
+                {{ entry.contentPreview || `Message ${entry.messageId.slice(-8)}` }}
+              </div>
             </div>
-            <div class="cp-savedMessages__itemPreview">
-              {{ entry.contentPreview || `Message ${entry.messageId.slice(-8)}` }}
+            <div class="cp-savedMessages__itemMeta">
+              <span class="cp-savedMessages__itemTime">{{ fmtTime(entry.bookmarkedAt) }}</span>
+              <button
+                class="cp-savedMessages__itemRemove"
+                type="button"
+                :aria-label="t('remove_bookmark')"
+                :title="t('remove_bookmark')"
+                @click.stop="handleRemove(entry.messageId)"
+              >
+                <AppIcon name="close" />
+              </button>
             </div>
-          </div>
-          <div class="cp-savedMessages__itemMeta">
-            <span class="cp-savedMessages__itemTime">{{ fmtTime(entry.bookmarkedAt) }}</span>
-            <button
-              class="cp-savedMessages__itemRemove"
-              type="button"
-              :aria-label="t('remove_bookmark')"
-              :title="t('remove_bookmark')"
-              @click.stop="handleRemove(entry.messageId)"
-            >
-              <AppIcon name="close" />
-            </button>
-          </div>
-        </li>
-      </ul>
-    </div>
+          </li>
+        </ul>
+      </section>
+    </main>
   </ErrorBoundary>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：SavedMessagesPage｜规格：cp-page 骨架 + PageHeader + 玻璃列表面板 + 行分隔 */
 .cp-savedMessages {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--cp-surface);
+  @include cp-page;
 }
 
-.cp-savedMessages__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--cp-border);
-  flex-shrink: 0;
+/* 列表面板：一级玻璃面板 */
+.cp-savedMessages__panel {
+  @include cp-glass-panel;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
 }
 
-.cp-savedMessages__title {
-  flex: 1;
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--cp-text);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
+/* 清空收藏：危险胶囊 */
 .cp-savedMessages__clearAll {
-  border: 1px solid var(--cp-border);
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--cp-danger);
-  padding: 4px 12px;
-  border-radius: 4px;
-  transition: background-color 0.1s;
-}
-
-.cp-savedMessages__clearAll:hover {
-  background: color-mix(in oklab, var(--cp-danger) 8%, transparent);
+  @include cp-pill-button(danger);
 }
 
 .cp-savedMessages__loading {
@@ -213,23 +200,25 @@ function fmtTime(ms: number): string {
 .cp-savedMessages__list {
   list-style: none;
   margin: 0;
-  padding: 8px;
-  flex: 1;
-  overflow-y: auto;
+  padding: 0;
 }
 
+/* 收藏行：行间 1px 分隔线，hover 只变底色 */
 .cp-savedMessages__item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 12px 14px;
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-savedMessages__item + .cp-savedMessages__item {
+  border-top: 1px solid var(--cp-border-light);
 }
 
 .cp-savedMessages__item:hover {
-  background: color-mix(in oklab, var(--cp-accent) 6%, transparent);
+  background: var(--cp-hover-bg);
 }
 
 .cp-savedMessages__itemBody {
@@ -250,12 +239,15 @@ function fmtTime(ms: number): string {
   color: var(--cp-text);
 }
 
+/* 频道 chip：等宽字体小胶囊 */
 .cp-savedMessages__itemChannel {
+  font-family: var(--cp-font-mono);
   font-size: 11px;
-  color: var(--cp-accent);
-  background: color-mix(in oklab, var(--cp-accent) 10%, transparent);
-  padding: 1px 6px;
-  border-radius: 4px;
+  color: var(--cp-text-muted);
+  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border-light);
+  border-radius: 999px;
+  padding: 1px 8px;
 }
 
 .cp-savedMessages__itemPreview {
@@ -280,22 +272,22 @@ function fmtTime(ms: number): string {
   white-space: nowrap;
 }
 
+/* 移除按钮：图标按钮规格，hover 行时才显现 */
 .cp-savedMessages__itemRemove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--cp-text-muted);
-  padding: 2px 4px;
-  border-radius: 2px;
+  @include cp-icon-button;
+
+  width: 24px;
+  height: 24px;
   opacity: 0;
-  transition: opacity 0.1s, color 0.1s;
+  transition:
+    opacity var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-savedMessages__item:hover .cp-savedMessages__itemRemove {
+.cp-savedMessages__item:hover .cp-savedMessages__itemRemove,
+.cp-savedMessages__itemRemove:focus-visible {
   opacity: 1;
 }
 

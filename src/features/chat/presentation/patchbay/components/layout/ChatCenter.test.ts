@@ -59,11 +59,10 @@ function makeMessage(id: string, timeMs: number): ChatMessage {
  * @returns 与 `messages` 等长的行模型数组。
  */
 function makeRows(messages: readonly ChatMessage[]) {
-  const projections = projectMessageRows(messages, { lastReadTimeMs: 0, lastReadMessageId: "" });
+  const projections = projectMessageRows(messages);
   return messages.map((m, idx) => ({
     m,
     isGroupStart: projections[idx].isGroupStart,
-    isUnreadStart: projections[idx].isUnreadStart,
     showDate: projections[idx].showDate,
   }));
 }

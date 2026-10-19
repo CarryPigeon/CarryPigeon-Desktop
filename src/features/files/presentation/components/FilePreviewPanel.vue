@@ -89,10 +89,17 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
   <Teleport to="body">
     <Transition name="cp-preview">
       <div v-if="visible && file" class="cp-previewOverlay" @click.self="emit('close')">
-        <aside class="cp-previewPanel" @click.stop>
+        <!-- 预览抽屉：一级玻璃面板 + 左侧 18px 圆角 -->
+        <aside class="cp-previewPanel" role="dialog" aria-modal="true" :aria-label="file.filename" @click.stop>
           <header class="cp-previewPanel__head">
             <span class="cp-previewPanel__filename">{{ file.filename }}</span>
-            <button class="cp-previewPanel__close" type="button" @click="emit('close')">
+            <button
+              class="cp-previewPanel__close"
+              type="button"
+              :aria-label="t('close')"
+              :title="t('close')"
+              @click="emit('close')"
+            >
               <AppIcon name="close" />
             </button>
           </header>
@@ -130,16 +137,17 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
             </object>
             <!-- Too Large -->
             <div v-else-if="previewType === 'too-large'" class="cp-previewPanel__placeholder">
-              <span class="cp-previewPanel__bigIcon"><AppIcon name="package" /></span>
+              <span class="cp-previewPanel__bigIcon"><AppIcon name="package" :size="36" /></span>
               <p>{{ t("file_size_too_large") }}</p>
             </div>
             <!-- Other -->
             <div v-else class="cp-previewPanel__placeholder">
-              <span class="cp-previewPanel__bigIcon"><AppIcon :name="getTypeIcon(file.mimeType)" /></span>
+              <span class="cp-previewPanel__bigIcon"><AppIcon :name="getTypeIcon(file.mimeType)" :size="36" /></span>
               <p>{{ t("file_no_preview") }}</p>
             </div>
           </div>
 
+          <!-- 元信息：分组行的轻分隔线 -->
           <div class="cp-previewPanel__meta">
             <div class="cp-previewPanel__metaRow">
               <span class="cp-previewPanel__metaLabel">{{ t("file_type") }}</span>
@@ -167,16 +175,16 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
 
           <div class="cp-previewPanel__actions">
             <button class="cp-previewPanel__actionBtn" type="button" @click="emit('download', file)">
-              <AppIcon name="download" /> {{ t("download") }}
+              <AppIcon name="download" :size="14" /> {{ t("download") }}
             </button>
             <button class="cp-previewPanel__actionBtn cp-previewPanel__actionBtn--danger" type="button" @click="emit('delete', file)">
-              <AppIcon name="delete" /> {{ t("file_delete") }}
+              <AppIcon name="delete" :size="14" /> {{ t("file_delete") }}
             </button>
             <button v-if="file.channelId" class="cp-previewPanel__actionBtn" type="button" @click="emit('openChannel', file)">
-              <AppIcon name="chat" /> {{ t("file_open_channel") }}
+              <AppIcon name="chat" :size="14" /> {{ t("file_open_channel") }}
             </button>
             <button class="cp-previewPanel__actionBtn" type="button" @click="handleCopyLink(file)">
-              <AppIcon name="link" /> {{ t("file_copy_link") }}
+              <AppIcon name="link" :size="14" /> {{ t("file_copy_link") }}
             </button>
           </div>
         </aside>
@@ -186,77 +194,75 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
 </template>
 
 <style scoped lang="scss">
+/* 样式：文件预览抽屉｜规格：玻璃面板 + 模糊遮罩 + 左侧 18px 圆角 + 状态 token */
 .cp-previewOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
   display: flex;
   justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 9000;
 }
 
+/* 抽屉面板：一级玻璃面板，仅左侧圆角 */
 .cp-previewPanel {
-  width: 420px;
-  max-width: 90vw;
+  @include cp-glass-panel;
+
+  width: 430px;
+  max-width: 92vw;
   height: 100%;
-  background: var(--cp-surface);
-  border-left: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg) 0 0 var(--cp-radius-lg);
   display: flex;
   flex-direction: column;
-  box-shadow: var(--cp-shadow-strong);
+  overflow: hidden;
 }
 
 .cp-previewPanel__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid var(--cp-border);
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--cp-border-light);
 }
 
 .cp-previewPanel__filename {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--cp-text);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.cp-previewPanel__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: var(--cp-text-muted);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.cp-previewPanel__close:hover {
-  background: var(--cp-hover-bg);
+  font-family: var(--cp-font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
   color: var(--cp-text);
 }
 
+/* 关闭：统一图标按钮规格 */
+.cp-previewPanel__close {
+  @include cp-icon-button;
+
+  flex: 0 0 auto;
+}
+
 .cp-previewPanel__body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 200px;
   overflow: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: #00000008;
-  min-height: 200px;
+  background: var(--cp-panel-muted);
 }
 
 .cp-previewPanel__media {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-control);
 }
 
 .cp-previewPanel__audio {
@@ -268,47 +274,66 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
   height: 100%;
   min-height: 400px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-control);
 }
 
 .cp-previewPanel__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-align: center;
   color: var(--cp-text-muted);
   font-size: 13px;
 }
 
 .cp-previewPanel__bigIcon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-card);
+  background: var(--cp-panel);
+  color: var(--cp-text-muted);
 }
 
+/* 元信息分组：行之间 1px 细分隔线 */
 .cp-previewPanel__meta {
-  padding: 16px;
-  border-top: 1px solid var(--cp-border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 4px 16px 8px;
+  border-top: 1px solid var(--cp-border-light);
 }
 
 .cp-previewPanel__metaRow {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
+  gap: 16px;
+  padding: 9px 0;
   font-size: 12px;
 }
 
+.cp-previewPanel__metaRow + .cp-previewPanel__metaRow {
+  border-top: 1px solid var(--cp-border-light);
+}
+
 .cp-previewPanel__metaLabel {
+  flex: 0 0 auto;
   color: var(--cp-text-muted);
 }
 
 .cp-previewPanel__metaValue {
+  min-width: 0;
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
   color: var(--cp-text);
-  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .cp-previewPanel__channelValue {
-  color: var(--cp-accent, #3b82f6);
+  color: var(--cp-accent);
   cursor: pointer;
 }
 
@@ -318,51 +343,46 @@ async function handleCopyLink(file: FileRecord): Promise<void> {
 
 .cp-previewPanel__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid var(--cp-border);
-  flex-wrap: wrap;
+  border-top: 1px solid var(--cp-border-light);
 }
 
+/* 动作：胶囊按钮（危险操作用状态 token） */
 .cp-previewPanel__actionBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color var(--cp-fast) var(--cp-ease);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+  @include cp-pill-button;
 
-.cp-previewPanel__actionBtn:hover {
-  border-color: var(--cp-highlight-border);
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
 .cp-previewPanel__actionBtn--danger {
-  color: #e74c3c;
-  border-color: #e74c3c;
+  @include cp-pill-button(danger);
+
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
-/* Transition */
+/* Transition：遮罩淡入 + 抽屉右侧滑入 */
 .cp-preview-enter-active,
 .cp-preview-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity var(--cp-fast) var(--cp-ease);
 }
+
 .cp-preview-enter-from,
 .cp-preview-leave-to {
   opacity: 0;
 }
+
 .cp-preview-enter-active .cp-previewPanel,
 .cp-preview-leave-active .cp-previewPanel {
-  transition: transform 0.2s ease;
+  transition: transform var(--cp-slow) var(--cp-ease);
 }
-.cp-preview-enter-from .cp-previewPanel {
-  transform: translateX(100%);
-}
+
+.cp-preview-enter-from .cp-previewPanel,
 .cp-preview-leave-to .cp-previewPanel {
   transform: translateX(100%);
 }

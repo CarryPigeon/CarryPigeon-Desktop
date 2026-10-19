@@ -50,13 +50,12 @@ const stageLabel = computed(computeStageLabel);
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；进度卡包含标题行、进度条与消息行。 */
+/* 样式：安装/更新进度｜规格：info 状态 token + 6px 进度条 + 微标签阶段名 */
 .cp-module-progress {
-  border: 1px solid color-mix(in oklab, var(--cp-info) 22%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel));
-  border-radius: 16px;
-  padding: 12px 12px 10px 12px;
-  box-shadow: var(--cp-shadow-soft);
+  padding: 10px 12px;
+  border: 1px solid var(--cp-info-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-info-bg);
 }
 
 .cp-module-progress__row {
@@ -66,26 +65,25 @@ const stageLabel = computed(computeStageLabel);
   gap: 12px;
 }
 
+/* 阶段名：微标签（固定英文状态 + 中文都保持小号大写字距） */
 .cp-module-progress__stage {
-  font-family: var(--cp-font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 12px;
+  @include cp-section-label;
+
+  font-size: 11px;
   color: var(--cp-text);
 }
 
 .cp-module-progress__pct {
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--cp-text-muted);
 }
 
 .cp-module-progress__bar {
   margin-top: 8px;
-  height: 10px;
+  height: 6px;
   border-radius: 999px;
-  border: 1px solid var(--cp-border);
-  background: rgba(148, 163, 184, 0.10);
+  background: var(--cp-border-light);
   overflow: hidden;
 }
 
@@ -95,15 +93,15 @@ const stageLabel = computed(computeStageLabel);
   background: linear-gradient(
     90deg,
     color-mix(in oklab, var(--cp-info) 92%, transparent),
-    color-mix(in oklab, var(--cp-accent) 92%, transparent)
+    var(--cp-accent)
   );
-  box-shadow: 0 10px 24px color-mix(in oklab, var(--cp-info) 18%, transparent);
   transition: width var(--cp-slow) var(--cp-ease);
 }
 
 .cp-module-progress__msg {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
 }
 </style>

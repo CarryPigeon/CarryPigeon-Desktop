@@ -457,6 +457,8 @@ watch(
 </template>
 
 <style scoped lang="scss">
+/* 样式：ImageLightbox｜说明：全屏灯箱是固定深色媒体层，其黑底/白字与半透明白色控件
+   不随主题切换（媒体浏览需要的对比度），因此仅统一圆角/字体 token，不改为主题色。 */
 .cp-lightbox__backdrop {
   position: fixed;
   inset: 0;
@@ -491,7 +493,7 @@ watch(
 }
 
 .cp-lightbox__counter {
-  font-family: var(--cp-font-mono, monospace);
+  font-family: var(--cp-font-mono);
   font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
 }
@@ -514,7 +516,7 @@ watch(
   color: #fff;
   font-size: 16px;
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background var(--cp-fast) var(--cp-ease);
 }
 
 .cp-lightbox__actionBtn:hover:not(:disabled) {
@@ -538,7 +540,7 @@ watch(
   color: #fff;
   font-size: 18px;
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background var(--cp-fast) var(--cp-ease);
 }
 
 .cp-lightbox__closeBtn:hover {
@@ -568,7 +570,7 @@ watch(
   max-width: 90vw;
   max-height: 80vh;
   object-fit: contain;
-  transition: transform 200ms ease;
+  transition: transform var(--cp-slow) var(--cp-ease);
   will-change: transform;
 }
 
@@ -593,8 +595,8 @@ watch(
   display: grid;
   place-items: center;
   cursor: pointer;
-  border-radius: 8px;
-  transition: background 120ms ease;
+  border-radius: var(--cp-radius-sm);
+  transition: background var(--cp-fast) var(--cp-ease);
 }
 
 .cp-lightbox__arrow:hover {
@@ -623,13 +625,13 @@ watch(
   flex-shrink: 0;
   width: 48px;
   height: 48px;
-  border-radius: 6px;
+  border-radius: var(--cp-radius-sm);
   overflow: hidden;
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
   background: transparent;
-  transition: border-color 120ms ease, opacity 120ms ease;
+  transition: border-color var(--cp-fast) var(--cp-ease), opacity var(--cp-fast) var(--cp-ease);
   opacity: 0.6;
 }
 
@@ -658,13 +660,13 @@ watch(
   display: flex;
   gap: 16px;
   padding: 6px 16px;
-  border-radius: 20px;
+  border-radius: 999px;
   background: rgba(0, 0, 0, 0.5);
   color: rgba(255, 255, 255, 0.5);
   font-size: 11px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 300ms ease;
+  transition: opacity var(--cp-slow) var(--cp-ease);
   align-items: center;
 }
 

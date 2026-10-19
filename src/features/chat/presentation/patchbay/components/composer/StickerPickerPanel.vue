@@ -246,37 +246,35 @@ watch(customEmojis, async (newEmojis) => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：StickerPickerPanel｜规格：不透明浮层面板 + 分段 Tab + 表情网格 + 上传弹窗 */
 .cp-stickerPanel {
   width: 360px;
-  background: var(--cp-panel);
-  border-radius: 12px;
+  background: var(--cp-panel-solid);
+  border-radius: var(--cp-radius-card);
   border: 1px solid var(--cp-border);
   overflow: hidden;
 }
 
+/* Tab 行：设置页分段控件 */
 .cp-stickerPanel__tabs {
-  display: flex;
-  gap: 4px;
-  padding: 8px 8px 0;
+  @include cp-segmented;
+
+  width: calc(100% - 16px);
+  margin: 8px 8px 0;
 }
 
 .cp-stickerPanel__tab {
-  flex: 1;
-  padding: 4px 8px;
-  border: 1px solid var(--cp-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--cp-text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background var(--cp-fast) var(--cp-ease), color var(--cp-fast) var(--cp-ease);
+  @include cp-segmented-item;
+
+  flex: 1 1 0;
 }
 
+/* 激活态与 mixin 的 data-active 视觉一致（本组件用 .active 类标记） */
 .cp-stickerPanel__tab.active {
-  background: var(--cp-accent);
-  color: #fff;
-  border-color: var(--cp-accent);
+  background: var(--cp-highlight-bg);
+  border-color: var(--cp-highlight-border);
+  color: var(--cp-text);
 }
 
 .cp-stickerPanel__body {
@@ -287,7 +285,7 @@ watch(customEmojis, async (newEmojis) => {
 
 .cp-stickerPanel__loading {
   text-align: center;
-  color: var(--cp-text-secondary);
+  color: var(--cp-text-muted);
   font-size: 13px;
   padding: 20px;
 }
@@ -305,11 +303,11 @@ watch(customEmojis, async (newEmojis) => {
   width: 100%;
   aspect-ratio: 1;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   background: transparent;
   cursor: pointer;
   padding: 4px;
-  transition: background var(--cp-fast) var(--cp-ease);
+  transition: background-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-stickerPanel__sticker:hover {
@@ -330,17 +328,19 @@ watch(customEmojis, async (newEmojis) => {
   justify-content: center;
   gap: 2px;
   border: 1px dashed var(--cp-border);
-  border-radius: 8px;
+  border-radius: var(--cp-radius-sm);
   background: transparent;
   cursor: pointer;
   color: var(--cp-text-muted);
   font-size: 11px;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-stickerPanel__addBtn:hover {
-  border-color: var(--cp-accent);
-  color: var(--cp-accent);
+  border-color: var(--cp-highlight-border-strong);
+  color: var(--cp-highlight);
 }
 
 .cp-stickerPanel__addIcon {
@@ -352,27 +352,31 @@ watch(customEmojis, async (newEmojis) => {
   font-size: 11px;
 }
 
-/* Upload dialog */
+/* 上传弹窗：一级浮层（不透明底 + 16px 圆角 + 浮层阴影） */
 .cp-stickerDialog__backdrop {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.4);
+  background: color-mix(in oklab, var(--cp-text) 38%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .cp-stickerDialog {
-  background: var(--cp-panel);
-  border-radius: 16px;
+  background: var(--cp-panel-solid);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-card);
   padding: 20px 24px;
   min-width: 320px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--cp-shadow-float);
 }
 
 .cp-stickerDialog__title {
+  font-family: var(--cp-font-display);
+  font-weight: 700;
   font-size: 16px;
+  line-height: 1.3;
   color: var(--cp-text);
   margin: 0 0 16px;
 }
@@ -384,16 +388,18 @@ watch(customEmojis, async (newEmojis) => {
 .cp-stickerDialog__label {
   display: block;
   font-size: 12px;
-  color: var(--cp-text-secondary);
+  line-height: 1.4;
+  color: var(--cp-text-muted);
   margin-bottom: 4px;
 }
 
 .cp-stickerDialog__input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--cp-border);
-  border-radius: 8px;
-  background: var(--cp-panel-muted);
+  height: var(--cp-field-height);
+  padding: 0 var(--cp-field-pad-x);
+  border: 1px solid var(--cp-field-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-field-bg);
   color: var(--cp-text);
   font-size: 13px;
   box-sizing: border-box;
@@ -406,24 +412,33 @@ watch(customEmojis, async (newEmojis) => {
   margin-top: 16px;
 }
 
+/* 弹窗按钮：设置页胶囊按钮 */
 .cp-stickerDialog__btn {
-  padding: 8px 16px;
+  min-height: 32px;
+  padding: 0 14px;
   border: 1px solid var(--cp-border);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--cp-panel-muted);
   color: var(--cp-text);
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.4;
   cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-stickerDialog__btn--primary {
-  background: var(--cp-accent);
-  color: white;
-  border-color: var(--cp-accent);
+  border-color: var(--cp-highlight-border-strong);
+  background: var(--cp-highlight-bg);
+}
+
+.cp-stickerDialog__btn--primary:hover:not(:disabled) {
+  background: var(--cp-highlight-bg-strong);
 }
 
 .cp-stickerDialog__btn--primary:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 </style>

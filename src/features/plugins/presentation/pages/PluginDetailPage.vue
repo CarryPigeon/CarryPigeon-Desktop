@@ -263,139 +263,134 @@ onMounted(handleMounted);
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；主体为两列网格，底部为动作按钮行。 */
+/* 样式：插件详情页｜布局：PageHeader 风格头部 + 一级玻璃内容面板 + 内嵌分组卡 */
 .cp-plugin-detail {
-  height: 100%;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  @include cp-page;
 }
 
+/* 头部：一级玻璃面板，与 PageHeader 同规格 */
 .cp-plugin-detail__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
+  @include cp-glass-panel;
+
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
+  gap: 12px;
+  padding: var(--cp-page-pad);
 }
 
 .cp-plugin-detail__name {
   font-family: var(--cp-font-display);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-weight: 900;
   font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
   color: var(--cp-text);
 }
 
 .cp-plugin-detail__meta {
-  margin-top: 8px;
-  display: inline-flex;
+  margin-top: 6px;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .cp-plugin-detail__mono {
+  min-width: 0;
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .cp-plugin-detail__dot {
-  width: 4px;
-  height: 4px;
+  flex: 0 0 auto;
+  width: 3px;
+  height: 3px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.5);
+  background: var(--cp-text-light);
 }
 
 .cp-plugin-detail__badges {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
-  flex-wrap: wrap;
 }
 
+/* 内容面板：一级玻璃，内部滚动 */
 .cp-plugin-detail__body {
+  @include cp-glass-panel;
+
   flex: 1 1 auto;
   min-height: 0;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 12px;
+  padding: 16px;
 }
 
+/* 内嵌分组卡：无阴影 */
 .cp-plugin-detail__card {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  padding: 12px;
+  @include cp-card;
+
+  padding: 14px;
 }
 
 .cp-plugin-detail__card.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 28%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
+  border-color: var(--cp-danger-border);
+  background: var(--cp-danger-bg);
 }
 
 .cp-plugin-detail__k {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
 }
 
 .cp-plugin-detail__v {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
   color: var(--cp-text);
-  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .cp-plugin-detail__vRow {
   margin-top: 10px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cp-plugin-detail__pill {
   padding: 6px 10px;
-  border-radius: 999px;
   border: 1px solid var(--cp-border);
+  border-radius: 999px;
   background: var(--cp-panel-muted);
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .cp-plugin-detail__ports {
   margin-top: 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
 .cp-plugin-detail__port {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-border) 70%, transparent);
+  box-shadow: 0 0 0 3px var(--cp-border-light);
 }
 
 .cp-plugin-detail__portsText {
@@ -410,20 +405,21 @@ onMounted(handleMounted);
   gap: 8px;
 }
 
+/* 权限行：内嵌分组卡 + high/medium 状态 token */
 .cp-plugin-detail__perm {
   display: grid;
-  grid-template-columns: 96px 1fr auto;
-  gap: 10px;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
   align-items: center;
-  padding: 10px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--cp-border);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
   background: var(--cp-panel-muted);
 }
 
 .cp-plugin-detail__permKey {
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--cp-text-muted);
 }
 
@@ -433,23 +429,22 @@ onMounted(handleMounted);
 }
 
 .cp-plugin-detail__permRisk {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  @include cp-section-label;
+
   font-size: 11px;
-  color: var(--cp-text-muted);
 }
 
 .cp-plugin-detail__perm[data-risk="high"] {
-  border-color: color-mix(in oklab, var(--cp-danger) 28%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
+  border-color: var(--cp-danger-border);
+  background: var(--cp-danger-bg);
 }
 
 .cp-plugin-detail__perm[data-risk="medium"] {
-  border-color: color-mix(in oklab, var(--cp-warn) 28%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel-muted));
+  border-color: var(--cp-warn-border);
+  background: var(--cp-warn-bg);
 }
 
+/* installed 三列键值 */
 .cp-plugin-detail__kv {
   margin-top: 10px;
   display: grid;
@@ -458,15 +453,16 @@ onMounted(handleMounted);
 }
 
 .cp-plugin-detail__kvItem {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  border-radius: 14px;
   padding: 10px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
 }
 
 .cp-plugin-detail__kvK {
-  font-size: 11px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
+
+  font-size: 10.5px;
 }
 
 .cp-plugin-detail__kvV {
@@ -474,62 +470,53 @@ onMounted(handleMounted);
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text);
+  overflow-wrap: anywhere;
 }
 
 .cp-plugin-detail__actions {
   grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* 动作按钮：主操作 highlight、危险默认 */
 .cp-plugin-detail__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 9px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-plugin-detail__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-plugin-detail__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
+  @include cp-pill-button;
 }
 
 .cp-plugin-detail__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  @include cp-pill-button(primary);
 }
 
-.cp-plugin-detail__btn.primary:hover {
-  border-color: rgba(34, 197, 94, 0.42);
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
-}
-
+/* 空态面板：一级玻璃 + 居中 */
 .cp-plugin-detail__empty {
+  @include cp-glass-panel;
+
   flex: 1 1 auto;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
   display: grid;
   place-items: center;
+  align-content: center;
   gap: 12px;
+  padding: 32px;
 }
 
 .cp-plugin-detail__emptyText {
+  font-size: 13px;
   color: var(--cp-text-muted);
+}
+
+/* 响应式：窄窗口内容单列 */
+@media (max-width: 900px) {
+  .cp-plugin-detail__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .cp-plugin-detail {
+    padding: 10px;
+    gap: 10px;
+  }
 }
 </style>

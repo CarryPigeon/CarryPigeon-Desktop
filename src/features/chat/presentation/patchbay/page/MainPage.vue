@@ -35,10 +35,11 @@ let activeResizeCleanup: (() => void) | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let resizeFrame = 0;
 
+// 布局预算按 .cp-main 的「内容盒宽度」计算：页面 8px 留白由内容盒天然排除，
+// 四栏共享一张玻璃面板，resizer 以负 margin 叠在交界处净占 0 宽，故无额外固定开销。
 const layoutMetrics = {
-  horizontalPadding: 14,
-  resizers: 24,
-  gaps: 36,
+  resizers: 0,
+  gaps: 0,
   messageMin: 240,
 } as const;
 
@@ -96,27 +97,44 @@ function applyResizeDelta(
     channelWidth.value = nextChannelWidth;
     preferredServerWidth.value = nextServerWidth;
     preferredChannelWidth.value = nextChannelWidth;
-    if (mainEl.value) fitSideRailsToContainer(mainEl.value.getBoundingClientRect().width);
+    if (mainEl.value) refitSideRails();
     return;
   }
 
   if (kind === "channel-message") {
     channelWidth.value = clampWidth(startChannelWidth + delta, railBounds.channel.min, railBounds.channel.max);
     preferredChannelWidth.value = channelWidth.value;
-    if (mainEl.value) fitSideRailsToContainer(mainEl.value.getBoundingClientRect().width);
+    if (mainEl.value) refitSideRails();
     return;
   }
 
   membersWidth.value = clampWidth(startMembersWidth - delta, railBounds.members.min, railBounds.members.max);
   preferredMembersWidth.value = membersWidth.value;
-  if (mainEl.value) fitSideRailsToContainer(mainEl.value.getBoundingClientRect().width);
+  if (mainEl.value) refitSideRails();
+}
+
+// 布局预算按「内容盒宽度」计算：窗口路径用 border-box 宽度减去计算后的左右 padding，
+// 与 ResizeObserver 的 contentRect.width 保持同一口径（.cp-main 的 8px 页面留白不计入预算）。
+function measureMainContentWidth(): number {
+  const el = mainEl.value;
+  if (!el) return document.documentElement.clientWidth;
+  const rect = el.getBoundingClientRect();
+  const styles = getComputedStyle(el);
+  const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
+  const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
+  return Math.max(0, rect.width - paddingLeft - paddingRight);
+}
+
+// 拖拽/窗口变化后按实测内容盒宽度重新分配两侧栏宽度。
+function refitSideRails(): void {
+  fitSideRailsToContainer(measureMainContentWidth());
 }
 
 function sideRailBudget(containerWidth: number): number {
   const membersMin = page.rightRailOpen ? railBounds.members.min : 0;
   return Math.max(
     railBounds.server.min + railBounds.channel.min + membersMin,
-    containerWidth - layoutMetrics.horizontalPadding - layoutMetrics.resizers - layoutMetrics.gaps - layoutMetrics.messageMin,
+    containerWidth - layoutMetrics.resizers - layoutMetrics.gaps - layoutMetrics.messageMin,
   );
 }
 
@@ -155,8 +173,7 @@ function fitSideRailsToViewport(): void {
   if (resizeFrame !== 0) cancelAnimationFrame(resizeFrame);
   resizeFrame = requestAnimationFrame(() => {
     resizeFrame = 0;
-    const mainWidth = mainEl.value?.getBoundingClientRect().width ?? document.documentElement.clientWidth;
-    fitSideRailsToContainer(Math.min(mainWidth, document.documentElement.clientWidth));
+    refitSideRails();
   });
 }
 
@@ -203,8 +220,9 @@ function startResize(kind: "server-channel" | "channel-message" | "message-membe
 
 onMounted(() => {
   resizeObserver = new ResizeObserver((entries) => {
+    // contentRect 已是内容盒宽度（不含 .cp-main 的页面留白），可直接作为预算基准。
     const width = entries[0]?.contentRect.width;
-    if (typeof width === "number") fitSideRailsToContainer(Math.min(width, document.documentElement.clientWidth));
+    if (typeof width === "number") fitSideRailsToContainer(width);
   });
   if (mainEl.value) resizeObserver.observe(mainEl.value);
   window.addEventListener("resize", fitSideRailsToViewport);

@@ -284,55 +284,64 @@ onUnmounted(() => {
         @back="router.back()"
       />
 
-      <FileSearchBar @search="handleSearch" />
-
-      <FileToolbar
-        :sort-by="sortBy"
-        :sort-order="sortOrder"
-        :selected-count="selectedIds.size"
-        @update:sort-by="handleSort"
-        @update:sort-order="handleSortOrderChange"
-        @batch-delete="handleBatchDeleteRequest"
-        @clear-selection="handleClearSelection"
-      />
-
-      <div v-if="loading" class="cp-fileManager__skeleton">
-        <div v-for="i in 5" :key="i" class="cp-fileManager__skeletonRow">
-          <SkeletonBlock variant="text" width="60%" />
-          <SkeletonBlock variant="text" width="30%" />
-          <SkeletonBlock variant="text" width="10%" />
+      <!-- 区块：一级玻璃面板｜用途：搜索 / 工具条 / 列表共用同一承载面 -->
+      <section class="cp-fileManager__panel">
+        <div class="cp-fileManager__searchZone">
+          <FileSearchBar @search="handleSearch" />
         </div>
-      </div>
 
-      <div v-else-if="error" class="cp-fileManager__error">
-        <p>{{ error }}</p>
-        <button class="cp-fileManager__retryBtn" type="button" @click="loadFiles(true)">{{ t("retry") }}</button>
-      </div>
-
-      <FileListTable
-        v-else
-        :files="files"
-        :sort-by="sortBy"
-        :sort-order="sortOrder"
-        :selected-ids="selectedIds"
-        :loading="loading"
-        @sort="handleSort"
-        @toggle-select="handleToggleSelect"
-        @select-all="handleSelectAll"
-        @deselect-all="handleDeselectAll"
-        @download="handleDownload"
-        @delete="handleDeleteRequest"
-        @preview="handlePreview"
-        @open-channel="handleOpenChannel"
-        @copy-link="handleCopyLink"
-      />
-
-      <!-- Infinite scroll sentinel -->
-      <div ref="sentinelRef" class="cp-fileManager__sentinel">
-        <div v-if="loadingMore" class="cp-fileManager__loadingMore">
-          <span>{{ t("loading") }}</span>
+        <div class="cp-fileManager__toolZone">
+          <FileToolbar
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            :selected-count="selectedIds.size"
+            @update:sort-by="handleSort"
+            @update:sort-order="handleSortOrderChange"
+            @batch-delete="handleBatchDeleteRequest"
+            @clear-selection="handleClearSelection"
+          />
         </div>
-      </div>
+
+        <div class="cp-fileManager__list">
+          <div v-if="loading" class="cp-fileManager__skeleton">
+            <div v-for="i in 5" :key="i" class="cp-fileManager__skeletonRow">
+              <SkeletonBlock variant="text" width="60%" />
+              <SkeletonBlock variant="text" width="30%" />
+              <SkeletonBlock variant="text" width="10%" />
+            </div>
+          </div>
+
+          <div v-else-if="error" class="cp-fileManager__error">
+            <p>{{ error }}</p>
+            <button class="cp-fileManager__retryBtn" type="button" @click="loadFiles(true)">{{ t("retry") }}</button>
+          </div>
+
+          <FileListTable
+            v-else
+            :files="files"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            :selected-ids="selectedIds"
+            :loading="loading"
+            @sort="handleSort"
+            @toggle-select="handleToggleSelect"
+            @select-all="handleSelectAll"
+            @deselect-all="handleDeselectAll"
+            @download="handleDownload"
+            @delete="handleDeleteRequest"
+            @preview="handlePreview"
+            @open-channel="handleOpenChannel"
+            @copy-link="handleCopyLink"
+          />
+
+          <!-- Infinite scroll sentinel -->
+          <div ref="sentinelRef" class="cp-fileManager__sentinel">
+            <div v-if="loadingMore" class="cp-fileManager__loadingMore">
+              <span>{{ t("loading") }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Preview Panel -->
       <FilePreviewPanel
@@ -360,50 +369,78 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
+/* 样式：文件管理页｜布局：PageHeader + 一级玻璃面板（搜索/工具条/列表）｜约束：列表在面板内滚动 */
 .cp-fileManager {
-  height: 100%;
-  padding: 14px;
+  @include cp-page;
+}
+
+/* 一级玻璃面板：搜索 / 工具条 / 列表共用同一承载面 */
+.cp-fileManager__panel {
+  @include cp-glass-panel;
+
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
-.cp-fileManager__head {
-  /* 旧 head 样式已迁移至 PageHeader 组件 */
+/* 搜索区：面板内上留白 */
+.cp-fileManager__searchZone {
+  padding: 14px 14px 10px;
 }
 
+/* 工具条区：与列表之间用细分隔线分隔 */
+.cp-fileManager__toolZone {
+  padding: 0 14px 12px;
+  border-bottom: 1px solid var(--cp-border-light);
+}
+
+/* 列表滚动容器：面板内唯一滚动区 */
+.cp-fileManager__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 骨架行：与数据行同高（48px） */
 .cp-fileManager__skeleton {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 8px 0;
 }
 
 .cp-fileManager__skeletonRow {
   display: flex;
-  gap: 16px;
   align-items: center;
-  padding: 12px 16px;
-  background: var(--cp-surface);
-  border-radius: 12px;
+  gap: 16px;
+  min-height: 48px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--cp-border-light);
 }
 
+/* 错误态：danger 状态条 + 重试胶囊 */
 .cp-fileManager__error {
+  @include cp-inline-status(danger);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 16px;
+  padding: 28px 20px;
   text-align: center;
-  padding: 40px;
-  color: var(--cp-text-muted);
+}
+
+.cp-fileManager__error p {
+  margin: 0;
 }
 
 .cp-fileManager__retryBtn {
-  margin-top: 12px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 13px;
-  cursor: pointer;
+  @include cp-pill-button;
+
+  background: var(--cp-panel);
 }
 
 .cp-fileManager__sentinel {
@@ -411,9 +448,23 @@ onUnmounted(() => {
 }
 
 .cp-fileManager__loadingMore {
-  text-align: center;
   padding: 20px;
-  color: var(--cp-text-muted);
+  text-align: center;
   font-size: 12px;
+  color: var(--cp-text-muted);
+}
+
+/* 响应式：≤640px 压缩页面留白 */
+@media (max-width: 640px) {
+  .cp-fileManager {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .cp-fileManager__searchZone,
+  .cp-fileManager__toolZone {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
 }
 </style>

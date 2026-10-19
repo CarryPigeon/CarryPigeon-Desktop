@@ -6,6 +6,7 @@
 
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
+import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useJoinApplicationsPage } from "@/features/chat/room-governance/presentation/page-models/useJoinApplicationsPage";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
@@ -37,40 +38,52 @@ const {
       <template #loading>{{ t("loading") }}</template>
       <template #default>
         <div v-if="pendingApplications.length === 0" class="cp-apps__empty">{{ t("no_applications") }}</div>
-        <div v-for="a in pendingApplications" :key="a.applicationId" class="cp-appCard">
-          <AvatarBadge :name="a.nickname || a.uid" :size="40" />
-          <div class="cp-appCard__info">
-            <div class="cp-appCard__name">{{ a.nickname || a.uid }}</div>
-            <div class="cp-appCard__reason">
-              <span class="cp-appCard__label">{{ t("application_reason") }}:</span>
-              {{ a.reason || "—" }}
+        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
+        <PanelGroup v-else>
+          <div v-for="a in pendingApplications" :key="a.applicationId" class="cp-appCard">
+            <AvatarBadge :name="a.nickname || a.uid" :size="40" />
+            <div class="cp-appCard__info">
+              <div class="cp-appCard__name">{{ a.nickname || a.uid }}</div>
+              <div class="cp-appCard__reason">
+                <span class="cp-appCard__label">{{ t("application_reason") }}:</span>
+                {{ a.reason || "—" }}
+              </div>
+              <div class="cp-appCard__time">{{ t("applied_at") }}: {{ formatApplyTime(a.applyTime) }}</div>
             </div>
-            <div class="cp-appCard__time">{{ t("applied_at") }}: {{ formatApplyTime(a.applyTime) }}</div>
+            <div v-if="canDecide" class="cp-appCard__actions">
+              <button class="cp-appCard__btn approve" type="button" @click="handleDecide(a.applicationId, true)">
+                {{ t("approve") }}
+              </button>
+              <button class="cp-appCard__btn reject" type="button" @click="handleDecide(a.applicationId, false)">
+                {{ t("reject") }}
+              </button>
+            </div>
           </div>
-          <div v-if="canDecide" class="cp-appCard__actions">
-            <button class="cp-appCard__btn approve" type="button" @click="handleDecide(a.applicationId, true)">
-              {{ t("approve") }}
-            </button>
-            <button class="cp-appCard__btn reject" type="button" @click="handleDecide(a.applicationId, false)">
-              {{ t("reject") }}
-            </button>
-          </div>
-        </div>
+        </PanelGroup>
       </template>
     </GovernancePageShell>
   </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">
+/* 样式：JoinApplicationsPage｜规格：分组行（容器 + 分隔线 + hover）+ 胶囊按钮 */
+/* 申请行：分组容器内的一行；相邻行 1px 细分隔线 */
 .cp-appCard {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 12px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
+  padding: 12px 14px;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-appCard + .cp-appCard {
+  border-top: 1px solid var(--cp-border-light);
+}
+
+/* 行 hover 只变底色，不做位移 */
+.cp-appCard:hover {
+  background: var(--cp-hover-bg);
 }
 
 .cp-appCard__info {
@@ -78,13 +91,13 @@ const {
 }
 
 .cp-appCard__name {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--cp-text);
-  font-weight: 500;
 }
 
 .cp-appCard__reason {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--cp-text);
   line-height: 1.4;
@@ -95,7 +108,7 @@ const {
 }
 
 .cp-appCard__time {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 11px;
   color: var(--cp-text-muted);
 }
@@ -107,43 +120,28 @@ const {
 }
 
 .cp-appCard__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-.cp-appCard__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-}
-
+/* 通过 = 授予访问（accent）；拒绝 = danger */
 .cp-appCard__btn.approve {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 10%, var(--cp-panel-muted));
+  border-color: color-mix(in oklab, var(--cp-accent) 40%, var(--cp-border));
+  background: var(--cp-accent-soft);
 }
 
 .cp-appCard__btn.approve:hover {
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
+  border-color: color-mix(in oklab, var(--cp-accent) 58%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-accent) 20%, transparent);
 }
 
 .cp-appCard__btn.reject {
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
-}
-
-.cp-appCard__btn.reject:hover {
-  background: color-mix(in oklab, var(--cp-danger) 18%, var(--cp-hover-bg));
+  @include cp-pill-button(danger);
 }
 
 .cp-apps__empty {
-  padding: 20px;
+  padding: 24px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--cp-text-muted);
 }
 </style>

@@ -81,17 +81,15 @@ const announcement = computed(computeAnnouncement);
 </template>
 
 <style scoped lang="scss">
-/* ChannelInfoPopoverView styles */
+/* ChannelInfoPopoverView styles：浮层保持不透明（--cp-panel-solid），圆角/阴影/边框统一 */
 /* Selector: `.cp-pop` — popover page surface. */
 .cp-pop {
   height: 100%;
-  padding: 12px;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  padding: var(--cp-page-pad);
+  background: var(--cp-panel-solid);
   border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  border-radius: var(--cp-radius-lg);
+  box-shadow: var(--cp-shadow-float);
 }
 
 /* Selector: `.cp-pop__title` — title line. */
@@ -121,12 +119,9 @@ const announcement = computed(computeAnnouncement);
   margin-top: 10px;
 }
 
-/* Selector: `.cp-pop__label` — announcement label. */
+/* Selector: `.cp-pop__label` — 固定英文标签使用统一微标签 */
 .cp-pop__label {
-  font-size: 11px;
-  color: var(--cp-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  @include cp-section-label;
 }
 
 /* Selector: `.cp-pop__anncText` — announcement text. */

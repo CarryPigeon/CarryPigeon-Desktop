@@ -236,22 +236,20 @@ function switchAuthMethod(method: "email" | "password"): void {
 
 <style scoped lang="scss">
 /* RegisterPage styles — reuses LoginPage CSS via same class names */
+/* 样式：RegisterPage｜规格：左右两栏一级玻璃面板 + 内嵌卡片 */
 .cp-login {
   height: 100%;
   display: grid;
   grid-template-columns: 1fr minmax(360px, 460px);
-  gap: 14px;
-  padding: 14px;
+  gap: var(--cp-page-gap);
+  padding: var(--cp-page-pad);
 }
 
+/* 左右两栏各自为一级玻璃面板 */
 .cp-login__left,
 .cp-login__right {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  border-radius: 18px;
-  box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  @include cp-glass-panel;
+
   overflow: hidden;
   min-width: 0;
 }
@@ -282,7 +280,7 @@ function switchAuthMethod(method: "email" | "password"): void {
   border-radius: 12px;
   border: 1px solid var(--cp-highlight-border);
   background:
-    radial-gradient(10px 10px at 30% 35%, color-mix(in oklab, var(--cp-highlight) 86%, transparent), transparent 60%),
+    radial-gradient(10px 10px at 30% 35%, color-mix(in oklab, var(--cp-accent) 86%, transparent), transparent 60%),
     radial-gradient(12px 12px at 68% 60%, color-mix(in oklab, var(--cp-accent-2) 84%, transparent), transparent 60%),
     color-mix(in oklab, var(--cp-panel-solid) 72%, var(--cp-bg));
   box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
@@ -302,6 +300,7 @@ function switchAuthMethod(method: "email" | "password"): void {
   color: var(--cp-text-muted);
 }
 
+/* 阶段指示：握手 → 认证；当前阶段用 accent（连接进程） */
 .cp-login__stage {
   display: inline-flex;
   align-items: center;
@@ -325,15 +324,13 @@ function switchAuthMethod(method: "email" | "password"): void {
 }
 
 .cp-login__stageItem {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--cp-text-muted);
 }
 
 .cp-login__stageItem[data-active="true"] {
-  color: var(--cp-text);
+  color: var(--cp-accent);
 }
 
 .cp-login__stageSep {
@@ -345,11 +342,10 @@ function switchAuthMethod(method: "email" | "password"): void {
   overflow: auto;
 }
 
+/* 机架概览微标签（本地化文案，不做大写变换） */
 .cp-login__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--cp-text-muted);
 }
 
@@ -359,13 +355,12 @@ function switchAuthMethod(method: "email" | "password"): void {
   border-top: 1px solid var(--cp-border-light);
 }
 
+/* Field label：普通字段标签（用户内容不做大写变换） */
 .cp-login__fieldLabel {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
   margin-bottom: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cp-text-muted);
 }
 
 .cp-login__fieldHint {
@@ -376,62 +371,27 @@ function switchAuthMethod(method: "email" | "password"): void {
   flex-wrap: wrap;
 }
 
+/* Mini connect button：连接动作使用 accent 语义 */
 .cp-login__miniBtn {
-  border: 1px solid var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
+  @include cp-pill-button;
+
+  border-color: color-mix(in oklab, var(--cp-accent) 40%, var(--cp-border));
+  background: var(--cp-accent-soft);
   color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-login__miniBtn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg-strong);
+  border-color: color-mix(in oklab, var(--cp-accent) 58%, var(--cp-border));
+  background: color-mix(in oklab, var(--cp-accent) 20%, transparent);
 }
 
-.cp-login__miniBtn:active {
-  transform: translateY(0);
-}
-
+/* 分段控件：使用统一 mixin */
 .cp-login__seg {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  @include cp-segmented;
 }
 
 .cp-login__segBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-login__segBtn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cp-highlight-border);
-  background: var(--cp-hover-bg);
-}
-
-.cp-login__segBtn:active {
-  transform: translateY(0);
-}
-
-.cp-login__segBtn[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
+  @include cp-segmented-item;
 }
 
 .cp-login__transportHint {
@@ -445,18 +405,19 @@ function switchAuthMethod(method: "email" | "password"): void {
   padding: 14px;
 }
 
+/* 提示块：内嵌卡片（虚化底） */
 .cp-login__monoBlock {
-  border: 1px dashed rgba(148, 163, 184, 0.22);
+  @include cp-card;
+
+  border-style: dashed;
   background: var(--cp-panel-muted);
-  border-radius: 18px;
   padding: 12px;
 }
 
+/* 提示标题（本地化文案，不做大写变换） */
 .cp-login__monoTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--cp-text-muted);
 }
 
@@ -473,12 +434,11 @@ function switchAuthMethod(method: "email" | "password"): void {
   padding: 14px;
 }
 
+/* 注册面板：内嵌卡片，不再叠加一层玻璃/阴影 */
 .cp-login__panel {
+  @include cp-card;
+
   width: min(440px, 100%);
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
   padding: 16px;
 }
 
@@ -496,14 +456,11 @@ function switchAuthMethod(method: "email" | "password"): void {
   color: var(--cp-text-muted);
 }
 
+/* 反馈条：校验提示 / 验证码已发送 */
 .cp-login__banner {
+  @include cp-inline-status(info);
+
   margin-top: 12px;
-  border: 1px dashed var(--cp-highlight-border);
-  background: var(--cp-highlight-bg);
-  border-radius: 16px;
-  padding: 10px 12px;
-  font-size: 12px;
-  color: var(--cp-text);
 }
 
 .cp-login__form {
@@ -513,27 +470,19 @@ function switchAuthMethod(method: "email" | "password"): void {
   gap: 12px;
 }
 
+/* 注册方式分段控件：2 等分 */
 .cp-login__methodTabs {
+  @include cp-segmented;
+
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
   margin: 4px 0 10px;
 }
 
 .cp-login__methodTab {
-  border: 1px solid var(--cp-border);
-  background: transparent;
-  color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
+  @include cp-segmented-item;
 
-.cp-login__methodTab[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
+  text-align: center;
 }
 
 .cp-login__codeRow {
@@ -543,91 +492,29 @@ function switchAuthMethod(method: "email" | "password"): void {
   align-items: center;
 }
 
+/* Send code button */
 .cp-login__sendBtn {
+  @include cp-pill-button;
+
   height: var(--cp-field-height);
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 0 14px;
   min-width: 128px;
-  font-size: 12px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   white-space: nowrap;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
 
-.cp-login__sendBtn:hover:enabled {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-login__sendBtn:active:enabled {
-  transform: translateY(0);
-}
-
-.cp-login__sendBtn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
+/* Primary create-account button：主操作使用 highlight 语义 */
 .cp-login__primary {
-  border: 1px solid var(--cp-highlight-border-strong);
-  background:
-    radial-gradient(140px 34px at 24% 0%, color-mix(in oklab, var(--cp-highlight) 24%, transparent), transparent 60%),
-    radial-gradient(160px 38px at 78% 0%, color-mix(in oklab, var(--cp-accent) 18%, transparent), transparent 60%),
-    color-mix(in oklab, var(--cp-panel-muted) 92%, transparent);
-  color: var(--cp-text);
-  border-radius: 999px;
-  height: calc(var(--cp-field-height) + 6px);
-  padding: 0 14px;
+  @include cp-pill-button(primary);
+
+  min-height: var(--cp-field-height);
   font-size: 13px;
-  cursor: pointer;
-  box-shadow: 0 18px 44px color-mix(in oklab, var(--cp-highlight) 16%, transparent);
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  font-weight: 600;
 }
 
-.cp-login__primary:hover:enabled {
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--cp-highlight) 66%, var(--cp-border));
-  background:
-    radial-gradient(140px 34px at 24% 0%, color-mix(in oklab, var(--cp-highlight) 30%, transparent), transparent 60%),
-    radial-gradient(160px 38px at 78% 0%, color-mix(in oklab, var(--cp-accent) 22%, transparent), transparent 60%),
-    color-mix(in oklab, var(--cp-hover-bg) 86%, var(--cp-panel-muted));
-}
-
-.cp-login__primary:active:enabled {
-  transform: translateY(0);
-}
-
-.cp-login__primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
+/* Ghost navigation button */
 .cp-login__ghost {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
+  @include cp-pill-button;
+
   color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 10px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-login__ghost:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-login__ghost:active {
-  transform: translateY(0);
 }
 
 .cp-login__miniBtn:focus-visible,
@@ -635,7 +522,7 @@ function switchAuthMethod(method: "email" | "password"): void {
 .cp-login__sendBtn:focus-visible,
 .cp-login__primary:focus-visible,
 .cp-login__ghost:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline: 2px solid var(--cp-highlight-border-strong);
   outline-offset: 2px;
 }
 
@@ -655,10 +542,10 @@ function switchAuthMethod(method: "email" | "password"): void {
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .cp-login {
-    gap: 12px;
-    padding: 12px;
+    gap: var(--cp-page-gap);
+    padding: 10px;
   }
 
   .cp-login__leftHead {

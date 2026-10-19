@@ -55,39 +55,47 @@ const { t } = useI18n();
 </template>
 
 <style scoped lang="scss">
+/* 样式：MultiSelectToolbar｜规格：消息区工具条（计数 + 胶囊动作按钮，无位移 hover） */
 .cp-multiSelectToolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--cp-panel, #1e1e2e);
-  border-bottom: 1px solid var(--cp-border, #313244);
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--cp-panel-muted);
   position: sticky;
   top: 0;
   z-index: 10;
 }
+
 .cp-multiSelectToolbar__count {
-  font-size: 13px;
-  color: var(--cp-text-secondary, #a6adc8);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--cp-text-muted);
 }
+
 .cp-multiSelectToolbar__actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
+
+/* 批量动作：统一胶囊按钮 */
 .cp-multiSelectToolbar__btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--cp-border, #313244);
-  background: transparent;
-  color: var(--cp-text, #cdd6f4);
+  @include cp-pill-button;
+
+  min-height: 26px;
+  padding: 0 10px;
   font-size: 12px;
-  cursor: pointer;
 }
+
 .cp-multiSelectToolbar__btn--cancel {
-  color: var(--cp-text-secondary, #a6adc8);
+  color: var(--cp-text-muted);
 }
+
 .cp-multiSelectToolbar__btn:disabled {
-  opacity: 0.4;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 </style>

@@ -150,7 +150,7 @@ onMounted(() => {
         class="cp-serverCard__avatar"
         :name="props.model.serverInfo?.name ?? '—'"
         :avatar-url="props.model.serverInfo?.avatar"
-        :size="40"
+        :size="32"
       />
       <div class="cp-serverCard__meta">
         <div class="cp-serverCard__name">{{ props.model.serverInfo?.name ?? '—' }}</div>
@@ -223,7 +223,15 @@ onMounted(() => {
         >
           {{ t("channels_discover") }}
         </button>
-        <button class="cp-channelTabs__btn add" type="button" @click="props.model.openCreateMenu()" :title="t('create_channel')">+</button>
+        <button
+          class="cp-channelTabs__btn add"
+          type="button"
+          :title="t('create_channel')"
+          :aria-label="t('create_channel')"
+          @click="props.model.openCreateMenu()"
+        >
+          <AppIcon name="plus" :size="16" />
+        </button>
       </div>
       <!-- 区块：搜索输入框 -->
       <t-input
@@ -348,85 +356,139 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ChannelRail｜规格：服务器卡（紧凑页头语言）+ 搜索区 + 列表行（行列表见全局 patchbay.scss） */
 .cp-serverCard {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  padding: 14px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 8px 10px;
   cursor: pointer;
   transition: background-color var(--cp-fast) var(--cp-ease);
 }
+
 .cp-serverCard:hover {
   background: var(--cp-hover-bg);
 }
+
 .cp-serverCard__meta {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
+
 .cp-serverCard__name {
+  font-family: var(--cp-font-display);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
   color: var(--cp-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .cp-serverCard__brief {
   font-size: 12px;
+  line-height: 1.4;
   color: var(--cp-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 服务器菜单：设置页图标按钮（静态透明，仅 hover 给反馈） */
 .cp-serverCard__menuBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  color: var(--cp-text-muted);
-  border-radius: 10px;
   width: 28px;
   height: 28px;
-  display: inline-grid;
-  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-radius: var(--cp-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
-  transition: background-color var(--cp-fast) var(--cp-ease), color var(--cp-fast) var(--cp-ease);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
+
 .cp-serverCard__menuBtn:hover {
   background: var(--cp-hover-bg);
+  border-color: var(--cp-border);
   color: var(--cp-text);
 }
 
 .cp-channelRow__count {
   display: block;
-  margin-top: 2px;
+  margin-top: 0;
   font-size: 11px;
-  color: var(--cp-text-muted);
+  line-height: 1.4;
+  color: var(--cp-text-light);
 }
 
+/* 加载更多：设置页胶囊按钮 */
 .cp-channelList__more {
+  min-height: 32px;
+  padding: 0 14px;
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   cursor: pointer;
   align-self: center;
-  margin: 4px 0 8px;
+  margin: 2px 0 4px;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 }
 
+.cp-channelList__more:hover:not(:disabled) {
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-highlight-border);
+}
+
+.cp-channelList__more:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 频道搜索框：栏内紧凑字段（全局 38px → 32px） */
+.cp-channelSearch :deep(.t-input) {
+  height: 32px;
+  font-size: 12.5px;
+}
+
+/* 发现频道类型：原生下拉，对齐字段 token */
 .cp-channelSearch__type {
-  margin-top: 8px;
+  margin-top: 6px;
   width: 100%;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--cp-field-border);
+  background: var(--cp-field-bg);
   color: var(--cp-text);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: var(--cp-radius-sm);
   font-size: 12px;
+  line-height: 1.4;
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
+}
+
+.cp-channelSearch__type:focus {
+  border-color: var(--cp-focus-border);
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
+  outline: none;
 }
 </style>
 

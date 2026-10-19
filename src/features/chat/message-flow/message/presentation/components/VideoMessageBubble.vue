@@ -108,13 +108,15 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：VideoMessageBubble｜规格：媒体卡片（卡片圆角 + 面板底/细边框），错误/文件名栏用 token */
 .video-message-bubble {
   display: inline-block;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-card);
   overflow: hidden;
-  background-color: rgba(0, 0, 0, 0.2);
+  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border-light);
 }
 
 .video-container {
@@ -126,10 +128,12 @@ onMounted(() => {
   display: block;
   max-width: 100%;
   height: auto;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--cp-radius-card) var(--cp-radius-card) 0 0;
+  /* 视频画布固定黑色（媒体内容底色，不随主题变化） */
   background: #000;
 }
 
+/* 媒体上的放大提示：深色遮罩 + 白色图标为固定媒体层配色，不随主题变化 */
 .video-expand-hint {
   position: absolute;
   top: 8px;
@@ -144,7 +148,7 @@ onMounted(() => {
   justify-content: center;
   font-size: 14px;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--cp-fast) var(--cp-ease);
   pointer-events: none;
 }
 
@@ -152,12 +156,13 @@ onMounted(() => {
   opacity: 1;
 }
 
+/* 错误态：danger 状态底 */
 .video-error {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 120px;
-  background: rgba(255, 0, 0, 0.1);
+  background: var(--cp-danger-bg);
 }
 
 .error-content {
@@ -174,23 +179,14 @@ onMounted(() => {
 }
 
 .error-message {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--cp-text);
   margin: 6px 0;
   font-size: 13px;
 }
 
+/* 重试：胶囊按钮（主操作语义用 highlight） */
 .retry-button {
-  background: rgba(59, 130, 246, 0.8);
-  color: #fff;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.retry-button:hover {
-  background: rgba(59, 130, 246, 1);
+  @include cp-pill-button(primary);
 }
 
 .video-filebar {
@@ -198,10 +194,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--cp-panel-muted);
+  border-top: 1px solid var(--cp-border-light);
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
-  border-radius: 0 0 8px 8px;
+  color: var(--cp-text-muted);
+  border-radius: 0 0 var(--cp-radius-card) var(--cp-radius-card);
 }
 
 .video-filename {
@@ -213,6 +210,6 @@ onMounted(() => {
 
 .video-filesize {
   flex-shrink: 0;
-  font-family: monospace;
+  font-family: var(--cp-font-mono);
 }
 </style>

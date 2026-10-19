@@ -98,7 +98,7 @@ function isLocked(): boolean {
   <div v-else-if="loading" class="cp-plugins__state loading">{{ t("loading_catalog") }}</div>
   <div v-else-if="error" class="cp-plugins__state err">{{ t("plugins_load_failed") }}: {{ error }}</div>
   <div v-else-if="plugins.length === 0" class="cp-plugins__state empty">
-    <div class="cp-emptyHint__icon"><AppIcon name="plug" /></div>
+    <div class="cp-emptyHint__icon"><AppIcon name="plug" :size="22" /></div>
     <div class="cp-emptyHint__title">{{ t("plugins_empty") }}</div>
     <div class="cp-emptyHint__desc">{{ t("plugins_empty_hint") }}</div>
   </div>
@@ -124,15 +124,19 @@ function isLocked(): boolean {
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：状态区与网格使用 `cp-plugins__*` 前缀，颜色与阴影取自全局 `--cp-*` 变量。 */
+/* 样式：插件目录网格｜规格：状态区用状态 token，卡片网格 16px 内边距 */
 .cp-plugins__state {
-  padding: 18px;
-  color: var(--cp-text-muted);
+  padding: 16px;
   font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
 }
 
+/* 错误态：danger 状态条 */
 .cp-plugins__state.err {
-  color: rgba(248, 113, 113, 0.92);
+  @include cp-inline-status(danger);
+
+  margin: 16px;
 }
 
 .cp-plugins__state.empty {
@@ -140,45 +144,54 @@ function isLocked(): boolean {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 240px;
   padding: 48px 24px;
   text-align: center;
-  min-height: 240px;
 }
 
 .cp-plugins__state.loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 36px 24px;
   min-height: 120px;
+  padding: 36px 24px;
 }
 
 .cp-emptyHint__icon {
-  font-size: 36px;
-  line-height: 1;
-  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-card);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
 }
 
 .cp-emptyHint__title {
+  font-family: var(--cp-font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--cp-text);
 }
 
 .cp-emptyHint__desc {
+  max-width: 300px;
   font-size: 13px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
-  max-width: 280px;
 }
 
+/* 模块网格：面板内滚动 */
 .cp-plugins__grid {
-  padding: 14px;
-  overflow: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+  padding: 16px;
+  overflow: auto;
   min-height: 0;
 }
 </style>

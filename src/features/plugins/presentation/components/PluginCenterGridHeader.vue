@@ -89,14 +89,14 @@ function handleBack(): void {
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：右侧内容区头部样式复用 `cp-plugins__*` 前缀，颜色取自全局 `--cp-*` 变量。 */
+/* 样式：插件中心头部｜规格：面板内分区头（标题 18px + mono 元信息 + 胶囊操作） */
 .cp-plugins__head {
-  padding: 14px 14px 12px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--cp-border-light);
 }
 
 .cp-plugins__headLeft {
@@ -105,59 +105,55 @@ function handleBack(): void {
 
 .cp-plugins__headTitle {
   font-family: var(--cp-font-display);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-weight: 900;
   font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
   color: var(--cp-text);
 }
 
 .cp-plugins__headMeta {
-  margin-top: 8px;
-  display: inline-flex;
+  margin-top: 6px;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .cp-plugins__mono {
+  min-width: 0;
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .cp-plugins__dot {
-  width: 4px;
-  height: 4px;
+  flex: 0 0 auto;
+  width: 3px;
+  height: 3px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.5);
+  background: var(--cp-text-light);
 }
 
 .cp-plugins__muted {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
 }
 
 .cp-plugins__headRight {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
+/* 操作按钮：统一胶囊规格 */
 .cp-plugins__headBtn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-plugins__headBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
+  @include cp-pill-button;
 }
 </style>

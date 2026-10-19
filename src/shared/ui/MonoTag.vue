@@ -87,15 +87,13 @@ async function handleCopy(): Promise<void> {
 .mono-tag.copyable {
   cursor: pointer;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease);
 
-  /* 选择器：`.mono-tag.copyable:hover`｜用途：轻微上浮 + info 边框高亮 */
+  /* 选择器：`.mono-tag.copyable:hover`｜用途：底色 + highlight 边框反馈（不做位移） */
   &:hover {
-    transform: translateY(-1px);
     background: var(--cp-hover-bg);
-    border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
+    border-color: var(--cp-highlight-border);
   }
 }
 

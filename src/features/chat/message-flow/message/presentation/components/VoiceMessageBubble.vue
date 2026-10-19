@@ -84,24 +84,26 @@ function onEnded(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：VoiceMessageBubble｜规格：媒体气泡（卡片圆角 + 面板底 + 细边框），播放中 accent 提示 */
 .cp-voiceBubble {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   max-width: 280px;
-  background: color-mix(in oklab, var(--cp-accent, #666) 10%, var(--cp-panel, #fff));
-  border: 1px solid var(--cp-border-light, #e5e7eb);
-  border-radius: 18px 18px 18px 4px;
+  background: var(--cp-panel);
+  border: 1px solid var(--cp-border-light);
+  border-radius: var(--cp-radius-card) var(--cp-radius-card) var(--cp-radius-card) var(--cp-radius-sm);
   padding: 6px 12px;
-  transition: background-color var(--cp-fast, 0.15s) var(--cp-ease, ease);
+  transition: background-color var(--cp-fast) var(--cp-ease);
 
   &--playing {
-    background: color-mix(in oklab, var(--cp-accent, #666) 18%, var(--cp-panel, #fff));
+    background: var(--cp-accent-soft);
+    border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border-light));
   }
 
   &__audio {
     height: 40px;
-    border-radius: 8px;
+    border-radius: var(--cp-radius-sm);
     flex: 1;
     min-width: 160px;
 
@@ -113,14 +115,14 @@ function onEnded(): void {
   &__duration {
     font-variant-numeric: tabular-nums;
     font-size: 11px;
-    color: var(--cp-text-muted, #888);
+    color: var(--cp-text-muted);
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   &__error {
     font-size: 12px;
-    color: var(--cp-danger, #e53935);
+    color: var(--cp-danger);
   }
 }
 </style>

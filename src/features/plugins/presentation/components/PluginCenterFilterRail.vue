@@ -14,6 +14,7 @@
  */
 
 import { useI18n } from "vue-i18n";
+import AppIcon from "@/shared/ui/AppIcon.vue";
 import type { RepoSource } from "@/features/plugins/contracts/repoSource";
 
 type FilterKind = "all" | "installed" | "enabled" | "failed" | "updates" | "required";
@@ -47,22 +48,62 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+/**
+ * 同步搜索框输入到父组件（保持与 t-input 清空按钮相同的 `update:q` 契约）。
+ *
+ * @param event - 原生输入事件。
+ */
+function handleSearchInput(event: Event): void {
+  emit("update:q", (event.target as HTMLInputElement).value);
+}
+
+/**
+ * 清空搜索关键字。
+ */
+function clearSearch(): void {
+  emit("update:q", "");
+}
 </script>
 
 <template>
-  <!-- 组件：PluginCenterFilterRail｜职责：插件中心左侧筛选栏 -->
+  <!-- 组件：PluginCenterFilterRail｜职责：插件中心左侧筛选栏（设置页 rail 风格） -->
   <!-- 区块：<aside> .cp-plugins__filters -->
   <aside class="cp-plugins__filters">
-    <div class="cp-plugins__filtersTitle">{{ t("module_rack") }}</div>
-    <div class="cp-plugins__filtersSub">{{ t("module_rack_sub") }}</div>
+    <!-- 区头：标题 + 说明 -->
+    <header class="cp-plugins__railHead">
+      <div class="cp-plugins__filtersTitle">{{ t("module_rack") }}</div>
+      <div class="cp-plugins__filtersSub">{{ t("module_rack_sub") }}</div>
+    </header>
 
-    <div class="cp-plugins__search">
-      <t-input :model-value="props.q" :placeholder="t('plugin_search_placeholder')" clearable @update:model-value="emit('update:q', String($event ?? ''))" />
+    <!-- 区块：搜索字段｜用途：按关键字过滤插件目录 -->
+    <div class="cp-plugins__search" role="search">
+      <AppIcon class="cp-plugins__searchIcon" name="search" :size="15" />
+      <input
+        class="cp-plugins__searchInput"
+        type="text"
+        role="searchbox"
+        :value="props.q"
+        :aria-label="t('plugin_search_placeholder')"
+        :placeholder="t('plugin_search_placeholder')"
+        @input="handleSearchInput"
+      />
+      <button
+        v-if="props.q"
+        class="cp-plugins__searchClear"
+        type="button"
+        :aria-label="t('settings_search_clear')"
+        :title="t('settings_search_clear')"
+        @click="clearSearch()"
+      >
+        <AppIcon name="close" :size="14" />
+      </button>
     </div>
 
+    <!-- 区块：状态筛选｜用途：分段控件（与设置页分段同规格） -->
     <div class="cp-plugins__group">
       <div class="cp-plugins__label">{{ t("plugin_filter") }}</div>
-      <div class="cp-seg">
+      <div class="cp-seg" role="group" :aria-label="t('plugin_filter')">
         <button class="cp-seg__btn" :data-active="props.filter === 'all'" type="button" @click="emit('update:filter', 'all')">{{ t("plugin_filter_all") }}</button>
         <button class="cp-seg__btn" :data-active="props.filter === 'installed'" type="button" @click="emit('update:filter', 'installed')">{{ t("plugin_filter_installed") }}</button>
         <button class="cp-seg__btn" :data-active="props.filter === 'enabled'" type="button" @click="emit('update:filter', 'enabled')">{{ t("plugin_filter_enabled") }}</button>
@@ -72,15 +113,17 @@ const { t } = useI18n();
       </div>
     </div>
 
+    <!-- 区块：来源筛选｜用途：服务端 / 仓库来源 -->
     <div class="cp-plugins__group">
       <div class="cp-plugins__label">{{ t("plugin_source") }}</div>
-      <div class="cp-seg">
+      <div class="cp-seg" role="group" :aria-label="t('plugin_source')">
         <button class="cp-seg__btn" :data-active="props.source === 'all'" type="button" @click="emit('update:source', 'all')">{{ t("plugin_filter_source_all") }}</button>
         <button class="cp-seg__btn" :data-active="props.source === 'server'" type="button" @click="emit('update:source', 'server')">{{ t("plugin_filter_source_server") }}</button>
         <button class="cp-seg__btn" :data-active="props.source === 'repo'" type="button" @click="emit('update:source', 'repo')">{{ t("plugin_filter_source_repo") }}</button>
       </div>
     </div>
 
+    <!-- 区块：Repo Sources｜用途：仓库来源启停 / 新增 / 删除 -->
     <div class="cp-plugins__group">
       <div class="cp-plugins__label">{{ t("repo_sources") }}</div>
       <div class="cp-plugins__repoMeta">
@@ -112,6 +155,7 @@ const { t } = useI18n();
       </div>
     </div>
 
+    <!-- 区块：Required Gate｜用途：缺失必装插件数量与快捷操作 -->
     <div class="cp-plugins__group">
       <div class="cp-plugins__label">{{ t("plugin_required_gate") }}</div>
       <div class="cp-plugins__gate">
@@ -127,134 +171,142 @@ const { t } = useI18n();
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；左侧为可滚动筛选栏，包含分组区块与按钮组。 */
+/* 样式：插件中心筛选栏｜规格：一级玻璃 rail（搜索字段 / 微标签 / 分段控件 / 分组卡） */
 .cp-plugins__filters {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
+  @include cp-glass-panel;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 14px;
-  box-shadow: var(--cp-shadow-soft);
   overflow: auto;
+  min-height: 0;
+}
+
+/* 区头：标题 + 说明 */
+.cp-plugins__railHead {
+  min-width: 0;
 }
 
 .cp-plugins__filtersTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text);
+  @include cp-section-title;
+
+  font-size: 16px;
+  letter-spacing: 0.04em;
 }
 
 .cp-plugins__filtersSub {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
 }
 
+/* 搜索字段：与设置页 rail 搜索同规格 */
 .cp-plugins__search {
-  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--cp-field-height);
+  padding: 0 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
 }
 
+.cp-plugins__search:focus-within {
+  border-color: var(--cp-focus-border);
+  background: var(--cp-field-bg);
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
+}
+
+.cp-plugins__searchIcon {
+  flex: 0 0 auto;
+  color: var(--cp-text-muted);
+}
+
+.cp-plugins__searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cp-text);
+  font-family: var(--cp-font-body);
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.cp-plugins__searchInput:focus-visible {
+  box-shadow: none;
+}
+
+.cp-plugins__searchInput::placeholder {
+  color: var(--cp-field-placeholder);
+}
+
+.cp-plugins__searchClear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--cp-fast) var(--cp-ease),
+    background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-plugins__searchClear:hover {
+  color: var(--cp-text);
+  background: var(--cp-hover-bg);
+}
+
+/* 分组：微标签 + 内容 */
 .cp-plugins__group {
-  margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--cp-border-light);
 }
 
 .cp-plugins__label {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  margin-bottom: 10px;
+  @include cp-section-label;
+
+  margin-bottom: 8px;
 }
 
+/* 分段控件：容器/选项成对使用；rail 内允许换行 */
 .cp-seg {
+  @include cp-segmented;
+
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
 }
 
 .cp-seg__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
-}
+  @include cp-segmented-item;
 
-.cp-seg__btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cp-highlight-border);
-  background: var(--cp-hover-bg);
-}
-
-.cp-seg__btn[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
+  flex: 1 1 auto;
+  white-space: nowrap;
 }
 
 .cp-plugins__muted {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
 }
 
-.cp-plugins__gate {
-  border: 1px dashed rgba(148, 163, 184, 0.26);
-  border-radius: 16px;
-  padding: 12px;
-  background: var(--cp-panel-muted);
-}
-
-.cp-plugins__gateLine {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.cp-plugins__gateK {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-.cp-plugins__gateV {
-  font-family: var(--cp-font-mono);
-  font-size: 12px;
-  color: var(--cp-text);
-}
-
-.cp-plugins__gateBtn {
-  margin-top: 10px;
-  width: 100%;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-plugins__gateBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
+/* Repo Sources 元信息行 */
 .cp-plugins__repoMeta {
   display: flex;
   align-items: center;
@@ -262,63 +314,65 @@ const { t } = useI18n();
   gap: 10px;
 }
 
+.cp-plugins__repoBtn {
+  @include cp-pill-button;
+
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
+}
+
 .cp-plugins__repoPanel {
   margin-top: 10px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
-.cp-plugins__repoBtn,
-.cp-plugins__repoAdd,
-.cp-plugins__repoRemove {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 10px;
+.cp-plugins__repoAdd {
+  @include cp-pill-button(primary);
+
+  min-height: 30px;
   font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-plugins__repoBtn:hover,
-.cp-plugins__repoAdd:hover,
-.cp-plugins__repoRemove:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
 }
 
 .cp-plugins__repoErr {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-danger);
 }
 
 .cp-plugins__repoList {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* repo 行：内嵌分组卡（无阴影） */
 .cp-plugins__repoRow {
-  border: 1px solid var(--cp-border-light);
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 14px;
-  padding: 10px;
+  @include cp-card(var(--cp-radius-control));
+
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
+  gap: 8px 10px;
+  padding: 10px;
 }
 
 .cp-plugins__repoToggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--cp-text);
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+}
+
+.cp-plugins__repoToggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--cp-accent);
+  cursor: pointer;
 }
 
 .cp-plugins__repoInfo {
@@ -329,13 +383,68 @@ const { t } = useI18n();
 
 .cp-plugins__repoUrl {
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
   color: var(--cp-text);
   overflow-wrap: anywhere;
 }
 
 .cp-plugins__repoNote {
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
   color: var(--cp-text-muted);
+}
+
+.cp-plugins__repoRemove {
+  @include cp-pill-button(danger);
+
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+/* Required Gate：内嵌分组卡 */
+.cp-plugins__gate {
+  @include cp-card(var(--cp-radius-control));
+
+  padding: 12px;
+}
+
+.cp-plugins__gateLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cp-plugins__gateK {
+  @include cp-section-label;
+}
+
+.cp-plugins__gateV {
+  font-family: var(--cp-font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-plugins__gateBtn {
+  @include cp-pill-button;
+
+  width: 100%;
+  margin-top: 8px;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.cp-plugins__gateBtn + .cp-plugins__gateBtn {
+  margin-top: 8px;
+}
+
+/* 响应式：纵向布局下限制 rail 高度，避免挤占内容区 */
+@media (max-width: 900px) {
+  .cp-plugins__filters {
+    max-height: 44vh;
+  }
 }
 </style>

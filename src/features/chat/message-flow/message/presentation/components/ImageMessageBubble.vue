@@ -216,22 +216,29 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+/* 样式：ImageMessageBubble｜规格：媒体卡片（卡片圆角 + 面板底/细边框），骨架与错误用 token */
 .image-message-bubble {
   display: inline-block;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--cp-radius-card);
   overflow: hidden;
-  background-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: var(--cp-panel-muted);
+  border: 1px solid var(--cp-border-light);
 }
 
+/* 骨架：用 --cp-skeleton 派生扫描高光，替代旧的白色 rgba */
 .image-skeleton {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 200px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--cp-skeleton) 25%,
+    color-mix(in oklab, var(--cp-skeleton) 45%, var(--cp-panel-solid)) 50%,
+    var(--cp-skeleton) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -251,7 +258,12 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--cp-panel-solid) 55%, transparent) 50%,
+    transparent 100%
+  );
   background-size: 50% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -270,17 +282,17 @@ onUnmounted(() => {
   max-width: 100%;
   height: auto;
   object-fit: contain;
-  border-radius: 8px;
-  transition: opacity 0.3s ease;
+  border-radius: var(--cp-radius-card);
+  transition: opacity var(--cp-slow) var(--cp-ease);
 }
 
+/* 错误态：danger 状态底，文字/按钮统一 token */
 .image-error {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 200px;
-  background-color: rgba(255, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
+  background: var(--cp-danger-bg);
 }
 
 .error-content {
@@ -297,23 +309,13 @@ onUnmounted(() => {
 }
 
 .error-message {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--cp-text);
   margin: 10px 0;
-  font-size: 14px;
+  font-size: 13px;
 }
 
+/* 重试：胶囊按钮（主操作语义用 highlight） */
 .retry-button {
-  background-color: rgba(59, 130, 246, 0.8);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.retry-button:hover {
-  background-color: rgba(59, 130, 246, 1);
+  @include cp-pill-button(primary);
 }
 </style>

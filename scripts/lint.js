@@ -10,6 +10,7 @@ if (!isWin) {
 }
 checks.push("lint:docs");
 checks.push("lint:color:literals");
+checks.push("lint:tokens");
 
 let exitCode = 0;
 for (const check of checks) {

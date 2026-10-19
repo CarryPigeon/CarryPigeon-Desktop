@@ -725,7 +725,8 @@ describe("AiSummaryHost", () => {
 
     it("快速范围「今天」：只发送今天的消息", async () => {
       const today = new Date();
-      today.setHours(9, 0, 0, 0);
+      // 取当天 00:00 作为「今天」样本：任何时刻都早于当前时间，避免 0 点后取到未来时刻导致范围过滤为空。
+      today.setHours(0, 0, 0, 0);
       const yesterday = new Date(today.getTime() - 24 * 3_600_000);
       messagesState = snapshotOf([
         message("m1", "昨天的消息", yesterday.getTime()),
@@ -785,7 +786,8 @@ describe("AiSummaryHost", () => {
 
     it("范围变化后不命中缓存：按新范围重新请求", async () => {
       const today = new Date();
-      today.setHours(9, 0, 0, 0);
+      // 取当天 00:00 作为「今天」样本：任何时刻都早于当前时间，避免 0 点后取到未来时刻导致范围过滤为空。
+      today.setHours(0, 0, 0, 0);
       const yesterday = new Date(today.getTime() - 24 * 3_600_000);
       messagesState = snapshotOf([
         message("m1", "昨天的消息", yesterday.getTime()),

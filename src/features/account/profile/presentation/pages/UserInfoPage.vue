@@ -96,9 +96,10 @@ const isOwnProfile = computed(() => !uid.value || uid.value === currentUser.valu
 const isEmailChanged = computed(() => draft.email.trim() !== email.value.trim());
 const heroStyle = computed(() => {
   if (backgroundUrl.value) {
+    // 背图遮罩使用语义表面色：浅色主题压向暖白、深色主题压向石墨，正文令牌始终可读。
     return {
       backgroundImage: [
-        "linear-gradient(180deg, rgba(15, 23, 42, 0.18) 0%, rgba(15, 23, 42, 0.56) 56%, rgba(15, 23, 42, 0.82) 100%)",
+        "linear-gradient(180deg, color-mix(in oklab, var(--cp-panel-solid) 18%, transparent) 0%, color-mix(in oklab, var(--cp-panel-solid) 56%, transparent) 56%, color-mix(in oklab, var(--cp-panel-solid) 82%, transparent) 100%)",
         `url(${backgroundUrl.value})`,
       ].join(", "),
     };
@@ -297,16 +298,16 @@ async function handleSaveEdit(): Promise<void> {
         <div v-if="isEditing" class="cp-info__hero-edit">
           <label class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("profile_name") }}</span>
-            <input v-model="draft.username" class="cp-info__input" type="text" autocomplete="name" />
+            <input v-model="draft.username" class="cp-info__input cp-field" type="text" autocomplete="name" />
           </label>
           <label class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("email") }}</span>
-            <input v-model="draft.email" class="cp-info__input" type="email" autocomplete="email" />
+            <input v-model="draft.email" class="cp-info__input cp-field" type="email" autocomplete="email" />
           </label>
           <label v-if="isEmailChanged" class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("email_code") }}</span>
             <span class="cp-info__inline">
-              <input v-model="draft.emailCode" class="cp-info__input" type="text" inputmode="numeric" />
+              <input v-model="draft.emailCode" class="cp-info__input cp-field" type="text" inputmode="numeric" />
               <button class="cp-info__smallBtn" :disabled="isSendingEmailCode" type="button" @click="handleSendEmailCode">
                 {{ isSendingEmailCode ? t("profile_sending_code") : t("send_code") }}
               </button>
@@ -315,13 +316,13 @@ async function handleSaveEdit(): Promise<void> {
           <label class="cp-info__field">
             <!-- 服务端无独立头像上传端点；头像 URL 经 PATCH /users/me 的 avatar 字段保存 -->
             <span class="cp-info__fieldLabel">{{ t("upload_avatar") }}</span>
-            <input v-model="draft.avatarUrl" class="cp-info__input" type="url" :placeholder="t('profile_avatar_url_hint')" />
+            <input v-model="draft.avatarUrl" class="cp-info__input cp-field" type="url" :placeholder="t('profile_avatar_url_hint')" />
           </label>
           <label class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("profile_background") }}</span>
             <input ref="backgroundFileInputRef" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleBackgroundFileChange" />
             <span class="cp-info__inline">
-              <input v-model="draft.backgroundUrl" class="cp-info__input" type="url" :placeholder="t('profile_bg_url_hint')" />
+              <input v-model="draft.backgroundUrl" class="cp-info__input cp-field" type="url" :placeholder="t('profile_bg_url_hint')" />
               <button class="cp-info__smallBtn" :disabled="isUploadingBackground" type="button" @click="handleUploadBackground">
                 {{ isUploadingBackground ? t("uploading") : t("profile_background") }}
               </button>
@@ -329,7 +330,7 @@ async function handleSaveEdit(): Promise<void> {
           </label>
           <label class="cp-info__field cp-info__field--wide">
             <span class="cp-info__fieldLabel">{{ t("user_brief") }}</span>
-            <textarea v-model="draft.brief" class="cp-info__textarea" rows="4"></textarea>
+            <textarea v-model="draft.brief" class="cp-info__textarea cp-field" rows="4"></textarea>
           </label>
           <div v-if="formError" class="cp-info__status cp-info__status--error">{{ formError }}</div>
           <div v-if="formSuccess" class="cp-info__status cp-info__status--success">{{ formSuccess }}</div>
@@ -371,38 +372,38 @@ async function handleSaveEdit(): Promise<void> {
 </template>
 
 <style scoped lang="scss">
+/* 样式：UserInfoPage｜规格：hero 横幅（语义 token 遮罩）+ body 玻璃面板 + cp-card */
 /* 布局与变量说明：使用全局 `--cp-*` 变量；页面为“背图横幅 + 资料详情面板”。 */
 .cp-info {
   height: 100%;
-  padding: 14px;
+  padding: var(--cp-page-pad);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--cp-page-gap);
 }
 
+/* hero 保留自定义渐变背景，外壳复用一级玻璃面板规格 */
 .cp-info__hero {
+  @include cp-glass-panel;
+
   position: relative;
   min-height: 220px;
-  border: 1px solid var(--cp-border);
   background:
-    radial-gradient(circle at 20% 18%, color-mix(in oklab, var(--cp-highlight) 28%, transparent), transparent 36%),
-    linear-gradient(135deg, color-mix(in oklab, var(--cp-primary) 40%, var(--cp-panel)) 0%, color-mix(in oklab, var(--cp-accent) 24%, var(--cp-panel-muted)) 100%);
+    radial-gradient(circle at 20% 18%, color-mix(in oklab, var(--cp-accent) 26%, transparent), transparent 36%),
+    linear-gradient(135deg, color-mix(in oklab, var(--cp-accent) 34%, var(--cp-panel)) 0%, color-mix(in oklab, var(--cp-accent-2) 20%, var(--cp-panel-muted)) 100%);
   background-size: cover;
   background-position: center;
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
   overflow: hidden;
   padding: 14px;
 }
 
+/* 遮罩改用语义表面色，文字令牌在明暗主题下都可读 */
 .cp-info__hero-overlay {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.22) 36%, rgba(15, 23, 42, 0.72) 100%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 42%);
+    linear-gradient(180deg, color-mix(in oklab, var(--cp-panel-solid) 18%, transparent) 0%, color-mix(in oklab, var(--cp-panel-solid) 34%, transparent) 36%, color-mix(in oklab, var(--cp-panel-solid) 82%, transparent) 100%),
+    linear-gradient(90deg, color-mix(in oklab, var(--cp-panel-solid) 10%, transparent) 0%, transparent 42%);
   pointer-events: none;
 }
 
@@ -460,40 +461,26 @@ async function handleSaveEdit(): Promise<void> {
   flex: 1 1 auto;
 }
 
-.cp-info__cancel,
-.cp-info__edit,
-.cp-info__smallBtn {
-  border: 1px solid var(--cp-border);
-  background: color-mix(in oklab, var(--cp-panel) 74%, transparent);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+/* 按钮：统一胶囊控件；编辑/保存为主操作（highlight），其余为默认胶囊 */
+.cp-info__cancel {
+  @include cp-pill-button;
 }
 
-.cp-info__cancel:hover,
-.cp-info__edit:hover,
-.cp-info__smallBtn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
+.cp-info__edit {
+  @include cp-pill-button(primary);
 }
 
-.cp-info__edit,
 .cp-info__smallBtn {
-  background: color-mix(in oklab, var(--cp-highlight) 26%, var(--cp-panel));
+  @include cp-pill-button;
+
+  flex: 0 0 auto;
+  min-height: var(--cp-field-height);
 }
 
 .cp-info__edit:disabled,
 .cp-info__smallBtn:disabled {
   cursor: not-allowed;
   opacity: 0.62;
-  transform: none;
 }
 
 .cp-info__hero-edit {
@@ -521,59 +508,39 @@ async function handleSaveEdit(): Promise<void> {
   grid-column: 1 / -1;
 }
 
+/* 字段标签：普通标签排版（用户内容不做大写变换） */
 .cp-info__fieldLabel {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cp-text-muted);
 }
 
+/* 输入/文本域：视觉由全局 .cp-field 提供，这里只约束布局 */
 .cp-info__input,
 .cp-info__textarea {
   min-width: 0;
-  border: 1px solid var(--cp-border);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--cp-panel) 86%, transparent);
-  color: var(--cp-text);
-  padding: 9px 10px;
-  outline: none;
+  width: 100%;
 }
 
 .cp-info__textarea {
   resize: vertical;
 }
 
-.cp-info__input:focus,
-.cp-info__textarea:focus {
-  border-color: var(--cp-highlight-border);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-highlight) 18%, transparent);
-}
-
 .cp-info__inline .cp-info__input {
   flex: 1 1 auto;
 }
 
-.cp-info__smallBtn {
-  flex: 0 0 auto;
-  border-radius: 12px;
-}
-
+/* 状态条：统一 cp-inline-status */
 .cp-info__status {
-  border: 1px solid var(--cp-border);
-  border-radius: 12px;
-  padding: 9px 10px;
-  font-size: 12px;
+  @include cp-inline-status(info);
 }
 
 .cp-info__status--error {
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.28);
+  @include cp-inline-status(danger);
 }
 
 .cp-info__status--success {
-  color: #bbf7d0;
-  background: rgba(20, 83, 45, 0.24);
+  @include cp-inline-status(success);
 }
 
 .cp-info__editActions {
@@ -587,52 +554,33 @@ async function handleSaveEdit(): Promise<void> {
   font-weight: 900;
   letter-spacing: 0.04em;
   font-size: 24px;
-  color: #fff;
+  color: var(--cp-text);
   line-height: 1.1;
 }
 
 .cp-info__sub {
   margin-top: 6px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--cp-text-muted);
 }
 
-.cp-info__hero-meta {
-  margin-top: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cp-info__hero-pill {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 11px;
-}
-
+/* body：一级玻璃面板 */
 .cp-info__body {
+  @include cp-glass-panel;
+
   flex: 1 1 auto;
   min-height: 0;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
-  padding: 14px;
+  padding: var(--cp-page-pad);
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--cp-page-gap);
 }
 
+/* 资料卡：内嵌卡片 */
 .cp-info__card {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
+  @include cp-card;
+
   padding: 12px;
 }
 
@@ -640,12 +588,9 @@ async function handleSaveEdit(): Promise<void> {
   grid-column: 1 / -1;
 }
 
+/* 固定英文标签：统一微标签 */
 .cp-info__k {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
 }
 
 .cp-info__v {

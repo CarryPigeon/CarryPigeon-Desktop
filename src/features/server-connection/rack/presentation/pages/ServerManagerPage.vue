@@ -495,96 +495,79 @@ watch(showLogoutConfirm, (visible) => {
 </template>
 
 <style scoped lang="scss">
-/* 样式：服务器管理页｜布局策略：header + create + list｜关键变量：--cp-* token｜约束：列表可滚动、编辑栅格自适应 */
+/* 样式：服务器管理页｜布局：PageHeader + 一级玻璃面板（新增/维护/列表）｜约束：列表内滚动、rack 行为分组行 */
 
-/* Page wrapper */
+/* 页面骨架：14px 留白 + 12px 节奏 */
 .cp-servers {
-  height: 100%;
-  padding: 14px;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 12px;
+  @include cp-page;
 }
 
-/* Header 由 PageHeader 组件承载；以下保留右侧 action 区域样式 */
-/* Active chip block */
+/* PageHeader 右侧 active socket 区 */
 .cp-servers__active {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
-/* Active label */
 .cp-servers__activeK {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
 }
 
-/* Create panel */
-.cp-servers__create {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
+/* 三块一级玻璃面板 */
+.cp-servers__create,
+.cp-servers__maintenance,
+.cp-servers__listWrap {
+  @include cp-glass-panel;
+
   padding: 14px;
 }
 
-/* Create title */
-.cp-servers__createTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+/* 列表面板：头部固定，行列表内部滚动 */
+.cp-servers__listWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
 }
 
-/* Create grid */
+/* 面板标题：display 字体小标题 */
+.cp-servers__createTitle {
+  font-family: var(--cp-font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--cp-text);
+}
+
+/* 新增栅格：名称 / socket / 主操作 */
 .cp-servers__createGrid {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: 1fr 2fr auto;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
   align-items: end;
+  gap: 12px;
 }
 
-/* Workspace maintenance panel */
-.cp-servers__maintenance {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-}
-
-/* Workspace maintenance grid */
 .cp-servers__maintenanceGrid {
   margin-top: 12px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
   align-items: start;
+  gap: 12px;
 }
 
-/* Field wrapper */
 .cp-servers__field {
   min-width: 0;
 }
 
-/* Wide field */
 .cp-servers__field.wide {
   grid-column: span 2;
 }
 
-/* Field label */
 .cp-servers__label {
   margin-bottom: 6px;
   font-size: 12px;
@@ -593,20 +576,21 @@ watch(showLogoutConfirm, (visible) => {
 
 .cp-servers__maintenanceHint {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-text-muted);
-  line-height: 1.45;
 }
 
 .cp-servers__maintenanceActions {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: 10px;
 }
 
 .cp-servers__error {
   margin-top: 8px;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--cp-danger);
 }
 
@@ -614,8 +598,8 @@ watch(showLogoutConfirm, (visible) => {
 .cp-servers__logoutHint {
   margin-top: 8px;
   font-size: 12px;
-  color: var(--cp-text-muted);
   line-height: 1.5;
+  color: var(--cp-text-muted);
 }
 
 .cp-servers__logoutTarget {
@@ -626,241 +610,197 @@ watch(showLogoutConfirm, (visible) => {
   overflow-wrap: anywhere;
 }
 
-/* Create actions */
 .cp-servers__actions {
   display: flex;
-  gap: 10px;
   justify-content: flex-end;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
-/* Buttons */
+/* 动作按钮：统一胶囊（primary=highlight / danger=状态 token） */
 .cp-servers__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 9px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-/* Primary create button */
 .cp-servers__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel));
+  @include cp-pill-button(primary);
 }
 
 .cp-servers__btn.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 55%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 14%, var(--cp-panel-muted));
+  @include cp-pill-button(danger);
 }
 
-/* Button hover */
-.cp-servers__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-.cp-servers__btn.danger:hover {
-  border-color: color-mix(in oklab, var(--cp-danger) 70%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 18%, var(--cp-panel-muted));
-}
-
-/* List panel */
-.cp-servers__listWrap {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  overflow: auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* List header */
+/* 列表面板头部：微标签 + 计数 */
 .cp-servers__listHead {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cp-border-light);
 }
 
-/* List title */
 .cp-servers__listTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
 }
 
-/* List meta */
 .cp-servers__listMeta {
   display: inline-flex;
-  gap: 10px;
   align-items: center;
+  gap: 10px;
 }
 
-/* Muted label */
 .cp-servers__muted {
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Mono number */
 .cp-servers__mono {
   font-family: var(--cp-font-mono);
   font-size: 12px;
   color: var(--cp-text);
+  font-variant-numeric: tabular-nums;
 }
 
-/* List container */
+/* 分组容器：一张内嵌卡承载所有 rack 行，行间 1px 细分隔线 */
 .cp-servers__list {
+  @include cp-card;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
-/* Rack row */
+/* rack 行：分组行（无独立圆角/阴影），hover 只变底色 */
 .cp-rackRow {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
-  padding: 12px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--cp-border-light);
+  transition: background-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Active row */
+.cp-rackRow:first-child {
+  border-top: 0;
+}
+
+.cp-rackRow:hover {
+  background: var(--cp-hover-bg);
+}
+
+/* 当前激活 rack：highlight 底 + 左侧细条 */
 .cp-rackRow[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: color-mix(in oklab, var(--cp-highlight) 10%, var(--cp-panel));
+  background: var(--cp-highlight-bg);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
 }
 
-/* Select button */
+/* 选择当前 rack：胶囊操作（LED + 文案） */
 .cp-rackRow__select {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  color: var(--cp-text);
+  font-size: 11.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* Select hover */
 .cp-rackRow__select:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
 }
 
-/* LED */
 .cp-rackRow__led {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: var(--cp-accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-accent) 18%, transparent);
+  box-shadow: 0 0 0 3px var(--cp-accent-soft);
 }
 
-/* Select text */
 .cp-rackRow__selectText {
   font-family: var(--cp-font-display);
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-/* Row body */
+/* 行主体 */
 .cp-rackRow__body {
   min-width: 0;
 }
 
-/* Row header */
 .cp-rackRow__top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
-/* Row name */
 .cp-rackRow__name {
   font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  font-weight: 700;
   font-size: 14px;
+  letter-spacing: 0.04em;
   color: var(--cp-text);
 }
 
-/* Tag row */
 .cp-rackRow__tags {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-/* Small pill */
+/* 置顶标记：warn 状态 token */
 .cp-rackRow__pill {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: var(--cp-text);
-  border: 1px solid color-mix(in oklab, var(--cp-warn) 36%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-warn) 14%, transparent);
+  @include cp-section-label;
+
+  padding: 3px 9px;
+  border: 1px solid var(--cp-warn-border);
   border-radius: 999px;
-  padding: 4px 8px;
+  background: var(--cp-warn-bg);
+  color: var(--cp-warn);
 }
 
-/* Meta row */
 .cp-rackRow__meta {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px 14px;
 }
 
-/* Key-value item */
 .cp-rackRow__kv {
   display: inline-flex;
-  gap: 8px;
   align-items: baseline;
+  gap: 8px;
 }
 
-/* Wide kv */
 .cp-rackRow__kv.wide {
   flex: 1 1 100%;
   min-width: 0;
 }
 
-/* KV key */
 .cp-rackRow__k {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: var(--cp-text-muted);
+  @include cp-section-label;
+
+  font-size: 10.5px;
 }
 
-/* KV value */
 .cp-rackRow__v {
   font-family: var(--cp-font-mono);
   font-size: 12px;
@@ -868,98 +808,99 @@ watch(showLogoutConfirm, (visible) => {
   overflow-wrap: anywhere;
 }
 
-/* Edit wrapper */
+/* 行内编辑态 */
 .cp-rackRow__edit {
   margin-top: 12px;
 }
 
-/* Edit grid */
 .cp-rackRow__editGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-/* Edit field */
 .cp-rackRow__field {
   min-width: 0;
 }
 
-/* Wide edit field */
 .cp-rackRow__field.wide {
   grid-column: 1 / -1;
 }
 
-/* Edit labels */
 .cp-rackRow__label {
   margin-bottom: 6px;
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-/* Edit actions */
 .cp-rackRow__editActions {
   margin-top: 12px;
   display: flex;
-  gap: 10px;
   justify-content: flex-end;
   flex-wrap: wrap;
-}
-
-/* Edit buttons */
-.cp-rackRow__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* Edit primary */
-.cp-rackRow__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel));
-}
-
-/* Edit hover */
-.cp-rackRow__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Ops column */
-.cp-rackRow__ops {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
-/* Op buttons */
+.cp-rackRow__btn {
+  @include cp-pill-button;
+}
+
+.cp-rackRow__btn.primary {
+  @include cp-pill-button(primary);
+}
+
+/* 操作区：横向排列的胶囊/图标按钮 */
+.cp-rackRow__ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .cp-rackRow__op {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 12px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
+
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
 }
 
-/* Op hover */
-.cp-rackRow__op:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
-/* Danger op */
 .cp-rackRow__op.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
+  @include cp-pill-button(danger);
+
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
+}
+
+/* 响应式：窄窗口新增栅格与 rack 行改纵向 */
+@media (max-width: 1100px) {
+  .cp-servers__createGrid {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  .cp-servers__field.wide {
+    grid-column: auto;
+  }
+
+  .cp-rackRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cp-rackRow__ops {
+    justify-content: flex-start;
+  }
+}
+
+/* 响应式：≤640px 压缩页面留白 */
+@media (max-width: 640px) {
+  .cp-servers {
+    padding: 10px;
+    gap: 10px;
+  }
 }
 </style>

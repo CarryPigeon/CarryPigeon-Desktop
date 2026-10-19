@@ -11,7 +11,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import MonoTag from "@/shared/ui/MonoTag.vue";
-import BackButton from "@/shared/ui/BackButton.vue";
+import PageHeader from "@/shared/ui/PageHeader.vue";
 import { useChannelInfoPage } from "@/features/chat/presentation/channel-info/useChannelInfoPage";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
 
@@ -47,13 +47,14 @@ const membershipStatusText = computed(() =>
   <!-- 区块：<main> .cp-info -->
   <main class="cp-info">
     <ErrorBoundary>
-      <header class="cp-info__head">
-        <BackButton test-id="channel-info-back" @click="goBack" />
-        <div class="cp-info__title">
-          <div class="cp-info__name">{{ channelName }}</div>
-          <div class="cp-info__sub">{{ t("channels") }}</div>
-        </div>
-      </header>
+      <!-- 区块：页面头部｜用途：返回 + 频道名 + 「频道」副标题（保留 channel-info-back 选择器） -->
+      <PageHeader
+        :title="channelName"
+        :subtitle="t('channels')"
+        back
+        back-test-id="channel-info-back"
+        @back="goBack"
+      />
 
       <section class="cp-info__body">
         <div class="cp-info__card">
@@ -98,64 +99,29 @@ const membershipStatusText = computed(() =>
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；主区域为两列网格，部分卡片跨全宽。 */
+/* 样式：ChannelInfoPage｜规格：cp-page 骨架 + PageHeader + 玻璃内容面板 + cp-card */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；内容区为两列网格，部分卡片跨全宽。 */
 .cp-info {
-  height: 100%;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  @include cp-page;
 }
 
-/* 头部：左返回（BackButton） / 中标题 两栏 */
-.cp-info__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.cp-info__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
-}
-
-.cp-info__sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
+/* 内容面板：一级玻璃面板 */
 .cp-info__body {
+  @include cp-glass-panel;
+
   flex: 1 1 auto;
   min-height: 0;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
-  padding: 14px;
+  padding: var(--cp-page-pad);
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--cp-page-gap);
 }
 
+/* 资料卡：内嵌卡片 */
 .cp-info__card {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
+  @include cp-card;
+
   padding: 12px;
 }
 
@@ -163,17 +129,16 @@ const membershipStatusText = computed(() =>
   grid-column: 1 / -1;
 }
 
+/* 字段标签：本地化文案，不做大写变换 */
 .cp-info__k {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   font-size: 12px;
+  font-weight: 600;
   color: var(--cp-text-muted);
 }
 
 .cp-info__v {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cp-text);
   line-height: 1.45;
 }
@@ -192,6 +157,7 @@ const membershipStatusText = computed(() =>
 .cp-info__editLabel {
   margin-bottom: 6px;
   font-size: 12px;
+  font-weight: 600;
   color: var(--cp-text-muted);
 }
 
@@ -202,40 +168,24 @@ const membershipStatusText = computed(() =>
   flex-wrap: wrap;
 }
 
+/* 错误状态条：统一 cp-inline-status */
 .cp-info__error {
+  @include cp-inline-status(danger);
+
   margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-danger, #b3261e);
 }
 
+/* 按钮：统一胶囊控件 */
 .cp-info__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 }
 
-.cp-info__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
-}
-
+/* 保存/申请加入为主操作：highlight */
 .cp-info__btn.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  @include cp-pill-button(primary);
 }
 
-.cp-info__btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
+/* 成员身份状态胶囊：已加入用 accent（连接/开启状态） */
 .cp-info__pill {
   display: inline-flex;
   align-items: center;
@@ -250,8 +200,8 @@ const membershipStatusText = computed(() =>
 }
 
 .cp-info__pill[data-ok="true"] {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel-muted));
+  border-color: color-mix(in oklab, var(--cp-accent) 40%, var(--cp-border));
+  background: var(--cp-accent-soft);
   color: var(--cp-text);
 }
 </style>

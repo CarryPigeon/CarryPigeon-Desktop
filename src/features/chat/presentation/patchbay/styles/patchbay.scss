@@ -1,22 +1,44 @@
-/* 样式：Patchbay｜布局：四栏网格（servers / channels / messages / members） */
+/* 样式：Patchbay｜布局：四栏共享一张悬浮玻璃面板（8px 页面留白，栏间无缝、无分割线） */
+
+/* 页面骨架：背景透明，让页面暖纸/网格透出；四栏拼成一张一级玻璃面板。
+   紧凑变体既无组件分割线，也无栏间距：外轮廓只由 8px 留白、18px 圆角与柔和阴影承担。 */
 .cp-main {
   height: 100%;
   display: flex;
   gap: 0;
-  padding: 0;
+  padding: 8px;
   position: relative;
+  isolation: isolate;
   min-width: 0;
-  background: var(--cp-surface);
+  background: transparent;
 }
 
+/* 共享玻璃表面：伪元素承载面板底色 / 背景模糊 / 描边 / 投影，四栏内容直接铺在同一表面上。
+   z-index: -1 垫在栏内容下方；isolation 把负层级限制在 .cp-main 内，避免沉到页面背景后面。 */
+.cp-main::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: -1;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface);
+  backdrop-filter: var(--cp-glass-blur);
+  -webkit-backdrop-filter: var(--cp-glass-blur);
+  box-shadow: var(--cp-shadow-soft);
+  pointer-events: none;
+}
+
+/* 列宽拖拽手柄：8px 宽、左右各 -4px 负 margin，净占 0 宽——手柄叠在两栏交界处，
+   既不留缝隙也不改变栏宽预算。静态不画竖线；仅悬停/拖拽时显示高亮引导线。 */
 .cp-resizer {
   flex: 0 0 8px;
+  margin: 0 -4px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   cursor: col-resize;
-  margin: 10px -4px;
-  z-index: 1;
+  z-index: 2;
   padding: 0;
   position: relative;
   touch-action: none;
@@ -25,13 +47,13 @@
 .cp-resizer::before {
   content: "";
   position: absolute;
-  top: 10px;
-  bottom: 10px;
+  top: 6px;
+  bottom: 6px;
   left: 50%;
   width: 2px;
   transform: translateX(-50%);
   border-radius: 999px;
-  background: var(--cp-border-light);
+  background: transparent;
   transition:
     background-color var(--cp-fast) var(--cp-ease),
     box-shadow var(--cp-fast) var(--cp-ease);
@@ -39,12 +61,12 @@
 
 .cp-resizer:hover::before,
 .cp-resizer[data-active="true"]::before {
-  background: color-mix(in oklab, var(--cp-info) 56%, var(--cp-border));
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-info) 14%, transparent);
+  background: var(--cp-highlight-border-strong);
+  box-shadow: 0 0 0 3px var(--cp-highlight-bg);
 }
 
 .cp-resizer:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline: 2px solid var(--cp-highlight-border-strong);
   outline-offset: 2px;
 }
 
@@ -55,33 +77,35 @@
 
 /* 区块：游标分页“加载更早历史”行 */
 .cp-historyMore {
-  padding: 10px 0 6px;
+  padding: 6px 0 4px;
   display: flex;
   justify-content: center;
 }
 
+/* 加载更早：设置页胶囊按钮（静态描边 + hover 仅变底色/描边，不做位移） */
 .cp-historyMore__btn {
-  border: 1px dashed var(--cp-border);
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   cursor: pointer;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-historyMore__btn:hover:not(:disabled) {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
-  border-color: var(--cp-border);
+  border-color: var(--cp-highlight-border);
 }
 
 .cp-historyMore__btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -89,31 +113,31 @@
 .cp-flash {
   position: absolute;
   left: 50%;
-  top: 10px;
+  top: 12px;
   transform: translateX(-50%);
   z-index: 20;
   border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
+  background: var(--cp-panel-solid);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 8px 14px;
   font-size: 12px;
-  box-shadow: var(--cp-shadow-soft);
+  box-shadow: var(--cp-shadow-float);
   max-width: min(680px, 88vw);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 容器：共享的 rail/center 面板外壳 */
+/* 容器：rail/center 是共享玻璃表面上的栏位，自身不再有底色 / 描边 / 圆角 / 投影；
+   外轮廓由 .cp-main::before 统一提供，栏与栏之间因此没有任何可见间隙。 */
 .cp-rail,
 .cp-center {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
+  background: transparent;
+  border: 0;
   border-radius: 0;
-  box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  box-shadow: none;
+
   overflow: hidden;
   min-width: 0;
 }
@@ -165,325 +189,249 @@
 /* 栏（Rail）：成员栏无底部区 */
 .cp-rail--members {
   grid-template-rows: auto 1fr;
-  border-radius: 0;
 }
 
-/* 栏标题：大写标签 */
-.cp-rail__title {
-  padding: 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--cp-panel) 66%, transparent),
-    transparent
-  );
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-/* 栏底部：纵向堆叠导航按钮 */
-.cp-rail__foot {
-  border-top: 1px solid var(--cp-border-light);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cp-rail__empty {
-  margin: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px dashed rgba(148, 163, 184, 0.26);
-  background: var(--cp-panel-muted);
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.45;
-}
-
-/* 栏按钮：胶囊形导航按钮 */
-.cp-rail__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  color: color-mix(in oklab, var(--cp-text) 82%, transparent);
-  border-radius: 999px;
-  padding: 10px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* 栏按钮：悬停态 */
-.cp-rail__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
-}
-
-.cp-rail__btn:active {
-  transform: translateY(0);
-}
-
-/* 服务器机架列表 */
-.cp-rackList {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow: auto;
-}
-
-/* 机架条目 */
-.cp-rack {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  color: color-mix(in oklab, var(--cp-text) 82%, transparent);
-  border-radius: 16px;
-  padding: 10px;
+/* 栏头部：设置页分组头（微标签 + 右侧图标按钮；不画底部分割线） */
+.cp-rail__head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* 机架条目：悬停态 */
-.cp-rack:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
-}
-
-.cp-rack:active {
-  transform: translateY(0);
-}
-
-/* 机架条目：激活态 */
-.cp-rack[data-active="true"] {
-  border-color: color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-info) 12%, var(--cp-panel));
-}
-
-/* 机架 LED 指示灯 */
-.cp-rack__led {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--cp-accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-accent) 16%, transparent);
-}
-
-/* 机架名称 */
-.cp-rack__name {
-  font-size: 12px;
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* 补丁面板（Patch Panel）头容器（频道栏头部） */
-.cp-panelHead {
-  padding: 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--cp-panel) 62%, transparent),
-    transparent
-  );
-}
-
-/* 补丁面板（Patch Panel）头：顶部行 */
-.cp-panelHead__top {
-  display: flex;
-  align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+  padding: 8px 10px 4px;
 }
 
-/* 补丁面板（Patch Panel）名称 */
-.cp-panelHead__name {
+/* 栏标题：固定英文微标签沿用大写/字距，用户内容不做 uppercase */
+.cp-rail__title {
+  min-width: 0;
   font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 16px;
-  color: color-mix(in oklab, var(--cp-text) 96%, transparent);
-}
-
-/* 补丁面板（Patch Panel）徽章（READY/LATCH） */
-.cp-panelHead__badges {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-/* 补丁面板（Patch Panel）socket 行 */
-.cp-panelHead__socket {
-  margin-top: 10px;
-}
-
-/* 补丁面板（Patch Panel）动作按钮行 */
-.cp-panelHead__actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* 补丁面板（Patch Panel）动作按钮 */
-.cp-panelHead__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
-}
-
-/* 补丁面板（Patch Panel）动作按钮：悬停态 */
-.cp-panelHead__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
-}
-
-.cp-panelHead__btn:active {
-  transform: translateY(0);
-}
-
-/* 补丁面板（Patch Panel）危险动作按钮（Required Setup） */
-.cp-panelHead__btn.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 32%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
-}
-
-/* 补丁面板（Patch Panel）危险动作按钮：悬停态 */
-.cp-panelHead__btn.danger:hover {
-  border-color: rgba(239, 68, 68, 0.46);
-  background: color-mix(in oklab, var(--cp-danger) 14%, var(--cp-hover-bg));
-}
-
-/* 频道栏：搜索 + Tabs 容器 */
-.cp-channelSearch {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-}
-
-/* 频道栏：Tabs 行 */
-.cp-channelTabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-/* 频道 Tab 按钮 */
-.cp-channelTabs__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--cp-text-muted);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
-}
-
-/* 频道 Tab 按钮：悬停态 */
-.cp-channelTabs__btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cp-highlight-border);
-  background: var(--cp-hover-bg);
-}
-
-.cp-channelTabs__btn:active {
-  transform: translateY(0);
-}
-
-/* 频道 Tab 按钮：激活态 */
-.cp-channelTabs__btn[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
-}
-
-/* 频道列表容器 */
-.cp-channelList {
-  padding: 12px;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* 频道列表：空状态 */
-.cp-channelEmpty {
-  padding: 10px 10px;
-  border-radius: 14px;
-  border: 1px dashed rgba(148, 163, 184, 0.26);
-  background: var(--cp-panel-muted);
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.45;
-}
-
-/* 频道端口点：颜色由行内 `--cp-channel-port` 决定（系统频道与普通频道区分） */
-.cp-channel__port {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--cp-channel-port, var(--cp-highlight));
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-channel-port, var(--cp-highlight)) 14%, transparent);
-}
-
-/* 频道名称（单行省略） */
-.cp-channel__name {
-  font-size: 13px;
-  color: color-mix(in oklab, var(--cp-text) 92%, transparent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 频道未读徽标（pill） */
+/* 栏底部：纵向堆叠导航行（不画顶部分割线） */
+.cp-rail__foot {
+  padding: 4px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 栏空状态：设置页提示底色（不再用虚线噪音） */
+.cp-rail__empty {
+  margin: 4px;
+  padding: 8px 10px;
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+/* 栏按钮：设置页导航行（透明底，hover 仅变底色与字色） */
+.cp-rail__btn {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-rail__btn:hover {
+  background: var(--cp-hover-bg);
+  border-color: var(--cp-border-light);
+  color: var(--cp-text);
+}
+
+/* 服务器机架列表：设置页行列表（padding 4/6、gap 1，行间不画分隔线） */
+.cp-rackList {
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: auto;
+}
+
+/* 机架行：透明底；hover 只变底色，active 用 highlight inset */
+.cp-rack {
+  position: relative;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-radius: var(--cp-radius-sm);
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-rack:hover {
+  background: var(--cp-hover-bg);
+  color: var(--cp-text);
+}
+
+.cp-rack:focus-visible {
+  outline: 2px solid var(--cp-highlight-border-strong);
+  outline-offset: 2px;
+}
+
+/* 机架行：激活态（低饱和高亮底 + 左侧 2px 细条，与设置页导航一致） */
+.cp-rack[data-active="true"] {
+  border-color: var(--cp-highlight-border);
+  background: var(--cp-highlight-bg);
+  color: var(--cp-text);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
+}
+
+/* 机架 LED 指示灯（品牌识别保留：accent = 开启/连接状态） */
+.cp-rack__led {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cp-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-accent) 14%, transparent);
+}
+
+/* 机架名称：设置页行标签（用户内容不 uppercase） */
+.cp-rack__name {
+  font-family: var(--cp-font-display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 频道栏：搜索 + Tabs 容器（不画底部分割线） */
+.cp-channelSearch {
+  padding: 6px 8px;
+}
+
+/* 频道栏：过滤 Tabs（设置页分段控件） */
+.cp-channelTabs {
+  @include cp-segmented;
+
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+/* 频道 Tab 选项（cp-segmented-item；激活态由 mixin 的 data-active 提供） */
+.cp-channelTabs__btn {
+  @include cp-segmented-item;
+
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 频道列表容器：设置页行列表（padding 4/6、gap 1，行间不画分隔线） */
+.cp-channelList {
+  padding: 4px 6px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* 频道列表：空状态（提示条，无描边） */
+.cp-channelEmpty {
+  margin: 2px 0;
+  padding: 8px 10px;
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+/* 频道端口点：颜色由行内 `--cp-channel-port` 决定（系统频道与普通频道区分） */
+.cp-channel__port {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cp-channel-port, var(--cp-highlight));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-channel-port, var(--cp-highlight)) 14%, transparent);
+}
+
+/* 频道名称（单行省略；设置页行标签字重） */
+.cp-channel__name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 频道未读徽标（pill，状态色统一走 warn token） */
 .cp-channel__unread {
   min-width: 20px;
   height: 20px;
+  padding: 0 6px;
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
   font-family: var(--cp-font-mono);
-  font-size: 12px;
-  color: var(--cp-text);
-  background: color-mix(in oklab, var(--cp-warn) 18%, transparent);
-  border: 1px solid color-mix(in oklab, var(--cp-warn) 40%, var(--cp-border));
+  font-size: 11px;
+  color: var(--cp-warn);
+  background: var(--cp-warn-bg);
+  border: 1px solid var(--cp-warn-border);
 }
 
-/* 频道行（joined/discover） */
+/* 频道行：设置页列表行（透明底 + hover/active 底色，行间不画分隔线） */
 .cp-channelRow {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 10px;
+  position: relative;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--cp-radius-sm);
+  padding: 4px 8px;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* 频道行：激活态 */
+.cp-channelRow:hover {
+  background: var(--cp-hover-bg);
+}
+
+/* 频道行：激活态（highlight 底 + inset 2px 细条） */
 .cp-channelRow[data-active="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  background: color-mix(in oklab, var(--cp-highlight) 10%, var(--cp-panel));
+  border-color: var(--cp-highlight-border);
+  background: var(--cp-highlight-bg);
+  box-shadow: inset 2px 0 0 var(--cp-highlight);
 }
 
 /* 频道行：主可点击区域 */
@@ -493,8 +441,8 @@
   padding: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
   text-align: left;
   cursor: pointer;
@@ -502,7 +450,7 @@
 
 /* 频道行：未加入时禁用态 */
 .cp-channelRow__main:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -511,13 +459,14 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 /* 频道行：brief（单行省略） */
 .cp-channelRow__brief {
   font-size: 12px;
-  color: color-mix(in oklab, var(--cp-text-muted) 88%, transparent);
+  line-height: 1.4;
+  color: var(--cp-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -526,21 +475,26 @@
 /* 频道行：草稿指示器 */
 .cp-channel__draft-indicator {
   font-size: 11px;
-  color: var(--cp-warning);
+  color: var(--cp-warn);
   margin-left: auto;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 /* 频道行：置顶指示器 */
 .cp-channel__pin-icon {
   font-size: 11px;
   margin-left: 4px;
-  opacity: 0.9;
+  color: var(--cp-highlight);
 }
 
-/* 频道行：置顶分组内的行使用强调边框 */
-.cp-channelRow[data-pinned="true"] {
-  border-color: color-mix(in oklab, var(--cp-highlight) 36%, var(--cp-border));
+/* 频道行：置顶分组内的非激活行保持极淡高亮底（分组头已用 highlight 色） */
+.cp-channelRow[data-pinned="true"]:not([data-active="true"]) {
+  background: color-mix(in oklab, var(--cp-highlight) 5%, transparent);
+}
+
+/* 置顶行 hover 仍只给常规底色，避免与置顶淡底叠加 */
+.cp-channelRow[data-pinned="true"]:not([data-active="true"]):hover {
+  background: var(--cp-hover-bg);
 }
 
 /* 频道行：置顶分组的分类标题强化视觉 */
@@ -553,47 +507,55 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* 频道行：加入/申请按钮 */
+/* 频道行：加入/申请按钮（小号胶囊） */
 .cp-channelRow__join {
-  border: 1px solid color-mix(in oklab, var(--cp-info) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-info) 10%, var(--cp-panel-muted));
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--cp-highlight-border);
+  background: var(--cp-highlight-bg);
   color: var(--cp-text);
   border-radius: 999px;
-  padding: 7px 10px;
   font-size: 12px;
+  line-height: 1.4;
   cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 /* 频道行：加入按钮悬停态 */
-.cp-channelRow__join:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
+.cp-channelRow__join:hover:not(:disabled) {
+  background: var(--cp-highlight-bg-strong);
+  border-color: var(--cp-highlight-border-strong);
 }
 
-.cp-channelRow__join:active {
-  transform: translateY(0);
+/* 频道行：加入按钮禁用态 */
+.cp-channelRow__join:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
-/* 频道行：信息快捷入口（悬停显示 ⓘ 图标） */
+/* 频道行：信息快捷入口（悬停显示 ⓘ 图标；设置页图标按钮，静态无外框） */
 .cp-channelRow__info {
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text-muted);
-  border-radius: 999px;
-  width: 28px;
-  height: 28px;
-  display: inline-grid;
-  place-items: center;
+  border-radius: var(--cp-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
+  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease),
     color var(--cp-fast) var(--cp-ease),
@@ -609,21 +571,9 @@
 
 /* 频道行：信息按钮悬停态 */
 .cp-channelRow__info:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
-  border-color: var(--cp-highlight-border);
+  border-color: var(--cp-border);
   color: var(--cp-text);
-}
-
-.cp-channelRow__info:active {
-  transform: translateY(0);
-}
-
-/* 频道行：加入按钮禁用态 */
-.cp-channelRow__join:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
 }
 
 /* 中间栏布局（top console / voice-call / messages / composer） */
@@ -637,28 +587,27 @@
   container-type: inline-size;
 }
 
-/* 顶部控制台栏 */
+/* 顶部控制台栏：设置页页头节奏（8/10 内边距，不画底部分割线，不做渐变底） */
 .cp-topConsole {
-  padding: 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--cp-panel) 60%, transparent),
-    transparent
-  );
+  padding: 8px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-/* 顶部控制台标题 */
+/* 顶部控制台标题：14px / 700 display，不做 uppercase（频道名是用户内容） */
 .cp-topConsole__title {
   font-family: var(--cp-font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cp-topConsole__left {
@@ -668,62 +617,48 @@
 .cp-topConsole__right {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* 消息面板：可滚动消息列表 */
 .cp-signalPane {
   flex: 1;
   min-height: 0;
-  padding: 14px;
+  padding: 10px;
   /* 消息区只纵向滚动：横向溢出属布局缺陷，若保留 auto 会在面板被压窄时冒出底部滚动条。 */
   overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
+/* 回到底部：浮层图标按钮（不透明底保证叠字可读，不做位移） */
 .cp-jumpBottom {
   position: sticky;
   bottom: 12px;
   align-self: flex-end;
   z-index: 3;
   border: 1px solid var(--cp-border);
-  background: color-mix(in oklab, var(--cp-panel) 92%, transparent);
-  color: var(--cp-text);
+  background: var(--cp-panel-solid);
+  color: var(--cp-text-muted);
   border-radius: 999px;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   cursor: pointer;
   box-shadow: var(--cp-shadow-soft);
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-jumpBottom:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-highlight-border);
-}
-
-.cp-jumpBottom:active {
-  transform: translateY(0);
-}
-
-/* 未读分隔符 */
-.cp-unreadSep {
-  align-self: center;
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: var(--cp-text-muted);
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px dashed rgba(148, 163, 184, 0.28);
-  background: color-mix(in oklab, var(--cp-panel-muted) 88%, transparent);
+  color: var(--cp-text);
 }
 
 /* 消息行网格（avatar / strip / body） */
@@ -731,9 +666,9 @@
   display: grid;
   grid-template-columns: 44px 2px 1fr;
   grid-template-areas: "avatar strip body";
-  gap: 12px;
+  gap: 8px;
   align-items: start;
-  border-radius: 14px;
+  border-radius: var(--cp-radius);
 }
 
 /* 消息行：mine 时翻转布局（右对齐） */
@@ -743,9 +678,9 @@
 }
 
 .cp-msg:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline: 2px solid var(--cp-highlight-border-strong);
   outline-offset: 2px;
-  background: color-mix(in oklab, var(--cp-info) 8%, transparent);
+  background: var(--cp-highlight-bg);
 }
 
 /* 消息行：头像槽位 */
@@ -803,14 +738,14 @@
   flex-wrap: wrap;
   font-size: 12px;
   line-height: 16px;
-  color: color-mix(in oklab, var(--cp-text-muted) 96%, transparent);
-  margin-bottom: 8px;
+  color: var(--cp-text-muted);
+  margin-bottom: 4px;
   width: 100%;
 }
 
 /* 元信息（meta）：分组消息的紧凑变体 */
 .cp-msg__meta[data-compact="true"] {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   opacity: 0.82;
 }
 
@@ -818,22 +753,24 @@
 .cp-msg__meta[data-bare="true"] {
   margin-bottom: 2px;
   /* 色条隐藏后由组内垂直间距承担视觉分隔；用 padding 让行底色随之延展 */
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 
-/* 元信息（meta）：发送者名称 */
+/* 元信息（meta）：发送者名称（用户内容，不做 uppercase） */
 .cp-msg__from {
   font-family: var(--cp-font-display);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--cp-text) 92%, transparent);
+  font-weight: 700;
+  font-size: 12.5px;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: var(--cp-text);
 }
 
 /* 元信息（meta）：时间戳（等宽字体；domain 类型标签已移除，仅保留名字与时间） */
 .cp-msg__time {
   font-family: var(--cp-font-mono);
   font-size: 12px;
-  color: color-mix(in oklab, var(--cp-text-muted) 96%, transparent);
+  color: var(--cp-text-muted);
 }
 
 /* 元信息（meta）：点分隔符 */
@@ -841,20 +778,26 @@
   width: 4px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.5);
+  background: var(--cp-border);
 }
 
 /* 单条消息的“更多”按钮（打开上下文菜单）：跟随 domain 标签内联展示，悬停行时可见 */
 .cp-msg__more {
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text-muted);
-  border-radius: 10px;
-  padding: 4px 8px;
+  border-radius: var(--cp-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease),
     color var(--cp-fast) var(--cp-ease),
@@ -870,28 +813,23 @@
 
 /* “更多”按钮：悬停态 */
 .cp-msg__more:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
   border-color: var(--cp-border);
   color: var(--cp-text);
 }
 
 .cp-msg__more:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 42%, var(--cp-border));
+  outline: 2px solid var(--cp-highlight-border-strong);
   outline-offset: 1px;
 }
 
-.cp-msg__more:active {
-  transform: translateY(0);
-}
-
-/* 核心文本气泡：接收侧弱化背景（仅保留极淡底色），mine 保留强调色 */
+/* 核心文本气泡：接收侧使用面板底 + 细分隔线（一级卡片语言），mine 保留 accent 12% */
 .cp-bubble {
-  border: 1px solid transparent;
-  background: color-mix(in oklab, var(--cp-panel) 42%, transparent);
-  border-radius: 16px;
-  padding: 12px;
-  color: color-mix(in oklab, var(--cp-text) 90%, transparent);
+  border: 1px solid var(--cp-border-light);
+  background: var(--cp-panel);
+  border-radius: var(--cp-radius-card);
+  padding: 8px 10px;
+  color: var(--cp-text);
   font-size: 13px;
   line-height: 1.5;
   max-width: min(74ch, 100%);
@@ -904,10 +842,10 @@
 
 /* 插件渲染气泡（外壳同核心气泡；内部 UI 由插件定义） */
 .cp-pluginBubble {
-  border: 1px solid transparent;
-  background: color-mix(in oklab, var(--cp-panel) 42%, transparent);
-  border-radius: 16px;
-  padding: 10px;
+  border: 1px solid var(--cp-border-light);
+  background: var(--cp-panel);
+  border-radius: var(--cp-radius-card);
+  padding: 8px;
   max-width: min(74ch, 100%);
   min-width: 0;
 }
@@ -924,11 +862,11 @@
   background: color-mix(in oklab, var(--cp-accent) 12%, var(--cp-panel));
 }
 
-/* 气泡内的引用预览 */
+/* 气泡内的引用预览（内嵌分组：1px 边框 + 更实底色，不叠加阴影） */
 .cp-replyMini {
-  margin-bottom: 10px;
-  padding: 8px 10px;
-  border-radius: 14px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: var(--cp-radius-control);
   border: 1px solid var(--cp-border-light);
   background: var(--cp-panel-muted);
   display: flex;
@@ -937,10 +875,11 @@
   min-width: 0;
 }
 
-/* 引用预览：标签 */
+/* 引用预览：标签（固定英文微标签） */
 .cp-replyMini__k {
   font-family: var(--cp-font-display);
-  letter-spacing: 0.10em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: 11px;
   color: var(--cp-text-muted);
@@ -957,45 +896,54 @@
   min-width: 0;
 }
 
-/* 编辑器面板容器 */
+/* 编辑器面板容器（composer 自身是内容区内的卡片，容器不再加分隔线） */
 .cp-composerPane {
-  border-top: 1px solid var(--cp-border-light);
-  padding: 12px;
+  padding: 8px;
 }
 
-/* 成员列表 */
+/* 成员列表：设置页行列表（padding 4/6、gap 1，行间不画分隔线） */
 .cp-memberList {
-  padding: 12px;
+  padding: 4px 6px;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1px;
 }
 
-/* 成员行 */
+/* 成员行：透明底；hover 只变底色 */
 .cp-member {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 10px;
+  position: relative;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--cp-radius-sm);
+  padding: 4px 8px;
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease);
 }
 
-/* 成员名称（省略） */
+.cp-member:hover {
+  background: var(--cp-hover-bg);
+}
+
+/* 成员名称（省略；设置页行标签字重） */
 .cp-member__name {
   font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
   color: var(--cp-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 成员角色标签 */
+/* 成员角色标签（等宽微标签） */
 .cp-member__role {
-  margin-top: 4px;
+  margin-top: 2px;
   font-family: var(--cp-font-mono);
   font-size: 11px;
   color: var(--cp-text-muted);
@@ -1003,43 +951,36 @@
   letter-spacing: 0.08em;
 }
 
-/* 标签页（Tabs）中的“创建频道”按钮 */
+/* 标签页（Tabs）中的“创建频道”按钮：图标段位（AppIcon plus） */
 .cp-channelTabs__btn.add {
+  flex: 0 0 30px;
+  min-width: 30px;
   margin-left: auto;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 16px;
-  font-weight: bold;
-  min-width: 32px;
-  padding: 6px 10px;
 }
 
 /* 顶部控制台图标按钮（搜索 / 固定成员栏 / 频道设置）：
    静态态不画外框（透明的 1px 边框只用来固定 32×32 命中区，避免 hover 出现时尺寸跳动），
-   仅悬停/聚焦时给底色与描边，与同排的插件工具栏入口、@提醒铃铛保持同一观感。 */
+   仅悬停/聚焦时给底色与描边，与设置页 cp-icon-button 同一观感。 */
 .cp-topConsole__search,
 .cp-topConsole__pinMembers,
 .cp-topConsole__settings {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  @include cp-icon-button;
+
+  /* 显式声明静态态（样式契约测试以源码声明为准）；图标跟随 14px 字号（1em） */
   border: 1px solid transparent;
   background: transparent;
-  color: var(--cp-text);
-  border-radius: 10px;
-  padding: 8px;
   font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-topConsole__search:hover,
 .cp-topConsole__pinMembers:hover,
 .cp-topConsole__settings:hover {
   background: var(--cp-hover-bg);
-  border-color: var(--cp-border);
 }
 
 /* 固定成员栏：已固定用强调色图标表达，不再额外套一层可见外框 */
@@ -1058,20 +999,19 @@
 
 /* 与最右侧的 @提醒铃铛留出间距 */
 .cp-topConsole__settings {
-  margin-right: 10px;
+  margin-right: 6px;
 }
 
-/* 频道设置菜单 */
+/* 频道设置菜单（浮层：不透明底，菜单项 hover 只变底色） */
 .cp-channelMenu {
   position: fixed;
   z-index: 60;
   min-width: 180px;
-  border: 1px solid color-mix(in oklab, var(--cp-info) 18%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-panel) 92%, rgba(0, 0, 0, 0.05));
-  border-radius: 16px;
-  box-shadow: var(--cp-shadow);
-  padding: 8px;
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-solid);
+  border-radius: var(--cp-radius-card);
+  box-shadow: var(--cp-shadow-float);
+  padding: 6px;
 }
 
 .cp-channelMenu__backdrop {
@@ -1088,42 +1028,38 @@
   display: flex;
   justify-content: flex-start;
   gap: 10px;
-  padding: 10px 10px;
-  border-radius: 12px;
+  padding: 8px 10px;
+  border-radius: var(--cp-radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   text-align: left;
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-channelMenu__item:hover {
-  transform: translateY(-1px);
   background: var(--cp-hover-bg);
-  border-color: var(--cp-border);
+  border-color: var(--cp-border-light);
 }
 
-.cp-channelMenu__item:active {
-  transform: translateY(0);
-}
 .cp-channelMenu__sep {
-  margin: 6px 6px;
+  margin: 6px;
   height: 1px;
   background: var(--cp-border-light);
 }
 
 .cp-channelMenu__item.danger {
-  color: color-mix(in oklab, var(--cp-danger) 72%, var(--cp-text));
+  color: var(--cp-danger);
 }
 
 .cp-channelMenu__item.danger:hover {
-  border-color: color-mix(in oklab, var(--cp-danger) 26%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-hover-bg));
+  border-color: var(--cp-danger-border);
+  background: var(--cp-danger-bg);
 }
 
 .cp-jumpBottom:focus-visible,
@@ -1132,72 +1068,11 @@
 .cp-topConsole__search:focus-visible,
 .cp-historyMore__btn:focus-visible,
 .cp-channelMenu__item:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--cp-info) 40%, var(--cp-border));
+  outline: 2px solid var(--cp-highlight-border-strong);
   outline-offset: 2px;
 }
 
-/* ── 渐进式入场动画 ── */
-
-/* 骨骼脉冲 */
-@keyframes cp-skeleton-pulse {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { opacity: 0.6; }
-}
-
-/* 列表项入场：淡入 + 轻微上滑 */
-@keyframes cp-fade-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 频道行入场 */
-.cp-channelRow {
-  animation: cp-fade-slide-in 0.25s ease both;
-}
-.cp-channelRow:nth-child(2) { animation-delay: 20ms; }
-.cp-channelRow:nth-child(3) { animation-delay: 40ms; }
-.cp-channelRow:nth-child(4) { animation-delay: 60ms; }
-.cp-channelRow:nth-child(5) { animation-delay: 80ms; }
-.cp-channelRow:nth-child(6) { animation-delay: 100ms; }
-.cp-channelRow:nth-child(7) { animation-delay: 120ms; }
-.cp-channelRow:nth-child(8) { animation-delay: 140ms; }
-
-/* 成员行入场：延迟按位置周期重复（每 8 个一组），任意长度列表都保持连贯波浪 */
-.cp-member {
-  animation: cp-fade-slide-in 0.25s ease both;
-}
-.cp-member:nth-child(8n+2) { animation-delay: 20ms; }
-.cp-member:nth-child(8n+3) { animation-delay: 40ms; }
-.cp-member:nth-child(8n+4) { animation-delay: 60ms; }
-.cp-member:nth-child(8n+5) { animation-delay: 80ms; }
-.cp-member:nth-child(8n+6) { animation-delay: 100ms; }
-.cp-member:nth-child(8n+7) { animation-delay: 120ms; }
-.cp-member:nth-child(8n)   { animation-delay: 140ms; }
-
-/* 机架条目入场 */
-.cp-rack {
-  animation: cp-fade-slide-in 0.25s ease both;
-}
-.cp-rack:nth-child(2) { animation-delay: 20ms; }
-.cp-rack:nth-child(3) { animation-delay: 40ms; }
-.cp-rack:nth-child(4) { animation-delay: 60ms; }
-.cp-rack:nth-child(5) { animation-delay: 80ms; }
-.cp-rack:nth-child(6) { animation-delay: 100ms; }
-
-/* 空状态骨骼占位（pending → loaded 过渡） */
-.cp-channelEmpty,
-.cp-rail__empty {
-  animation: cp-skeleton-pulse 1.8s ease-in-out infinite;
-}
-
-/* ── 消息入场动画 ── */
+/* ── 动效：只保留消息入场与骨架屏交叉淡入；列表行不再做错峰位移 ── */
 
 /* 消息行入场：轻微淡入 + 上滑 */
 @keyframes cp-msg-enter {
@@ -1217,8 +1092,12 @@
 
 /* 骨架屏 → 内容交叉淡入 */
 @keyframes cp-content-reveal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .cp-signalPane:not(:empty) {
@@ -1232,18 +1111,18 @@
 /* 一级收紧：面板 ≤520px */
 @container (max-width: 520px) {
   .cp-signalPane {
-    padding: 10px;
-    gap: 10px;
+    padding: 8px;
+    gap: 6px;
   }
 
   .cp-topConsole {
-    padding: 10px;
+    padding: 6px 8px;
   }
 
   /* 头像列 44px → 40px：AvatarBadge 固定 36px，保留 2px 呼吸；不再下调以免裁切头像 */
   .cp-msg {
     grid-template-columns: 40px 2px 1fr;
-    gap: 10px;
+    gap: 6px;
   }
 
   .cp-msg[data-mine="true"] {
@@ -1251,23 +1130,23 @@
   }
 
   .cp-msg__meta {
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
 
   .cp-msg__meta[data-bare="true"] {
-    padding-bottom: 10px;
+    padding-bottom: 6px;
   }
 }
 
 /* 二级收紧：面板 ≤400px */
 @container (max-width: 400px) {
   .cp-signalPane {
-    padding: 8px;
-    gap: 8px;
+    padding: 6px;
+    gap: 4px;
   }
 
   .cp-msg {
-    gap: 8px;
+    gap: 4px;
   }
 
   /* 名称与时间必须同步缩小：.cp-msg__time 自带 font-size: 12px，只改 .cp-msg__meta
@@ -1296,8 +1175,7 @@
   .cp-channelRow__join,
   .cp-channelTabs__btn,
   .cp-channelMenu__item,
-  .cp-channelEmpty,
-  .cp-rail__empty {
+  .cp-msg {
     transition: none !important;
     animation: none !important;
   }

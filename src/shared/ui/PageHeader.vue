@@ -14,11 +14,14 @@ const props = withDefaults(
     subtitle?: string;
     back?: boolean;
     backLabel?: string;
+    /** 返回按钮的 data-testid（默认 page-header-back，兼容各页面既有选择器）。 */
+    backTestId?: string;
   }>(),
   {
     subtitle: "",
     back: false,
     backLabel: "",
+    backTestId: "page-header-back",
   },
 );
 
@@ -39,7 +42,7 @@ function onBack(): void {
     <BackButton
       v-if="props.back"
       :label="props.backLabel"
-      test-id="page-header-back"
+      :test-id="props.backTestId"
       @click="onBack"
     />
     <!-- 标题块 -->
@@ -57,19 +60,15 @@ function onBack(): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：PageHeader｜布局：左返回 / 中标题 / 右操作 三栏 */
+/* 样式：PageHeader｜布局：左返回 / 中标题 / 右操作 三栏；外壳复用统一玻璃面板 */
 .cp-page-header {
+  @include cp-glass-panel;
+
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 14px;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
+  padding: var(--cp-page-pad);
 }
 
 /* 标题文字 */

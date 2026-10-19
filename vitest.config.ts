@@ -11,10 +11,10 @@ export default defineConfig({
   },
   css: {
     preprocessorOptions: {
-      // 与 vite.config.ts 保持一致：组件 <style lang="scss"> 依赖全局注入的 button-size mixin。
+      // 与 vite.config.ts 保持一致：组件 <style lang="scss"> 依赖全局注入的 mixin。
       scss: {
         api: "modern-compiler",
-        additionalData: `@use "@/styles/button-size" as *;\n`,
+        additionalData: `@use "@/styles/button-size" as *;\n@use "@/styles/ui" as *;\n`,
       },
     },
   },

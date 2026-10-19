@@ -135,69 +135,77 @@ watch(() => props.visible, (v) => {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ForwardChannelDialog｜规格：字段 + 分组行列表 + 胶囊按钮 */
 .cp-forwardDialog {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 360px;
 }
+
+/* 频道列表：内嵌卡片 + 行分隔 */
 .cp-forwardDialog__list {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid var(--cp-border, #313244);
-  border-radius: 8px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
 }
+
 .cp-forwardDialog__empty {
   padding: 24px 12px;
   text-align: center;
-  font-size: 13px;
-  color: var(--cp-text-muted, #a6adc8);
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
 }
+
+/* 频道行：hover 只变底色，选中用 highlight 语言 */
 .cp-forwardDialog__channel {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
   cursor: pointer;
-  border-bottom: 1px solid var(--cp-border-light, rgba(49, 50, 68, 0.4));
+  border-top: 1px solid var(--cp-border-light);
   font-size: 13px;
-  transition: background-color 0.15s;
+  transition: background-color var(--cp-fast) var(--cp-ease);
 
-  &:last-child { border-bottom: none; }
-  &:hover { background: var(--cp-hover-bg, rgba(255,255,255,0.04)); }
+  &:first-child {
+    border-top: 0;
+  }
+
+  &:hover {
+    background: var(--cp-hover-bg);
+  }
 
   &[data-selected="true"] {
-    background: color-mix(in oklab, var(--cp-primary) 12%, transparent);
+    background: var(--cp-highlight-bg);
+    box-shadow: inset 2px 0 0 var(--cp-highlight);
   }
 }
+
 .cp-forwardDialog__channelHash {
-  color: var(--cp-text-muted, #a6adc8);
+  font-family: var(--cp-font-mono);
+  color: var(--cp-text-muted);
 }
+
 .cp-forwardDialog__channelName {
-  color: var(--cp-text, #cdd6f4);
+  font-size: 13px;
+  color: var(--cp-text);
 }
+
 .cp-forwardDialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
-.cp-forwardDialog__btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--cp-border, #313244);
-  background: transparent;
-  color: var(--cp-text, #cdd6f4);
-  font-size: 13px;
-  cursor: pointer;
 
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+/* 动作按钮：胶囊按钮（主操作 = highlight） */
+.cp-forwardDialog__btn {
+  @include cp-pill-button;
 }
+
 .cp-forwardDialog__btn--primary {
-  background: var(--cp-primary);
-  border-color: var(--cp-primary);
-  color: #fff;
+  @include cp-pill-button(primary);
 }
 </style>

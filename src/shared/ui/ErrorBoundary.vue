@@ -63,45 +63,48 @@ function handleRetry(): void {
 }
 
 .error-boundary-card {
+  @include cp-glass-panel;
+
   text-align: center;
   padding: 40px;
-  background: var(--cp-panel);
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-lg);
-  box-shadow: var(--cp-shadow-soft);
   max-width: 380px;
   width: 80vw;
 }
 
 .error-boundary-icon {
-  font-size: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--cp-danger-border);
+  border-radius: 999px;
+  background: var(--cp-danger-bg);
+  font-size: 26px;
 }
 
 .error-boundary-title {
+  margin: 12px 0 8px;
   font-family: var(--cp-font-display);
+  font-weight: 900;
   font-size: 18px;
   color: var(--cp-text);
-  margin: 12px 0 8px;
 }
 
 .error-boundary-detail {
-  font-size: 12px;
-  color: var(--cp-text-muted);
   margin: 0 0 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
   word-break: break-all;
   max-height: 80px;
   overflow: auto;
 }
 
 .error-boundary-btn {
-  border-radius: 999px;
-  padding: 8px 28px;
-  font-size: 13px;
-  cursor: pointer;
-  background: var(--cp-accent);
-  color: #fff;
-  border: none;
-  transition: background-color var(--cp-fast) var(--cp-ease);
-  &:hover { background: var(--cp-accent-hover); }
+  @include cp-pill-button(primary);
+
+  min-height: 36px;
+  padding: 0 28px;
 }
 </style>

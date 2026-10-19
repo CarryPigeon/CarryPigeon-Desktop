@@ -247,6 +247,7 @@ function handleSave(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：PinnedChannelsDialog｜规格：字段 + 分组行列表 + 胶囊/图标按钮 */
 .cp-pinEditor {
   display: flex;
   flex-direction: column;
@@ -265,11 +266,12 @@ function handleSave(): void {
   gap: 6px;
 }
 
+/* 分区头：中文文案不做 uppercase，用弱化小标题 */
 .cp-pinEditor__sectionHead {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
   color: var(--cp-text-muted);
 }
 
@@ -277,12 +279,13 @@ function handleSave(): void {
   margin: 0;
   padding: 12px;
   border: 1px dashed var(--cp-border);
-  border-radius: 10px;
+  border-radius: var(--cp-radius-control);
   font-size: 12px;
   color: var(--cp-text-muted);
   text-align: center;
 }
 
+/* 列表容器：内嵌卡片；行间细分隔线 */
 .cp-pinEditor__list {
   list-style: none;
   margin: 0;
@@ -290,7 +293,8 @@ function handleSave(): void {
   max-height: 200px;
   overflow-y: auto;
   border: 1px solid var(--cp-border);
-  border-radius: 10px;
+  border-radius: var(--cp-radius-control);
+  background: var(--cp-panel-muted);
 }
 
 .cp-pinEditor__row {
@@ -298,10 +302,10 @@ function handleSave(): void {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--cp-border-light);
+  border-top: 1px solid var(--cp-border-light);
 
-  &:last-child {
-    border-bottom: none;
+  &:first-child {
+    border-top: none;
   }
 
   &:hover {
@@ -335,60 +339,25 @@ function handleSave(): void {
   gap: 6px;
 }
 
+/* 动作按钮：胶囊按钮（主操作 = highlight） */
 .cp-pinEditor__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    opacity var(--cp-fast) var(--cp-ease);
+  @include cp-pill-button;
 
-  &:hover:not(:disabled) {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: var(--cp-highlight-border);
-  }
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
 
   &.primary {
-    border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-    background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
+    @include cp-pill-button(primary);
   }
 }
 
+/* 排序图标按钮：统一图标按钮规格 */
 .cp-pinEditor__iconBtn {
+  @include cp-icon-button;
+
   width: 24px;
   height: 24px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color var(--cp-fast) var(--cp-ease);
-
-  &:hover:not(:disabled) {
-    background: var(--cp-hover-bg);
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
 }
 
 .cp-pinEditor__footer {

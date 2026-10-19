@@ -6,6 +6,7 @@
 
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
+import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import { useChannelMembersPage } from "@/features/chat/room-governance/presentation/page-models/useChannelMembersPage";
@@ -42,46 +43,58 @@ const {
     >
       <template #loading>{{ t("loading") }}</template>
       <template #default>
-        <div v-for="m in members" :key="m.uid" class="cp-memberCard">
-          <UserProfilePopover
-            :user-id="m.uid"
-            :username="m.nickname"
-            trigger="hover"
-          >
-            <AvatarBadge :name="m.nickname" :size="40" />
-          </UserProfilePopover>
-          <div class="cp-memberCard__info">
-            <div class="cp-memberCard__name">{{ m.nickname }}</div>
-            <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>
-            <div class="cp-memberCard__time">{{ t("joined_at") }}: {{ formatJoinTime(m.joinTime) }}</div>
+        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
+        <PanelGroup>
+          <div v-for="m in members" :key="m.uid" class="cp-memberCard">
+            <UserProfilePopover
+              :user-id="m.uid"
+              :username="m.nickname"
+              trigger="hover"
+            >
+              <AvatarBadge :name="m.nickname" :size="40" />
+            </UserProfilePopover>
+            <div class="cp-memberCard__info">
+              <div class="cp-memberCard__name">{{ m.nickname }}</div>
+              <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>
+              <div class="cp-memberCard__time">{{ t("joined_at") }}: {{ formatJoinTime(m.joinTime) }}</div>
+            </div>
+            <div class="cp-memberCard__actions">
+              <button v-if="canPromoteMember(m)" class="cp-memberCard__btn" type="button" @click="handleSetAdmin(m.uid)">
+                {{ t("set_admin") }}
+              </button>
+              <button v-if="canDemoteAdmin(m)" class="cp-memberCard__btn" type="button" @click="handleRemoveAdmin(m.uid)">
+                {{ t("remove_admin") }}
+              </button>
+              <button v-if="canKickMember(m)" class="cp-memberCard__btn danger" type="button" @click="handleKick(m.uid)">
+                {{ t("kick_member") }}
+              </button>
+            </div>
           </div>
-          <div class="cp-memberCard__actions">
-            <button v-if="canPromoteMember(m)" class="cp-memberCard__btn" type="button" @click="handleSetAdmin(m.uid)">
-              {{ t("set_admin") }}
-            </button>
-            <button v-if="canDemoteAdmin(m)" class="cp-memberCard__btn" type="button" @click="handleRemoveAdmin(m.uid)">
-              {{ t("remove_admin") }}
-            </button>
-            <button v-if="canKickMember(m)" class="cp-memberCard__btn danger" type="button" @click="handleKick(m.uid)">
-              {{ t("kick_member") }}
-            </button>
-          </div>
-        </div>
+        </PanelGroup>
       </template>
     </GovernancePageShell>
   </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">
+/* 样式：ChannelMembersPage｜规格：分组行（容器 + 分隔线 + hover）+ 胶囊按钮 */
+/* 成员行：分组容器内的一行；相邻行 1px 细分隔线 */
 .cp-memberCard {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 16px;
-  padding: 12px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+  padding: 12px 14px;
+  transition: background-color var(--cp-fast) var(--cp-ease);
+}
+
+.cp-memberCard + .cp-memberCard {
+  border-top: 1px solid var(--cp-border-light);
+}
+
+/* 行 hover 只变底色，不做位移 */
+.cp-memberCard:hover {
+  background: var(--cp-hover-bg);
 }
 
 .cp-memberCard__info {
@@ -89,17 +102,16 @@ const {
 }
 
 .cp-memberCard__name {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--cp-text);
-  font-weight: 500;
 }
 
+/* 角色标签：状态语义（owner=accent，admin=accent-2） */
 .cp-memberCard__role {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 3px;
+  font-size: 11px;
   color: var(--cp-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .cp-memberCard__role[data-role="owner"] {
@@ -107,11 +119,11 @@ const {
 }
 
 .cp-memberCard__role[data-role="admin"] {
-  color: var(--cp-info);
+  color: var(--cp-accent-2);
 }
 
 .cp-memberCard__time {
-  margin-top: 4px;
+  margin-top: 3px;
   font-size: 11px;
   color: var(--cp-text-muted);
 }
@@ -120,30 +132,14 @@ const {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .cp-memberCard__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-memberCard__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
+  @include cp-pill-button;
 }
 
 .cp-memberCard__btn.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel-muted));
-}
-
-.cp-memberCard__btn.danger:hover {
-  background: color-mix(in oklab, var(--cp-danger) 18%, var(--cp-hover-bg));
+  @include cp-pill-button(danger);
 }
 </style>

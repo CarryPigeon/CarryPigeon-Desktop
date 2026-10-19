@@ -189,61 +189,57 @@ function domainColor(colorVar: string): string {
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；卡片包含标题区、domain 端口点阵、进度条与动作区。 */
+/* 样式：插件模块卡片｜规格：内嵌分组卡（cp-card）+ 无位移 hover + 胶囊动作按钮 */
 .cp-module-card {
+  @include cp-card;
+
   position: relative;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
   padding: 14px;
-  box-shadow: var(--cp-shadow-soft);
   transition:
-    transform var(--cp-fast) var(--cp-ease),
     border-color var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease);
 }
 
+/* hover 只变底色/描边，不做上浮（与设置页行列表一致） */
+.cp-module-card:hover {
+  border-color: var(--cp-highlight-border);
+  background: color-mix(in oklab, var(--cp-panel) 88%, var(--cp-hover-bg));
+}
+
+/* 聚焦（路由 focus / 抽屉选中）：高亮描边 + ring */
+.cp-module-card[data-focused="true"] {
+  border-color: var(--cp-highlight-border-strong);
+  box-shadow: var(--cp-highlight-ring);
+}
+
+/* 锁定遮罩：warn 状态 token，不叠加嵌套模糊 */
 .cp-module-card__disabled {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
-  background: color-mix(in oklab, var(--cp-panel) 72%, transparent);
-  backdrop-filter: blur(2px);
+  z-index: 3;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 10px;
   padding: 18px;
-  z-index: 3;
-  border: 1px dashed color-mix(in oklab, var(--cp-warn) 32%, var(--cp-border));
+  border: 1px dashed var(--cp-warn-border);
+  border-radius: var(--cp-radius-card);
+  background: color-mix(in oklab, var(--cp-panel) 84%, transparent);
 }
 
 .cp-module-card__disabledTitle {
-  font-family: var(--cp-font-display);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: var(--cp-text);
+  @include cp-section-label;
+
+  color: var(--cp-warn);
 }
 
 .cp-module-card__disabledSub {
   font-size: 12px;
+  line-height: 1.4;
   color: var(--cp-text-muted);
   text-align: center;
-  line-height: 1.4;
-}
-
-.cp-module-card[data-focused="true"] {
-  border-color: var(--cp-highlight-border-strong);
-  box-shadow:
-    var(--cp-shadow-soft),
-    var(--cp-highlight-ring);
-}
-
-.cp-module-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--cp-highlight-border);
-  background: color-mix(in oklab, var(--cp-panel) 86%, var(--cp-hover-bg));
 }
 
 .cp-module-card__head {
@@ -263,10 +259,10 @@ function domainColor(colorVar: string): string {
 .cp-module-card__name {
   font-family: var(--cp-font-display);
   font-weight: 700;
+  font-size: 15px;
+  line-height: 1.2;
   letter-spacing: 0.02em;
-  font-size: 16px;
   color: var(--cp-text);
-  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -277,7 +273,7 @@ function domainColor(colorVar: string): string {
   align-items: baseline;
   gap: 6px;
   font-family: var(--cp-font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--cp-text-muted);
 }
 
@@ -288,22 +284,23 @@ function domainColor(colorVar: string): string {
 .cp-module-card__badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
   justify-content: flex-end;
+  gap: 6px;
 }
 
 .cp-module-card__tagline {
   margin-top: 10px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-  line-height: 1.35;
   min-height: 32px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--cp-text-muted);
 }
 
 .cp-module-card__mono {
   margin-top: 10px;
 }
 
+/* domain 端口点阵：保留品牌识别，仅收敛投影为边框色 */
 .cp-ports {
   display: flex;
   flex-wrap: wrap;
@@ -315,7 +312,7 @@ function domainColor(colorVar: string): string {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.10);
+  box-shadow: 0 0 0 3px var(--cp-border-light);
 }
 
 .cp-module-card__progress {
@@ -323,55 +320,35 @@ function domainColor(colorVar: string): string {
 }
 
 .cp-module-card__actions {
-  margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
 }
 
+/* 动作按钮：主操作用 highlight、危险操作用 danger */
 .cp-module-action {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 7px 12px;
+  @include cp-pill-button;
+
+  min-height: 30px;
+  padding: 0 12px;
   font-size: 12px;
-  cursor: pointer;
-  transition:
-    transform var(--cp-fast) var(--cp-ease),
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease);
-
-  &:hover {
-    transform: translateY(-1px);
-    background: var(--cp-hover-bg);
-    border-color: var(--cp-highlight-border);
-  }
-}
-
-.cp-module-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
 }
 
 .cp-module-action.primary {
-  border-color: color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 14%, var(--cp-panel-muted));
+  @include cp-pill-button(primary);
 
-  &:hover {
-    border-color: rgba(34, 197, 94, 0.42);
-    background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
-  }
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
 .cp-module-action.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 12%, var(--cp-panel-muted));
+  @include cp-pill-button(danger);
 
-  &:hover {
-    border-color: rgba(239, 68, 68, 0.46);
-    background: color-mix(in oklab, var(--cp-danger) 16%, var(--cp-hover-bg));
-  }
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 </style>

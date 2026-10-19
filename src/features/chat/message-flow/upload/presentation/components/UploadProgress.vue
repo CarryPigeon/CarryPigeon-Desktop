@@ -66,11 +66,11 @@ function formatFileSize(bytes: number): string {
 </template>
 
 <style scoped lang="scss">
-/* UploadProgress styles */
+/* 样式：UploadProgress｜规格：内嵌卡片 + 进度条 accent + 胶囊按钮 */
 .cp-uploadProgress {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
-  border-radius: 14px;
+  border-radius: var(--cp-radius-card);
   padding: 12px;
 }
 
@@ -109,17 +109,19 @@ function formatFileSize(bytes: number): string {
   height: 100%;
   border-radius: 999px;
   background: var(--cp-accent);
-  transition: width 0.2s ease;
+  transition: width var(--cp-slow) var(--cp-ease);
 }
 
 .cp-uploadProgress__status {
   margin-top: 8px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--cp-text-muted);
 }
 
+/* 成功/失败：状态语义色 */
 .cp-uploadProgress__status .success {
-  color: var(--cp-accent);
+  color: var(--cp-success);
 }
 
 .cp-uploadProgress__status .error {
@@ -133,19 +135,12 @@ function formatFileSize(bytes: number): string {
   justify-content: flex-end;
 }
 
+/* 动作按钮：胶囊按钮（无位移 hover） */
 .cp-uploadProgress__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
+  @include cp-pill-button;
 
-.cp-uploadProgress__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
 }
 </style>

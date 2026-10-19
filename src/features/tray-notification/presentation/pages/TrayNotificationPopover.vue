@@ -57,6 +57,7 @@ async function handleClick(channelId: string) {
 <template>
   <main class="cp-notif">
     <div class="cp-notif__header">{{ t("tray_unread_count", { n: items.length }) }}</div>
+    <div v-if="sortedItems.length === 0" class="cp-notif__empty">{{ t("no_messages") }}</div>
     <div
       v-for="(item, idx) in sortedItems"
       :key="item.messageId || idx"
@@ -74,31 +75,33 @@ async function handleClick(channelId: string) {
 </template>
 
 <style scoped lang="scss">
+/* 样式：TrayNotificationPopover｜规格：18px 玻璃窗口 + 分组行 */
 .cp-notif {
+  @include cp-glass-panel;
+
   height: 100%;
-  padding: 10px 0;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .cp-notif__header {
-  padding: 0 14px 8px;
-  border-bottom: 1px solid var(--cp-border);
-  font-family: var(--cp-font-display);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--cp-text);
+  @include cp-section-label;
+
+  padding: 6px 16px 10px;
+  border-bottom: 1px solid var(--cp-border-light);
+}
+
+.cp-notif__empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--cp-text-muted);
 }
 
 .cp-notif__item {
-  padding: 8px 14px;
+  padding: 10px 16px;
   cursor: pointer;
   transition: background-color var(--cp-fast) var(--cp-ease);
 
@@ -107,14 +110,14 @@ async function handleClick(channelId: string) {
   }
 
   & + & {
-    border-top: 1px solid var(--cp-border);
+    border-top: 1px solid var(--cp-border-light);
   }
 }
 
 .cp-notif__item-top {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .cp-notif__sender {
@@ -124,13 +127,14 @@ async function handleClick(channelId: string) {
 }
 
 .cp-notif__channel-tag {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--cp-accent-soft);
-  color: var(--cp-accent);
-  font-weight: 500;
   flex-shrink: 0;
+  padding: 1px 7px;
+  border: 1px solid var(--cp-border-light);
+  border-radius: 999px;
+  background: var(--cp-panel-muted);
+  font-family: var(--cp-font-mono);
+  font-size: 10px;
+  color: var(--cp-text-muted);
 }
 
 .cp-notif__time {
@@ -144,7 +148,7 @@ async function handleClick(channelId: string) {
   margin-top: 3px;
   font-size: 12px;
   color: var(--cp-text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

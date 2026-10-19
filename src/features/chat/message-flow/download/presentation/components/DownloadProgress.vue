@@ -52,20 +52,21 @@ const statusText = computed(() => {
 </template>
 
 <style scoped lang="scss">
+/* 样式：DownloadProgress｜规格：内嵌卡片 + 进度条 accent + 状态语义色 */
 .cp-downloadProgress {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel);
-  border-radius: 12px;
+  border-radius: var(--cp-radius-card);
   padding: 10px;
   margin-top: 8px;
 }
 
 .cp-downloadProgress[data-status="completed"] {
-  border-color: color-mix(in oklab, var(--cp-success) 24%, var(--cp-border));
+  border-color: var(--cp-success-border);
 }
 
 .cp-downloadProgress[data-status="error"] {
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
+  border-color: var(--cp-danger-border);
 }
 
 .cp-downloadProgress__info {
@@ -101,7 +102,7 @@ const statusText = computed(() => {
   height: 100%;
   background: var(--cp-accent);
   border-radius: 999px;
-  transition: width 0.3s var(--cp-ease);
+  transition: width var(--cp-slow) var(--cp-ease);
 }
 
 .cp-downloadProgress__actions {
@@ -111,13 +112,12 @@ const statusText = computed(() => {
   justify-content: flex-end;
 }
 
+/* 动作按钮：胶囊按钮 */
 .cp-downloadProgress__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 4px 10px;
+  @include cp-pill-button;
+
+  min-height: 24px;
+  padding: 0 10px;
   font-size: 11px;
-  cursor: pointer;
 }
 </style>

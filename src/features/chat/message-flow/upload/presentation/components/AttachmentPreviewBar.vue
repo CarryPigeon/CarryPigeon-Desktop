@@ -147,6 +147,7 @@ function formatSize(bytes: number): string {
 </template>
 
 <style scoped lang="scss">
+/* 样式：AttachmentPreviewBar｜规格：媒体缩略条（控件圆角 + token，无位移 hover） */
 /* 水平可滚动缩略图条 */
 .cp-attachmentBar {
   padding: 8px 0;
@@ -165,17 +166,19 @@ function formatSize(bytes: number): string {
   flex-shrink: 0;
   width: 64px;
   height: 64px;
-  border-radius: 10px;
+  border-radius: var(--cp-radius-control);
   overflow: hidden;
-  border: 1px solid var(--cp-border, #e0e0e0);
-  background: var(--cp-panel-muted, #f5f5f5);
+  border: 1px solid var(--cp-border);
+  background: var(--cp-panel-muted);
   cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), box-shadow var(--cp-fast) var(--cp-ease);
+  transition:
+    border-color var(--cp-fast) var(--cp-ease),
+    box-shadow var(--cp-fast) var(--cp-ease);
 }
 
 .cp-attachmentBar__item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px color-mix(in oklab, var(--cp-accent, #5865f2) 30%, transparent);
+  border-color: var(--cp-highlight-border);
+  box-shadow: var(--cp-highlight-ring);
 }
 
 .cp-attachmentBar__thumb {
@@ -210,9 +213,9 @@ function formatSize(bytes: number): string {
   height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
-  background: color-mix(in oklab, var(--cp-accent, #5865f2) 14%, transparent);
-  color: var(--cp-accent, #5865f2);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-panel-muted);
+  color: var(--cp-text-muted);
   font-size: 16px;
 }
 
@@ -229,7 +232,7 @@ function formatSize(bytes: number): string {
 .cp-attachmentBar__fileName {
   font-size: 11px;
   font-weight: 500;
-  color: var(--cp-text, #222);
+  color: var(--cp-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -238,7 +241,7 @@ function formatSize(bytes: number): string {
 
 .cp-attachmentBar__fileSize {
   font-size: 10px;
-  color: var(--cp-text-muted, #888);
+  color: var(--cp-text-muted);
 }
 
 .cp-attachmentBar__progress {
@@ -247,28 +250,29 @@ function formatSize(bytes: number): string {
   left: 0;
   right: 0;
   height: 4px;
-  background: color-mix(in oklab, var(--cp-border, #e0e0e0) 50%, transparent);
+  background: color-mix(in oklab, var(--cp-border) 50%, transparent);
 }
 
 .cp-attachmentBar__progressBar {
   height: 100%;
-  background: var(--cp-accent, #5865f2);
-  transition: width 200ms ease;
+  background: var(--cp-accent);
+  transition: width var(--cp-fast) var(--cp-ease);
 }
 
+/* 上传失败遮罩：danger 状态底 */
 .cp-attachmentBar__error {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in oklab, var(--cp-danger, #e34) 20%, transparent);
+  background: color-mix(in oklab, var(--cp-danger) 20%, transparent);
 }
 
 .cp-attachmentBar__retryBtn {
-  border: 1px solid var(--cp-danger, #e34);
-  background: color-mix(in oklab, var(--cp-danger, #e34) 15%, transparent);
-  color: var(--cp-danger, #e34);
+  border: 1px solid var(--cp-danger);
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
   font-size: 16px;
   width: 28px;
   height: 28px;
@@ -276,13 +280,14 @@ function formatSize(bytes: number): string {
   display: inline-grid;
   place-items: center;
   cursor: pointer;
-  transition: transform 120ms ease;
+  transition: background-color var(--cp-fast) var(--cp-ease);
 }
 
 .cp-attachmentBar__retryBtn:hover {
-  transform: scale(1.15);
+  background: color-mix(in oklab, var(--cp-danger) 22%, var(--cp-panel));
 }
 
+/* 完成标记：success 状态底；图标反色固定白色 */
 .cp-attachmentBar__done {
   position: absolute;
   top: 2px;
@@ -298,6 +303,7 @@ function formatSize(bytes: number): string {
   line-height: 1;
 }
 
+/* 移除按钮：悬浮在媒体缩略图上，使用固定深色遮罩保证对比度 */
 .cp-attachmentBar__remove {
   position: absolute;
   top: 2px;
@@ -306,7 +312,7 @@ function formatSize(bytes: number): string {
   height: 18px;
   border: none;
   border-radius: 50%;
-  background: color-mix(in oklab, #000 60%, transparent);
+  background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-size: 12px;
   line-height: 1;
@@ -314,10 +320,10 @@ function formatSize(bytes: number): string {
   place-items: center;
   cursor: pointer;
   padding: 0;
-  transition: background 120ms ease;
+  transition: background var(--cp-fast) var(--cp-ease);
 }
 
 .cp-attachmentBar__remove:hover {
-  background: color-mix(in oklab, #000 80%, transparent);
+  background: rgba(0, 0, 0, 0.8);
 }
 </style>

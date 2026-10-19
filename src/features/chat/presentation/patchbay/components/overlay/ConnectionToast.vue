@@ -47,7 +47,10 @@ function handleAction(): void {
 </template>
 
 <style scoped lang="scss">
+/* 样式：ConnectionToast｜规格：玻璃浮层胶囊（LED 保留状态色，hover 只变色不移位） */
 .cp-connection-toast {
+  @include cp-glass-panel(999px, var(--cp-shadow-float));
+
   position: fixed;
   left: 16px;
   /* 抬到底部服务器栏页脚（插件/设置两个按钮）之上，避免遮挡 */
@@ -57,10 +60,6 @@ function handleAction(): void {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel);
-  box-shadow: var(--cp-shadow-float);
   color: var(--cp-text);
   max-width: min(420px, 80vw);
 }
@@ -70,16 +69,19 @@ function handleAction(): void {
   height: 10px;
   border-radius: 999px;
   background: var(--cp-domain-unknown);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-domain-unknown) 18%, transparent);
   flex: 0 0 auto;
 }
 
 .cp-connection-toast[data-state="reconnecting"] .cp-connection-toast__led {
   background: var(--cp-warn);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-warn) 18%, transparent);
   animation: cp-led-breathe 1.25s var(--cp-ease) infinite;
 }
 
 .cp-connection-toast[data-state="offline"] .cp-connection-toast__led {
   background: var(--cp-danger);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--cp-danger) 18%, transparent);
   animation: cp-led-blink 1.4s var(--cp-ease) infinite;
 }
 
@@ -106,20 +108,20 @@ function handleAction(): void {
   text-overflow: ellipsis;
 }
 
+/* 动作按钮：胶囊按钮（主操作语义用 highlight） */
 .cp-connection-toast__action {
-  margin-left: 6px;
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color var(--cp-fast) var(--cp-ease);
-}
+  @include cp-pill-button(primary);
 
-.cp-connection-toast__action:hover {
-  background: var(--cp-hover-bg);
+  min-height: 26px;
+  padding: 0 10px;
+  margin-left: 6px;
+  font-size: 11.5px;
+  flex: 0 0 auto;
+
+  &:focus-visible {
+    outline: 2px solid var(--cp-highlight-border-strong);
+    outline-offset: 2px;
+  }
 }
 
 @keyframes cp-led-blink {

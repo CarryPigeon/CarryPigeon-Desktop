@@ -98,30 +98,21 @@ watch(
 </template>
 
 <style scoped lang="scss">
-/* DeleteChannelDialog styles */
+/* 样式：DeleteChannelDialog｜规格：状态条 + 字段标签 + 胶囊按钮 */
 .cp-deleteChannel {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
+/* 确认警示：统一内联状态条（warn） */
 .cp-deleteChannel__warn {
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in oklab, var(--cp-warn) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-warn) 10%, var(--cp-panel));
-  font-size: 13px;
-  color: var(--cp-text);
-  line-height: 1.5;
+  @include cp-inline-status(warn);
 }
 
+/* 错误提示：统一内联状态条（danger） */
 .cp-deleteChannel__error {
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px dashed color-mix(in oklab, var(--cp-danger) 34%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));
-  font-size: 12px;
-  color: var(--cp-danger);
+  @include cp-inline-status(danger);
 }
 
 .cp-deleteChannel__field {
@@ -132,6 +123,7 @@ watch(
 
 .cp-deleteChannel__label {
   font-size: 12px;
+  line-height: 1.4;
   color: var(--cp-text-muted);
 }
 
@@ -141,34 +133,12 @@ watch(
   gap: 10px;
 }
 
+/* 动作按钮：胶囊按钮；危险操作使用 danger tone */
 .cp-deleteChannel__btn {
-  border: 1px solid var(--cp-border);
-  background: var(--cp-panel-muted);
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
+  @include cp-pill-button;
 
-.cp-deleteChannel__btn:hover {
-  transform: translateY(-1px);
-  background: var(--cp-hover-bg);
-}
-
-.cp-deleteChannel__btn.danger {
-  border-color: color-mix(in oklab, var(--cp-danger) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-danger) 14%, var(--cp-panel-muted));
-}
-
-.cp-deleteChannel__btn.danger:hover {
-  background: color-mix(in oklab, var(--cp-danger) 22%, var(--cp-hover-bg));
-}
-
-.cp-deleteChannel__btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  &.danger {
+    @include cp-pill-button(danger);
+  }
 }
 </style>

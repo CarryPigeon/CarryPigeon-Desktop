@@ -4,7 +4,7 @@
  * @description chat/room-governance｜presentation component：治理子页面共享页面骨架。
  */
 
-import BackButton from "@/shared/ui/BackButton.vue";
+import PageHeader from "@/shared/ui/PageHeader.vue";
 
 defineProps<{
   channelName: string;
@@ -19,24 +19,29 @@ const emit = defineEmits<{
 </script>
 
 <template>
+  <!-- 组件：GovernancePageShell｜职责：治理子页面统一骨架（PageHeader + 状态/内容面板） -->
   <main class="cp-governancePage">
-    <header class="cp-governancePage__head">
-      <BackButton test-id="governance-back" @click="emit('back')" />
-      <div class="cp-governancePage__title">
-        <div class="cp-governancePage__name">{{ channelName }}</div>
-        <div class="cp-governancePage__sub">{{ subtitle }}</div>
-      </div>
-      <div v-if="$slots.actions" class="cp-governancePage__actions">
+    <!-- 区块：页面头部｜用途：返回 + 频道名 + 治理类别 + 右侧筛选/操作（保留原 back 事件与 testid） -->
+    <PageHeader
+      :title="channelName"
+      :subtitle="subtitle"
+      back
+      back-test-id="governance-back"
+      @back="emit('back')"
+    >
+      <template v-if="$slots.actions" #actions>
         <slot name="actions" />
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
+    <!-- 区块：加载/错误状态｜用途：先于内容渲染（类名保持兼容既有测试） -->
     <div v-if="isLoading" class="cp-governancePage__state">
       <slot name="loading">Loading</slot>
     </div>
     <div v-else-if="errorMessage" class="cp-governancePage__state cp-governancePage__state--error">
       {{ errorMessage }}
     </div>
+    <!-- 区块：内容面板｜用途：一级玻璃面板承载治理列表 -->
     <section v-else class="cp-governancePage__body">
       <slot />
     </section>
@@ -44,49 +49,9 @@ const emit = defineEmits<{
 </template>
 
 <style scoped lang="scss">
+/* 样式：GovernancePageShell｜规格：cp-page 骨架 + PageHeader + 玻璃内容面板 */
 .cp-governancePage {
-  height: 100%;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cp-governancePage__head {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.cp-governancePage__title {
-  min-width: 0;
-}
-
-.cp-governancePage__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
-}
-
-.cp-governancePage__sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
-
-.cp-governancePage__actions {
-  display: flex;
-  justify-content: flex-end;
+  @include cp-page;
 }
 
 .cp-governancePage__state {
@@ -101,18 +66,14 @@ const emit = defineEmits<{
 }
 
 .cp-governancePage__body {
+  @include cp-glass-panel;
+
   flex: 1 1 auto;
   min-height: 0;
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
-  padding: 14px;
+  padding: var(--cp-page-pad);
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--cp-page-gap);
 }
 </style>

@@ -76,7 +76,6 @@ export type MessageRow = {
   m: ChatMessage;
   /** 是否为分组首条（仅组首渲染名字 / 头像 / 时间戳）。 */
   isGroupStart: boolean;
-  isUnreadStart: boolean;
   /** 组首时间戳是否需要带日期前缀（跨自然日时为 `true`）。 */
   showDate: boolean;
 };
@@ -366,17 +365,11 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
 
   const messageRows = computed<MessageRow[]>(() => {
     const list = messageTimelineSnapshot.value.currentMessages;
-    const lastReadTime = currentSessionSnapshot.value.lastReadTimeMs;
-    const lastReadMid = currentSessionSnapshot.value.lastReadMessageId;
-    const projections = projectMessageRows(list, {
-      lastReadTimeMs: lastReadTime,
-      lastReadMessageId: lastReadMid,
-    });
+    const projections = projectMessageRows(list);
 
     return list.map((raw, idx) => ({
       m: withResolvedAuthorNames(raw),
       isGroupStart: projections[idx].isGroupStart,
-      isUnreadStart: projections[idx].isUnreadStart,
       showDate: projections[idx].showDate,
     }));
   });

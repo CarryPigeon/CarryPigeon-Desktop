@@ -460,26 +460,47 @@ function onGlobalKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped lang="scss">
-/* 布局与变量说明：使用全局 `--cp-*` 变量；整体为两列布局（左筛选栏 + 右内容区）。 */
+/* 样式：插件中心页｜布局：左侧筛选 rail + 右侧内容，两侧均为一级玻璃面板，列间距 16px */
 .cp-plugins {
-  height: 100%;
+  @include cp-page;
+
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 14px;
-  padding: 14px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
 }
 
+/* 右侧内容面板：头部/网格共用同一玻璃承载面 */
 .cp-plugins__gridWrap {
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border: 1px solid var(--cp-border);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow-soft);
-  overflow: hidden;
+  @include cp-glass-panel;
+
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 响应式：≤900px 左右布局转纵向 */
+@media (max-width: 900px) {
+  .cp-plugins {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .cp-plugins__gridWrap {
+    flex: 1 1 auto;
+    min-height: 320px;
+  }
+}
+
+/* 响应式：≤640px 压缩页面留白 */
+@media (max-width: 640px) {
+  .cp-plugins {
+    padding: 10px;
+    gap: 10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -488,5 +509,4 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     scroll-behavior: auto !important;
   }
 }
-
 </style>

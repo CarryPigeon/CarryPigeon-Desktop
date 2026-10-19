@@ -56,17 +56,15 @@ const bio = computed(computeBio);
 </template>
 
 <style scoped lang="scss">
-/* UserPopoverPage styles */
+/* UserPopoverPage styles：浮层保持不透明（--cp-panel-solid），圆角/阴影/边框统一 */
 /* Selector: `.cp-pop` — popover page surface. */
 .cp-pop {
   height: 100%;
-  padding: 12px;
+  padding: var(--cp-page-pad);
+  background: var(--cp-panel-solid);
   border: 1px solid var(--cp-border);
-  background: var(--cp-surface);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  border-radius: 18px;
-  box-shadow: var(--cp-shadow);
+  border-radius: var(--cp-radius-lg);
+  box-shadow: var(--cp-shadow-float);
 }
 
 /* Selector: `.cp-pop__title` — title line. */

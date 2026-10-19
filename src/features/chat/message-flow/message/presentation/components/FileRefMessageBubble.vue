@@ -146,18 +146,19 @@ function handleDismissTask(): void {
 </template>
 
 <style scoped lang="scss">
-/* 布局约束：文件消息气泡最大宽度 320px，图片预览限制高度，避免撑破消息流布局 */
+/* 样式：FileRefMessageBubble｜布局约束：文件气泡最大宽度 320px，图片预览限制高度；
+   气泡表面用 panel + border-light（接收气泡统一配方） */
 .cp-fileBubble {
-  border: 1px solid var(--cp-border);
+  border: 1px solid var(--cp-border-light);
   background: var(--cp-panel);
-  border-radius: 16px;
+  border-radius: var(--cp-radius-card);
   padding: 12px;
   max-width: 320px;
 }
 
 .cp-fileBubble__preview {
   margin-bottom: 10px;
-  border-radius: 12px;
+  border-radius: var(--cp-radius-control);
   overflow: hidden;
   cursor: pointer;
 }
@@ -201,27 +202,22 @@ function handleDismissTask(): void {
   font-family: var(--cp-font-mono);
 }
 
+/* 下载按钮：主操作语义用 highlight；重试沿用 warn 状态 */
 .cp-fileBubble__btn {
+  @include cp-pill-button(primary);
+
   margin-top: 10px;
   width: 100%;
-  border: 1px solid color-mix(in oklab, var(--cp-accent) 30%, var(--cp-border));
-  background: color-mix(in oklab, var(--cp-accent) 10%, var(--cp-panel-muted));
-  color: var(--cp-text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform var(--cp-fast) var(--cp-ease), background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-fileBubble__btn:hover {
-  transform: translateY(-1px);
-  background: color-mix(in oklab, var(--cp-accent) 18%, var(--cp-hover-bg));
 }
 
 .cp-fileBubble__btn--resume {
-  background: color-mix(in oklab, var(--cp-warning, #d97706) 15%, var(--cp-panel-muted));
-  border-color: color-mix(in oklab, var(--cp-warning, #d97706) 40%, var(--cp-border));
-  color: var(--cp-text);
+  border-color: var(--cp-warn-border);
+  background: var(--cp-warn-bg);
+  color: var(--cp-warn);
+
+  &:hover:not(:disabled) {
+    border-color: var(--cp-warn);
+    background: color-mix(in oklab, var(--cp-warn) 16%, var(--cp-hover-bg));
+  }
 }
 </style>
