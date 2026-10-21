@@ -32,28 +32,14 @@ unknown-git = "warn"
 
 [advisories]
 # CI 基线：`cargo deny check`（cargo-deny 0.19.4）。ignore 仅支持 id + reason。
-# 下列条目请在 2027-08-23 前重新评估是否仍需忽略。
+# 2026-10-21 更新：rustls-webpki / wasmtime / webpki-root-certs 已升级到修复版本；
+# 同时清理依赖升级后已不再触发的旧忽略项（避免 CI 输出 advisory-not-detected 噪音）。
+# 下列条目请在 2027-10-21 前重新评估是否仍需忽略。
 ignore = [
-    { id = "RUSTSEC-2023-0071", reason = "Ignored in CI; known transitive issue with no safe upgrade path at this time." },
-    { id = "RUSTSEC-2024-0370", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0411", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0412", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0413", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0414", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0415", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0416", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0417", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0418", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0419", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2024-0420", reason = "Transitive dependency from Tauri GTK stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2025-0075", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2025-0080", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2025-0081", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2025-0098", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2025-0100", reason = "Transitive dependency from Tauri URL pattern stack; no safe upgrade is available." },
-    { id = "RUSTSEC-2026-0173", reason = "Transitive dependency from sea-orm → sea-orm-macros → sea-bae → proc-macro-error2; no safe upgrade is available." },
-    { id = "RUSTSEC-2025-0057", reason = "Transitive dependency from Tauri (selectors → kuchikiki → tauri-utils → tauri); no safe upgrade is available." },
-    { id = "RUSTSEC-2026-0194", reason = "Transitive dependency (xcb 0.30, tauri-winrt-notif 0.37, plist 0.38, wayland-scanner 0.39); quick-xml >=0.41.0 requires upstream crate updates." },
-    { id = "RUSTSEC-2026-0195", reason = "Transitive dependency (xcb 0.30, tauri-winrt-notif 0.37, plist 0.38, wayland-scanner 0.39); quick-xml >=0.41.0 requires upstream crate updates." },
-    { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7.46 is an optional rust_decimal dependency (sqlx/sea-orm). Upstream 0.7 is unsupported and rust_decimal still pins ^0.7.46; this app does not deserialize untrusted rkyv archives. rkyv 0.8 is upgraded separately." },
+    # proc-macro-error 已停止维护，但仍被 sea-orm 宏链间接引入，暂无替代。
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is unmaintained but still pulled in transitively by sea-orm macros; no safe replacement is available yet." },
+    # zbus 5.x 系列 crate 已并入 zbus 6；需等待 notify-rust / secret-service / xcap / tauri-plugin-opener 等上游迁移。
+    { id = "RUSTSEC-2026-0370", reason = "zvariant 5.x is unmaintained (merged into zbus 6); transitive via zbus 5.x used by notify-rust / secret-service / xcap / tauri-plugin-opener. Upstream migration pending." },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names 4.x is unmaintained (merged into zbus 6); transitive via zbus 5.x used by notify-rust / secret-service / xcap / tauri-plugin-opener. Upstream migration pending." },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive 5.x is unmaintained (merged into zbus 6); transitive via zvariant 5.x used by the zbus 5.x stack. Upstream migration pending." },
 ]
