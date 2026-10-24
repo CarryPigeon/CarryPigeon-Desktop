@@ -278,7 +278,7 @@ function handleClose(): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：插件详情抽屉｜规格：微标签分区 + 内嵌分组卡 + 胶囊按钮（与设置页一致） */
+/* 样式：插件详情抽屉｜规格：微标签分区 + 内嵌分组卡 + 胶囊按钮（与工作台一致） */
 .cp-drawer {
   position: relative;
   padding: 16px 16px 20px;
@@ -469,7 +469,7 @@ function handleClose(): void {
   overflow-wrap: anywhere;
 }
 
-/* 版本切换：分段控件（与设置页分段同规格） */
+/* 版本切换：分段控件（与工作台分段同规格） */
 .cp-versions {
   @include cp-segmented;
 

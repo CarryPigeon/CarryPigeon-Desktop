@@ -6,7 +6,7 @@ use crate::features::plugins::domain::ports::plugin_install_store_port::PluginIn
 use crate::features::plugins::domain::ports::plugin_loader_port::PluginLoaderPort;
 use crate::features::plugins::domain::types::{
     InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest, PluginLoadResult,
-    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry,
+    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry, PluginSecretStatus,
 };
 
 /// 加载并返回插件前端运行所需资源（wasm/js/html）。
@@ -255,4 +255,66 @@ pub async fn plugins_network_fetch(
     plugin_store_port: &dyn PluginInstallStorePort,
 ) -> anyhow::Result<PluginFetchResponse> {
     plugin_store_port.network_fetch(request).await
+}
+
+/// 写入（覆盖）插件密钥（系统 keyring，按 server + plugin 隔离）。
+pub async fn plugins_secret_set(
+    server_socket: &str,
+    plugin_id: &str,
+    name: &str,
+    value: &str,
+    tls_policy: Option<&str>,
+    tls_fingerprint: Option<&str>,
+    plugin_store_port: &dyn PluginInstallStorePort,
+) -> anyhow::Result<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(anyhow::anyhow!("Missing secret name"));
+    }
+    plugin_store_port
+        .secret_set(
+            server_socket,
+            plugin_id,
+            name,
+            value,
+            tls_policy,
+            tls_fingerprint,
+        )
+        .await
+}
+
+/// 查询插件密钥状态（不返回密钥内容）。
+pub async fn plugins_secret_status(
+    server_socket: &str,
+    plugin_id: &str,
+    name: &str,
+    tls_policy: Option<&str>,
+    tls_fingerprint: Option<&str>,
+    plugin_store_port: &dyn PluginInstallStorePort,
+) -> anyhow::Result<PluginSecretStatus> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(anyhow::anyhow!("Missing secret name"));
+    }
+    plugin_store_port
+        .secret_status(server_socket, plugin_id, name, tls_policy, tls_fingerprint)
+        .await
+}
+
+/// 清除插件密钥（幂等：未配置时同样返回成功）。
+pub async fn plugins_secret_clear(
+    server_socket: &str,
+    plugin_id: &str,
+    name: &str,
+    tls_policy: Option<&str>,
+    tls_fingerprint: Option<&str>,
+    plugin_store_port: &dyn PluginInstallStorePort,
+) -> anyhow::Result<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(anyhow::anyhow!("Missing secret name"));
+    }
+    plugin_store_port
+        .secret_clear(server_socket, plugin_id, name, tls_policy, tls_fingerprint)
+        .await
 }

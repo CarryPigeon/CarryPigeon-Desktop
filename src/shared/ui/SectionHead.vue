@@ -31,7 +31,7 @@ withDefaults(
   <!-- 组件：SectionHead｜职责：面板内分区头 -->
   <header class="cp-section-head">
     <div v-if="icon" class="cp-section-head__icon">
-      <AppIcon :name="icon" :size="18" />
+      <AppIcon :name="icon" :size="16" />
     </div>
     <div class="cp-section-head__heading">
       <div class="cp-section-head__title">{{ title }}</div>
@@ -44,12 +44,12 @@ withDefaults(
 </template>
 
 <style scoped lang="scss">
-/* 样式：SectionHead｜规格：图标瓦片 32px + 分区标题 20px */
+/* 样式：SectionHead｜规格：图标瓦片 28px + 分区标题 14px/900（工作台紧凑层级） */
 .cp-section-head {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: var(--cp-section-head-gap, 20px);
+  gap: 10px;
+  margin-bottom: var(--cp-section-head-gap, 14px);
 }
 
 .cp-section-head__icon {
@@ -57,8 +57,8 @@ withDefaults(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--cp-border-light);
   border-radius: var(--cp-radius-sm);
   background: var(--cp-panel-muted);
@@ -75,8 +75,8 @@ withDefaults(
 }
 
 .cp-section-head__sub {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--cp-text-muted);
 }

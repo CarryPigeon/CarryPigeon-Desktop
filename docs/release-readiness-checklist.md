@@ -1,19 +1,19 @@
 # 发布准备状态检查清单
 
-## 当前版本: 0.6.0
+## 当前版本: 0.6.1
 
-发布日期：2026-10-03
+发布日期：2026-10-24
 
-> 上一版（0.4.0）清单见本文件历史提交。本次为插件运行时 Cordis 重构版本，清单已按 0.6.0 实际状态重写。
+> 上一版（0.6.0）清单见本文件历史提交。本次为 AI 能力迁出宿主、ai-summary 插件自管版本，版本号与变更记录已按 0.6.1 对齐。
 
 ## 版本号一致性
 
 | 文件 | 字段 | 值 |
 | --- | --- | --- |
-| `package.json` | `version` | 0.6.0 |
-| `src-tauri/Cargo.toml` | `package.version` | 0.6.0 |
-| `src-tauri/tauri.conf.json` | `version` | 0.6.0 |
-| `Cargo.lock` | `carrypigeon-desktop.version` | 0.6.0 |
+| `package.json` | `version` | 0.6.1 |
+| `src-tauri/Cargo.toml` | `package.version` | 0.6.1 |
+| `src-tauri/tauri.conf.json` | `version` | 0.6.1 |
+| `Cargo.lock` | `carrypigeon-desktop.version` | 0.6.1 |
 
 - ⚠️ **本次修复**：`tauri.conf.json` 此前长期停留于 `0.4.0`。CI 的 `tauri-action` 用 `tagName: v__VERSION__`，而 `__VERSION__` 取自该文件，未对齐会把本次发布打成 `v0.4.0` 标签。现已三处对齐，`Cargo.lock` 由 `cargo metadata` 刷新。
 
@@ -23,34 +23,34 @@
 | --- | --- | --- |
 | 前端 lint | `pnpm run lint` | ✅ 通过（Windows 跳过 3 个 bash 检查） |
 | feature 边界 | `bash scripts/check-feature-boundaries.sh` | ✅ 通过 |
-| Rust 规范 | `bash scripts/check-rust-standards.sh` | ✅ 7/7 通过（含 rustfmt） |
+| Rust 规范 | `bash scripts/check-rust-standards.sh` | ✅ 7/7 通过（含 rustfmt；`plugin_store.rs` 已补格式化） |
 | 日志规范 | `bash scripts/check-log-standards.sh` | ✅ 3/3 通过 |
 | 类型检查 | `pnpm run typecheck` | ✅ 通过 |
-| 前端测试 | `pnpm test` | ✅ 83 suites / 654 tests |
-| 前端构建 | `pnpm run build` | ✅ 通过（含 vendor + 5 插件 prebuild） |
-| Rust 测试 | `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` | ✅ 217 passed / 2 ignored / 0 failed |
-| 依赖漏洞 | `cargo audit`（CI 原命令） | ✅ exit 0 |
+| 前端测试 | `pnpm test` | ✅ 119 suites / 879 tests |
+| 前端构建 | `pnpm run build` | ✅ 通过（含 vendor + 插件 prebuild） |
+| Rust 测试 | `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` | ✅ 185 passed / 2 ignored / 0 failed |
+| 依赖漏洞 | `cargo audit`（CI 原命令 + `--ignore RUSTSEC-2026-0387`） | ✅ exit 0 |
 | 依赖合规 | `cargo deny check` | ✅ advisories / bans / licenses / sources ok |
 
 ### 本阶段修复的发布阻塞项
 
-1. **`tauri.conf.json` 版本漂移**（`0.4.0` → `0.6.0`）：会导致 CI 生成错误 tag。
-2. **wasmtime 3 条新的 RUSTSEC 公告**：48.0.3 命中 RUSTSEC-2026-0325 / 0326 / 0327，`cargo deny check` 失败，且 CI 的 `cargo audit` 忽略列表不含这 3 条 → CI 必红。已升级到 **48.0.5**（修复区间 `>=48.0.4,<49.0.0`），未新增 ignore。
-3. **`CHANGELOG.md` 缺失 v0.5.0 条目**（该版本已打标签但未记录）：已按 `v0.4.0..v0.5.0` 提交补记，并新增 0.6.0 条目。
+1. **2026-10-23 新发布的三条 RUSTSEC 公告**：ctutils 0.4.3（RUSTSEC-2026-0385）升级 0.4.5、tokio 1.53.2（RUSTSEC-2026-0386，`AsyncFd` I/O 安全）升级 1.54.1，均为真修复；crypto-bigint 0.5.5（RUSTSEC-2026-0387）修复版本 >=0.7.6 与 elliptic-curve 0.13 不兼容（p256/p384 0.13 → dtls → webrtc 链锁死），无法本仓升级，按惯例在 `deny.toml` 补充带理由忽略并同步 CI `cargo audit` ignore 列表。
+2. **CI 全量测试抖动**：`SettingsPage.test.ts` 两个用例在全量并行负载下动态 import + 挂载超过默认 5s 超时（3 次全量必现、单文件跑通过），显式放宽到 20s。
+3. **rustfmt 漂移**：`plugin_store.rs` 格式化未通过规范脚本，已执行 `cargo fmt`。
 
 ## 功能完整性
 
 ### 0.6.0 新增 / 变更
 
 - ✅ 插件运行时 Cordis 重构：`runtime/**` + `sdk/` 新增，旧 `pluginScope` / `hostApiFactory` / `domainRegistryContext` / `domainRegistryBindings` / `pluginUiApi` / `pluginInvokeApi` / `pluginEventApi` 删除
-- ✅ 插件入口契约 v2（`apply` / `inject` / `ctx.domains` / `ctx.ui` / `ctx.ipc` / `ctx.storage` / `ctx.network` / `ctx.ai` / `ctx.messages`）
+- ✅ 插件入口契约 v2（`apply` / `inject` / `ctx.domains` / `ctx.ui` / `ctx.ipc` / `ctx.storage` / `ctx.network` / `ctx.secrets` / `ctx.messages`）
 - ✅ v1 legacy adapter（`entryApiVersion` 缺省 = 1，兼容旧 `PluginContext` 全字段）
 - ✅ 权限 = 服务可见性；`assertRequiredPermissions` + `markFailed`
 - ✅ IPC 白名单 manifest 声明（`ipcPrefixes`）+ 宿主命名空间双重约束
 - ✅ Cordis 单实例（`src/cordis-entry.ts` → `public/vendor/cordis.mjs` + importmap + 插件 alias）
 - ✅ 五个内置插件迁移 v2（markdown / theme / group-notice / ai-summary / voice-call）
 - ✅ 频道置顶（本地 `channel-pins.json` + 文件热加载事件 + 5 个 Tauri 命令）
-- ✅ 客户端可替换 AI 服务（7 种来源、密钥凭据管理器单向存取、模型列表拉取）
+- ✅ 客户端可替换 AI 服务 → 已迁移为 ai-summary 插件自管（provider 设置项 + 密钥保管箱 `ctx.secrets` + `network:external` 直连；宿主不再含 AI 专有代码）
 - ✅ AI 摘要插件增强（范围选择 + `chatPluginMessagesBridge` / `channelMessageProjection`）
 - ✅ 消息引用跳转（右键 + 引用块按钮，虚拟列表定位高亮）
 - ✅ theme 插件改为宿主主题薄代理

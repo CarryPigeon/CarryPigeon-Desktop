@@ -119,3 +119,18 @@ pub(super) async fn build_installed_state(
         last_error: state.last_error,
     })
 }
+
+/// 判断安装态是否构成一次“真实安装”。
+///
+/// 背景：本地源（自带）插件通过 `plugins_storage_*` 写 KV 存储时，也会在
+/// `{base}/{server_id}/{plugin_id}/` 下创建 `storage.json`，仅凭目录存在
+/// 判定“已安装”会把这类目录误报为幻影安装记录（无 current.json 时
+/// `enabled` 恒为 false），进而覆盖前端本地源的默认启用态，表现为
+/// “自带插件反复回到已禁用、启用不生效”。
+///
+/// 判定规则：存在 current.json（`current_version` 非空）或至少一个版本目录
+/// （`installed_versions` 非空）才算已安装；仅剩 storage.json 等运行期数据
+/// 的目录视为未安装。
+pub(super) fn is_actually_installed(state: &InstalledPluginState) -> bool {
+    state.current_version.is_some() || !state.installed_versions.is_empty()
+}

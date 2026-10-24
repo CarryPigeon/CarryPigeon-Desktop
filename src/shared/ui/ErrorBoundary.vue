@@ -63,12 +63,12 @@ function handleRetry(): void {
 }
 
 .error-boundary-card {
-  @include cp-glass-panel;
+  @include cp-card;
 
-  text-align: center;
   padding: 40px;
   max-width: 380px;
   width: 80vw;
+  text-align: center;
 }
 
 .error-boundary-icon {

@@ -56,6 +56,7 @@ function handleClose(): void {
         >
           <div class="cp-forwardDetail__msgMeta">
             <span class="cp-forwardDetail__msgAuthor">{{ fm.authorName || fm.userId }}</span>
+            <span v-if="fm.channelName || fm.channelId" class="cp-forwardDetail__msgChannel">#{{ fm.channelName || fm.channelId }}</span>
             <span class="cp-forwardDetail__msgTime">{{ fmtTime(fm.sentTime) }}</span>
           </div>
           <div class="cp-forwardDetail__msgPreview">
@@ -142,6 +143,14 @@ function handleClose(): void {
   font-size: 13px;
   font-weight: 600;
   color: var(--cp-text);
+}
+/* 来源频道：与作者同行的弱化标签（跨频道合并转发时可见来源）。 */
+.cp-forwardDetail__msgChannel {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cp-forwardDetail__msgTime {

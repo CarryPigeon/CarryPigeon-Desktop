@@ -66,6 +66,16 @@ pub struct PluginFetchResponse {
     pub headers: HashMap<String, String>,
 }
 
+/// 插件密钥状态（不包含密钥内容）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSecretStatus {
+    /// 是否已配置密钥。
+    pub configured: bool,
+    /// 系统安全存储（keyring）是否可用。
+    pub secure_storage_available: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct PluginInstallFromUrlRequest<'a> {
     pub server_socket: &'a str,
@@ -80,10 +90,14 @@ pub struct PluginInstallFromUrlRequest<'a> {
 #[derive(Debug, Clone)]
 pub struct PluginNetworkFetchRequest<'a> {
     pub server_socket: &'a str,
+    /// 发起请求的插件 id（跨源权限与 `@secret()` 命名空间归属）。
+    pub plugin_id: &'a str,
     pub url: &'a str,
     pub method: &'a str,
     pub headers: HashMap<String, String>,
     pub body: Option<String>,
+    /// 请求超时（毫秒，可选；夹取到 [1000, 120000]）。
+    pub timeout_ms: Option<u64>,
     pub tls_policy: Option<&'a str>,
     pub tls_fingerprint: Option<&'a str>,
 }

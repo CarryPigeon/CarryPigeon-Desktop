@@ -1301,10 +1301,13 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     }
 
     const comment = String(body?.comment ?? "");
+    // 契约（docs/api/15-quote-reply-forward-v1.md §5.2）：forwarded_from / forwarded_messages
+    // 必须封装在 data 内，不得放在消息顶层；data.domain 固定 Core:Text（附言域）。
     const data: Record<string, unknown> = {
       domain: "Core:Text",
       domain_version: "1.0.0",
       ...(comment ? { content: { text: comment } } : {}),
+      ...(hasMerged ? { forwarded_messages: forwardedMessages } : { forwarded_from: singleForwardedFrom }),
     };
 
     const newMsg: Record<string, unknown> = {
@@ -1315,8 +1318,11 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       domain_version: "1.0.0",
       data,
       send_time: Date.now(),
-      preview: comment || (hasMerged ? `转发 ${forwardedMessages!.length} 条消息` : ""),
-      ...(hasMerged ? { forwarded_messages: forwardedMessages } : { forwarded_from: singleForwardedFrom }),
+      preview:
+        comment ||
+        (hasMerged
+          ? `转发 ${forwardedMessages!.length} 条消息`
+          : singleForwardedFrom?.preview ?? ""),
     };
 
     msgs.push(newMsg as ChatMessage);

@@ -1,23 +1,19 @@
 /**
- * @fileoverview ai 领域类型与纯函数。
+ * @fileoverview AI 总结插件自管的 provider 配置（纯逻辑，不依赖 Vue / Tauri / 浏览器 API）。
  * @description
- * 定义"客户端可替换 AI 服务"的配置形状、内置 provider 预设，以及与 UI/Tauri 无关的
- * 纯函数（配置归一化、目标解析、总结提示词组装）。
+ * 从宿主「AI 服务」设置迁移而来：provider 预设、配置归一化、目标解析与总结提示词组装
+ * 全部由插件自管（配置经 `ctx.storage` 按 server 持久化；API Key 经 `ctx.secrets`
+ * 存系统凭据管理器，本模块不接触密钥明文）。
  *
  * 说明：
- * - 该文件不依赖 Vue / Tauri / 浏览器 API，可独立单测；
  * - 所有 provider 走 OpenAI 兼容协议（`POST {baseUrl}/chat/completions`），
- *   因此新增厂商通常只需增加一条预设。
+ *   新增厂商通常只需增加一条预设；
+ * - 没有「跟随服务端」档：是否回退服务端由「AI 摘要后端」偏好（summarizeBackend.ts）决定，
+ *   未配置 provider（目标解析为 null 且从未显式选择）等价于旧的默认行为。
  */
 
-/**
- * 内置 provider 预设 id。
- *
- * - `server`：不自带模型，回退到聊天服务器的 `/api/ai/summarize`（客户端不接触密钥）；
- * - 其余为 OpenAI 兼容的第三方/本地服务。
- */
+/** 插件自管的 provider 预设 id。 */
 export type AiProviderId =
-  | "server"
   | "openai"
   | "deepseek"
   | "dashscope"
@@ -25,9 +21,7 @@ export type AiProviderId =
   | "ollama"
   | "custom";
 
-/**
- * provider 预设（OpenAI 兼容协议）。
- */
+/** provider 预设（OpenAI 兼容协议）。 */
 export type AiProviderPreset = {
   /** 预设 id。 */
   id: AiProviderId;
@@ -36,8 +30,8 @@ export type AiProviderPreset = {
   /**
    * 预设 base URL（OpenAI SDK 语义）。
    *
-   * 后端拼接规则：若该值已以 `/chat/completions` 结尾则原样使用，
-   * 否则追加 `/chat/completions`。
+   * 拼接规则：若该值已以 `/chat/completions` 结尾则原样使用，
+   * 否则追加 `/chat/completions`（见 openaiClient.ts）。
    */
   baseUrl: string;
   /** 建议模型名；空字符串表示需用户拉取模型列表后选择。 */
@@ -46,26 +40,17 @@ export type AiProviderPreset = {
   requiresApiKey: boolean;
   /** 是否为本地（loopback）服务：本地服务同样不需要密钥。 */
   local: boolean;
-  /** 预设备注（中文，展示在设置页）。 */
+  /** 预设备注（中文，展示在设置项）。 */
   hint: string;
 };
 
 /**
  * 内置 provider 预设表。
  *
- * 注：base URL 依据各厂商现行文档整理；模型名仅为建议值，可在设置页任意修改
+ * 注：base URL 依据各厂商现行文档整理；模型名仅为建议值，可在设置项任意修改
  * （提供"拉取模型列表"以避免写死模型名过期）。
  */
 export const AI_PROVIDER_PRESETS: readonly AiProviderPreset[] = [
-  {
-    id: "server",
-    label: "跟随服务端（默认）",
-    baseUrl: "",
-    model: "",
-    requiresApiKey: false,
-    local: false,
-    hint: "由聊天服务端的 /api/ai/summarize 完成总结，客户端不接触模型与密钥。",
-  },
   {
     id: "openai",
     label: "OpenAI",
@@ -123,7 +108,7 @@ export const AI_PROVIDER_PRESETS: readonly AiProviderPreset[] = [
 ];
 
 /**
- * 客户端 AI provider 配置（非敏感部分；API Key 由 Rust 侧保存在系统凭据管理器）。
+ * 插件自管的 provider 配置（非敏感部分；API Key 由 `ctx.secrets` 写入系统凭据管理器）。
  */
 export type AiProviderConfig = {
   /** 选中的 provider。 */
@@ -138,6 +123,13 @@ export type AiProviderConfig = {
   temperature: number;
   /** 请求超时（毫秒）。 */
   timeoutMs: number;
+  /**
+   * 用户是否显式选择过 provider（区分「从未配置」与「选了但没填全」）。
+   *
+   * - false：视为未配置（后端 auto 时允许回退服务端，等价旧默认行为）；
+   * - true 但 base URL / 模型名为空：配置不完整，给出可操作提示且不静默回退。
+   */
+  providerChosen: boolean;
 };
 
 /**
@@ -146,39 +138,33 @@ export type AiProviderConfig = {
 export const DEFAULT_AI_SYSTEM_PROMPT =
   "你是一个聊天记录总结助手。请用简洁的要点总结下面的聊天内容，保留关键结论与待办事项，不要编造未出现的信息。";
 
-/**
- * 默认配置：`server` 表示沿用既有服务端行为，升级后行为不变。
- */
-export const DEFAULT_AI_CONFIG: AiProviderConfig = {
-  providerId: "server",
+/** 默认配置：未选择、未填写（目标解析为 null → 跟随「后端」偏好的回退语义）。 */
+export const DEFAULT_AI_PROVIDER_CONFIG: AiProviderConfig = {
+  providerId: "openai",
   baseUrl: "",
   model: "",
   systemPrompt: "",
   temperature: 0.3,
   timeoutMs: 30000,
+  providerChosen: false,
 };
 
 /**
- * 单次总结允许的最大消息条数（超出截断，避免超出模型上下文与费用失控）。
+ * 单次总结允许的最大消息条数（超出截断，避免超出模型上下文与费用失控；
+ * 与宿主 `messages:read` 单次 500 条上限保持一致）。
  */
 export const MAX_SUMMARIZE_MESSAGES = 500;
 
-/**
- * 单条消息允许的最大字符数（超出截断）。
- */
+/** 单条消息允许的最大字符数（超出截断）。 */
 export const MAX_SUMMARIZE_MESSAGE_CHARS = 4000;
 
-/**
- * OpenAI 兼容 chat message。
- */
+/** OpenAI 兼容 chat message。 */
 export type AiChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
-/**
- * 解析后的可调用目标。
- */
+/** 解析后的可调用目标。 */
 export type AiTarget = {
   providerId: AiProviderId;
   baseUrl: string;
@@ -201,7 +187,7 @@ export function isAiProviderId(raw: unknown): raw is AiProviderId {
 }
 
 /**
- * 按 id 读取预设；未知 id 回退到 `server` 预设。
+ * 按 id 读取预设；未知 id 回退到首个预设（openai）。
  *
  * @param id - provider id。
  * @returns 对应预设。
@@ -212,12 +198,6 @@ export function getAiProviderPreset(id: AiProviderId): AiProviderPreset {
 
 /**
  * 数值裁剪（含 NaN / Infinity 兜底）。
- *
- * @param raw - 原始值。
- * @param min - 下界。
- * @param max - 上界。
- * @param fallback - 非法值时的回退值。
- * @returns 裁剪后的有限数值。
  */
 function clampNumber(raw: unknown, min: number, max: number, fallback: number): number {
   const num = typeof raw === "number" ? raw : Number(raw);
@@ -227,47 +207,48 @@ function clampNumber(raw: unknown, min: number, max: number, fallback: number): 
 
 /**
  * 归一化字符串字段（去首尾空白，非字符串回退）。
- *
- * @param raw - 原始值。
- * @param fallback - 回退值。
- * @returns 归一化后的字符串。
  */
 function normalizeString(raw: unknown, fallback: string): string {
   return typeof raw === "string" ? raw.trim() : fallback;
 }
 
 /**
- * 归一化来自持久化/导入的配置对象（容错，永不抛错）。
+ * 归一化来自持久化的配置对象（容错，永不抛错）。
  *
  * @param raw - 未知来源的配置。
  * @returns 合法配置；字段非法时逐项回退默认值。
  */
 export function normalizeAiProviderConfig(raw: unknown): AiProviderConfig {
-  if (typeof raw !== "object" || raw === null) return { ...DEFAULT_AI_CONFIG };
+  if (typeof raw !== "object" || raw === null) return { ...DEFAULT_AI_PROVIDER_CONFIG };
   const r = raw as Record<string, unknown>;
-  const providerId = isAiProviderId(r.providerId) ? r.providerId : DEFAULT_AI_CONFIG.providerId;
+  // providerId 容错（trim + 小写后校验），避免手改存储时静默回退到默认预设。
+  const rawProviderId =
+    typeof r.providerId === "string" ? r.providerId.trim().toLowerCase() : undefined;
+  const providerId = isAiProviderId(rawProviderId)
+    ? rawProviderId
+    : DEFAULT_AI_PROVIDER_CONFIG.providerId;
   return {
     providerId,
     baseUrl: normalizeString(r.baseUrl, ""),
     model: normalizeString(r.model, ""),
+    // 提示词保留原样（含首尾空白）：resolveAiTarget 使用时再 trim，避免裁掉用户刻意的换行。
     systemPrompt: typeof r.systemPrompt === "string" ? r.systemPrompt : "",
-    temperature: clampNumber(r.temperature, 0, 2, DEFAULT_AI_CONFIG.temperature),
-    timeoutMs: clampNumber(r.timeoutMs, 1000, 120000, DEFAULT_AI_CONFIG.timeoutMs),
+    temperature: clampNumber(r.temperature, 0, 2, DEFAULT_AI_PROVIDER_CONFIG.temperature),
+    timeoutMs: clampNumber(r.timeoutMs, 1000, 120000, DEFAULT_AI_PROVIDER_CONFIG.timeoutMs),
+    providerChosen: r.providerChosen === true,
   };
 }
 
 /**
  * 解析当前配置对应的可调用目标。
  *
- * 规则：
- * - `providerId === "server"` → 返回 `null`，表示"不使用客户端 AI，回退服务端"；
- * - base URL 或模型名为空 → 返回 `null`（配置不完整，调用方应回退/提示）。
+ * 规则：base URL 或模型名为空 → 返回 `null`（配置不完整）；
+ * 调用方结合 `providerChosen` 区分「未配置」（可回退）与「配置不完整」（提示补全）。
  *
  * @param config - 归一化后的配置。
  * @returns 可调用目标；不可用时为 `null`。
  */
 export function resolveAiTarget(config: AiProviderConfig): AiTarget | null {
-  if (config.providerId === "server") return null;
   const baseUrl = config.baseUrl.trim();
   const model = config.model.trim();
   if (!baseUrl || !model) return null;
@@ -288,7 +269,7 @@ export function resolveAiTarget(config: AiProviderConfig): AiTarget | null {
  * 组装总结用的 chat messages（纯函数）。
  *
  * 规则：
- * - 按行/条目清空空白后丢弃空项；
+ * - 按条清空空白后丢弃空项；
  * - 条数截断到 {@link MAX_SUMMARIZE_MESSAGES}，单条截断到 {@link MAX_SUMMARIZE_MESSAGE_CHARS}；
  * - 每条前置序号，减少模型把相邻消息粘连成一句的概率。
  *

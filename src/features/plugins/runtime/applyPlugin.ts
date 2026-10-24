@@ -18,11 +18,11 @@ import type { DomainsRegistry } from "./domainsRegistry";
 import { createRuntimeGuard } from "./guard";
 import { assertRequiredPermissions, CAPABILITY_SERVICE_NAMES, isServiceVisible, normalizePermissions } from "./permissions";
 import type { PluginSettingsRegistry } from "./pluginSettingsRegistry";
-import { createAiService } from "./services/ai";
 import { createDomainsService } from "./services/domains";
 import { createIpcService, resolveIpcPrefixes } from "./services/ipc";
 import { createMessagesService } from "./services/messages";
 import { createNetworkService } from "./services/network";
+import { createSecretsService } from "./services/secrets";
 import { createStorageService } from "./services/storage";
 import { createUiService, type PluginUiBridge } from "./services/ui";
 import type { Plugin } from "./types";
@@ -96,8 +96,8 @@ export async function applyPlugin(
       if (isServiceVisible("network", permissions)) {
         ctx.set("network", createNetworkService(deps.serverSocket, runtime.pluginId, guard));
       }
-      if (isServiceVisible("ai", permissions)) {
-        ctx.set("ai", createAiService(runtime.pluginId, guard));
+      if (isServiceVisible("secrets", permissions)) {
+        ctx.set("secrets", createSecretsService(deps.serverSocket, runtime.pluginId, guard));
       }
       if (isServiceVisible("messages", permissions)) {
         ctx.set(

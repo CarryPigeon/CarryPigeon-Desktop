@@ -45,6 +45,7 @@ function fmtTime(ms: number): string {
       >
         <div class="cp-mergedForward__msgMeta">
           <span class="cp-mergedForward__msgAuthor">{{ fm.authorName || fm.userId }}</span>
+          <span v-if="fm.channelName || fm.channelId" class="cp-mergedForward__msgChannel">#{{ fm.channelName || fm.channelId }}</span>
           <span class="cp-mergedForward__msgTime">{{ fmtTime(fm.sentTime) }}</span>
         </div>
         <div class="cp-mergedForward__msgPreview">
@@ -117,6 +118,14 @@ function fmtTime(ms: number): string {
   font-size: 12px;
   font-weight: 600;
   color: var(--cp-text);
+}
+/* 来源频道：与作者同行的弱化标签（跨频道合并转发时可见来源）。 */
+.cp-mergedForward__msgChannel {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cp-mergedForward__msgTime {
   font-size: 10px;

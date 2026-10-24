@@ -1,6 +1,6 @@
 /**
  * @fileoverview forwardAuthorNames.test.ts
- * @description chat｜view-model：转发条目作者昵称解析助手单测。
+ * @description chat｜view-model：转发条目作者昵称 / 来源频道名解析助手单测。
  */
 
 import { describe, expect, it } from "vitest";
@@ -9,6 +9,7 @@ import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message
 import {
   collectUnresolvedForwardAuthorUids,
   withResolvedForwardAuthorNames,
+  withResolvedForwardChannelNames,
 } from "./forwardAuthorNames";
 
 type CoreTextMessage = Extract<ChatMessage, { kind: "core_text" }>;
@@ -117,5 +118,49 @@ describe("collectUnresolvedForwardAuthorUids", () => {
       }),
     ];
     expect(collectUnresolvedForwardAuthorUids(messages, () => false)).toEqual([]);
+  });
+});
+
+describe("withResolvedForwardChannelNames", () => {
+  it("resolves entry channel names into a shallow copy without mutating the source", () => {
+    const source = makeMessage({
+      forwardedMessages: [entry({ channelId: "ch1" }), entry({ messageId: "src-2", channelId: "ch2" })],
+    });
+    const result = withResolvedForwardChannelNames(source, (cid) => `频道-${cid}`);
+
+    expect(result).not.toBe(source);
+    expect(result.forwardedMessages?.[0].channelName).toBe("频道-ch1");
+    expect(result.forwardedMessages?.[1].channelName).toBe("频道-ch2");
+    // 原对象不被改写
+    expect(source.forwardedMessages?.[0].channelName).toBeUndefined();
+  });
+
+  it("also resolves forwardedFrom snapshots", () => {
+    const source = makeMessage({ forwardedFrom: entry({ channelId: "ch-origin" }) });
+    const result = withResolvedForwardChannelNames(source, () => "开发频道");
+
+    expect(result.forwardedFrom?.channelName).toBe("开发频道");
+  });
+
+  it("returns the original message when the channel is unresolvable", () => {
+    const source = makeMessage({ forwardedFrom: entry({ channelId: "ch-404" }) });
+    expect(withResolvedForwardChannelNames(source, () => "")).toBe(source);
+    expect(source.forwardedFrom?.channelName).toBeUndefined();
+  });
+
+  it("returns the original message when no forward fields exist", () => {
+    const source = makeMessage();
+    expect(withResolvedForwardChannelNames(source, () => "开发频道")).toBe(source);
+  });
+
+  it("keeps identity when channel names are already up to date", () => {
+    const source = makeMessage({ forwardedFrom: entry({ channelId: "ch1", channelName: "开发频道" }) });
+    expect(withResolvedForwardChannelNames(source, () => "开发频道")).toBe(source);
+  });
+
+  it("trims resolver output before assigning", () => {
+    const source = makeMessage({ forwardedFrom: entry({ channelId: "ch1" }) });
+    const result = withResolvedForwardChannelNames(source, () => "  开发频道  ");
+    expect(result.forwardedFrom?.channelName).toBe("开发频道");
   });
 });

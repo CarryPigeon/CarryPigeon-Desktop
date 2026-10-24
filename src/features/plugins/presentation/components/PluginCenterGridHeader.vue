@@ -89,14 +89,13 @@ function handleBack(): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：插件中心头部｜规格：面板内分区头（标题 18px + mono 元信息 + 胶囊操作） */
+/* 样式：插件中心头部｜规格：工作台控制台（标题 14px + mono 元信息 + 胶囊操作，无底部分隔线） */
 .cp-plugins__head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 8px 10px;
 }
 
 .cp-plugins__headLeft {
@@ -104,16 +103,11 @@ function handleBack(): void {
 }
 
 .cp-plugins__headTitle {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  font-size: 18px;
-  line-height: 1.2;
-  letter-spacing: 0.04em;
-  color: var(--cp-text);
+  @include cp-console-title;
 }
 
 .cp-plugins__headMeta {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -124,7 +118,7 @@ function handleBack(): void {
 .cp-plugins__mono {
   min-width: 0;
   font-family: var(--cp-font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--cp-text-muted);
   overflow-wrap: anywhere;

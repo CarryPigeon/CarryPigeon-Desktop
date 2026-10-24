@@ -71,17 +71,17 @@ const props = defineProps<{
    */
   onMessageContextMenu: (e: MouseEvent, messageId: string) => void;
   /**
-   * 打开消息上下文菜单（⋯）。
+   * 打开消息引用块（回复 / 引用预览 / 转发来源）的右键菜单。
+   *
+   * channelId 存在时表示跳转目标在其他频道（跨频道转发来源）。
    */
-  onMoreClick: (e: MouseEvent, messageId: string) => void;
-  /**
-   * 打开消息引用块（回复 / 引用预览）的右键菜单。
-   */
-  onReferenceContextMenu: (e: MouseEvent, messageId: string) => void;
+  onReferenceContextMenu: (e: MouseEvent, messageId: string, channelId?: string) => void;
   /**
    * 点击消息引用块上的「跳转到原消息」按钮。
+   *
+   * channelId 存在时表示目标消息在其他频道（跨频道转发跳转）。
    */
-  onJumpReference: (messageId: string) => void;
+  onJumpReference: (messageId: string, channelId?: string) => void;
   /**
    * 安装提示：从未知 domain 卡片跳转到插件中心。
    */
@@ -131,8 +131,8 @@ const virtualizerOptions = computed(() => ({
     if (!item) return 52;
     const m = item.m;
     if (m.kind === 'image' || m.kind === 'video') return 220;
-    // 组内后续消息隐藏 domain 色条，但保留组内垂直间距，基准高度相应上浮。
-    let base = item.isGroupStart ? 52 : 44;
+    // 组首行含 16px 分组间距 padding；组内后续消息隐藏 domain 色条，但保留组内垂直间距，基准高度相应上浮。
+    let base = item.isGroupStart ? 68 : 44;
     if (m.replyToId) base += 28;
     return base;
   },
@@ -215,21 +215,22 @@ watch(
 /**
  * 处理消息引用块右键：转发给页面层的引用菜单编排。
  *
- * @param payload - 右键事件与被引用消息 id。
+ * @param payload - 右键事件、被引用消息 id 与可选的目标频道 id（跨频道转发来源）。
  * @returns 无返回值。
  */
-function handleReferenceContextMenu(payload: { event: MouseEvent; messageId: string }): void {
-  props.onReferenceContextMenu(payload.event, payload.messageId);
+function handleReferenceContextMenu(payload: { event: MouseEvent; messageId: string; channelId?: string }): void {
+  props.onReferenceContextMenu(payload.event, payload.messageId, payload.channelId);
 }
 
 /**
  * 处理引用块「跳转到原消息」按钮点击：转发给页面层定位编排。
  *
  * @param messageId - 被引用的消息 id。
+ * @param channelId - 目标消息所在频道（跨频道转发跳转时提供）。
  * @returns 无返回值。
  */
-function handleJumpReference(messageId: string): void {
-  props.onJumpReference(messageId);
+function handleJumpReference(messageId: string, channelId?: string): void {
+  props.onJumpReference(messageId, channelId);
 }
 
 /** 通用浮层宿主：把 expose.mount 注入 chat UI 桥，供插件经 host.mountOverlay 注册全局浮层。
@@ -614,10 +615,9 @@ function getReplyText(m: ChatMessage): string {
               </div>
               <!-- 区块：内容列（meta + bubble/card） -->
               <div class="cp-msg__body">
-                <!-- 区块：meta 行（仅分组首条展示名字/时间，不展示消息类型；组内其余条只保留“⋯”操作入口） -->
+                <!-- 区块：meta 行（仅分组首条展示名字/时间；组内其余条为空占位，只承担组内垂直间距） -->
                 <div
                   class="cp-msg__meta"
-                  :data-compact="!virtualListItems[vr.index].isGroupStart"
                   :data-bare="!virtualListItems[vr.index].isGroupStart"
                 >
                   <template v-if="virtualListItems[vr.index].isGroupStart">
@@ -625,7 +625,6 @@ function getReplyText(m: ChatMessage): string {
                     <span class="cp-msg__dot"></span>
                     <span class="cp-msg__time">{{ props.model.fmtGroupHeadTime(virtualListItems[vr.index].m.timeMs, virtualListItems[vr.index].showDate) }}</span>
                   </template>
-                  <button v-if="!virtualListItems[vr.index].m.recalledAt" class="cp-msg__more" type="button" :aria-label="t('more_actions')" @click="props.onMoreClick($event, virtualListItems[vr.index].m.id)"><AppIcon name="more" /></button>
                 </div>
 
                 <!-- 区块：消息内容渲染宿主（core/plugin/unknown 分发） -->

@@ -372,19 +372,18 @@ async function handleSaveEdit(): Promise<void> {
 </template>
 
 <style scoped lang="scss">
-/* 样式：UserInfoPage｜规格：hero 横幅（语义 token 遮罩）+ body 玻璃面板 + cp-card */
-/* 布局与变量说明：使用全局 `--cp-*` 变量；页面为“背图横幅 + 资料详情面板”。 */
+/* 样式：UserInfoPage｜规格：工作台骨架 + hero 内容卡（语义 token 遮罩）+ 透明资料区 + cp-card */
+/* 布局与变量说明：使用全局 `--cp-*` 变量；页面为“背图横幅 + 资料详情区”。 */
 .cp-info {
-  height: 100%;
-  padding: var(--cp-page-pad);
-  display: flex;
-  flex-direction: column;
-  gap: var(--cp-page-gap);
+  @include cp-workspace;
+
+  gap: 8px;
+  overflow: hidden;
 }
 
-/* hero 保留自定义渐变背景，外壳复用一级玻璃面板规格 */
+/* hero 保留自定义渐变背景，外壳使用内容卡（不叠加模糊） */
 .cp-info__hero {
-  @include cp-glass-panel;
+  @include cp-card;
 
   position: relative;
   min-height: 220px;
@@ -394,7 +393,7 @@ async function handleSaveEdit(): Promise<void> {
   background-size: cover;
   background-position: center;
   overflow: hidden;
-  padding: 14px;
+  padding: 12px;
 }
 
 /* 遮罩改用语义表面色，文字令牌在明暗主题下都可读 */
@@ -564,17 +563,17 @@ async function handleSaveEdit(): Promise<void> {
   color: var(--cp-text-muted);
 }
 
-/* body：一级玻璃面板 */
+/* body：共享玻璃面上的透明资料区 */
 .cp-info__body {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--cp-page-pad);
+  padding: 10px;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--cp-page-gap);
+  gap: 10px;
 }
 
 /* 资料卡：内嵌卡片 */
@@ -608,11 +607,6 @@ async function handleSaveEdit(): Promise<void> {
 }
 
 @media (max-width: 640px) {
-  .cp-info {
-    padding: 10px;
-    gap: 10px;
-  }
-
   .cp-info__hero {
     min-height: 200px;
   }

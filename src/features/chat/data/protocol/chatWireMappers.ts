@@ -316,8 +316,14 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   } else if (domain === "Core:Forward") {
     const forwardData = mapChatForwardMessageWireDataToRecord(wire.data as ChatForwardMessageWireData);
     data = forwardData;
-    forwardedFrom = forwardData.forwardedFrom;
-    forwardedMessages = forwardData.forwardedMessages;
+    // 现行契约要求 forward 快照封装在 data 内；旧版服务端放在消息顶层，这里做回退兼容
+    //（data 内优先，顶层仅在 data 缺失时兜底），避免跨频道转发来源丢失导致转发消息不可见。
+    forwardedFrom = forwardData.forwardedFrom ?? mapChatForwardedFromWire(wire.forwarded_from);
+    forwardedMessages =
+      forwardData.forwardedMessages ??
+      (Array.isArray(wire.forwarded_messages)
+        ? wire.forwarded_messages.map(mapChatForwardedFromWire).filter((m): m is ChatForwardedFromRecord => m != null)
+        : undefined);
   }
 
   const status = asTrimmedString(wire.status);

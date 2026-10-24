@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Component } from "vue";
 import type { Context } from "@/features/plugins/sdk";
 import { resetBackendPreferenceForTests } from "./host/backendPreference";
+import { resetProviderConfigForTests } from "./host/providerConfig";
 import { SUMMARIZE_BACKEND_STORAGE_KEY } from "./domain/summarizeBackend";
 import { getContext, unbindContext } from "./host/bridge";
 
@@ -103,25 +104,32 @@ async function flushAsync(): Promise<void> {
 describe("ai-summary 插件入口", () => {
   beforeEach(() => {
     resetBackendPreferenceForTests();
+    resetProviderConfigForTests();
   });
 
   afterEach(() => {
     unbindContext();
   });
 
-  it("注册工具栏入口与设置项（含来源可搜索元数据）", () => {
+  it("注册工具栏入口与两组设置项（后端 + 自管 provider，含可搜索元数据）", () => {
     const { ctx, settingsItems, toolbarActions } = createPluginContext();
 
     apply(ctx);
 
     expect(toolbarActions).toHaveLength(1);
-    expect(settingsItems).toHaveLength(1);
-    const item = settingsItems[0]!;
-    expect(item.id).toBe("backend");
-    expect(item.title).toBe("AI 摘要后端");
-    expect(item.order).toBe(10);
-    expect(item.component).toBeTruthy();
-    expect(item.keywords ?? []).toContain("后端");
+    expect(settingsItems).toHaveLength(2);
+    const backend = settingsItems[0]!;
+    expect(backend.id).toBe("backend");
+    expect(backend.title).toBe("AI 摘要后端");
+    expect(backend.order).toBe(10);
+    expect(backend.component).toBeTruthy();
+    expect(backend.keywords ?? []).toContain("后端");
+    const provider = settingsItems[1]!;
+    expect(provider.id).toBe("provider");
+    expect(provider.title).toBe("AI 服务提供方");
+    expect(provider.order).toBe(20);
+    expect(provider.component).toBeTruthy();
+    expect(provider.keywords ?? []).toContain("密钥");
   });
 
   it("apply 时预载入已保存的后端档位", async () => {

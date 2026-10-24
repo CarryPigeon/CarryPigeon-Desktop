@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_ENABLED_PLUGIN_IDS,
+  alignInstalledStateWithLocalSource,
   getEnabledLocalPluginIds,
   getLocalInstalledState,
   getLocalPluginRuntimeEntry,
@@ -13,6 +14,7 @@ import {
   isLocalPluginDisabled,
   isLocalPluginSourceEnabled,
   listLocalDefaultInstalledStates,
+  listLocalInstalledStates,
   listLocalPluginCatalogEntries,
   resolveEnabledLocalPluginIds,
   setLocalPluginDisabled,
@@ -156,5 +158,94 @@ describe("localPluginSource", () => {
     localStorage.clear();
     expect(getLocalInstalledState("server-1", "markdown")).toBeNull();
     expect(getLocalInstalledState("server-1", "unknown")).toBeNull();
+  });
+
+  it("listLocalInstalledStates 覆盖全部本地源插件（含被停用的）", () => {
+    // 回归：本地源插件安装态以本地源为权威（覆盖 Rust 残留记录），
+    // 停用条目需以 enabled:false 出现（而非从列表中消失）。
+    vi.stubEnv("VITE_USE_LOCAL_PLUGINS", "theme,markdown");
+    vi.stubEnv("VITE_USE_LOCAL_VOICE_CALL_PLUGIN", "false");
+    localStorage.clear();
+    let states = listLocalInstalledStates("server-1");
+    expect(states.map((s) => s.pluginId)).toEqual(["theme", "markdown"]);
+    expect(states.every((s) => s.enabled)).toBe(true);
+
+    setLocalPluginDisabled("server-1", "theme", true);
+    states = listLocalInstalledStates("server-1");
+    expect(states.map((s) => s.pluginId)).toEqual(["theme", "markdown"]);
+    expect(states.find((s) => s.pluginId === "theme")?.enabled).toBe(false);
+    expect(states.find((s) => s.pluginId === "markdown")?.enabled).toBe(true);
+
+    setLocalPluginDisabled("server-1", "theme", false);
+    states = listLocalInstalledStates("server-1");
+    expect(states.every((s) => s.enabled)).toBe(true);
+  });
+
+  it("listLocalInstalledStates 仅列出开关中启用的本地源插件", () => {
+    vi.stubEnv("VITE_USE_LOCAL_PLUGINS", "ai-summary");
+    vi.stubEnv("VITE_USE_LOCAL_VOICE_CALL_PLUGIN", "false");
+    localStorage.clear();
+    const states = listLocalInstalledStates("server-1");
+    expect(states.map((s) => s.pluginId)).toEqual(["ai-summary"]);
+    expect(states[0]?.currentVersion).toBe(getLocalPluginRuntimeEntry("server-1", "ai-summary").version);
+  });
+
+  describe("alignInstalledStateWithLocalSource", () => {
+    it("本地源插件的旧版本安装态被对齐到本地源版本", () => {
+      // 回归：历史落盘的 0.1.0 与本地源 0.2.0 不一致时，协调器会反复重挂插件。
+      const localVersion = getLocalPluginRuntimeEntry("server-1", "ai-summary").version;
+      const stale = {
+        pluginId: "ai-summary",
+        installedVersions: ["0.1.0"],
+        currentVersion: "0.1.0",
+        enabled: true,
+        status: "ok" as const,
+        lastError: "",
+      };
+      const aligned = alignInstalledStateWithLocalSource(stale);
+      expect(aligned.currentVersion).toBe(localVersion);
+      expect(aligned.installedVersions).toEqual([localVersion]);
+      expect(aligned.enabled).toBe(true);
+      expect(aligned.status).toBe("ok");
+    });
+
+    it("已对齐的安装态原样返回（引用不变）", () => {
+      const localVersion = getLocalPluginRuntimeEntry("server-1", "theme").version;
+      const state = {
+        pluginId: "theme",
+        installedVersions: [localVersion],
+        currentVersion: localVersion,
+        enabled: true,
+        status: "ok" as const,
+        lastError: "",
+      };
+      expect(alignInstalledStateWithLocalSource(state)).toBe(state);
+    });
+
+    it("非本地源插件的安装态原样返回（引用不变）", () => {
+      const state = {
+        pluginId: "some-server-plugin",
+        installedVersions: ["0.3.0"],
+        currentVersion: "0.3.0",
+        enabled: true,
+        status: "ok" as const,
+        lastError: "",
+      };
+      expect(alignInstalledStateWithLocalSource(state)).toBe(state);
+    });
+
+    it("本地源未启用（env 显式关闭）时不对齐", () => {
+      vi.stubEnv("VITE_USE_LOCAL_PLUGINS", "");
+      vi.stubEnv("VITE_USE_LOCAL_VOICE_CALL_PLUGIN", "false");
+      const state = {
+        pluginId: "ai-summary",
+        installedVersions: ["0.1.0"],
+        currentVersion: "0.1.0",
+        enabled: true,
+        status: "ok" as const,
+        lastError: "",
+      };
+      expect(alignInstalledStateWithLocalSource(state)).toBe(state);
+    });
   });
 });

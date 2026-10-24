@@ -108,7 +108,7 @@ function formatTime(iso: string): string {
 </script>
 
 <template>
-  <!-- 组件：FileListTable｜职责：文件列表（11px 表头 / 48px 行高 / 细分隔线 / 选中 highlight） -->
+  <!-- 组件：FileListTable｜职责：文件列表（11px 表头 / 44px 行高 / 行无分隔线 / 选中 highlight） -->
   <div v-if="files.length === 0 && !loading" class="cp-fileTable__empty">
     <span class="cp-fileTable__emptyIcon"><AppIcon name="file" :size="22" /></span>
     <span class="cp-fileTable__emptyText">{{ t("file_list_empty") }}</span>
@@ -203,14 +203,14 @@ function formatTime(iso: string): string {
 </template>
 
 <style scoped lang="scss">
-/* 样式：文件列表表格｜规格：微标签表头 + 48px 行 + 细分隔线 + 选中 highlight */
+/* 样式：文件列表表格｜规格：微标签表头 + 44px 行 + 行无分隔线 + 选中 highlight */
 .cp-fileTable__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 56px 20px;
+  padding: 48px 20px;
   text-align: center;
 }
 
@@ -231,13 +231,13 @@ function formatTime(iso: string): string {
   color: var(--cp-text-muted);
 }
 
-/* 表头：11px uppercase / 0.08em；与数据行共用列宽 */
+/* 表头：11px uppercase / 0.08em；与数据行共用列宽；保留一条功能分隔线 */
 .cp-fileTable__header {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--cp-border-light);
   font-family: var(--cp-font-display);
   font-size: 11px;
@@ -300,14 +300,14 @@ function formatTime(iso: string): string {
   cursor: pointer;
 }
 
-/* 数据行：48px、层叠细分隔线、hover 只变底色 */
+/* 数据行：44px、无分隔线、hover 只变底色 */
 .cp-fileTable__row {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 48px;
-  padding: 6px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
+  min-height: 44px;
+  padding: 4px 10px;
+  border-radius: var(--cp-radius-sm);
   cursor: pointer;
   transition:
     background-color var(--cp-fast) var(--cp-ease),

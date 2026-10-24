@@ -84,6 +84,7 @@ function makeMessage(id: string, fromId: string, timeMs: number): ChatMessage {
 type CenterOptions = {
   messages?: ChatMessage[];
   resolveSenderName?: (uid: string) => string;
+  resolveChannelName?: (channelId: string) => string;
   fetchUserNames?: (uids: string[]) => Promise<Record<string, string>>;
 };
 
@@ -143,6 +144,7 @@ function mountCenter(options: CenterOptions = {}): {
     onForwardMessage: async () => {},
     selectChannel,
     resolveSenderName: options.resolveSenderName ?? (() => ""),
+    resolveChannelName: options.resolveChannelName ?? (() => ""),
     fetchUserNames,
   };
 
@@ -280,6 +282,58 @@ describe("useChatCenterModel 消息定位", () => {
     expect(loadContextAroundMessage).not.toHaveBeenCalled();
     expect(model.messageReveal.messageId).toBe("");
     expect(model.messageReveal.nonce).toBe(0);
+  });
+
+  it("跨频道跳转（转发来源）先切换频道再加载上下文", async () => {
+    const { model, loadContextAroundMessage, selectChannel } = mountCenter();
+
+    await model.jumpToReferencedMessage("src-1", "cid-2");
+
+    expect(selectChannel).toHaveBeenCalledWith("cid-2");
+    // 先切换频道、再加载目标上下文（顺序错误会导致定位落在旧频道时间线）。
+    expect(selectChannel.mock.invocationCallOrder[0]).toBeLessThan(
+      loadContextAroundMessage.mock.invocationCallOrder[0],
+    );
+    expect(loadContextAroundMessage).toHaveBeenCalledWith("src-1");
+    expect(model.messageReveal.messageId).toBe("src-1");
+    expect(model.messageReveal.nonce).toBe(1);
+  });
+
+  it("目标频道与当前频道相同时不重复切换频道", async () => {
+    const { model, selectChannel } = mountCenter();
+
+    await model.jumpToReferencedMessage("m0", "cid-1");
+
+    expect(selectChannel).not.toHaveBeenCalled();
+    expect(model.messageReveal.messageId).toBe("m0");
+  });
+});
+
+describe("useChatCenterModel 转发来源频道名投影", () => {
+  it("按频道目录解析转发来源频道名，不可解析时保留原始 channelId", () => {
+    const forwarded: ChatMessage = {
+      id: "m-fwd",
+      kind: "core_text",
+      from: { id: "1002", name: "Operator" },
+      timeMs: 2000,
+      domain: { id: "Core:Forward", label: "Core:Forward", colorVar: "--cp-domain-core" },
+      text: "",
+      forwardedFrom: { messageId: "src-1", channelId: "ch-known", userId: "1001", preview: "hello", sentTime: 1000 },
+      forwardedMessages: [
+        { messageId: "src-2", channelId: "ch-known", userId: "1001", preview: "a", sentTime: 1000 },
+        { messageId: "src-3", channelId: "ch-404", userId: "1001", preview: "b", sentTime: 1001 },
+      ],
+    };
+    const { model } = mountCenter({
+      messages: [forwarded],
+      resolveChannelName: (cid) => (cid === "ch-known" ? "开发频道" : ""),
+    });
+
+    const row = model.messageRows[0].m;
+    expect(row.forwardedFrom?.channelName).toBe("开发频道");
+    expect(row.forwardedMessages?.[0].channelName).toBe("开发频道");
+    // 不可解析的频道保留 undefined，由 UI 回退显示 channelId。
+    expect(row.forwardedMessages?.[1].channelName).toBeUndefined();
   });
 });
 

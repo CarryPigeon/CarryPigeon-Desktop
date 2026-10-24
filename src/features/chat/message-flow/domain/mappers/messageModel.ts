@@ -38,8 +38,10 @@ export function createMessageMapper(deps: MessageModelDeps) {
     const domainLabel = String(m.domain ?? "").trim() || "Unknown:Domain";
     const isWrapperDomain = domainLabel === "Core:ReplyText" || domainLabel === "Core:Forward";
     const wrapperData = isWrapperDomain && m.data && typeof m.data === "object" ? (m.data as Record<string, unknown>) : null;
+    // 包装域嵌套内容固定为 Core:Text（ReplyText 为正文、Forward 为可选附言）；
+    // data.domain 缺失时同样按 Core:Text 兜底，避免转发消息掉进未知 domain 卡片而不可见。
     const contentDomain = isWrapperDomain
-      ? String(wrapperData?.domain ?? (domainLabel === "Core:ReplyText" ? "Core:Text" : "")).trim()
+      ? String(wrapperData?.domain ?? "Core:Text").trim() || "Core:Text"
       : domainLabel;
     const contentData = wrapperData?.content ?? m.data;
     const pluginIdHint = deps.resolveDomainPluginHint(serverSocket, contentDomain) || "";

@@ -65,12 +65,16 @@ const emit = defineEmits<{
   (event: "retry", messageId: string): void;
   /**
    * 右键消息引用块：请求打开「跳转到被回复消息」菜单。
+   *
+   * payload.channelId 存在时表示跳转目标在其他频道（跨频道转发来源）。
    */
-  (event: "openReferenceMenu", payload: { event: MouseEvent; messageId: string }): void;
+  (event: "openReferenceMenu", payload: { event: MouseEvent; messageId: string; channelId?: string }): void;
   /**
    * 点击引用块上的「跳转到原消息」按钮。
+   *
+   * channelId 存在时表示目标消息在其他频道（跨频道转发跳转）。
    */
-  (event: "jumpReference", messageId: string): void;
+  (event: "jumpReference", messageId: string, channelId?: string): void;
 }>();
 
 const { t } = useI18n();
@@ -291,7 +295,7 @@ function handleInstall(): void {
       :current-user-name="currentUserName"
       @openLightbox="(payload) => emit('openLightbox', payload)"
       @open-reference-menu="(payload) => emit('openReferenceMenu', payload)"
-      @jump-reference="(mid: string) => emit('jumpReference', mid)"
+      @jump-reference="(mid: string, cid?: string) => emit('jumpReference', mid, cid)"
     />
     <div v-else-if="renderModel.kind === 'plugin'" class="cp-pluginBubble">
       <component

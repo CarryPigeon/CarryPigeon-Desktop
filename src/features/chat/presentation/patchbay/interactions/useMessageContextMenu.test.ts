@@ -82,7 +82,8 @@ describe("useMessageContextMenu 引用块菜单", () => {
     model.handleReferenceContextMenu(mouseEvent(), "m0");
     model.handleMenuAction("jump");
 
-    expect(spies.jumpToReferencedMessage).toHaveBeenCalledWith("m0");
+    // 同频道引用不携带 channelId（第二个参数为 undefined）。
+    expect(spies.jumpToReferencedMessage).toHaveBeenCalledWith("m0", undefined);
     expect(spies.startReply).not.toHaveBeenCalled();
     expect(spies.enterMultiSelectMode).not.toHaveBeenCalled();
   });
@@ -103,5 +104,38 @@ describe("useMessageContextMenu 引用块菜单", () => {
     model.handleMenuAction("jump");
 
     expect(spies.jumpToReferencedMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("useMessageContextMenu 转发来源块菜单", () => {
+  it("右键转发来源（携带源频道 id）进入 forward 菜单形态", () => {
+    const { model } = setup();
+
+    model.handleReferenceContextMenu(mouseEvent(7, 8), "src-1", "c-origin");
+
+    expect(model.menuOpen.value).toBe(true);
+    expect(model.menuMode.value).toBe("forward");
+    expect(model.menuReferenceMessageId.value).toBe("src-1");
+    expect(model.menuReferenceChannelId.value).toBe("c-origin");
+    expect(model.menuMessageId.value).toBe("");
+  });
+
+  it("jump 动作携带源频道 id 跳转（跨频道转发）", () => {
+    const { model, spies } = setup();
+
+    model.handleReferenceContextMenu(mouseEvent(), "src-1", "c-origin");
+    model.handleMenuAction("jump");
+
+    expect(spies.jumpToReferencedMessage).toHaveBeenCalledWith("src-1", "c-origin");
+  });
+
+  it("回到引用菜单后 jump 不再携带上一次的源频道 id", () => {
+    const { model, spies } = setup();
+
+    model.handleReferenceContextMenu(mouseEvent(), "src-1", "c-origin");
+    model.handleReferenceContextMenu(mouseEvent(), "m0");
+    model.handleMenuAction("jump");
+
+    expect(spies.jumpToReferencedMessage).toHaveBeenCalledWith("m0", undefined);
   });
 });

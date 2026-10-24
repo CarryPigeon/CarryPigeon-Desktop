@@ -542,7 +542,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   let _enterMultiSelectMode: ((messageId: string) => void) = () => {};
   let _openForwardDialog: ((messageId: string) => void) = () => {};
   let _startReply: ((messageId: string) => void) = () => {};
-  let _jumpToReferencedMessage: ((messageId: string) => void) = () => {};
+  let _jumpToReferencedMessage: ((messageId: string, channelId?: string) => void) = () => {};
 
   const {
     menuOpen,
@@ -553,7 +553,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     closeMenu,
     handleMenuAction,
     handleMessageContextMenu,
-    handleMoreClick,
     handleReferenceContextMenu,
   } = useMessageContextMenu({
     getClipboardText: getMessageClipboardText,
@@ -587,8 +586,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     unpinMessage: (messageId: string) => handleUnpinMessage(messageId),
     bookmarkMessage: (messageId: string) => handleBookmarkMessage(messageId),
     unbookmarkMessage: (messageId: string) => handleUnbookmarkMessage(messageId),
-    jumpToReferencedMessage: (messageId: string) => {
-      _jumpToReferencedMessage(messageId);
+    jumpToReferencedMessage: (messageId: string, channelId?: string) => {
+      _jumpToReferencedMessage(messageId, channelId);
     },
   });
 
@@ -723,6 +722,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
       if (isSameUserId(uid, currentUserId.value)) return currentChatUsername.value;
       return "";
     },
+    // 转发来源频道名：频道目录（含可发现频道）解析，缺失时 UI 回退显示 channelId。
+    resolveChannelName: (channelId: string) => {
+      const channel = findChannelByIdIncludingDiscover(channelId);
+      return channel?.name?.trim() ?? "";
+    },
     fetchUserNames: async (uids: string[]) => {
       const s = socket.value;
       if (!s) return {};
@@ -762,9 +766,10 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     const resolvedName = chatCenter.messageRows.find((row) => row.m.id === messageId)?.m.from.name;
     currentChannelMessageFlow.beginReply(messageId, resolvedName);
   };
-  // 引用跳转：由 ChatCenter 把目标消息加载进时间线并滚入视口。
-  _jumpToReferencedMessage = (messageId: string) => {
-    void chatCenter.jumpToReferencedMessage(messageId);
+  // 引用跳转：由 ChatCenter 把目标消息加载进时间线并滚入视口；
+  // channelId 存在时（跨频道转发来源）先切换频道再定位。
+  _jumpToReferencedMessage = (messageId: string, channelId?: string) => {
+    void chatCenter.jumpToReferencedMessage(messageId, channelId);
   };
 
   const connectionToastLabel = computed(() => {
@@ -838,11 +843,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     handleSignalScroll,
     openChannelSettingsMenu,
     handleMessageContextMenu,
-    handleMoreClick,
     handleReferenceContextMenu,
-    // 引用块「跳转到原消息」按钮与右键菜单的 jump 动作走同一定位链路。
-    handleJumpReference: (messageId: string) => {
-      _jumpToReferencedMessage(messageId);
+    // 引用块「跳转到原消息」按钮与右键菜单的 jump 动作走同一定位链路；
+    // channelId 存在时（跨频道转发来源）由定位编排先切换频道。
+    handleJumpReference: (messageId: string, channelId?: string) => {
+      _jumpToReferencedMessage(messageId, channelId);
     },
     handleInstallHint,
   });

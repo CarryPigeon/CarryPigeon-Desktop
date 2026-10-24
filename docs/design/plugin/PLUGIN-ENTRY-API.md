@@ -40,8 +40,8 @@ export function apply(ctx: Context): void {
 | `ctx.storage` | 始终 | `get/set`（按 serverId + pluginId 隔离） |
 | `ctx.domains` | 始终 | `renderer/composer/contract` 注册 |
 | `ctx.ui` | `ui` | `mountOverlay` / `registerToolbarAction` / `registerSettingsItem` |
-| `ctx.network` | `network` | 同源 `fetch` |
-| `ctx.ai` | `ai` | `isConfigured` / `summarize` |
+| `ctx.network` | `network`（跨源另需 `network:external`） | 受控 `fetch`（支持 `@secret()` 头引用与 `timeoutMs`） |
+| `ctx.secrets` | `secrets` | 密钥保管箱：`set/status/clear`（keyring 代持，只写不读） |
 | `ctx.messages` | `messages:read` / `messages:send` | 当前频道读取 + 发送 |
 | `ctx.ipc` | `invoke` / `events` | 受前缀白名单约束的 `invoke` / `onEvent` |
 
@@ -86,15 +86,16 @@ export function apply(ctx: Context) {
 - **作用域**：设置项归属「当前 server」——只在注册它的 server 运行时内可见；停用/卸载插件或切换 server 后立即从设置页与搜索结果中消失。
 - **id**：`^[A-Za-z0-9._:-]{1,64}$`；同插件内重复注册视为替换（旧的反注册函数不会误删新项）；单插件最多 **20** 项，超出忽略并记日志。
 - **文案**：宿主不翻译插件声明文本，插件需自行按 `ctx.server.lang` 本地化；`title`/`description`/`keywords` 会参与宿主搜索匹配。
-- **持久化**：设置项自身的取值请用 `ctx.storage`（按 serverId + pluginId 隔离），宿主不保存插件设置值。
+- **持久化**：设置项自身的取值请用 `ctx.storage`（按 serverId + pluginId 隔离），宿主不保存插件设置值；敏感值（如 API Key）应经 `ctx.secrets` 写入系统凭据管理器，绝不落 KV 存储。
 - **兼容性**：旧宿主（无该方法）上直接调用会抛出并导致插件加载失败，建议
   `if (typeof ctx.ui?.registerSettingsItem === "function") { ... }` 守卫，或提升 `plugin.json` 的 `min_host_version`。
-- **样例**：内置 `ai-summary` 插件用该能力提供「AI 摘要后端」（自动 / 仅客户端 AI / 仅服务端）。
+- **样例**：内置 `ai-summary` 插件用该能力提供「AI 摘要后端」与「AI 服务提供方」两组设置项。
 
 ## 4. 兼容性边界
 
-- 网络能力仅能通过 `ctx.network` 获取；`ctx.ai` 密钥由宿主代持。
-- 存储命名空间按 `server_id` 隔离，不允许跨服务器读写。
+- 网络能力仅能通过 `ctx.network` 获取：默认仅同源；跨源需 manifest 声明 `network:external`。
+- 请求头值中的 `@secret(<name>)` 引用由宿主 Rust 侧从该插件的密钥保管箱解析替换；密钥明文不进入 WebView。
+- 存储命名空间按 `server_id` 隔离，不允许跨服务器读写；密钥保管箱同样按 `server_id + plugin_id` 隔离。
 - 插件资源引用应使用相对路径或 `new URL(rel, import.meta.url)`。
 - 旧契约（`activate/deactivate` + 静态 `renderers/composers/contracts`）由宿主 legacy adapter 兼容，无需改写即可继续运行。
 

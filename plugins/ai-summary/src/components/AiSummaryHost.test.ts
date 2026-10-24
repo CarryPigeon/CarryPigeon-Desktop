@@ -2,15 +2,15 @@
  * @fileoverview AiSummaryHost 面板单测。
  * @description
  * 覆盖：读取当前频道而非手动粘贴、无频道/空频道/旧宿主提示、缓存新鲜与过期语义、
- * 「加载更多历史」翻页后自动重新生成、缓存不落消息正文、客户端 AI（`host.ai`）
- * 优先/回退/失败语义与重复点击保护，以及参与范围（时间范围 + 聊天区多选）。
+ * 「加载更多历史」翻页后自动重新生成、缓存不落消息正文、自配 provider（经
+ * `ctx.network.fetch` 直连 + `ctx.secrets` 密钥预检）优先/回退/失败语义与重复点击保护，
+ * 以及参与范围（时间范围 + 聊天区多选）。
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import type {
-  PluginAiSummarizeResult,
   PluginChannelHistoryLoadResult,
   PluginChannelMessage,
   PluginCurrentChannelMessagesSnapshot,
@@ -18,7 +18,9 @@ import type {
 import type { Context } from "@/features/plugins/sdk";
 import { bindContext, unbindContext } from "../host/bridge";
 import { resetBackendPreferenceForTests } from "../host/backendPreference";
+import { resetProviderConfigForTests, PROVIDER_CONFIG_STORAGE_KEY } from "../host/providerConfig";
 import { SUMMARIZE_BACKEND_STORAGE_KEY, type SummarizeBackend } from "../domain/summarizeBackend";
+import type { AiProviderConfig } from "../domain/aiProvider";
 import { computeScopeFingerprint } from "../domain/summarizeScope";
 import AiSummaryHost from "./AiSummaryHost.vue";
 
@@ -62,17 +64,23 @@ const RangePickerStub = defineComponent({
   },
 });
 
+type FetchInit = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  timeoutMs?: number;
+};
 type FetchResponse = { ok: boolean; status: number; bodyText: string; headers: Record<string, string> };
 
 const storage = new Map<string, unknown>();
-let fetchImpl: (input: string, init?: { method?: string; body?: string }) => Promise<FetchResponse>;
-let fetchCalls: Array<{ input: string; init?: { method?: string; body?: string } }> = [];
-/** 客户端 AI 实现；为 null 表示宿主未注入 `host.ai`（旧宿主）。 */
-let aiImpl: ((input: { channelId: string; messages: readonly string[] }) => Promise<PluginAiSummarizeResult>) | null =
-  null;
-let aiConfigured = true;
-let aiCalls: Array<{ channelId: string; messages: readonly string[] }> = [];
-/** `host.messages` 是否注入；false 表示旧宿主（无读取能力）。 */
+let fetchImpl: (input: string, init?: FetchInit) => Promise<FetchResponse>;
+let fetchCalls: Array<{ input: string; init?: FetchInit }> = [];
+/** API Key（`ctx.secrets.status("api_key")`）是否已配置。 */
+let secretConfigured = true;
+let secretStatusCalls = 0;
+/** `ctx.network` 是否注入；false 表示旧宿主（无网络能力）。 */
+let networkEnabled = true;
+/** `ctx.messages` 是否注入；false 表示旧宿主（无读取能力）。 */
 let messagesApiEnabled = true;
 let messagesState: PluginCurrentChannelMessagesSnapshot;
 let loadMoreImpl: (() => Promise<PluginChannelHistoryLoadResult>) | null = null;
@@ -116,17 +124,66 @@ function snapshotOf(
   };
 }
 
-/** 绑定 stub 宿主上下文（storage / network / 可选 ai / 可选 messages）。 */
+/**
+ * 预设自配 provider 配置（写入插件存储，模拟设置项已保存）。
+ *
+ * @param overrides - 覆盖字段（如 baseUrl 置空模拟配置不完整）。
+ */
+function persistProviderConfig(overrides: Partial<AiProviderConfig> = {}): void {
+  const config: AiProviderConfig = {
+    providerId: "deepseek",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-flash",
+    systemPrompt: "",
+    temperature: 0.3,
+    timeoutMs: 30000,
+    providerChosen: true,
+    ...overrides,
+  };
+  storage.set(PROVIDER_CONFIG_STORAGE_KEY, config);
+}
+
+/** 服务端 `/api/ai/summarize` 的成功响应。 */
+function serverOkResponse(summary: string, messageCount: number): FetchResponse {
+  return {
+    ok: true,
+    status: 200,
+    bodyText: JSON.stringify({ summary, channel_id: "c1", message_count: messageCount }),
+    headers: {},
+  };
+}
+
+/** OpenAI 兼容 `chat/completions` 的成功响应。 */
+function chatOkResponse(summary: string, model = "deepseek-flash"): FetchResponse {
+  return {
+    ok: true,
+    status: 200,
+    bodyText: JSON.stringify({
+      choices: [{ message: { role: "assistant", content: summary } }],
+      model,
+    }),
+    headers: {},
+  };
+}
+
+/**
+ * 默认 fetch 路由：按 URL 分流到服务端端点或 provider 端点。
+ *
+ * @param input - 请求 URL。
+ * @returns 模拟响应。
+ */
+function routedFetch(input: string): Promise<FetchResponse> {
+  if (input.startsWith("/api/ai/summarize")) {
+    return Promise.resolve(serverOkResponse("默认总结", 2));
+  }
+  if (input.endsWith("/chat/completions")) {
+    return Promise.resolve(chatOkResponse("自配总结"));
+  }
+  return Promise.resolve({ ok: false, status: 404, bodyText: "", headers: {} });
+}
+
+/** 绑定 stub 宿主上下文（storage / 可选 network / secrets / 可选 messages）。 */
 function bindStubContext(): void {
-  const ai = aiImpl
-    ? {
-        isConfigured: async () => aiConfigured,
-        summarize: async (input: { channelId: string; messages: readonly string[] }) => {
-          aiCalls.push({ channelId: input.channelId, messages: input.messages });
-          return aiImpl!(input);
-        },
-      }
-    : undefined;
   const messages = messagesApiEnabled
     ? {
         readCurrentChannel: async () => {
@@ -149,13 +206,25 @@ function bindStubContext(): void {
         storage.set(key, value);
       },
     },
-    network: {
-      fetch(input: string, init?: { method?: string; body?: string }) {
-        fetchCalls.push({ input, init });
-        return fetchImpl(input, init);
+    network: networkEnabled
+      ? {
+          fetch(input: string, init?: FetchInit) {
+            fetchCalls.push({ input, init });
+            return fetchImpl(input, init);
+          },
+        }
+      : undefined,
+    secrets: {
+      async status(name: string) {
+        secretStatusCalls += 1;
+        return {
+          configured: secretConfigured && name === "api_key",
+          secureStorageAvailable: true,
+        };
       },
+      async set() {},
+      async clear() {},
     },
-    ai,
     messages,
   } as unknown as Context;
   bindContext(ctx);
@@ -244,30 +313,22 @@ async function setPickerRange(
   await flushPromises();
 }
 
-function okResponse(summary: string, messageCount: number): FetchResponse {
-  return {
-    ok: true,
-    status: 200,
-    bodyText: JSON.stringify({ summary, channel_id: "c1", message_count: messageCount }),
-    headers: {},
-  };
-}
-
 describe("AiSummaryHost", () => {
   beforeEach(() => {
     storage.clear();
     fetchCalls = [];
-    aiCalls = [];
-    aiImpl = null;
-    aiConfigured = true;
+    secretConfigured = true;
+    secretStatusCalls = 0;
+    networkEnabled = true;
     messagesApiEnabled = true;
     messagesState = snapshotOf([message("m1", "第一条"), message("m2", "第二条")]);
     loadMoreImpl = null;
     readCalls = 0;
     loadMoreCalls = 0;
-    fetchImpl = async () => okResponse("默认总结", 2);
-    // 后端偏好是模块级状态：每个用例重置，避免相互污染。
+    fetchImpl = (input) => routedFetch(input);
+    // 后端偏好与 provider 配置是模块级状态：每个用例重置，避免相互污染。
     resetBackendPreferenceForTests();
+    resetProviderConfigForTests();
     bindStubContext();
   });
 
@@ -460,7 +521,7 @@ describe("AiSummaryHost", () => {
     const releaseFns: Array<() => void> = [];
     fetchImpl = async () =>
       await new Promise<FetchResponse>((resolve) => {
-        releaseFns.push(() => resolve(okResponse("慢总结", 2)));
+        releaseFns.push(() => resolve(serverOkResponse("慢总结", 2)));
       });
     const { wrapper, summarize } = await mountHost();
 
@@ -486,100 +547,96 @@ describe("AiSummaryHost", () => {
     expect(wrapper.text()).toContain("总结请求失败（HTTP 503）");
   });
 
-  describe("客户端 AI（host.ai）", () => {
-    it("已配置客户端 AI：优先生效，不再请求服务端，并标注来源", async () => {
-      aiImpl = async () => ({
-        ok: true,
-        summary: "客户端总结",
-        messageCount: 2,
-        provider: "DeepSeek",
-        model: "deepseek-flash",
-      });
+  describe("自配 provider（插件自管）", () => {
+    it("已配置 provider：直连外部端点优先生效，携带密钥引用与超时，并标注来源", async () => {
+      persistProviderConfig();
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
-      expect(aiCalls).toHaveLength(1);
-      expect(aiCalls[0]!.messages).toEqual(["Alice: 第一条", "Alice: 第二条"]);
-      expect(fetchCalls).toHaveLength(0);
-      expect(wrapper.text()).toContain("客户端总结");
+      expect(fetchCalls).toHaveLength(1);
+      expect(fetchCalls[0]!.input).toBe("https://api.deepseek.com/chat/completions");
+      expect(fetchCalls[0]!.init?.headers).toMatchObject({
+        authorization: "Bearer @secret(api_key)",
+      });
+      expect(fetchCalls[0]!.init?.timeoutMs).toBe(30000);
+      const body = JSON.parse(String(fetchCalls[0]!.init?.body)) as {
+        model: string;
+        messages: Array<{ role: string; content: string }>;
+      };
+      expect(body.model).toBe("deepseek-flash");
+      expect(body.messages).toHaveLength(2);
+      expect(body.messages[0]!.role).toBe("system");
+      expect(body.messages[1]!.content).toContain("Alice: 第一条");
+      expect(wrapper.text()).toContain("自配总结");
       expect(wrapper.text()).toContain("来源：DeepSeek · deepseek-flash");
       expect(wrapper.text()).not.toContain("总结请求失败");
       expect(storage.get("ai_summary.result:c1")).toMatchObject({
-        summary: "客户端总结",
+        summary: "自配总结",
         sourceKind: "client",
         provider: "DeepSeek",
       });
     });
 
-    it("not-configured：回退服务端端点", async () => {
-      aiImpl = async () => ({ ok: false, code: "not-configured", error: "not configured" });
+    it("未配置 provider（auto 档）：回退服务端端点，不预检密钥", async () => {
+      // 不写 provider 配置：目标解析为 null 且从未显式选择 → not-configured。
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
-      expect(aiCalls).toHaveLength(1);
+      expect(secretStatusCalls).toBe(0);
       expect(fetchCalls).toHaveLength(1);
+      expect(fetchCalls[0]!.input).toBe("/api/ai/summarize");
       expect(wrapper.text()).toContain("默认总结");
       expect(wrapper.text()).toContain("来源：聊天服务端 /api/ai/summarize");
     });
 
     it("已选 provider 但缺密钥：给出可操作提示，且不静默回退服务端", async () => {
-      aiImpl = async () => ({
-        ok: false,
-        code: "api-key-missing",
-        error: "api key is not configured",
-        provider: "DeepSeek",
-      });
+      persistProviderConfig();
+      secretConfigured = false;
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
+      expect(secretStatusCalls).toBe(1);
       expect(fetchCalls).toHaveLength(0);
       expect(wrapper.text()).toContain("已选择 DeepSeek，但尚未配置 API Key");
     });
 
-    it("配置不完整：提示去设置页补全，不回退服务端", async () => {
-      aiImpl = async () => ({
-        ok: false,
-        code: "incomplete-config",
-        error: "base url or model is empty",
-        provider: "自定义（OpenAI 兼容）",
-      });
+    it("配置不完整（已选但缺 base URL）：提示去设置项补全，不回退服务端", async () => {
+      persistProviderConfig({ baseUrl: "" });
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
       expect(fetchCalls).toHaveLength(0);
-      expect(wrapper.text()).toContain("客户端 AI 配置不完整");
+      expect(wrapper.text()).toContain("自管 AI 配置不完整");
     });
 
     it("请求失败：提示带 provider 与状态码，不回退服务端（避免误导用户）", async () => {
-      aiImpl = async () => ({
-        ok: false,
-        code: "request-failed",
-        error: "invalid api key",
-        status: 401,
-        provider: "DeepSeek",
-      });
-      const { wrapper, summarize } = await mountHost();
-
-      await summarize("c1");
-
-      expect(fetchCalls).toHaveLength(0);
-      expect(wrapper.text()).toContain("DeepSeek: invalid api key / HTTP 401");
-    });
-
-    it("宿主未注入 host.ai（旧宿主）：直接走服务端端点，不报错", async () => {
-      aiImpl = null;
+      persistProviderConfig();
+      fetchImpl = async () =>
+        Promise.resolve({
+          ok: false,
+          status: 401,
+          bodyText: JSON.stringify({ error: { message: "invalid api key" } }),
+          headers: {},
+        });
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
       expect(fetchCalls).toHaveLength(1);
-      expect(wrapper.text()).toContain("默认总结");
-      // 旧宿主上不展示客户端 AI 引导，避免误导
-      expect(wrapper.text()).not.toContain("设置 → AI 服务");
+      expect(wrapper.text()).toContain("DeepSeek: invalid api key (HTTP 401)");
+    });
+
+    it("宿主未注入 network（旧宿主）：给出失败提示，不崩溃", async () => {
+      networkEnabled = false;
+      const { wrapper, summarize } = await mountHost();
+
+      await summarize("c1");
+
+      expect(wrapper.text()).toContain("总结请求失败");
     });
   });
 
@@ -593,59 +650,44 @@ describe("AiSummaryHost", () => {
       storage.set(SUMMARIZE_BACKEND_STORAGE_KEY, mode);
     }
 
-    it("server 档：即使客户端 AI 已配置也走服务端，且不展示客户端 AI 引导", async () => {
+    it("server 档：即使 provider 已配置也走服务端，且不展示自配 AI 引导", async () => {
       persistBackend("server");
-      aiImpl = async () => ({
-        ok: true,
-        summary: "客户端总结",
-        messageCount: 2,
-        provider: "DeepSeek",
-        model: "deepseek-flash",
-      });
+      persistProviderConfig();
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
-      expect(aiCalls).toHaveLength(0);
       expect(fetchCalls).toHaveLength(1);
+      expect(fetchCalls[0]!.input).toBe("/api/ai/summarize");
       expect(wrapper.text()).toContain("默认总结");
       expect(wrapper.text()).toContain("来源：聊天服务端 /api/ai/summarize");
-      expect(wrapper.text()).not.toContain("设置 → AI 服务");
+      expect(wrapper.text()).not.toContain("设置 → 插件设置");
     });
 
-    it("client 档：已配置客户端 AI 时只走客户端，不请求服务端", async () => {
+    it("client 档：已配置 provider 时只走自配端点，不请求服务端", async () => {
       persistBackend("client");
-      aiImpl = async () => ({
-        ok: true,
-        summary: "客户端总结",
-        messageCount: 2,
-        provider: "DeepSeek",
-        model: "deepseek-flash",
-      });
+      persistProviderConfig();
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
-      expect(aiCalls).toHaveLength(1);
-      expect(fetchCalls).toHaveLength(0);
-      expect(wrapper.text()).toContain("客户端总结");
+      expect(fetchCalls).toHaveLength(1);
+      expect(fetchCalls[0]!.input).toBe("https://api.deepseek.com/chat/completions");
+      expect(wrapper.text()).toContain("自配总结");
     });
 
-    it("client 档：客户端 AI 未配置时不回退服务端，给出可操作提示", async () => {
+    it("client 档：provider 未配置时不回退服务端，给出可操作提示", async () => {
       persistBackend("client");
-      aiImpl = async () => ({ ok: false, code: "not-configured", error: "not configured" });
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
 
-      expect(aiCalls).toHaveLength(1);
       expect(fetchCalls).toHaveLength(0);
-      expect(wrapper.text()).toContain("当前为「仅客户端 AI」");
+      expect(wrapper.text()).toContain("当前为「仅自配 AI」");
     });
 
-    it("auto 档：未配置客户端 AI 时回退服务端（保持历史行为）", async () => {
+    it("auto 档：未配置 provider 时回退服务端（保持历史行为）", async () => {
       persistBackend("auto");
-      aiImpl = async () => ({ ok: false, code: "not-configured", error: "not configured" });
       const { wrapper, summarize } = await mountHost();
 
       await summarize("c1");
@@ -732,7 +774,7 @@ describe("AiSummaryHost", () => {
         message("m1", "昨天的消息", yesterday.getTime()),
         message("m2", "今天的消息", today.getTime()),
       ]);
-      fetchImpl = async () => okResponse("默认总结", 2);
+      fetchImpl = async (input) => routedFetch(input);
       const { wrapper, summarize } = await mountHost();
       await summarize("c1");
       expect(bodyOf(0).messages).toEqual(["Alice: 昨天的消息", "Alice: 今天的消息"]);

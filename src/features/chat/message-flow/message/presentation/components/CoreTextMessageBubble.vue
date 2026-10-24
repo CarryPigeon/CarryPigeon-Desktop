@@ -13,6 +13,7 @@ import CodeBlockReviewable from "@/features/chat/message-flow/code-review/presen
 import { hasFileToken, parseCoreTextParts } from "@/features/chat/message-flow/message/domain/coreTextFileSyntax";
 import { parseCoreTextWithCodeBlocks } from "@/features/chat/message-flow/code-review/domain/codeBlockParser";
 import type { MessageMention, MessageQuoteSummary, MessageReplySummary } from "@/features/chat/message-flow/api-types";
+import type { ForwardedMessageEntry } from "@/features/chat/message-flow/message/domain/messageModels";
 import type { ChatLinkPreview } from "@/features/chat/domain/types/chatApiModels";
 import AppIcon from "@/shared/ui/AppIcon.vue";
 
@@ -103,13 +104,10 @@ const props = defineProps<{
    * 内联引用回复（quote）。
    */
   quoteReply?: MessageQuoteSummary;
-  forwardedFrom?: {
-    messageId: string;
-    channelId: string;
-    userId: string;
-    preview: string;
-    sentTime: number;
-  };
+  /**
+   * 转发来源快照（单条转发）：展示原消息预览，可跳转到源频道的原消息。
+   */
+  forwardedFrom?: ForwardedMessageEntry;
   /**
    * 消息是否已被编辑过（显示 "已编辑" 标记）。
    */
@@ -144,12 +142,17 @@ const emit = defineEmits<{
   (event: "openLightbox", payload: { url: string; fileName: string }): void;
   /**
    * 右键消息引用块：请求打开「跳转到被回复消息」菜单。
+   *
+   * payload.channelId 存在时表示跳转目标在其他频道（如转发来源），
+   * 由页面层负责先切换频道再定位。
    */
-  (event: "openReferenceMenu", payload: { event: MouseEvent; messageId: string }): void;
+  (event: "openReferenceMenu", payload: { event: MouseEvent; messageId: string; channelId?: string }): void;
   /**
    * 点击引用块上的「跳转到原消息」按钮。
+   *
+   * channelId 存在时表示目标消息在其他频道（跨频道转发跳转）。
    */
-  (event: "jumpReference", messageId: string): void;
+  (event: "jumpReference", messageId: string, channelId?: string): void;
 }>();
 
 /**
@@ -171,20 +174,31 @@ const replyReferenceId = computed(() => {
 const quoteReferenceId = computed(() => String(props.quoteReply?.messageId ?? "").trim());
 
 /**
+ * 转发来源的目标消息 id；缺失表示不可跳转（快照无 mid，如源消息已不可解析）。
+ */
+const forwardSourceReferenceId = computed(() => String(props.forwardedFrom?.messageId ?? "").trim());
+
+/**
+ * 转发来源的源频道 id：与当前频道不同时跳转为跨频道定位。
+ */
+const forwardSourceChannelId = computed(() => String(props.forwardedFrom?.channelId ?? "").trim());
+
+/**
  * 右键引用块：派发「跳转到被回复消息」菜单请求。
  *
  * 说明：仅在存在可跳转目标时拦截事件；否则不拦截，让消息行的右键菜单照常打开。
  *
  * @param e - 鼠标右键事件。
  * @param messageId - 被引用的消息 id。
+ * @param channelId - 跳转目标所在频道（跨频道转发来源时提供）。
  * @returns 无返回值。
  */
-function handleReferenceContextMenu(e: MouseEvent, messageId: string): void {
+function handleReferenceContextMenu(e: MouseEvent, messageId: string, channelId?: string): void {
   const mid = String(messageId ?? "").trim();
   if (!mid) return;
   e.preventDefault();
   e.stopPropagation();
-  emit("openReferenceMenu", { event: e, messageId: mid });
+  emit("openReferenceMenu", { event: e, messageId: mid, channelId: channelId?.trim() || undefined });
 }
 
 /**
@@ -212,14 +226,43 @@ function handleQuoteReferenceContextMenu(e: MouseEvent): void {
  *
  * @param e - 鼠标点击事件。
  * @param messageId - 被引用的消息 id。
+ * @param channelId - 跳转目标所在频道（跨频道转发来源时提供）。
  * @returns 无返回值。
  */
-function handleJumpReference(e: MouseEvent, messageId: string): void {
+function handleJumpReference(e: MouseEvent, messageId: string, channelId?: string): void {
   const mid = String(messageId ?? "").trim();
   if (!mid) return;
   // 阻止冒泡：避免点击按钮被当作「点击消息行」处理。
   e.stopPropagation();
-  emit("jumpReference", mid);
+  emit("jumpReference", mid, channelId?.trim() || undefined);
+}
+
+/**
+ * 点击转发来源块：跳转到源频道的原消息。
+ *
+ * @param e - 鼠标点击事件。
+ * @returns 无返回值。
+ */
+function handleJumpForwardSource(e: MouseEvent): void {
+  const mid = forwardSourceReferenceId.value;
+  if (!mid) return;
+  // 阻止冒泡：避免点击被当作「点击消息行」处理。
+  e.stopPropagation();
+  emit("jumpReference", mid, forwardSourceChannelId.value || undefined);
+}
+
+/**
+ * 右键转发来源块：派发「跳转到转发的原消息」菜单请求。
+ *
+ * @param e - 鼠标右键事件。
+ * @returns 无返回值。
+ */
+function handleForwardSourceContextMenu(e: MouseEvent): void {
+  const mid = forwardSourceReferenceId.value;
+  if (!mid) return;
+  e.preventDefault();
+  e.stopPropagation();
+  emit("openReferenceMenu", { event: e, messageId: mid, channelId: forwardSourceChannelId.value || undefined });
 }
 
 /**
@@ -251,9 +294,36 @@ function openLink(url: string): void {
 <template>
   <!-- 组件：CoreTextMessageBubble｜职责：渲染 core-text（文本 + 文件引用 token） -->
   <div class="cp-bubble">
-    <div v-if="props.forwardedFrom" class="cp-forwardedFrom">
-      <span class="cp-forwardedFrom__icon"><AppIcon name="corner-up-left" /></span>
-      <span class="cp-forwardedFrom__text">{{ $t('forwarded_from') }} #{{ props.forwardedFrom.channelId }}</span>
+    <!-- 区块：转发来源（forwardedFrom 快照）——展示原消息预览，可跳转到源频道原消息 -->
+    <div
+      v-if="props.forwardedFrom"
+      class="cp-forwardedFrom"
+      :class="{ 'cp-forwardedFrom--jumpable': Boolean(forwardSourceReferenceId) }"
+      :title="forwardSourceReferenceId ? $t('jump_to_forwarded_message') : undefined"
+      @click="handleJumpForwardSource"
+      @contextmenu="handleForwardSourceContextMenu"
+    >
+      <div class="cp-forwardedFrom__bar"></div>
+      <div class="cp-forwardedFrom__content">
+        <span class="cp-forwardedFrom__meta">
+          <AppIcon name="corner-up-left" :size="12" />
+          <span class="cp-forwardedFrom__label">
+            {{ $t('forwarded_from') }} #{{ props.forwardedFrom.channelName || props.forwardedFrom.channelId }}
+          </span>
+          <span class="cp-forwardedFrom__author">{{ props.forwardedFrom.authorName || props.forwardedFrom.userId }}</span>
+        </span>
+        <span v-if="props.forwardedFrom.preview" class="cp-forwardedFrom__preview">{{ props.forwardedFrom.preview }}</span>
+      </div>
+      <button
+        v-if="forwardSourceReferenceId"
+        class="cp-jumpRef"
+        type="button"
+        :title="$t('jump_to_forwarded_message')"
+        :aria-label="$t('jump_to_forwarded_message')"
+        @click="handleJumpReference($event, forwardSourceReferenceId, forwardSourceChannelId)"
+      >
+        <AppIcon name="rollback" :size="14" />
+      </button>
     </div>
     <!-- 区块：内联引用（quote）——可跳转到被引用消息 -->
     <div
@@ -458,7 +528,7 @@ function openLink(url: string): void {
 .cp-coreText__replyAuthor { font-size: 11px; color: var(--cp-text-muted); }
 .cp-coreText__replyPreview { margin-top: 4px; font-size: 12px; color: var(--cp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 引用块「跳转到原消息」按钮：沿用消息行 ⋯ 的幽灵按钮语言，靠右常驻。 */
+/* 引用块「跳转到原消息」按钮：幽灵按钮（透明底 + 悬停显形），靠右常驻。 */
 .cp-jumpRef {
   display: inline-flex;
   align-items: center;
@@ -527,21 +597,66 @@ function openLink(url: string): void {
   font-weight: 600;
   background: var(--cp-warn-bg);
 }
+/* 转发来源块：与引用块同规格（左侧色条 + 来源 meta + 原消息预览），可跳转到源频道原消息。 */
 .cp-forwardedFrom {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  font-size: 11px;
-  color: var(--cp-text-muted);
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  border-radius: var(--cp-radius-sm);
+  min-width: 0;
+  max-width: 360px;
 }
-.cp-forwardedFrom__icon {
+.cp-forwardedFrom--jumpable {
+  cursor: pointer;
+}
+.cp-forwardedFrom--jumpable:hover {
+  background: color-mix(in oklab, var(--cp-info) 10%, transparent);
+}
+.cp-forwardedFrom__bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--cp-info);
   flex-shrink: 0;
 }
-.cp-forwardedFrom__text {
+.cp-forwardedFrom__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cp-forwardedFrom__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--cp-info);
+  min-width: 0;
+}
+.cp-forwardedFrom__label {
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cp-forwardedFrom__author {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-forwardedFrom__preview {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 转发来源块内跳转按钮与单行引用条一致垂直居中。 */
+.cp-forwardedFrom .cp-jumpRef {
+  align-self: center;
 }
 
 .cp-bubble__edited {

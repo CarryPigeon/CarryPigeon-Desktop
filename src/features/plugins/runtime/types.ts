@@ -12,7 +12,6 @@
 import type { Context, Plugin } from "@cordisjs/core";
 import type { Component } from "vue";
 import type {
-  PluginAiApi,
   PluginChannelHistoryLoadResult,
   PluginChatContext,
   PluginComposerPayload,
@@ -20,6 +19,8 @@ import type {
   PluginMessagesApi,
   PluginOverlayMountHandle,
   PluginRuntimeContract,
+  PluginSecretStatus,
+  PluginSecretsApi,
   PluginSettingsItemInput,
 } from "@/features/plugins/domain/types/pluginRuntimeTypes";
 
@@ -50,16 +51,22 @@ export type PluginStorageService = {
   set(key: string, value: unknown): Promise<void>;
 };
 
-/** 网络能力（Rust 侧强制同源）。 */
+/** 网络能力（Rust 侧默认同源；`network:external` 权限放行跨源）。 */
 export type PluginNetworkService = {
   fetch(
     input: string,
-    init?: { method?: string; headers?: Record<string, string>; body?: string },
+    init?: {
+      method?: string;
+      headers?: Record<string, string>;
+      body?: string;
+      /** 请求超时（毫秒；Rust 侧夹取到 [1000, 120000]）。 */
+      timeoutMs?: number;
+    },
   ): Promise<PluginFetchResponse>;
 };
 
-/** 客户端 AI 能力（密钥宿主代持）。 */
-export type PluginAiService = PluginAiApi;
+/** 插件密钥保管箱能力（系统 keyring 代持，只写不读）。 */
+export type PluginSecretsService = PluginSecretsApi;
 
 /**
  * 频道消息能力。
@@ -117,10 +124,10 @@ declare module "@cordisjs/core" {
     storage: PluginStorageService;
     /** domain 注册能力（宿主始终注入）。 */
     domains: PluginDomainsService;
-    /** 网络能力（`network` 权限门控）。 */
+    /** 网络能力（`network` 权限门控；跨源另需 manifest 声明 `network:external`）。 */
     network?: PluginNetworkService;
-    /** 客户端 AI 能力（`ai` 权限门控）。 */
-    ai?: PluginAiService;
+    /** 密钥保管箱能力（`secrets` 权限门控；密钥存系统 keyring，只写不读）。 */
+    secrets?: PluginSecretsService;
     /** 频道消息能力（`messages:read` / `messages:send` 权限门控）。 */
     messages?: PluginMessagesService;
     /** 全局 UI 能力（`ui` 权限门控）。 */
@@ -130,4 +137,10 @@ declare module "@cordisjs/core" {
   }
 }
 
-export type { Context, Plugin, PluginChannelHistoryLoadResult, PluginCurrentChannelMessagesSnapshot };
+export type {
+  Context,
+  Plugin,
+  PluginChannelHistoryLoadResult,
+  PluginCurrentChannelMessagesSnapshot,
+  PluginSecretStatus,
+};

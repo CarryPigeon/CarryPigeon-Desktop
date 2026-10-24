@@ -8,7 +8,7 @@ use crate::features::plugins::domain::ports::plugin_loader_port::{
 };
 use crate::features::plugins::domain::types::{
     InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest, PluginLoadResult,
-    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry,
+    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry, PluginSecretStatus,
 };
 
 use super::plugin_manager::{list_installed_manifests, plugin_manager};
@@ -276,14 +276,66 @@ impl PluginInstallStorePort for PluginInstallStorePortAdapter {
         Box::pin(async move {
             plugin_store::network_fetch(
                 request.server_socket,
+                request.plugin_id,
                 request.url,
                 request.method,
                 request.headers,
                 request.body,
+                request.timeout_ms,
                 request.tls_policy,
                 request.tls_fingerprint,
             )
             .await
+        })
+    }
+
+    fn secret_set<'a>(
+        &'a self,
+        server_socket: &'a str,
+        plugin_id: &'a str,
+        name: &'a str,
+        value: &'a str,
+        tls_policy: Option<&'a str>,
+        tls_fingerprint: Option<&'a str>,
+    ) -> PluginInstallStoreFuture<'a, ()> {
+        Box::pin(async move {
+            plugin_store::secret_set(
+                server_socket,
+                plugin_id,
+                name,
+                value,
+                tls_policy,
+                tls_fingerprint,
+            )
+            .await
+        })
+    }
+
+    fn secret_status<'a>(
+        &'a self,
+        server_socket: &'a str,
+        plugin_id: &'a str,
+        name: &'a str,
+        tls_policy: Option<&'a str>,
+        tls_fingerprint: Option<&'a str>,
+    ) -> PluginInstallStoreFuture<'a, PluginSecretStatus> {
+        Box::pin(async move {
+            plugin_store::secret_status(server_socket, plugin_id, name, tls_policy, tls_fingerprint)
+                .await
+        })
+    }
+
+    fn secret_clear<'a>(
+        &'a self,
+        server_socket: &'a str,
+        plugin_id: &'a str,
+        name: &'a str,
+        tls_policy: Option<&'a str>,
+        tls_fingerprint: Option<&'a str>,
+    ) -> PluginInstallStoreFuture<'a, ()> {
+        Box::pin(async move {
+            plugin_store::secret_clear(server_socket, plugin_id, name, tls_policy, tls_fingerprint)
+                .await
         })
     }
 }

@@ -684,7 +684,7 @@ function selectSystemMention(type: "everyone" | "here"): void {
   padding: 6px 8px;
 }
 
-/* 发送按钮：highlight = 主操作（设置页主按钮语义，不用品牌 accent） */
+/* 发送按钮：highlight = 主操作（工作台主按钮语义，不用品牌 accent） */
 .cp-composer__send {
   min-height: 32px;
   padding: 0 14px;

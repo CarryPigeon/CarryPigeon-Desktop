@@ -309,7 +309,7 @@ function escapeRegex(s: string): string {
   flex: 0 0 auto;
 }
 
-/* 结果列表：设置页行列表语言 */
+/* 结果列表：工作台行列表语言 */
 .cp-searchPanel__results {
   display: flex;
   flex-direction: column;

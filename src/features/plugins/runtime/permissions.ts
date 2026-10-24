@@ -23,7 +23,7 @@ export const CAPABILITY_SERVICE_NAMES = [
   "storage",
   "domains",
   "network",
-  "ai",
+  "secrets",
   "messages",
   "ui",
   "ipc",
@@ -35,11 +35,13 @@ export type CapabilityServiceName = (typeof CAPABILITY_SERVICE_NAMES)[number];
  * 能力服务 → 所需权限（满足其中任意一个即可见）。
  *
  * - 未列出的服务为基础能力（始终注入，无需权限）；
- * - `messages` 覆盖读与发两类，分别由 `messages:read` / `messages:send` 授权。
+ * - `messages` 覆盖读与发两类，分别由 `messages:read` / `messages:send` 授权；
+ * - `network` 服务本身由 `network` 授权；跨源访问另需 manifest 声明
+ *   `network:external`（由 Rust 侧在 fetch 时强制，不在此映射）。
  */
 export const PERMISSIONS_BY_SERVICE: Record<string, readonly string[]> = {
   network: ["network"],
-  ai: ["ai"],
+  secrets: ["secrets"],
   messages: ["messages:read", "messages:send"],
   ui: ["ui"],
   ipc: ["invoke", "events"],

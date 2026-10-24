@@ -12,7 +12,7 @@
  */
 
 /** 设置页分区 id（顺序即导航与内容区顺序）。 */
-export const SETTINGS_SECTION_IDS = ["general", "business", "ai", "data", "plugins", "about"] as const;
+export const SETTINGS_SECTION_IDS = ["general", "business", "data", "plugins", "about"] as const;
 
 /** 设置页分区 id 类型。 */
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
@@ -31,7 +31,6 @@ export type SettingsSectionDefinition = {
 export const SETTINGS_SECTIONS: readonly SettingsSectionDefinition[] = [
   { id: "general", labelKey: "general", subtitleKey: "settings_nav_general_sub" },
   { id: "business", labelKey: "settings_business", subtitleKey: "settings_nav_business_sub" },
-  { id: "ai", labelKey: "settings_ai_service", subtitleKey: "settings_ai_provider" },
   { id: "data", labelKey: "settings_data", subtitleKey: "settings_nav_data_sub" },
   { id: "plugins", labelKey: "settings_plugins_section", subtitleKey: "settings_nav_plugins_sub" },
   { id: "about", labelKey: "menu_about", subtitleKey: "about_version" },
@@ -147,14 +146,6 @@ export const SETTINGS_CATALOG: readonly SettingsCatalogEntry[] = [
     titleKey: "notification_sound",
     descriptionKey: "settings_business_settings_sub",
     keywords: ["sound", "audio", "提示音", "声音"],
-  },
-  // AI 服务
-  {
-    id: "ai-provider",
-    sectionId: "ai",
-    titleKey: "settings_ai_service",
-    descriptionKey: "settings_ai_service_sub",
-    keywords: ["ai", "provider", "model", "api key", "openai", "deepseek", "ollama", "模型", "服务商", "密钥", "本地模型"],
   },
   // 数据管理
   {

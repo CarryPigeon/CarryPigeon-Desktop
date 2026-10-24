@@ -60,9 +60,9 @@ describe("AiSummarySettings", () => {
     await flushPromises();
 
     const options = wrapper.findAll(".ai-summary-settings__option");
-    expect(options.map((option) => option.text())).toEqual(["自动", "仅客户端 AI", "仅服务端"]);
+    expect(options.map((option) => option.text())).toEqual(["自动", "仅自配 AI", "仅服务端"]);
     expect(wrapper.find('[data-testid="ai-summary-backend-auto"]').attributes("data-active")).toBe("true");
-    expect(wrapper.text()).toContain("优先使用客户端 AI");
+    expect(wrapper.text()).toContain("优先使用自配 AI");
   });
 
   it("载入已保存档位并展示对应说明", async () => {
@@ -85,7 +85,7 @@ describe("AiSummarySettings", () => {
     expect(useBackendPreference().value).toBe("client");
     expect(storage.get(SUMMARIZE_BACKEND_STORAGE_KEY)).toBe("client");
     expect(wrapper.find('[data-testid="ai-summary-backend-client"]').attributes("data-active")).toBe("true");
-    expect(wrapper.text()).toContain("只使用客户端 AI");
+    expect(wrapper.text()).toContain("只使用自配 AI");
   });
 
   it("持久化失败：保留已选档位并提示失败", async () => {

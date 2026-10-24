@@ -103,6 +103,15 @@ fn build_reqwest_client(policy: TlsPolicy) -> anyhow::Result<reqwest::Client> {
     Ok(builder.build()?)
 }
 
+/// 为外源请求（`network:external`）构建 reqwest client。
+///
+/// 说明：
+/// - 使用系统证书链严格校验（外源不受聊天服务器的自签 TLS 策略影响）；
+/// - 与同源 client 一致禁用重定向，防止借 302 把请求引向任意主机。
+pub(super) fn build_external_client() -> anyhow::Result<reqwest::Client> {
+    build_reqwest_client(TlsPolicy::Strict)
+}
+
 /// 为 server API 请求构建 reqwest client（包含可选 TLS 策略与指纹校验）。
 ///
 /// 说明：

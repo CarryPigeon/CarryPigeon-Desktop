@@ -6,7 +6,7 @@ use crate::features::plugins::data::plugin_ports::{
 };
 use crate::features::plugins::domain::types::{
     InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest, PluginLoadResult,
-    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry,
+    PluginManifest, PluginNetworkFetchRequest, PluginRuntimeEntry, PluginSecretStatus,
 };
 use crate::features::plugins::usecases::plugin_usecases;
 use crate::shared::error::{CommandResult, to_command_error};
@@ -544,10 +544,12 @@ pub async fn plugins_storage_set(
 ///
 /// # 参数
 /// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：发起请求的插件 id（跨源权限与 `@secret()` 命名空间归属）。
 /// - `url`：请求 URL。
 /// - `method`：HTTP 方法（GET/POST/...）。
-/// - `headers`：请求头。
+/// - `headers`：请求头（值中的 `@secret(<name>)` 引用由后端解析替换）。
 /// - `body`：请求体（可选，通常为字符串/JSON）。
+/// - `timeout_ms`：请求超时毫秒（可选，夹取到 [1000, 120000]）。
 /// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
 ///
 /// # 返回值
@@ -556,20 +558,24 @@ pub async fn plugins_storage_set(
 #[tauri::command]
 pub async fn plugins_network_fetch(
     server_socket: String,
+    plugin_id: String,
     url: String,
     method: String,
     headers: HashMap<String, String>,
     body: Option<String>,
+    timeout_ms: Option<u64>,
     tls_policy: Option<String>,
     tls_fingerprint: Option<String>,
 ) -> CommandResult<PluginFetchResponse> {
     plugin_usecases::plugins_network_fetch(
         PluginNetworkFetchRequest {
             server_socket: &server_socket,
+            plugin_id: &plugin_id,
             url: &url,
             method: &method,
             headers,
             body,
+            timeout_ms,
             tls_policy: tls_policy.as_deref(),
             tls_fingerprint: tls_fingerprint.as_deref(),
         },
@@ -580,6 +586,120 @@ pub async fn plugins_network_fetch(
         to_command_error(
             "PLUGINS_NETWORK_FETCH_FAILED",
             "error.plugins_network_fetch_failed",
+            e,
+        )
+    })
+}
+
+/// 写入（覆盖）插件密钥（供插件 runtime 调用）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `name`：密钥名（插件自定义，如 `api_key`）。
+/// - `value`：密钥明文（仅经 IPC 传入，写入系统 keyring，不落库、不进日志）。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(())`：保存成功（前端得到 `null`）。
+/// - `Err(String)`：保存失败原因。
+#[tauri::command]
+pub async fn plugins_secret_set(
+    server_socket: String,
+    plugin_id: String,
+    name: String,
+    value: String,
+    tls_policy: Option<String>,
+    tls_fingerprint: Option<String>,
+) -> CommandResult<()> {
+    plugin_usecases::plugins_secret_set(
+        &server_socket,
+        &plugin_id,
+        &name,
+        &value,
+        tls_policy.as_deref(),
+        tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
+    )
+    .await
+    .map_err(|e| {
+        to_command_error(
+            "PLUGINS_SECRET_SET_FAILED",
+            "error.plugins_secret_set_failed",
+            e,
+        )
+    })
+}
+
+/// 查询插件密钥状态（不返回密钥内容）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `name`：密钥名。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(PluginSecretStatus)`：`{ configured, secureStorageAvailable }`。
+/// - `Err(String)`：查询失败原因。
+#[tauri::command]
+pub async fn plugins_secret_status(
+    server_socket: String,
+    plugin_id: String,
+    name: String,
+    tls_policy: Option<String>,
+    tls_fingerprint: Option<String>,
+) -> CommandResult<PluginSecretStatus> {
+    plugin_usecases::plugins_secret_status(
+        &server_socket,
+        &plugin_id,
+        &name,
+        tls_policy.as_deref(),
+        tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
+    )
+    .await
+    .map_err(|e| {
+        to_command_error(
+            "PLUGINS_SECRET_STATUS_FAILED",
+            "error.plugins_secret_status_failed",
+            e,
+        )
+    })
+}
+
+/// 清除插件密钥（幂等：未配置时同样返回成功）。
+///
+/// # 参数
+/// - `server_socket`：目标服务端 socket。
+/// - `plugin_id`：插件 id。
+/// - `name`：密钥名。
+/// - `tls_policy`/`tls_fingerprint`：TLS 相关参数（可选）。
+///
+/// # 返回值
+/// - `Ok(())`：清除成功（前端得到 `null`）。
+/// - `Err(String)`：清除失败原因。
+#[tauri::command]
+pub async fn plugins_secret_clear(
+    server_socket: String,
+    plugin_id: String,
+    name: String,
+    tls_policy: Option<String>,
+    tls_fingerprint: Option<String>,
+) -> CommandResult<()> {
+    plugin_usecases::plugins_secret_clear(
+        &server_socket,
+        &plugin_id,
+        &name,
+        tls_policy.as_deref(),
+        tls_fingerprint.as_deref(),
+        PluginInstallStorePortAdapter::shared(),
+    )
+    .await
+    .map_err(|e| {
+        to_command_error(
+            "PLUGINS_SECRET_CLEAR_FAILED",
+            "error.plugins_secret_clear_failed",
             e,
         )
     })

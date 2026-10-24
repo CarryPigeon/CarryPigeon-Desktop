@@ -5,7 +5,7 @@ use std::pin::Pin;
 
 use crate::features::plugins::domain::types::{
     InstalledPluginState, PluginFetchResponse, PluginInstallFromUrlRequest,
-    PluginNetworkFetchRequest, PluginRuntimeEntry,
+    PluginNetworkFetchRequest, PluginRuntimeEntry, PluginSecretStatus,
 };
 
 pub type PluginInstallStoreFuture<'a, T> =
@@ -131,4 +131,35 @@ pub trait PluginInstallStorePort: Send + Sync {
         &'a self,
         request: PluginNetworkFetchRequest<'a>,
     ) -> PluginInstallStoreFuture<'a, PluginFetchResponse>;
+
+    /// 写入（覆盖）插件密钥（系统 keyring，按 server + plugin 隔离）。
+    fn secret_set<'a>(
+        &'a self,
+        server_socket: &'a str,
+        plugin_id: &'a str,
+        name: &'a str,
+        value: &'a str,
+        tls_policy: Option<&'a str>,
+        tls_fingerprint: Option<&'a str>,
+    ) -> PluginInstallStoreFuture<'a, ()>;
+
+    /// 查询插件密钥状态（不返回密钥内容）。
+    fn secret_status<'a>(
+        &'a self,
+        server_socket: &'a str,
+        plugin_id: &'a str,
+        name: &'a str,
+        tls_policy: Option<&'a str>,
+        tls_fingerprint: Option<&'a str>,
+    ) -> PluginInstallStoreFuture<'a, PluginSecretStatus>;
+
+    /// 清除插件密钥（幂等）。
+    fn secret_clear<'a>(
+        &'a self,
+        server_socket: &'a str,
+        plugin_id: &'a str,
+        name: &'a str,
+        tls_policy: Option<&'a str>,
+        tls_fingerprint: Option<&'a str>,
+    ) -> PluginInstallStoreFuture<'a, ()>;
 }

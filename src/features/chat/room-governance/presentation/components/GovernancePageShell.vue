@@ -49,15 +49,17 @@ const emit = defineEmits<{
 </template>
 
 <style scoped lang="scss">
-/* 样式：GovernancePageShell｜规格：cp-page 骨架 + PageHeader + 玻璃内容面板 */
+/* 样式：GovernancePageShell｜规格：工作台骨架 + PageHeader + 透明内容区 */
 .cp-governancePage {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
 .cp-governancePage__state {
-  padding: 20px;
+  padding: 16px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--cp-text-muted);
 }
 
@@ -66,14 +68,14 @@ const emit = defineEmits<{
 }
 
 .cp-governancePage__body {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--cp-page-pad);
+  padding: 8px;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--cp-page-gap);
+  gap: 8px;
 }
 </style>

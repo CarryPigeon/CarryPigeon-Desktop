@@ -18,9 +18,10 @@ const props = defineProps<{
   /**
    * 菜单形态：
    * - `message`（默认）：消息本身的右键菜单；
-   * - `reference`：消息引用块（回复 / 引用预览）的右键菜单，仅提供跳转动作。
+   * - `reference`：消息引用块（回复 / 引用预览）的右键菜单，仅提供跳转动作；
+   * - `forward`：转发来源块的右键菜单，仅提供「跳转到转发的原消息」动作。
    */
-  mode?: "message" | "reference";
+  mode?: "message" | "reference" | "forward";
   showRecall?: boolean;
   canPin?: boolean;
   isPinned?: boolean;
@@ -65,10 +66,16 @@ function handleAction(action: MessageMenuAction): void {
     :min-width="180"
     @close="handleClose"
   >
-    <!-- 区块：引用块菜单（仅跳转到被回复消息） -->
+    <!-- 区块：引用块菜单（仅跳转到被回复 / 被转发来源消息） -->
     <template v-if="props.mode === 'reference'">
       <ContextMenuItem @select="handleAction('jump')">
         {{ t("jump_to_referenced_message") }}
+      </ContextMenuItem>
+    </template>
+    <!-- 区块：转发来源块菜单（跨频道跳转到转发的原消息） -->
+    <template v-else-if="props.mode === 'forward'">
+      <ContextMenuItem @select="handleAction('jump')">
+        {{ t("jump_to_forwarded_message") }}
       </ContextMenuItem>
     </template>
     <!-- 区块：消息菜单 -->

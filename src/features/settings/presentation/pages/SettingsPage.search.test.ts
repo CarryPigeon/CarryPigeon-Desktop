@@ -226,7 +226,7 @@ describe("SettingsPage 分区 Tab 切换", () => {
     wrapper = await mountPage();
 
     expect(wrapper.find('[data-testid="settings-section-general"]').isVisible()).toBe(true);
-    for (const id of ["business", "ai", "data", "about"]) {
+    for (const id of ["business", "data", "about"]) {
       const panel = wrapper.find(`[data-testid="settings-section-${id}"]`);
       expect(panel.exists()).toBe(true);
       expect(panel.isVisible()).toBe(false);

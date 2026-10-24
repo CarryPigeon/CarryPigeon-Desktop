@@ -392,53 +392,55 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   <!-- 区块：<main> .cp-plugins -->
   <main class="cp-plugins">
     <ErrorBoundary>
-      <PluginCenterFilterRail
-        v-model:q="q"
-        v-model:filter="filter"
-        v-model:source="source"
-        v-model:show-repo-manager="showRepoManager"
-        v-model:repo-draft="repoDraft"
-        v-model:repo-note-draft="repoNoteDraft"
-        :enabled-repo-count="enabledRepoSources.length"
-        :repo-sources="repoSources"
-        :repo-error="repoError"
-        :missing-required-count="installStore.missingRequiredIds.value.length"
-        @add-repo="handleAddRepo"
-        @toggle-repo="handleToggleRepo"
-        @remove-repo="handleRemoveRepo"
-        @open-required="filter = 'required'"
-        @recheck-required="ensureData"
-      />
-
-      <section class="cp-plugins__gridWrap">
-        <PluginCenterGridHeader
-          :server-socket="serverSocket"
-          :server-id="serverId"
-          :modules-count="filtered.length"
-          @refresh="ensureData"
-          @open-domains="router.push('/plugins/domain-catalog')"
-          @back="router.back()"
+      <div class="cp-plugins__layout">
+        <PluginCenterFilterRail
+          v-model:q="q"
+          v-model:filter="filter"
+          v-model:source="source"
+          v-model:show-repo-manager="showRepoManager"
+          v-model:repo-draft="repoDraft"
+          v-model:repo-note-draft="repoNoteDraft"
+          :enabled-repo-count="enabledRepoSources.length"
+          :repo-sources="repoSources"
+          :repo-error="repoError"
+          :missing-required-count="installStore.missingRequiredIds.value.length"
+          @add-repo="handleAddRepo"
+          @toggle-repo="handleToggleRepo"
+          @remove-repo="handleRemoveRepo"
+          @open-required="filter = 'required'"
+          @recheck-required="ensureData"
         />
 
-        <PluginCenterCatalogGrid
-          :server-socket="serverSocket"
-          :server-id="serverId"
-          :loading="catalogStore.loading.value"
-          :error="catalogStore.error.value || ''"
-          :plugins="filtered"
-          :installed-by-id="installStore.installedById"
-          :progress-by-id="installStore.progressById"
-          :selected-id="selectedId"
-          :focus-plugin-id="focusPluginId"
-          :has-update="hasUpdate"
-          @install="handleCardInstall"
-          @update="handleCardUpdate"
-          @enable="handleCardEnable"
-          @disable="handleCardDisable"
-          @uninstall="handleCardUninstall"
-          @detail="openDetail"
-        />
-      </section>
+        <section class="cp-plugins__gridWrap">
+          <PluginCenterGridHeader
+            :server-socket="serverSocket"
+            :server-id="serverId"
+            :modules-count="filtered.length"
+            @refresh="ensureData"
+            @open-domains="router.push('/plugins/domain-catalog')"
+            @back="router.back()"
+          />
+
+          <PluginCenterCatalogGrid
+            :server-socket="serverSocket"
+            :server-id="serverId"
+            :loading="catalogStore.loading.value"
+            :error="catalogStore.error.value || ''"
+            :plugins="filtered"
+            :installed-by-id="installStore.installedById"
+            :progress-by-id="installStore.progressById"
+            :selected-id="selectedId"
+            :focus-plugin-id="focusPluginId"
+            :has-update="hasUpdate"
+            @install="handleCardInstall"
+            @update="handleCardUpdate"
+            @enable="handleCardEnable"
+            @disable="handleCardDisable"
+            @uninstall="handleCardUninstall"
+            @detail="openDetail"
+          />
+        </section>
+      </div>
 
       <ModuleDetailDrawer
         :open="drawerOpen"
@@ -460,19 +462,26 @@ function onGlobalKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：插件中心页｜布局：左侧筛选 rail + 右侧内容，两侧均为一级玻璃面板，列间距 16px */
+/* 样式：插件中心页｜布局：工作台骨架；左侧筛选栏 + 右侧内容区共享一张玻璃面，栏间 0 间距 */
 .cp-plugins {
-  @include cp-page;
+  @include cp-workspace;
 
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
-  min-height: 0;
+  overflow: hidden;
 }
 
-/* 右侧内容面板：头部/网格共用同一玻璃承载面 */
+/* 页面布局：桌面左右分栏；窄屏转纵向并由本层滚动，共享玻璃面保持固定 */
+.cp-plugins__layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 右侧内容区域：头部/网格共用同一透明承载面 */
 .cp-plugins__gridWrap {
-  @include cp-glass-panel;
+  @include cp-region;
 
   display: flex;
   flex-direction: column;
@@ -481,9 +490,9 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   overflow: hidden;
 }
 
-/* 响应式：≤900px 左右布局转纵向 */
+/* 响应式：≤900px 左右布局转纵向，滚动交给布局区 */
 @media (max-width: 900px) {
-  .cp-plugins {
+  .cp-plugins__layout {
     display: flex;
     flex-direction: column;
     overflow: auto;
@@ -495,11 +504,10 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   }
 }
 
-/* 响应式：≤640px 压缩页面留白 */
+/* 响应式：≤640px 只压缩内容内边距，页面留白保持 8px */
 @media (max-width: 640px) {
-  .cp-plugins {
-    padding: 10px;
-    gap: 10px;
+  .cp-plugins__gridWrap {
+    min-height: 260px;
   }
 }
 

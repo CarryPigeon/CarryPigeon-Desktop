@@ -126,15 +126,16 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type {
-  PluginAiFailureCode,
   PluginChannelMessage,
   PluginCurrentChannelMessagesSnapshot,
 } from "@/features/plugins/api-types";
 import { getContext } from "../host/bridge";
 import { ensureBackendLoaded, useBackendPreference } from "../host/backendPreference";
-import type { PluginAiService, PluginMessagesService } from "@/features/plugins/sdk";
+import { summarizeWithProvider } from "../host/clientAi";
+import { ensureProviderLoaded } from "../host/providerConfig";
+import type { PluginMessagesService, PluginNetworkService } from "@/features/plugins/sdk";
 import { createLogger } from "../shared/logger";
-import { resolveBackendPlan, shouldFallbackToServer } from "../domain/summarizeBackend";
+import { resolveBackendPlan, shouldFallbackToServer, type ClientAiFailureCode } from "../domain/summarizeBackend";
 import {
   buildChannelMessageLines,
   buildSummarizeRequestBody,
@@ -329,26 +330,26 @@ const sourceLabel = computed(() => {
 });
 
 /**
- * 是否展示"可配置客户端 AI"的引导。
+ * 是否展示"可配置自管 AI"的引导。
  *
- * 仅在本次走服务端回退、且插件确实拿到了 `host.ai` 能力（即宿主支持客户端 AI）、
- * 且用户未显式选择「仅服务端」时展示，避免对未升级宿主/已明确选择服务端的场景产生误导。
+ * 仅在本次走服务端回退、且插件具备网络能力（可直连外部 provider）、
+ * 且用户未显式选择「仅服务端」时展示，避免对不支持的场景产生误导。
  */
 const showConfigureHint = computed(
   () =>
     source.value?.kind === "server" &&
-    getHostAi() !== undefined &&
+    getHostNetwork() !== undefined &&
     useBackendPreference().value !== "server",
 );
 
 /**
- * 读取宿主注入的 `host.ai` 能力（未注入/读取失败时返回 undefined）。
+ * 读取宿主注入的 `ctx.network` 能力（未注入/读取失败时返回 undefined）。
  *
- * @returns ai 能力或 undefined。
+ * @returns network 能力或 undefined。
  */
-function getHostAi(): PluginAiService | undefined {
+function getHostNetwork(): PluginNetworkService | undefined {
   try {
-    return getContext().ai;
+    return getContext().network;
   } catch {
     return undefined;
   }
@@ -491,7 +492,7 @@ function failedText(status?: number): string {
 }
 
 /**
- * 把客户端 AI 的失败分类转成可操作文案。
+ * 把自配 provider 的失败分类转成可操作文案。
  *
  * @param code - 失败分类。
  * @param error - 原始（已脱敏）错误描述。
@@ -500,7 +501,7 @@ function failedText(status?: number): string {
  * @returns 展示用错误文案。
  */
 function clientFailureText(
-  code: PluginAiFailureCode,
+  code: ClientAiFailureCode,
   error: string,
   status?: number,
   provider?: string,
@@ -559,8 +560,9 @@ async function readSnapshot(
  * 执行总结请求。
  *
  * 顺序（受「AI 摘要后端」设置项控制，见 `domain/summarizeBackend.ts`）：
- * 1. `client` / `auto`：客户端 AI（`host.ai.summarize`，用户自配 provider，密钥由宿主代持）；
- * 2. `auto` 且未配置客户端 AI（`not-configured`）→ 回退服务端 `/api/ai/summarize`；
+ * 1. `client` / `auto`：自配 provider（插件经 `ctx.network.fetch` 直连 OpenAI 兼容端点，
+ *    API Key 由宿主 Rust 侧从系统凭据管理器注入请求头）；
+ * 2. `auto` 且未配置 provider（`not-configured`）→ 回退服务端 `/api/ai/summarize`；
  * 3. `client` 且未配置 → 给出可操作提示，**不回退**（否则用户会误以为自选模型在生效）；
  * 4. `server` → 直接走服务端端点。
  *
@@ -573,12 +575,13 @@ async function requestSummary(
 ): Promise<void> {
   loading.value = true;
   try {
-    // 载入用户选择的总结后端（失败时保持 auto，即历史行为）。
+    // 载入用户选择的总结后端与 provider 配置（失败时保持默认，即历史行为）。
     const backendMode = await ensureBackendLoaded();
-    const ai = getHostAi();
-    const plan = resolveBackendPlan(backendMode, ai !== undefined);
-    if (plan.useClient && ai) {
-      const client = await ai.summarize({ channelId, messages: buildChannelMessageLines(messages) });
+    await ensureProviderLoaded();
+    const network = getHostNetwork();
+    const plan = resolveBackendPlan(backendMode, network !== undefined);
+    if (plan.useClient) {
+      const client = await summarizeWithProvider(buildChannelMessageLines(messages));
       if (client.ok) {
         result.value = {
           summary: client.summary,

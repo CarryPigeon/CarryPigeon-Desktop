@@ -35,6 +35,7 @@ afterEach(() => {
 });
 
 describe("SettingsPage", () => {
+  // 全量并行跑测时动态 import + 挂载在负载下可能超过默认 5s，显式放宽超时避免抖动。
   it("不再渲染退出登录入口（已移至服务器管理）", async () => {
     const { default: SettingsPage } = await import("./SettingsPage.vue");
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/settings", component: { template: "<div />" } }] });
@@ -54,7 +55,7 @@ describe("SettingsPage", () => {
     // 空置的「账号」分区与导航项也应一并移除
     expect(wrapper.find('[data-testid="settings-section-account"]').exists()).toBe(false);
     expect(wrapper.findAll(".cp-settings__navBtn").some((btn) => btn.text().includes("账号"))).toBe(false);
-  });
+  }, 20000);
 
   it("页头只保留统一返回按钮，不再渲染「进入聊天」入口", async () => {
     const { default: SettingsPage } = await import("./SettingsPage.vue");
@@ -76,5 +77,5 @@ describe("SettingsPage", () => {
 
     expect(wrapper.find('[data-testid="settings-open-patchbay"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("进入聊天");
-  });
+  }, 20000);
 });

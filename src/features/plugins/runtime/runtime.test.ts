@@ -191,6 +191,8 @@ describe("permissions", () => {
     expect(isServiceVisible("storage", none)).toBe(true);
     expect(isServiceVisible("domains", none)).toBe(true);
     expect(isServiceVisible("network", none)).toBe(false);
+    expect(isServiceVisible("secrets", none)).toBe(false);
+    expect(isServiceVisible("secrets", new Set(["secrets"]))).toBe(true);
     // 未登记的服务名视为基础能力（始终可见）。
     expect(isServiceVisible("custom-service", none)).toBe(true);
   });
@@ -205,10 +207,44 @@ describe("permissions", () => {
     expect(() =>
       assertRequiredPermissions(withInject({ network: { required: false } }), base),
     ).not.toThrow();
+    expect(() =>
+      assertRequiredPermissions(withInject(["secrets"]), runtimeOf("p", { permissions: ["secrets"] })),
+    ).not.toThrow();
   });
 
   it("normalizePermissions 去重 trim 去空", () => {
     expect(normalizePermissions([" ui ", "ui", "", "storage"])).toEqual(["ui", "storage"]);
+  });
+});
+
+describe("secrets 能力装配", () => {
+  it("ctx.secrets 按权限注入：已授权可见，未授权为 undefined", async () => {
+    const server = makeServer();
+    const seen: Array<unknown> = [];
+    const mk = (id: string) => ({
+      name: id,
+      // 声明为可选依赖：未注入时保持 undefined（与 legacy 投影的语义一致）。
+      inject: { secrets: { required: false } },
+      apply(ctx: Context) {
+        seen.push(ctx.secrets);
+      },
+    });
+
+    await applyPlugin(
+      server.ctx,
+      { serverSocket: "srv", registry: server.registry },
+      runtimeOf("with-secrets", { permissions: ["secrets"] }),
+      mk("with-secrets"),
+    );
+    await applyPlugin(
+      server.ctx,
+      { serverSocket: "srv", registry: server.registry },
+      runtimeOf("no-secrets", { permissions: [] }),
+      mk("no-secrets"),
+    );
+
+    expect(seen[0]).toBeDefined();
+    expect(seen[1]).toBeUndefined();
   });
 });
 

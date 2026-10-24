@@ -57,7 +57,8 @@
 - `getContext()`
 - `sendMessage(payload)`
 - `storage`（P0，默认注入：按 server_id 命名空间隔离）
-- `network`（已确定：仅允许访问当前 `server_socket` 对应地址；不得访问任意公网）
+- `network`（已确定：默认仅允许访问当前 `server_socket` 对应地址；`network:external` 权限可放行外部目标）
+- `secrets`（已确定：密钥保管箱，系统凭据管理器代持、只写不读）
 
 ### 5.0 storage 默认可用（P0，已确定）
 宿主必须默认提供受控的 `storage` 能力（无需插件声明权限），并满足：
@@ -67,25 +68,31 @@
 
 ### 5.1 network 权限边界（P0，已确定）
 若插件声明 `network` 权限，宿主的网络能力必须满足：
-- 仅允许访问“当前 server_socket”对应的主机/端口，也就是当前 server origin，同源下载端点包含在内。
+- 默认仅允许访问“当前 server_socket”对应的主机/端口，也就是当前 server origin，同源下载端点包含在内。
 - 禁止跨服务器访问（例如插件在 A 服务器上下文中访问 B 服务器）。
-- 禁止访问任意公网（除非后续版本引入更细粒度白名单与用户授权）。
+- 仅当 manifest 声明 `network:external` 权限时，才允许访问任意外部 http/https 目标
+  （例如 OpenAI 兼容 provider、本地 Ollama）；该权限属高危，安装/更新时需用户显式确认。
+  外源请求使用系统证书校验（不继承聊天服务器的自签 TLS 策略），重定向一律不跟随。
 
 实现建议（不限制具体技术）：
-- 宿主只提供一个受控的 `host.network.fetch()`，内部做 allowlist 校验；
-- 不直接把原生 `fetch` 或不受控的 HTTP 能力暴露给插件。
+- 宿主只提供一个受控的 `host.network.fetch()`，内部做 allowlist（同源 + 可选 `network:external`）校验；
+- 不直接把原生 `fetch` 或不受控的 HTTP 能力暴露给插件；
+- 请求头值支持 `@secret(<name>)` 引用：由宿主 Rust 侧从该插件的密钥保管箱解析替换，
+  密钥明文不进入 WebView（引用缺失时请求失败，不静默发送空密钥）；
+- 可选 `timeoutMs` 请求超时（宿主夹取到 [1000, 120000] 毫秒）。
 
-### 5.2 ai 权限边界（P0，已确定）
-若插件声明 `ai` 权限，宿主提供客户端自配 AI（OpenAI 兼容）的**窄能力**，边界如下：
-- 只暴露 `host.ai.isConfigured()` 与 `host.ai.summarize({ channelId, messages })`：
-  不提供任意提示词入口，插件无法把客户端当作通用 LLM 代理；
-- 系统提示词、温度、超时、base URL、模型名一律由宿主的客户端设置决定，插件不可覆盖；
-- API Key 只由宿主（Rust 侧系统凭据管理器）持有：插件既拿不到明文，也无法通过
-  `host.storage` / localStorage 读到；密钥写入是单向接口，任何读取接口都不返回明文；
-- 用户选择“跟随服务端”时 `summarize` 返回 `{ ok: false, code: "not-configured" }`，
-  插件应据此回退到服务端端点；其余失败码（`incomplete-config` / `api-key-missing` /
-  `request-failed`）表示用户已显式配置客户端 AI 但不可用，插件应提示而非静默回退，
-  否则用户会误以为自己配置的模型在生效。
+### 5.2 secrets 权限边界（P0，已确定）
+若插件声明 `secrets` 权限，宿主提供**密钥保管箱**能力，边界如下：
+- 只暴露 `host.secrets.set(name, value)` / `host.secrets.status(name)` / `host.secrets.clear(name)`：
+  `status` 只返回 `{ configured, secureStorageAvailable }`，任何接口都不返回密钥明文；
+- 密钥写入系统凭据管理器（Windows 凭据管理器 / macOS Keychain / Secret Service），
+  账户名按 `plugin-secret:{server_id}:{plugin_id}:{name}` 三段净化拼接——与 KV 存储同源的
+  命名空间隔离，跨 server / 跨插件不可互读；
+- 密钥不得写入 `host.storage`（storage.json 明文落盘）或 localStorage；
+- 发起网络请求需要携带密钥时，应通过 `host.network.fetch` 的 `@secret(name)` 头引用完成，
+  插件代码全程不接触明文；
+- 安全存储不可用时 `status` 返回 `secureStorageAvailable: false`、`set` 报错，插件应给出
+  可操作提示（如"系统凭据管理器不可用"）而不是静默失败。
 
 ### 5.3 messages:read 权限边界（P0，已确定）
 
@@ -94,8 +101,8 @@
 - 只暴露两个方法：
   - `host.messages.readCurrentChannel({ maxMessages? })`：返回当前频道**已载入时间线**的快照
     （`channelId` / `channelName` / `messages`（时间升序）/ `totalCount` / `truncated` /
-    `hasMoreHistory` / `capturedAtMs`）。单次最多 500 条（与宿主 AI 总结上限一致，越界由宿主钳制），
-    该调用不发起网络请求、不改动聊天视图；
+    `hasMoreHistory` / `capturedAtMs`）。单次最多 500 条（越界由宿主钳制；ai-summary 插件侧
+    的总结条数上限与之保持一致），该调用不发起网络请求、不改动聊天视图；
     快照还会带上聊天视图**当前多选中**的消息（`selectedMessageIds`（仅"已载入且可参与总结"的
     id，时间线顺序）/ `selectedTotalCount`（原始多选条数，含被过滤/未载入的条目）），
     供插件让用户显式圈定处理范围；这不构成新的读取权限——仍是同一频道、同一 `messages:read`

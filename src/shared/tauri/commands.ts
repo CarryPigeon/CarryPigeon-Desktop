@@ -56,13 +56,9 @@ export const TAURI_COMMANDS = {
   pluginsStorageGet: "plugins_storage_get",
   pluginsStorageSet: "plugins_storage_set",
   pluginsNetworkFetch: "plugins_network_fetch",
-
-  // 客户端 AI provider（密钥保管 + OpenAI 兼容调用）
-  aiSecretSet: "ai_secret_set",
-  aiSecretStatus: "ai_secret_status",
-  aiSecretClear: "ai_secret_clear",
-  aiChatCompletion: "ai_chat_completion",
-  aiListModels: "ai_list_models",
+  pluginsSecretSet: "plugins_secret_set",
+  pluginsSecretStatus: "plugins_secret_status",
+  pluginsSecretClear: "plugins_secret_clear",
 
   settingsGetConfigBool: "get_config_bool",
   settingsUpdateConfigBool: "update_config_bool",

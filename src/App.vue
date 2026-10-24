@@ -126,11 +126,12 @@ const tdGlobalConfig = computed(() => ({ icon: TD_ICON_OVERRIDES }));
   --cp-radius-card: 16px;
   --cp-radius-control: 12px;
 
-  /* 页面骨架与玻璃面板（设置页视觉语言的全局基准） */
+  /* 页面骨架与玻璃面板（无缝工作台视觉语言的全局基准） */
+  --cp-workspace-pad: 8px;
   --cp-page-pad: 14px;
   --cp-page-gap: 12px;
   --cp-glass-blur: blur(16px) saturate(1.08);
-  --cp-section-head-gap: 20px;
+  --cp-section-head-gap: 14px;
 
   /* 状态底色/描边：由状态色 + 面板/边框色派生，亮/暗主题自动跟随 */
   --cp-danger-bg: color-mix(in oklab, var(--cp-danger) 10%, var(--cp-panel));

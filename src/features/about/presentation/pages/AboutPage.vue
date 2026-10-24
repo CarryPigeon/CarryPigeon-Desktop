@@ -94,15 +94,15 @@ onMounted(async () => {
 </template>
 
 <style scoped lang="scss">
-/* 样式：AboutPage｜布局：PageHeader + 单玻璃内容面板（设置页风格） */
+/* 样式：AboutPage｜布局：工作台骨架 + 紧凑 PageHeader + 透明内容区（880 阅读列） */
 .cp-about {
-  @include cp-page;
+  @include cp-workspace;
 
-  overflow: auto;
+  overflow: hidden;
 }
 
 .cp-about__panel {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
@@ -113,7 +113,7 @@ onMounted(async () => {
   max-width: 880px;
   width: 100%;
   margin: 0 auto;
-  padding: 28px 32px 40px;
+  padding: 20px 24px 28px;
   display: flex;
   flex-direction: column;
   gap: var(--cp-page-gap);
@@ -151,7 +151,7 @@ onMounted(async () => {
   margin: 0;
   font-family: var(--cp-font-display);
   font-weight: 900;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.2;
   color: var(--cp-text);
 }
@@ -235,7 +235,7 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .cp-about__body {
-    padding: 16px 12px 24px;
+    padding: 12px 12px 16px;
   }
 
   .cp-about__hero {

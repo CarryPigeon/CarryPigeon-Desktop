@@ -44,20 +44,21 @@ withDefaults(
 </template>
 
 <style scoped lang="scss">
-/* 样式：PanelRow｜规格：cp-list-row + 相邻行细分隔线 */
+/* 样式：PanelRow｜规格：cp-list-row + hover 底色；工作台分组内不画相邻分隔线 */
 .cp-panel-row {
   @include cp-list-row;
 
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   scroll-margin-top: 16px;
+  transition: background-color var(--cp-fast) var(--cp-ease);
 }
 
-/* 相邻行使用细分隔线，形成设置列表节奏 */
-.cp-panel-row + .cp-panel-row {
-  border-top: 1px solid var(--cp-border-light);
+/* 行 hover 只变底色，不做位移 */
+.cp-panel-row:hover {
+  background: var(--cp-hover-bg);
 }
 
 .cp-panel-row__text {

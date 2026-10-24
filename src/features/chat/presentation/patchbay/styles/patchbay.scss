@@ -1,32 +1,12 @@
 /* 样式：Patchbay｜布局：四栏共享一张悬浮玻璃面板（8px 页面留白，栏间无缝、无分割线） */
 
-/* 页面骨架：背景透明，让页面暖纸/网格透出；四栏拼成一张一级玻璃面板。
-   紧凑变体既无组件分割线，也无栏间距：外轮廓只由 8px 留白、18px 圆角与柔和阴影承担。 */
+/* 页面骨架：统一走 cp-workspace（8px 留白 + 单张共享玻璃面），四栏按行排布；
+   背景透明，让页面暖纸/网格透出。外轮廓只由 8px 留白、18px 圆角与柔和阴影承担。 */
 .cp-main {
-  height: 100%;
-  display: flex;
-  gap: 0;
-  padding: 8px;
-  position: relative;
-  isolation: isolate;
-  min-width: 0;
-  background: transparent;
-}
+  @include cp-workspace;
 
-/* 共享玻璃表面：伪元素承载面板底色 / 背景模糊 / 描边 / 投影，四栏内容直接铺在同一表面上。
-   z-index: -1 垫在栏内容下方；isolation 把负层级限制在 .cp-main 内，避免沉到页面背景后面。 */
-.cp-main::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  z-index: -1;
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-lg);
-  background: var(--cp-surface);
-  backdrop-filter: var(--cp-glass-blur);
-  -webkit-backdrop-filter: var(--cp-glass-blur);
-  box-shadow: var(--cp-shadow-soft);
-  pointer-events: none;
+  flex-direction: row;
+  min-width: 0;
 }
 
 /* 列宽拖拽手柄：8px 宽、左右各 -4px 负 margin，净占 0 宽——手柄叠在两栏交界处，
@@ -130,7 +110,7 @@
 }
 
 /* 容器：rail/center 是共享玻璃表面上的栏位，自身不再有底色 / 描边 / 圆角 / 投影；
-   外轮廓由 .cp-main::before 统一提供，栏与栏之间因此没有任何可见间隙。 */
+   外轮廓由 cp-workspace 的共享玻璃面统一提供，栏与栏之间因此没有任何可见间隙。 */
 .cp-rail,
 .cp-center {
   background: transparent;
@@ -191,7 +171,7 @@
   grid-template-rows: auto 1fr;
 }
 
-/* 栏头部：设置页分组头（微标签 + 右侧图标按钮；不画底部分割线） */
+/* 栏头部：工作台分组头（微标签 + 右侧图标按钮；不画底部分割线） */
 .cp-rail__head {
   display: flex;
   align-items: center;
@@ -223,7 +203,7 @@
   gap: 2px;
 }
 
-/* 栏空状态：设置页提示底色（不再用虚线噪音） */
+/* 栏空状态：工作台提示底色（不再用虚线噪音） */
 .cp-rail__empty {
   margin: 4px;
   padding: 8px 10px;
@@ -234,7 +214,7 @@
   color: var(--cp-text-muted);
 }
 
-/* 栏按钮：设置页导航行（透明底，hover 仅变底色与字色） */
+/* 栏按钮：工作台导航行（透明底，hover 仅变底色与字色） */
 .cp-rail__btn {
   width: 100%;
   min-height: 30px;
@@ -262,7 +242,7 @@
   color: var(--cp-text);
 }
 
-/* 服务器机架列表：设置页行列表（padding 4/6、gap 1，行间不画分隔线） */
+/* 服务器机架列表：工作台行列表（padding 4/6、gap 1，行间不画分隔线） */
 .cp-rackList {
   padding: 4px 6px;
   display: flex;
@@ -299,7 +279,7 @@
   outline-offset: 2px;
 }
 
-/* 机架行：激活态（低饱和高亮底 + 左侧 2px 细条，与设置页导航一致） */
+/* 机架行：激活态（低饱和高亮底 + 左侧 2px 细条，与工作台导航一致） */
 .cp-rack[data-active="true"] {
   border-color: var(--cp-highlight-border);
   background: var(--cp-highlight-bg);
@@ -352,7 +332,7 @@
   text-overflow: ellipsis;
 }
 
-/* 频道列表容器：设置页行列表（padding 4/6、gap 1，行间不画分隔线） */
+/* 频道列表容器：工作台行列表（padding 4/6、gap 1，行间不画分隔线） */
 .cp-channelList {
   padding: 4px 6px;
   overflow: auto;
@@ -407,7 +387,7 @@
   border: 1px solid var(--cp-warn-border);
 }
 
-/* 频道行：设置页列表行（透明底 + hover/active 底色，行间不画分隔线） */
+/* 频道行：工作台列表行（透明底 + hover/active 底色，行间不画分隔线） */
 .cp-channelRow {
   position: relative;
   border: 1px solid transparent;
@@ -587,7 +567,7 @@
   container-type: inline-size;
 }
 
-/* 顶部控制台栏：设置页页头节奏（8/10 内边距，不画底部分割线，不做渐变底） */
+/* 顶部控制台栏：工作台页头节奏（8/10 内边距，不画底部分割线，不做渐变底） */
 .cp-topConsole {
   padding: 8px 10px;
   display: flex;
@@ -661,7 +641,7 @@
   color: var(--cp-text);
 }
 
-/* 消息行网格（avatar / strip / body） */
+/* 消息行网格（avatar / strip / body）。 */
 .cp-msg {
   display: grid;
   grid-template-columns: 44px 2px 1fr;
@@ -669,6 +649,13 @@
   gap: 8px;
   align-items: start;
   border-radius: var(--cp-radius);
+}
+
+/* 消息行：分组首行——用 padding-top 拉开与上一组的间距（padding 计入虚拟列表实测行高，
+   margin 在绝对定位行上会造成测量与定位错位；组内间距仍由 bare meta 的 margin-bottom 承担）。
+   上一组末行为续行时实际组间空隙 = 12px（bare meta）+ 16px = 28px；上组仅单条时为 16px，均大于组内 12px。 */
+.cp-msg[data-group-start="true"] {
+  padding-top: 16px;
 }
 
 /* 消息行：mine 时翻转布局（右对齐） */
@@ -725,12 +712,12 @@
   align-items: flex-end;
 }
 
-/* 消息行：mine 时 meta 行整体靠右（昵称/时间/消息类型跟随气泡右对齐） */
+/* 消息行：mine 时 meta 行整体靠右（昵称/时间跟随气泡右对齐） */
 .cp-msg[data-mine="true"] .cp-msg__meta {
   justify-content: flex-end;
 }
 
-/* 消息 meta 行（from/time/domain/more） */
+/* 消息 meta 行（from/time） */
 .cp-msg__meta {
   display: flex;
   align-items: baseline;
@@ -743,17 +730,13 @@
   width: 100%;
 }
 
-/* 元信息（meta）：分组消息的紧凑变体 */
-.cp-msg__meta[data-compact="true"] {
-  margin-bottom: 4px;
-  opacity: 0.82;
-}
-
-/* 元信息（meta）：组内非首条（仅保留“⋯”操作入口，收紧占位） */
+/* 元信息（meta）：组内非首条——折叠为纯间距，不再占一行高度；
+   组内垂直间距只由 margin-bottom 承担（设计基准 12px，窄宽度断点再收紧）。
+   消息操作统一走右键菜单，行内不再有操作按钮。 */
 .cp-msg__meta[data-bare="true"] {
-  margin-bottom: 2px;
-  /* 色条隐藏后由组内垂直间距承担视觉分隔；用 padding 让行底色随之延展 */
-  padding-bottom: 8px;
+  height: 0;
+  min-height: 0;
+  margin-bottom: 12px;
 }
 
 /* 元信息（meta）：发送者名称（用户内容，不做 uppercase） */
@@ -779,48 +762,6 @@
   height: 4px;
   border-radius: 999px;
   background: var(--cp-border);
-}
-
-/* 单条消息的“更多”按钮（打开上下文菜单）：跟随 domain 标签内联展示，悬停行时可见 */
-.cp-msg__more {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--cp-text-muted);
-  border-radius: var(--cp-radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease),
-    opacity var(--cp-fast) var(--cp-ease);
-}
-
-/* 悬停/聚焦消息行时显示“更多”按钮 */
-.cp-msg:hover .cp-msg__more,
-.cp-msg:focus-within .cp-msg__more,
-.cp-msg__more:focus-visible {
-  opacity: 1;
-}
-
-/* “更多”按钮：悬停态 */
-.cp-msg__more:hover {
-  background: var(--cp-hover-bg);
-  border-color: var(--cp-border);
-  color: var(--cp-text);
-}
-
-.cp-msg__more:focus-visible {
-  outline: 2px solid var(--cp-highlight-border-strong);
-  outline-offset: 1px;
 }
 
 /* 核心文本气泡：接收侧使用面板底 + 细分隔线（一级卡片语言），mine 保留 accent 12% */
@@ -901,7 +842,7 @@
   padding: 8px;
 }
 
-/* 成员列表：设置页行列表（padding 4/6、gap 1，行间不画分隔线） */
+/* 成员列表：工作台行列表（padding 4/6、gap 1，行间不画分隔线） */
 .cp-memberList {
   padding: 4px 6px;
   overflow: auto;
@@ -965,7 +906,7 @@
 
 /* 顶部控制台图标按钮（搜索 / 固定成员栏 / 频道设置）：
    静态态不画外框（透明的 1px 边框只用来固定 32×32 命中区，避免 hover 出现时尺寸跳动），
-   仅悬停/聚焦时给底色与描边，与设置页 cp-icon-button 同一观感。 */
+   仅悬停/聚焦时给底色与描边，与工作台 cp-icon-button 同一观感。 */
 .cp-topConsole__search,
 .cp-topConsole__pinMembers,
 .cp-topConsole__settings {
@@ -1134,7 +1075,11 @@
   }
 
   .cp-msg__meta[data-bare="true"] {
-    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .cp-msg[data-group-start="true"] {
+    padding-top: 10px;
   }
 }
 
@@ -1147,6 +1092,14 @@
 
   .cp-msg {
     gap: 4px;
+  }
+
+  .cp-msg__meta[data-bare="true"] {
+    margin-bottom: 6px;
+  }
+
+  .cp-msg[data-group-start="true"] {
+    padding-top: 8px;
   }
 
   /* 名称与时间必须同步缩小：.cp-msg__time 自带 font-size: 12px，只改 .cp-msg__meta
@@ -1164,7 +1117,6 @@
 @media (prefers-reduced-motion: reduce) {
   .cp-historyMore__btn,
   .cp-jumpBottom,
-  .cp-msg__more,
   .cp-topConsole__pinMembers,
   .cp-topConsole__settings,
   .cp-topConsole__search,

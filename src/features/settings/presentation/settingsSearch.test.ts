@@ -25,8 +25,6 @@ const TRANSLATIONS: Record<string, string> = {
   settings_nav_general_sub: "主题 · 运行时",
   settings_business: "业务",
   settings_nav_business_sub: "功能设置",
-  settings_ai_service: "AI 服务",
-  settings_ai_provider: "服务商",
   settings_data: "数据",
   settings_nav_data_sub: "导入 · 导出 · 重置",
   settings_plugins_section: "插件设置",
@@ -42,11 +40,20 @@ function translate(key: string): string {
   return TRANSLATIONS[key] ?? key;
 }
 
-const CATALOG: readonly SettingsCatalogEntry[] = [
-  SETTINGS_CATALOG[0]!, // general-theme
-  SETTINGS_CATALOG[2]!, // general-language
-  SETTINGS_CATALOG[14]!, // data-import-export
-];
+/** 按 id 从内置索引裁剪子集（避免依赖条目下标，增删分区/条目不会误取错项）。 */
+function catalogEntriesOf(ids: readonly string[]): readonly SettingsCatalogEntry[] {
+  return ids.map((id) => {
+    const entry = SETTINGS_CATALOG.find((item) => item.id === id);
+    if (!entry) throw new Error(`catalog entry not found: ${id}`);
+    return entry;
+  });
+}
+
+const CATALOG: readonly SettingsCatalogEntry[] = catalogEntriesOf([
+  "general-theme",
+  "general-language",
+  "data-import-export",
+]);
 
 function pluginItem(overrides: Partial<PluginSettingsContribution> = {}): PluginSettingsContribution {
   return {

@@ -92,342 +92,324 @@ function switchAuthMethod(method: "email" | "password"): void {
   <!-- 区块：<main> .cp-login -->
   <main class="cp-login">
     <ErrorBoundary>
-      <div class="cp-login__shell">
-        <header class="cp-login__head">
-          <div class="cp-login__brand">
-            <div class="cp-login__brandMark" aria-hidden="true"></div>
-            <div class="cp-login__brandText">
-              <div class="cp-login__brandName">CarryPigeon</div>
-              <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
-            </div>
+      <header class="cp-login__console">
+        <div class="cp-login__brand">
+          <div class="cp-login__brandMark" aria-hidden="true"></div>
+          <div class="cp-login__brandText">
+            <div class="cp-login__brandName">CarryPigeon</div>
+            <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <!-- Step 1: server -->
-        <section v-if="wizard.step.value === 'server'" class="cp-login__panel">
-          <h1 class="cp-login__panelTitle">{{ t("login_server_title") }}</h1>
+      <div class="cp-login__center">
+        <div class="cp-login__shell">
+          <!-- Step 1: server -->
+          <section v-if="wizard.step.value === 'server'" class="cp-login__panel">
+            <h1 class="cp-login__panelTitle">{{ t("login_server_title") }}</h1>
 
-          <div class="cp-login__form">
-            <div class="cp-login__field">
-              <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
-              <t-input v-model="wizard.socketDraft.value" :placeholder="t('server_socket_placeholder')" clearable />
-              <div class="cp-login__fieldHint">
-                <button class="cp-login__miniBtn" type="button" :disabled="connecting" @click="onConnect">
-                  {{ connecting ? t("login_connecting") : t("login_connect") }}
+            <div class="cp-login__form">
+              <div class="cp-login__field">
+                <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
+                <t-input v-model="wizard.socketDraft.value" :placeholder="t('server_socket_placeholder')" clearable />
+                <div class="cp-login__fieldHint">
+                  <button class="cp-login__miniBtn" type="button" :disabled="connecting" @click="onConnect">
+                    {{ connecting ? t("login_connecting") : t("login_connect") }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="cp-login__footRow">
+                <button class="cp-login__ghost" type="button" @click="router.push('/servers')">
+                  {{ t("login_open_server_manager") }}
+                </button>
+                <button class="cp-login__ghost" type="button" @click="router.push('/plugins')">
+                  {{ t("login_open_plugin_center") }}
                 </button>
               </div>
+            </div>
+          </section>
+
+          <!-- Step 2: prepare -->
+          <section v-else-if="wizard.step.value === 'prepare'" class="cp-login__panel">
+            <h1 class="cp-login__panelTitle">{{ t("login_prepare_title") }}</h1>
+            <p class="cp-login__panelSub">{{ t("login_prepare_desc") }}</p>
+
+            <div class="cp-login__serverInfo">
+              <div class="cp-login__serverInfoHead">
+                <div class="cp-login__serverInfoName">{{ wizard.serverInfo.value?.name }}</div>
+                <div class="cp-login__serverInfoId">
+                  <MonoTag :value="wizard.serverInfo.value?.serverId || '-'" :title="t('server_id_label')" :copyable="true" />
+                  <span v-if="wizard.serverInfo.value?.apiVersion" class="cp-login__serverInfoApi">{{ wizard.serverInfo.value?.apiVersion }}</span>
+                </div>
+              </div>
+              <div class="cp-login__serverInfoBrief">{{ wizard.serverInfo.value?.brief }}</div>
+              <div v-if="wizard.serverInfo.value?.requiredPlugins?.length" class="cp-login__serverInfoPlugins">
+                <span class="cp-login__monoTitle">{{ t("login_server_id_hint") }}</span>
+                <div class="cp-login__serverInfoTags">
+                  <MonoTag v-for="pid in (wizard.serverInfo.value?.requiredPlugins ?? [])" :key="pid" :value="pid" :copyable="true" />
+                </div>
+              </div>
+              <div class="cp-login__confirmLine">{{ t("login_confirm_server") }}</div>
+            </div>
+
+            <h2 class="cp-login__sectionTitle">{{ t("login_required_plugins_title") }}</h2>
+
+            <div v-if="wizard.requiredEntries.value.length === 0" class="cp-login__empty">
+              {{ t("login_prepare_no_required") }}
+            </div>
+
+            <div v-else class="cp-required__list">
+              <article
+                v-for="p in wizard.requiredEntries.value"
+                :key="p.pluginId"
+                class="cp-required__item"
+                :data-ok="Boolean(wizard.plugins.installedById.value[p.pluginId]?.enabled && wizard.plugins.installedById.value[p.pluginId]?.status === 'ok')"
+              >
+                <header class="cp-required__itemHead">
+                  <div class="cp-required__itemLeft">
+                    <div class="cp-required__itemName">{{ p.name }}</div>
+                    <div class="cp-required__itemMeta">
+                      <MonoTag :value="p.pluginId" :title="t('server_id_label')" :copyable="true" />
+                      <span class="cp-required__mini">{{ wizard.latestVersion(p) || "—" }}</span>
+                    </div>
+                  </div>
+                  <div class="cp-required__itemBadges">
+                    <LabelBadge variant="required" :label="t('badge_required')" />
+                    <LabelBadge
+                      v-if="wizard.plugins.installedById.value[p.pluginId]?.status === 'failed'"
+                      variant="failed"
+                      :label="t('badge_failed')"
+                    />
+                    <LabelBadge
+                      v-else-if="wizard.plugins.installedById.value[p.pluginId]?.enabled"
+                      variant="info"
+                      :label="t('badge_enabled')"
+                    />
+                    <LabelBadge
+                      v-else-if="wizard.plugins.installedById.value[p.pluginId]?.currentVersion"
+                      variant="info"
+                      :label="t('badge_installed')"
+                    />
+                    <LabelBadge v-else variant="info" :label="t('badge_missing')" />
+                  </div>
+                </header>
+
+                <div class="cp-required__itemDesc">{{ p.tagline }}</div>
+
+                <footer class="cp-required__itemActions">
+                  <button
+                    v-if="!wizard.plugins.installedById.value[p.pluginId]?.currentVersion"
+                    class="cp-required__btn primary"
+                    type="button"
+                    :disabled="Boolean(wizard.currentServerSocket.value) && !Boolean(wizard.serverInfo.value?.serverId)"
+                    @click="wizard.plugins.install(p, wizard.latestVersion(p))"
+                  >
+                    {{ t("install") }}
+                  </button>
+                  <button
+                    v-else-if="!wizard.plugins.installedById.value[p.pluginId]?.enabled"
+                    class="cp-required__btn primary"
+                    type="button"
+                    :disabled="Boolean(wizard.currentServerSocket.value) && !Boolean(wizard.serverInfo.value?.serverId)"
+                    @click="wizard.plugins.enable(p.pluginId)"
+                  >
+                    {{ t("enable") }}
+                  </button>
+                  <button
+                    v-else
+                    class="cp-required__btn"
+                    type="button"
+                    :disabled="Boolean(wizard.currentServerSocket.value) && !Boolean(wizard.serverInfo.value?.serverId)"
+                    @click="wizard.plugins.disable(p.pluginId)"
+                  >
+                    {{ t("disable") }}
+                  </button>
+
+                  <button
+                    class="cp-required__btn"
+                    type="button"
+                    @click="router.push({ path: '/plugins', query: { focus_plugin_id: p.pluginId, filter: 'required' } })"
+                  >
+                    {{ t("plugin_center") }}
+                  </button>
+                </footer>
+              </article>
+            </div>
+
+            <div v-if="!wizard.allRequiredReady.value" class="cp-login__hint">
+              {{ t("login_prepare_blocked") }}
             </div>
 
             <div class="cp-login__footRow">
-              <button class="cp-login__ghost" type="button" @click="router.push('/servers')">
-                {{ t("login_open_server_manager") }}
-              </button>
-              <button class="cp-login__ghost" type="button" @click="router.push('/plugins')">
-                {{ t("login_open_plugin_center") }}
+              <button class="cp-login__ghost" type="button" @click="wizard.goToServer()">{{ t("login_back") }}</button>
+              <button class="cp-login__primary" type="button" :disabled="!wizard.allRequiredReady.value" @click="wizard.beginAccount()">
+                {{ t("login_next_account") }}
               </button>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- Step 2: prepare -->
-        <section v-else-if="wizard.step.value === 'prepare'" class="cp-login__panel">
-          <h1 class="cp-login__panelTitle">{{ t("login_prepare_title") }}</h1>
-          <p class="cp-login__panelSub">{{ t("login_prepare_desc") }}</p>
+          <!-- Step 3: account -->
+          <section v-else class="cp-login__panel">
+            <h1 class="cp-login__panelTitle">{{ t("login_account_title") }}</h1>
+            <p class="cp-login__panelSub">{{ t("login_account_desc") }}</p>
 
-          <div class="cp-login__serverInfo">
-            <div class="cp-login__serverInfoHead">
-              <div class="cp-login__serverInfoName">{{ wizard.serverInfo.value?.name }}</div>
-              <div class="cp-login__serverInfoId">
-                <MonoTag :value="wizard.serverInfo.value?.serverId || '-'" :title="t('server_id_label')" :copyable="true" />
-                <span v-if="wizard.serverInfo.value?.apiVersion" class="cp-login__serverInfoApi">{{ wizard.serverInfo.value?.apiVersion }}</span>
-              </div>
+            <div class="cp-login__methodTabs" role="tablist">
+              <button
+                class="cp-login__methodTab"
+                type="button"
+                role="tab"
+                :aria-selected="authMethod === 'email'"
+                :data-active="authMethod === 'email'"
+                @click="switchAuthMethod('email')"
+              >
+                {{ t("login_method_email") }}
+              </button>
+              <button
+                class="cp-login__methodTab"
+                type="button"
+                role="tab"
+                :aria-selected="authMethod === 'password'"
+                :data-active="authMethod === 'password'"
+                @click="switchAuthMethod('password')"
+              >
+                {{ t("login_method_password") }}
+              </button>
             </div>
-            <div class="cp-login__serverInfoBrief">{{ wizard.serverInfo.value?.brief }}</div>
-            <div v-if="wizard.serverInfo.value?.requiredPlugins?.length" class="cp-login__serverInfoPlugins">
-              <span class="cp-login__monoTitle">{{ t("login_server_id_hint") }}</span>
-              <div class="cp-login__serverInfoTags">
-                <MonoTag v-for="pid in (wizard.serverInfo.value?.requiredPlugins ?? [])" :key="pid" :value="pid" :copyable="true" />
-              </div>
+
+            <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
+              {{ authMethod === "email" ? emailBanner : passwordBanner }}
             </div>
-            <div class="cp-login__confirmLine">{{ t("login_confirm_server") }}</div>
-          </div>
 
-          <h2 class="cp-login__sectionTitle">{{ t("login_required_plugins_title") }}</h2>
+            <div v-if="authMethod === 'email'" class="cp-login__form">
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
+                <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
+              </div>
 
-          <div v-if="wizard.requiredEntries.value.length === 0" class="cp-login__empty">
-            {{ t("login_prepare_no_required") }}
-          </div>
-
-          <div v-else class="cp-required__list">
-            <article
-              v-for="p in wizard.requiredEntries.value"
-              :key="p.pluginId"
-              class="cp-required__item"
-              :data-ok="Boolean(wizard.plugins.installedById.value[p.pluginId]?.enabled && wizard.plugins.installedById.value[p.pluginId]?.status === 'ok')"
-            >
-              <header class="cp-required__itemHead">
-                <div class="cp-required__itemLeft">
-                  <div class="cp-required__itemName">{{ p.name }}</div>
-                  <div class="cp-required__itemMeta">
-                    <MonoTag :value="p.pluginId" :title="t('server_id_label')" :copyable="true" />
-                    <span class="cp-required__mini">{{ wizard.latestVersion(p) || "—" }}</span>
-                  </div>
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_code") }}</div>
+                <div class="cp-login__codeRow">
+                  <t-input v-model="code" :placeholder="t('login_code_placeholder')" clearable />
+                  <button class="cp-login__sendBtn" type="button" :disabled="sending || countdown > 0" @click="handleSendCode">
+                    {{ countdown > 0 ? t("resend_in", { n: countdown }) : sending ? t("sending") : t("send_code") }}
+                  </button>
                 </div>
-                <div class="cp-required__itemBadges">
-                  <LabelBadge variant="required" :label="t('badge_required')" />
-                  <LabelBadge
-                    v-if="wizard.plugins.installedById.value[p.pluginId]?.status === 'failed'"
-                    variant="failed"
-                    :label="t('badge_failed')"
-                  />
-                  <LabelBadge
-                    v-else-if="wizard.plugins.installedById.value[p.pluginId]?.enabled"
-                    variant="info"
-                    :label="t('badge_enabled')"
-                  />
-                  <LabelBadge
-                    v-else-if="wizard.plugins.installedById.value[p.pluginId]?.currentVersion"
-                    variant="info"
-                    :label="t('badge_installed')"
-                  />
-                  <LabelBadge v-else variant="info" :label="t('badge_missing')" />
-                </div>
-              </header>
-
-              <div class="cp-required__itemDesc">{{ p.tagline }}</div>
-
-              <footer class="cp-required__itemActions">
-                <button
-                  v-if="!wizard.plugins.installedById.value[p.pluginId]?.currentVersion"
-                  class="cp-required__btn primary"
-                  type="button"
-                  :disabled="Boolean(wizard.currentServerSocket.value) && !Boolean(wizard.serverInfo.value?.serverId)"
-                  @click="wizard.plugins.install(p, wizard.latestVersion(p))"
-                >
-                  {{ t("install") }}
-                </button>
-                <button
-                  v-else-if="!wizard.plugins.installedById.value[p.pluginId]?.enabled"
-                  class="cp-required__btn primary"
-                  type="button"
-                  :disabled="Boolean(wizard.currentServerSocket.value) && !Boolean(wizard.serverInfo.value?.serverId)"
-                  @click="wizard.plugins.enable(p.pluginId)"
-                >
-                  {{ t("enable") }}
-                </button>
-                <button
-                  v-else
-                  class="cp-required__btn"
-                  type="button"
-                  :disabled="Boolean(wizard.currentServerSocket.value) && !Boolean(wizard.serverInfo.value?.serverId)"
-                  @click="wizard.plugins.disable(p.pluginId)"
-                >
-                  {{ t("disable") }}
-                </button>
-
-                <button
-                  class="cp-required__btn"
-                  type="button"
-                  @click="router.push({ path: '/plugins', query: { focus_plugin_id: p.pluginId, filter: 'required' } })"
-                >
-                  {{ t("plugin_center") }}
-                </button>
-              </footer>
-            </article>
-          </div>
-
-          <div v-if="!wizard.allRequiredReady.value" class="cp-login__hint">
-            {{ t("login_prepare_blocked") }}
-          </div>
-
-          <div class="cp-login__footRow">
-            <button class="cp-login__ghost" type="button" @click="wizard.goToServer()">{{ t("login_back") }}</button>
-            <button class="cp-login__primary" type="button" :disabled="!wizard.allRequiredReady.value" @click="wizard.beginAccount()">
-              {{ t("login_next_account") }}
-            </button>
-          </div>
-        </section>
-
-        <!-- Step 3: account -->
-        <section v-else class="cp-login__panel">
-          <h1 class="cp-login__panelTitle">{{ t("login_account_title") }}</h1>
-          <p class="cp-login__panelSub">{{ t("login_account_desc") }}</p>
-
-          <div class="cp-login__methodTabs" role="tablist">
-            <button
-              class="cp-login__methodTab"
-              type="button"
-              role="tab"
-              :aria-selected="authMethod === 'email'"
-              :data-active="authMethod === 'email'"
-              @click="switchAuthMethod('email')"
-            >
-              {{ t("login_method_email") }}
-            </button>
-            <button
-              class="cp-login__methodTab"
-              type="button"
-              role="tab"
-              :aria-selected="authMethod === 'password'"
-              :data-active="authMethod === 'password'"
-              @click="switchAuthMethod('password')"
-            >
-              {{ t("login_method_password") }}
-            </button>
-          </div>
-
-          <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
-            {{ authMethod === "email" ? emailBanner : passwordBanner }}
-          </div>
-
-          <div v-if="authMethod === 'email'" class="cp-login__form">
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
-              <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
-            </div>
-
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_code") }}</div>
-              <div class="cp-login__codeRow">
-                <t-input v-model="code" :placeholder="t('login_code_placeholder')" clearable />
-                <button class="cp-login__sendBtn" type="button" :disabled="sending || countdown > 0" @click="handleSendCode">
-                  {{ countdown > 0 ? t("resend_in", { n: countdown }) : sending ? t("sending") : t("send_code") }}
-                </button>
               </div>
+
+              <button class="cp-login__primary" type="button" :disabled="emailLoggingIn" @click="handleLogin">
+                {{ emailLoggingIn ? t("signing_in") : t("sign_in_register") }}
+              </button>
+
+              <div class="cp-login__formRow cp-login__registerRow">
+                <span class="cp-login__muted">{{ t("login_no_account") }}</span>
+                <button class="cp-login__ghost" type="button" @click="router.push('/register')">{{ t("login_register") }}</button>
+              </div>
+
+              <button class="cp-login__ghost" type="button" @click="wizard.goToPrepare()">{{ t("login_back") }}</button>
             </div>
 
-            <button class="cp-login__primary" type="button" :disabled="emailLoggingIn" @click="handleLogin">
-              {{ emailLoggingIn ? t("signing_in") : t("sign_in_register") }}
-            </button>
+            <div v-else class="cp-login__form">
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_field_username") }}</div>
+                <t-input v-model="username" :placeholder="t('login_username_placeholder')" clearable />
+              </div>
 
-            <div class="cp-login__formRow cp-login__registerRow">
-              <span class="cp-login__muted">{{ t("login_no_account") }}</span>
-              <button class="cp-login__ghost" type="button" @click="router.push('/register')">{{ t("login_register") }}</button>
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_field_password") }}</div>
+                <t-input v-model="password" type="password" :placeholder="t('login_password_placeholder')" clearable />
+              </div>
+
+              <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn" @click="handlePasswordAuth">
+                {{ passwordLoggingIn ? t("signing_in") : t("sign_in") }}
+              </button>
+
+              <div class="cp-login__formRow cp-login__registerRow">
+                <span class="cp-login__muted">{{ t("login_no_account") }}</span>
+                <button class="cp-login__ghost" type="button" @click="router.push('/register')">{{ t("login_register") }}</button>
+              </div>
+
+              <button class="cp-login__ghost" type="button" @click="wizard.goToPrepare()">{{ t("login_back") }}</button>
             </div>
-
-            <button class="cp-login__ghost" type="button" @click="wizard.goToPrepare()">{{ t("login_back") }}</button>
-          </div>
-
-          <div v-else class="cp-login__form">
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_field_username") }}</div>
-              <t-input v-model="username" :placeholder="t('login_username_placeholder')" clearable />
-            </div>
-
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_field_password") }}</div>
-              <t-input v-model="password" type="password" :placeholder="t('login_password_placeholder')" clearable />
-            </div>
-
-            <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn" @click="handlePasswordAuth">
-              {{ passwordLoggingIn ? t("signing_in") : t("sign_in") }}
-            </button>
-
-            <div class="cp-login__formRow cp-login__registerRow">
-              <span class="cp-login__muted">{{ t("login_no_account") }}</span>
-              <button class="cp-login__ghost" type="button" @click="router.push('/register')">{{ t("login_register") }}</button>
-            </div>
-
-            <button class="cp-login__ghost" type="button" @click="wizard.goToPrepare()">{{ t("login_back") }}</button>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </ErrorBoundary>
   </main>
 </template>
 
 <style scoped lang="scss">
-/* 样式：LoginPage｜规格：居中外壳（cp-glass-panel）+ 步骤卡片（cp-card） */
-/* Layout: centered wizard shell */
+/* 样式：LoginPage｜规格：无缝工作台——整页一张共享玻璃面（cp-workspace），向导内容为玻璃面上的透明居中列 */
 .cp-login {
-  height: 100%;
-  display: grid;
-  place-items: center;
-  padding: var(--cp-page-pad);
+  @include cp-workspace;
 }
 
-/* Shell card：页面唯一一级玻璃面板 */
-.cp-login__shell {
-  @include cp-glass-panel;
-
-  width: min(640px, 100%);
-  max-height: 100%;
-  overflow: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--cp-page-gap);
-}
-
-/* Header (brand + hotkeys) */
-.cp-login__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+/* 控制台头：品牌行，紧凑节奏、不画底部分割线 */
+.cp-login__console {
+  @include cp-console;
 }
 
 /* Brand cluster */
 .cp-login__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 /* Brand mark */
 .cp-login__brandMark {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   border: 1px solid var(--cp-highlight-border);
   background:
-    radial-gradient(10px 10px at 30% 35%, color-mix(in oklab, var(--cp-accent) 86%, transparent), transparent 60%),
-    radial-gradient(12px 12px at 68% 60%, color-mix(in oklab, var(--cp-accent-2) 84%, transparent), transparent 60%),
+    radial-gradient(9px 9px at 30% 35%, color-mix(in oklab, var(--cp-accent) 86%, transparent), transparent 60%),
+    radial-gradient(11px 11px at 68% 60%, color-mix(in oklab, var(--cp-accent-2) 84%, transparent), transparent 60%),
     color-mix(in oklab, var(--cp-panel-solid) 72%, var(--cp-bg));
   box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
 }
 
 /* Brand name */
 .cp-login__brandName {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 16px;
-  color: var(--cp-text);
+  @include cp-console-title;
 }
 
 /* Brand subtitle */
 .cp-login__brandSub {
+  @include cp-console-sub;
+
   margin-top: 2px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
 }
 
-/* Panel (step body)：内嵌卡片，不叠加投影 */
-.cp-login__panel {
-  @include cp-card;
+/* 居中容器：剩余空间内居中放向导列，溢出时可滚动 */
+.cp-login__center {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
 
-  padding: 16px;
+/* Wizard column：玻璃面上的透明居中列（margin auto 居中，溢出时仍可滚动） */
+.cp-login__shell {
+  width: min(640px, 100%);
+  margin: auto;
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-page-gap);
 }
 
 /* Panel title */
 .cp-login__panelTitle {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
+  @include cp-section-title;
 }
 
 /* Section title */
 .cp-login__sectionTitle {
   margin-top: 16px;
-  font-family: var(--cp-font-display);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  font-size: 15px;
-  color: var(--cp-text);
+  @include cp-section-title;
 }
 
 /* Server info confirm card */
@@ -542,9 +524,8 @@ function switchAuthMethod(method: "email" | "password"): void {
 
 /* Field wrapper */
 .cp-login__field {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--cp-border-light);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Field label：普通字段标签（用户内容不做大写变换） */
@@ -576,16 +557,6 @@ function switchAuthMethod(method: "email" | "password"): void {
 .cp-login__miniBtn:hover:enabled {
   border-color: color-mix(in oklab, var(--cp-accent) 58%, var(--cp-border));
   background: color-mix(in oklab, var(--cp-accent) 20%, transparent);
-}
-
-/* Transport segmented control */
-.cp-login__seg {
-  @include cp-segmented;
-}
-
-/* Transport segment button */
-.cp-login__segBtn {
-  @include cp-segmented-item;
 }
 
 /* Form wrapper */
@@ -748,7 +719,6 @@ function switchAuthMethod(method: "email" | "password"): void {
 }
 
 .cp-login__miniBtn:focus-visible,
-.cp-login__segBtn:focus-visible,
 .cp-login__sendBtn:focus-visible,
 .cp-login__primary:focus-visible,
 .cp-login__ghost:focus-visible,
@@ -758,18 +728,13 @@ function switchAuthMethod(method: "email" | "password"): void {
 }
 
 @media (max-width: 640px) {
-  .cp-login {
-    padding: 10px;
-  }
-
   .cp-login__shell {
-    padding: 12px;
+    padding: 10px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .cp-login__miniBtn,
-  .cp-login__segBtn,
   .cp-login__sendBtn,
   .cp-login__primary,
   .cp-login__ghost,

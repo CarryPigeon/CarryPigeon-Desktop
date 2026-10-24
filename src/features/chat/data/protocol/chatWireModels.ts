@@ -164,6 +164,15 @@ export type ChatMessageWire = {
   preview: string;
   /** 消息状态；缺失时按文档默认 "sent"。 */
   status: "sent" | "recalled";
+  /**
+   * 顶层转发来源快照（旧版服务端兼容）。
+   *
+   * 说明：现行契约（docs/api/15-quote-reply-forward-v1.md §5.2）要求 forwarded_from /
+   * forwarded_messages 封装在 `data` 内；早期服务端实现放在消息顶层。客户端映射时
+   * 以 `data` 内为准，顶层字段仅作旧版回退。
+   */
+  forwarded_from?: ChatForwardedFromWire;
+  forwarded_messages?: ChatForwardedFromWire[];
 };
 
 /**

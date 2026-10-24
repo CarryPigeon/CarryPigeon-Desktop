@@ -57,7 +57,7 @@ function handleToggle(): void {
 </template>
 
 <style scoped>
-/* 样式：CategoryGroupHeader｜规格：设置页分组头（微标签 + 计数胶囊，安静 hover） */
+/* 样式：CategoryGroupHeader｜规格：工作台分组头（微标签 + 计数胶囊，安静 hover） */
 .cp-categoryHeader {
   display: flex;
   align-items: center;

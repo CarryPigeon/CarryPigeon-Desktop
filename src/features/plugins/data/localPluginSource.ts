@@ -70,10 +70,11 @@ const LOCAL_PLUGIN_SOURCES: Record<string, LocalPluginSourceDefinition> = {
   },
   "ai-summary": {
     pluginId: "ai-summary",
-    version: "0.1.0",
-    // `ai`：允许使用客户端自配的 AI provider（密钥由宿主代持）；`network`：回退服务端端点；
+    version: "0.2.0",
+    // `network:external`：调用插件自配的外部 AI provider（OpenAI 兼容）；`secrets`：API Key
+    // 存系统凭据管理器（宿主代持、只写不读）；`network`：回退服务端端点；
     // `messages:read`：读取当前频道消息用于总结（只读当前频道，上限 500 条）。
-    permissions: ["ui", "network", "storage", "ai", "messages:read"],
+    permissions: ["ui", "network", "network:external", "secrets", "storage", "messages:read"],
     providesDomains: [{ domain: "ai_summary", domainVersion: "1" }],
     entryApiVersion: 2,
     ipcPrefixes: [],
@@ -234,6 +235,24 @@ export function listLocalDefaultInstalledStates(serverSocket: string): Installed
 }
 
 /**
+ * 列出全部本地源插件的安装态（含被用户停用的）。
+ *
+ * 说明：本地源插件的安装态以本地源注册表为权威来源（entry 解析已遵循
+ * 「本地源优先」）；Rust 侧可能残留同名插件的历史安装记录（current.json），
+ * 其 enabled 状态无法被本地源的 localStorage 停用标记更新，若放任其参与
+ * 合并会导致「启用后又被刷新回已禁用」。此列表供适配器整体覆盖 Rust 记录。
+ *
+ * @param serverSocket - 服务器 socket（用于停用标记隔离）。
+ * @returns 安装状态列表（含 enabled:false 的停用条目）。
+ */
+export function listLocalInstalledStates(serverSocket: string): InstalledPluginState[] {
+  return getEnabledLocalPluginIds()
+    .filter((id) => id in LOCAL_PLUGIN_SOURCES && isLocalPluginSourceEnabled(id))
+    .map((id) => getLocalInstalledState(serverSocket, id))
+    .filter((state): state is InstalledPluginState => state !== null);
+}
+
+/**
  * 构造本地源插件的安装态。
  */
 function buildLocalInstalledState(
@@ -261,6 +280,35 @@ export function getLocalInstalledState(serverSocket: string, pluginId: string): 
   if (!id || !(id in LOCAL_PLUGIN_SOURCES) || !isLocalPluginSourceEnabled(id)) return null;
   if (isLocalPluginDisabled(serverSocket, id)) return buildLocalInstalledState(id, false, "ok", "");
   return buildLocalInstalledState(id, true, "ok", "");
+}
+
+/**
+ * 将安装态版本与本地源注册表对齐。
+ *
+ * 背景：本地源插件的 entry 解析（`getRuntimeEntry`）始终优先于安装记录，
+ * 实际加载版本恒为本地源注册表中的 `def.version`。若安装态（如历史落盘的
+ * mock 状态或服务端安装记录）仍保留旧版本，运行时协调器会因
+ * 「已加载版本 ≠ 安装记录版本」在每次 `ensureLoaded` 时反复卸载并重挂插件，
+ * 表现为设置页「插件设置」分区反复消失、编辑中的表单被重置。
+ *
+ * 规则：命中本地源且本地源已启用时，`currentVersion` / `installedVersions`
+ * 统一改写为本地源版本（该版本之外无其他可加载版本）；`enabled` / `status` /
+ * `lastError` 等用户意图保持不变。未命中或本地源未启用时原样返回。
+ *
+ * @param state - 适配器产出的安装态。
+ * @returns 对齐后的安装态（无需对齐时返回原对象）。
+ */
+export function alignInstalledStateWithLocalSource(state: InstalledPluginState): InstalledPluginState {
+  const id = String(state?.pluginId ?? "").trim();
+  const def = LOCAL_PLUGIN_SOURCES[id];
+  if (!def || !isLocalPluginSourceEnabled(id)) return state;
+  if (state.currentVersion === def.version && state.installedVersions.length === 1) return state;
+  return {
+    ...state,
+    pluginId: def.pluginId,
+    installedVersions: [def.version],
+    currentVersion: def.version,
+  };
 }
 
 /**

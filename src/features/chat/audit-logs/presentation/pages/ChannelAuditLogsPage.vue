@@ -5,7 +5,6 @@
  */
 
 import { useI18n } from "vue-i18n";
-import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useChannelAuditLogsPage } from "@/features/chat/audit-logs/presentation/page-models/useChannelAuditLogsPage";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
@@ -63,8 +62,8 @@ const {
       </template>
       <template #default>
         <div v-if="items.length === 0" class="cp-audit__empty">{{ t("audit_logs_empty") }}</div>
-        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
-        <PanelGroup v-else>
+        <!-- 审计行直接落在内容区上，不再叠加分组卡框 -->
+        <template v-else>
           <article v-for="item in items" :key="item.auditId" class="cp-auditCard">
             <div class="cp-auditCard__head">
               <div class="cp-auditCard__action">{{ actionLabel(item.action) }}</div>
@@ -73,7 +72,7 @@ const {
             <div class="cp-auditCard__meta">{{ t("audit_actor") }}: {{ item.actorUserId || "—" }}</div>
             <pre class="cp-auditCard__details">{{ formatDetails(item.details) }}</pre>
           </article>
-        </PanelGroup>
+        </template>
         <button
           v-if="hasMore"
           class="cp-audit__more"
@@ -97,17 +96,13 @@ const {
   color: var(--cp-text-muted);
 }
 
-/* 审计行：分组容器内的一行；相邻行 1px 细分隔线 */
+/* 审计行：分组容器内的一行；行间不画分隔线 */
 .cp-auditCard {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px 14px;
+  padding: 8px 10px;
   transition: background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-auditCard + .cp-auditCard {
-  border-top: 1px solid var(--cp-border-light);
 }
 
 /* 行 hover 只变底色，不做位移 */

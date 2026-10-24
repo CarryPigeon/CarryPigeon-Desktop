@@ -1,8 +1,9 @@
-/* 样式：统一界面语言 mixin｜职责：把设置页（悬浮玻璃面板）的页面骨架、面板、卡片、
-   标签与控件规格收敛为单一真源，供各 feature 的 scoped 样式复用。
+/* 样式：统一界面语言 mixin｜职责：把无缝工作台（以聊天主窗口为基准）的页面骨架、
+   共享玻璃面、区域、行列表、卡片、标签与控件规格收敛为单一真源，供各 feature 复用。
    边界：只产出声明，不产出选择器；所有颜色/圆角/间距均取自 App.vue 的 --cp-* token。 */
 
-/* 页面骨架：14px 留白 + 12px 节奏；滚动交给内部面板。 */
+/* 页面骨架（旧版）：14px 留白 + 12px 节奏，仅保留给居中/引导类页面；
+   主窗口页面统一使用 cp-workspace。 */
 @mixin cp-page {
   height: 100%;
   min-height: 0;
@@ -10,6 +11,132 @@
   display: flex;
   flex-direction: column;
   gap: var(--cp-page-gap);
+}
+
+/* 工作台骨架（统一基准）：8px 留白 + 零区域间距；整页由一张共享玻璃面承载，
+   区域自身透明。滚动优先交给内部内容区；需要整页滚动时玻璃面固定到视口，外轮廓保持稳定。 */
+@mixin cp-workspace($pad: var(--cp-workspace-pad)) {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: $pad;
+  background: transparent;
+
+  /* 共享玻璃面：固定到视口并垫在所有区域下方；页面内容滚动时表面保持不动，
+     外轮廓只由 8px 留白、18px 圆角与阴影承担。 */
+  &::before {
+    content: "";
+    position: fixed;
+    inset: $pad;
+    z-index: -1;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-lg);
+    background: var(--cp-surface);
+    backdrop-filter: var(--cp-glass-blur);
+    -webkit-backdrop-filter: var(--cp-glass-blur);
+    box-shadow: var(--cp-shadow-soft);
+    pointer-events: none;
+  }
+}
+
+/* 工作台区域：铺在共享玻璃面上的透明栏位，不提供底色/描边/圆角/投影。 */
+@mixin cp-region {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 顶部控制台（页面头/面板内头部）：紧凑节奏，不画底部分割线。 */
+@mixin cp-console {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+}
+
+/* 控制台主标题：14px/700 display，不做 uppercase（多为用户内容）。 */
+@mixin cp-console-title {
+  font-family: var(--cp-font-display);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 控制台副标题。 */
+@mixin cp-console-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+/* 栏/列表容器：紧凑行列表（padding 4/6、gap 1、无分割线）。 */
+@mixin cp-rail-list {
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: auto;
+}
+
+/* 导航/列表行：透明底，hover 只变底色，选中用 highlight 底 + inset 2px 竖条。 */
+@mixin cp-nav-row {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--cp-fast) var(--cp-ease),
+    border-color var(--cp-fast) var(--cp-ease),
+    color var(--cp-fast) var(--cp-ease);
+
+  &:hover {
+    background: var(--cp-hover-bg);
+    border-color: var(--cp-border-light);
+    color: var(--cp-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--cp-highlight-border-strong);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &[data-active="true"] {
+    border-color: var(--cp-highlight-border);
+    background: var(--cp-highlight-bg);
+    color: var(--cp-text);
+    box-shadow: inset 2px 0 0 var(--cp-highlight);
+  }
 }
 
 /* 一级玻璃面板：页面/侧栏/内容区的外壳。 */
@@ -40,12 +167,12 @@
   color: var(--cp-text-muted);
 }
 
-/* 分区标题（面板内主标题）。 */
+/* 分区标题（工作台内主标题）。 */
 @mixin cp-section-title {
   font-family: var(--cp-font-display);
   font-weight: 900;
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 14px;
+  line-height: 1.3;
   letter-spacing: 0.02em;
   color: var(--cp-text);
 }
@@ -195,7 +322,7 @@
   }
 }
 
-/* 列表行：统一 padding；相邻行分隔线由调用方按容器结构补齐。 */
+/* 列表行：工作台紧凑内边距；相邻行分隔线由调用方按容器结构补齐（工作台默认不画）。 */
 @mixin cp-list-row {
-  padding: 14px 16px;
+  padding: 10px 12px;
 }

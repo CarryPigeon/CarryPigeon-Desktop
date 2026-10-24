@@ -369,14 +369,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-/* 样式：文件管理页｜布局：PageHeader + 一级玻璃面板（搜索/工具条/列表）｜约束：列表在面板内滚动 */
+/* 样式：文件管理页｜布局：工作台骨架 + PageHeader + 透明内容区（搜索/工具条/列表）｜约束：列表在区域内滚动 */
 .cp-fileManager {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
-/* 一级玻璃面板：搜索 / 工具条 / 列表共用同一承载面 */
+/* 内容区域：共享玻璃面上的透明承载面 */
 .cp-fileManager__panel {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
@@ -385,18 +387,17 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 搜索区：面板内上留白 */
+/* 搜索区：区域内上留白 */
 .cp-fileManager__searchZone {
-  padding: 14px 14px 10px;
+  padding: 10px 10px 8px;
 }
 
-/* 工具条区：与列表之间用细分隔线分隔 */
+/* 工具条区：与列表之间不再画分隔线，靠间距分组 */
 .cp-fileManager__toolZone {
-  padding: 0 14px 12px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 0 10px 8px;
 }
 
-/* 列表滚动容器：面板内唯一滚动区 */
+/* 列表滚动容器：区域内唯一滚动区 */
 .cp-fileManager__list {
   flex: 1 1 auto;
   min-height: 0;
@@ -405,7 +406,7 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-/* 骨架行：与数据行同高（48px） */
+/* 骨架行：与数据行同高（44px） */
 .cp-fileManager__skeleton {
   display: flex;
   flex-direction: column;
@@ -415,9 +416,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 48px;
-  padding: 6px 14px;
-  border-bottom: 1px solid var(--cp-border-light);
+  min-height: 44px;
+  padding: 4px 10px;
 }
 
 /* 错误态：danger 状态条 + 重试胶囊 */
@@ -454,17 +454,12 @@ onUnmounted(() => {
   color: var(--cp-text-muted);
 }
 
-/* 响应式：≤640px 压缩页面留白 */
+/* 响应式：≤640px 只压缩内容内边距，页面留白保持 8px */
 @media (max-width: 640px) {
-  .cp-fileManager {
-    padding: 10px;
-    gap: 10px;
-  }
-
   .cp-fileManager__searchZone,
   .cp-fileManager__toolZone {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }
 </style>

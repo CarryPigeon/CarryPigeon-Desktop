@@ -36,11 +36,10 @@ type PatchbayChatViewportRawModel = {
   handleSignalScroll(): void;
   openChannelSettingsMenu(e: MouseEvent): void;
   handleMessageContextMenu(e: MouseEvent, messageId: string): void;
-  handleMoreClick(e: MouseEvent, messageId: string): void;
-  /** 打开消息引用块（回复 / 引用预览）的右键菜单。 */
-  handleReferenceContextMenu(e: MouseEvent, messageId: string): void;
-  /** 点击消息引用块上的「跳转到原消息」按钮。 */
-  handleJumpReference(messageId: string): void;
+  /** 打开消息引用块（回复 / 引用预览 / 转发来源）的右键菜单；channelId 为跨频道转发来源的目标频道。 */
+  handleReferenceContextMenu(e: MouseEvent, messageId: string, channelId?: string): void;
+  /** 点击消息引用块上的「跳转到原消息」按钮；channelId 存在时先切换频道（跨频道转发跳转）。 */
+  handleJumpReference(messageId: string, channelId?: string): void;
   handleInstallHint(pluginId: string | undefined): void;
 };
 /**
@@ -52,8 +51,8 @@ type PatchbayMessageContextMenuRawModel = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
-  /** 菜单形态：消息本身 or 消息引用块。 */
-  mode: RefLike<"message" | "reference">;
+  /** 菜单形态：消息本身 / 引用块 / 转发来源块。 */
+  mode: RefLike<"message" | "reference" | "forward">;
   showRecall: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;
@@ -140,9 +139,8 @@ type CreatePatchbayChatViewportSectionDeps = {
   handleSignalScroll(): void;
   openChannelSettingsMenu(e: MouseEvent): void;
   handleMessageContextMenu(e: MouseEvent, messageId: string): void;
-  handleMoreClick(e: MouseEvent, messageId: string): void;
-  handleReferenceContextMenu(e: MouseEvent, messageId: string): void;
-  handleJumpReference(messageId: string): void;
+  handleReferenceContextMenu(e: MouseEvent, messageId: string, channelId?: string): void;
+  handleJumpReference(messageId: string, channelId?: string): void;
   handleInstallHint(pluginId: string | undefined): void;
 };
 
@@ -157,7 +155,6 @@ export function createPatchbayChatViewportSection(deps: CreatePatchbayChatViewpo
     handleSignalScroll: deps.handleSignalScroll,
     openChannelSettingsMenu: deps.openChannelSettingsMenu,
     handleMessageContextMenu: deps.handleMessageContextMenu,
-    handleMoreClick: deps.handleMoreClick,
     handleReferenceContextMenu: deps.handleReferenceContextMenu,
     handleJumpReference: deps.handleJumpReference,
     handleInstallHint: deps.handleInstallHint,
@@ -168,7 +165,7 @@ type CreatePatchbayMessageContextMenuSectionDeps = {
   open: RefLike<boolean>;
   x: RefLike<number>;
   y: RefLike<number>;
-  mode: RefLike<"message" | "reference">;
+  mode: RefLike<"message" | "reference" | "forward">;
   showRecall: RefLike<boolean>;
   canPin: RefLike<boolean>;
   isPinned: RefLike<boolean>;

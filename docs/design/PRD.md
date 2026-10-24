@@ -84,7 +84,11 @@ CarryPigeon 是面向自建服务器的聊天客户端：
 - 插件能力必须经宿主白名单 API 注入。
 - 禁止插件直接访问宿主敏感状态（token、跨服务器私有缓存等）。
 - `storage` 作为按 `server_id` 隔离的默认能力。
-- 网络能力必须限制在当前服务器边界及明确下载端点。
+- 网络能力必须限制在当前服务器边界及明确下载端点；跨源访问需 manifest 显式声明
+  `network:external` 权限并在安装时向用户确认。
+- 插件密钥（如 AI provider 的 API Key）必须经密钥保管箱（`secrets` 权限）写入系统凭据
+  管理器：只写不读，按 `server_id + plugin_id` 隔离，不得落 KV 存储；网络请求经
+  `@secret()` 头引用由宿主代为注入，明文不进入 WebView。
 - 插件读取聊天内容必须走受控只读 Host API（`host.messages`）并显式声明 `messages:read`：
   只允许读取当前频道已载入的消息，不允许跨频道/跨服务器读取，也不允许持久化消息正文。
   快照附带聊天视图当前多选中的消息 id（`selectedMessageIds` / `selectedTotalCount`），

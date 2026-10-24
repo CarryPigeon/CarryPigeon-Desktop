@@ -84,7 +84,7 @@ function buildLegacyContext(ctx: Context, runtime: PluginRuntimeEntry): PluginCo
   const ipc = ctx.ipc;
   const ui = ctx.ui;
   const network = ctx.network;
-  const ai = ctx.ai;
+  const secrets = ctx.secrets;
 
   const host: PluginContext["host"] = {
     sendMessage: async (payload: PluginComposerPayload): Promise<void> => {
@@ -102,7 +102,13 @@ function buildLegacyContext(ctx: Context, runtime: PluginRuntimeEntry): PluginCo
       set: (key: string, value: unknown) => ctx.storage.set(key, value),
     },
     network: network ? { fetch: network.fetch.bind(network) } : undefined,
-    ai: ai ? { isConfigured: ai.isConfigured.bind(ai), summarize: ai.summarize.bind(ai) } : undefined,
+    secrets: secrets
+      ? {
+          set: secrets.set.bind(secrets),
+          status: secrets.status.bind(secrets),
+          clear: secrets.clear.bind(secrets),
+        }
+      : undefined,
     messages: messages
       ? {
           readCurrentChannel: messages.readCurrentChannel.bind(messages),
@@ -150,7 +156,7 @@ export function legacyToCordis(mod: PluginRuntimeModuleV1, runtime: PluginRuntim
     domains: { required: true },
     server: { required: true },
     network: { required: false },
-    ai: { required: false },
+    secrets: { required: false },
     messages: { required: false },
     ui: { required: false },
     ipc: { required: false },

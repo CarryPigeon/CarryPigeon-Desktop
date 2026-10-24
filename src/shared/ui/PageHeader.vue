@@ -60,38 +60,32 @@ function onBack(): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：PageHeader｜布局：左返回 / 中标题 / 右操作 三栏；外壳复用统一玻璃面板 */
+/* 样式：PageHeader｜布局：左返回 / 中标题 / 右操作 三栏；作为工作台顶部控制台铺在共享玻璃面上 */
 .cp-page-header {
-  @include cp-glass-panel;
+  @include cp-console;
 
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: var(--cp-page-pad);
+  padding: 8px 10px;
 }
 
-/* 标题文字 */
+/* 标题文字：工作台控制台规格（14px/700 display） */
 .cp-page-header__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
+  @include cp-console-title;
 }
 
 /* 副标题 */
 .cp-page-header__sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  @include cp-console-sub;
 }
 
 /* 右侧操作区 */
 .cp-page-header__actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }

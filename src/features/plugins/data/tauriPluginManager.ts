@@ -25,9 +25,10 @@ import type { PluginLifecycleCommandPort } from "@/features/plugins/domain/ports
 import { createPluginOperationError } from "@/features/plugins/domain/errors/PluginOperationError";
 import type { InstalledPluginState, PluginProgress, PluginProgressHandler } from "@/features/plugins/domain/types/pluginTypes";
 import {
+  alignInstalledStateWithLocalSource,
   getLocalInstalledState,
   isLocalPluginSourceEnabled,
-  listLocalDefaultInstalledStates,
+  listLocalInstalledStates,
   setLocalPluginDisabled,
 } from "@/features/plugins/data/localPluginSource";
 
@@ -84,16 +85,23 @@ function emitProgress(
 /**
  * 查询已安装插件列表。
  *
- * 说明：dev 本地源模式下，默认启用的本地源插件会被合并进结果
- * （本地源插件不落盘安装，安装态由本地源注册表推导）。
+ * 说明：本地源（自带）插件的安装态以本地源注册表为权威（与 entry 解析的
+ * 「本地源优先」一致）：Rust 返回的同名条目（可能来自历史安装记录，其
+ * enabled 无法被本地源停用标记更新）会被本地源推导的完整安装态覆盖，
+ * 避免「启用后又被下一次刷新打回已禁用」。
  */
 async function listInstalled(serverSocket: string): Promise<InstalledPluginState[]> {
   const socket = serverSocket.trim();
   if (!socket) return [];
   const raw = await invokeTauri<RustInstalledPluginState[]>(TAURI_COMMANDS.pluginsListInstalled, { serverSocket: socket, ...buildTauriTlsArgs(socket) });
-  const merged = (raw ?? []).map(mapInstalledState).filter((x) => Boolean(x.pluginId));
-  for (const state of listLocalDefaultInstalledStates(socket)) {
-    if (!merged.some((x) => x.pluginId === state.pluginId)) merged.push(state);
+  const merged = (raw ?? [])
+    .map(mapInstalledState)
+    .filter((x) => Boolean(x.pluginId))
+    // 本地源插件不采用 Rust 侧安装态，统一由本地源覆盖。
+    .filter((x) => !isLocalPluginSourceEnabled(x.pluginId))
+    .map(alignInstalledStateWithLocalSource);
+  for (const state of listLocalInstalledStates(socket)) {
+    merged.push(state);
   }
   return merged;
 }
@@ -105,13 +113,16 @@ async function getInstalledState(serverSocket: string, pluginId: string): Promis
   const socket = serverSocket.trim();
   const id = pluginId.trim();
   if (!socket || !id) return null;
+  // 本地源插件：安装态由本地源注册表推导（含停用标记），不查询 Rust。
+  if (isLocalPluginSourceEnabled(id)) {
+    return getLocalInstalledState(socket, id);
+  }
   const raw = await invokeTauri<RustInstalledPluginState | null>(TAURI_COMMANDS.pluginsGetInstalledState, {
     serverSocket: socket,
     pluginId: id,
     ...buildTauriTlsArgs(socket),
   });
-  if (raw) return mapInstalledState(raw);
-  return getLocalInstalledState(socket, id);
+  return raw ? alignInstalledStateWithLocalSource(mapInstalledState(raw)) : null;
 }
 
 async function install(

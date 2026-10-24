@@ -213,13 +213,15 @@ function extractNameFromPath(filePath: string): string {
 </template>
 
 <style scoped lang="scss">
-/* 样式：EmojiManagePage｜布局：PageHeader + 单玻璃面板（设置页风格） */
+/* 样式：EmojiManagePage｜布局：工作台骨架 + 紧凑 PageHeader + 透明内容区 */
 .cp-emojiManage {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
 .cp-emojiManage__panel {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
@@ -227,10 +229,10 @@ function extractNameFromPath(filePath: string): string {
 }
 
 .cp-emojiManage__body {
-  padding: 20px 24px 28px;
+  padding: 16px 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .cp-emojiManage__add {
@@ -333,7 +335,7 @@ function extractNameFromPath(filePath: string): string {
 
 @media (max-width: 640px) {
   .cp-emojiManage__body {
-    padding: 16px 12px 24px;
+    padding: 12px 12px 16px;
   }
 }
 </style>

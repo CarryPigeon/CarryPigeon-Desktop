@@ -2,7 +2,12 @@
 
 本文件记录 CarryPigeon Desktop 的主要变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.6.1] - 2026-10-24
+
+### 重大变更
+- **「AI 服务」设置完全迁移至 ai-summary 插件，AI 总结与客户端彻底解耦**：客户端不再包含任何 AI 专有代码——删除 `src/features/ai/` feature、设置页「AI 服务」分区（导航/目录/搜索索引/中英文案）、插件运行时 `ctx.ai` 能力（`runtime/services/ai.ts`）与 Rust `features/ai`（`ai_chat_completion` / `ai_list_models` / `ai_secret_*` 5 个命令）。原「AI 服务」设置卡的全部内容（provider 选择 / base URL / 模型与列表拉取 / API Key / 高级采样参数）由 ai-summary 插件以设置项「AI 服务提供方」自管（`plugins/ai-summary` v0.2.0）：非敏感配置经 `ctx.storage` 按 server 持久化，密钥经 `ctx.secrets` 写入系统凭据管理器，OpenAI 兼容请求由插件组装并经 `ctx.network.fetch` 直连（不再依赖宿主代持的总结能力）。旧客户端配置不做自动迁移，升级后需在「设置 → 插件设置 → AI 摘要」重新配置一次。
+- **新增通用插件能力：密钥保管箱（`ctx.secrets`，`secrets` 权限）**：新 Rust 命令 `plugins_secret_set / status / clear`，密钥写入系统 keyring 并按 `plugin-secret:{server_id}:{plugin_id}:{name}` 三段净化隔离；只写不读（`status` 仅返回是否已配置 + 存储是否可用），明文不落 KV 存储、不进日志。
+- **新增跨源网络权限 `network:external`**：`plugins_network_fetch` 增加 `pluginId` 归属，默认仍强制同源；manifest 声明 `network:external` 的插件可访问任意外部 http/https 目标（外源走系统证书校验、禁用重定向，不继承服务器自签 TLS 策略）。请求头值支持 `@secret(<name>)` 引用（由 Rust 侧从该插件密钥保管箱解析替换，明文不进入 WebView），并支持可选 `timeoutMs` 超时（夹取 1s–120s）。
 
 ### 新增功能
 - **设置页左栏搜索**：设置页左栏新增搜索框（原生输入 + 内联 SVG 放大镜，样式与设置页玻璃面板一致），有查询时结果列表替换分区导航，支持 `↑`/`↓` 移动、`Enter` 跳转、`Esc` / 清空按钮恢复导航；点击结果滚动到目标并短暂高亮。搜索基于单一真源 `src/features/settings/presentation/settingsCatalog.ts`（内置 21 项索引 + 模板 `data-settings-item` 锚点，单测校验二者不漂移），匹配「标题 / 说明 / 追加关键词 / 分区名 / 插件 id」，空格分词取 AND。
@@ -10,6 +15,7 @@
 - **内置 ai-summary 插件改用插件设置提供「AI 摘要后端」**：新增 `plugins/ai-summary/src/domain/summarizeBackend.ts`（纯逻辑）与设置项控件，可选「自动（优先客户端 AI，未配置回退服务端，保持历史行为）/ 仅客户端 AI（未配置时提示且不静默回退）/ 仅服务端（忽略客户端 AI 配置）」，偏好经 `ctx.storage` 按 server 持久化；面板在请求前载入该偏好，且「仅服务端」档不再展示客户端 AI 引导。
 
 ### UX 改进
+- **登录/注册页统一为聊天页「无缝工作台」风格**：两页从居中/双卡悬浮玻璃卡迁移至 `cp-workspace` 骨架——整窗一张共享玻璃面（8px 留白、18px 圆角、毛玻璃），区域透明、0 间距、无分割线。注册页改为「控制台头 + 左连接栏（机架概览 `cp-card` 分组）+ 右注册表单栏」的无缝双栏；登录页改为玻璃面上的居中三步向导列（连接 → 准备 → 登录）。两页标题/副标题对齐 `cp-section-title` / `cp-console-sub` 密度，品牌头改用 `cp-console` 紧凑节奏，并清理死代码样式（`cp-login__seg` 等）；纯样式改动，业务逻辑、路由与文案不变。设计文档 16 §1.1 的登录/注册例外条款同步取消，`workspaceSkeleton` 契约测试纳入两页。
 - **设置页右侧改为分区 Tab 切换**：左栏导航由「滚动定位 + `IntersectionObserver` 滚动高亮」改为 Tab（`role="tablist"` / `role="tab"` + `aria-selected`），点击任一导航项只切换右栏当前分区面板（非当前面板 `v-show` 隐藏但保持挂载，插件设置项控件与「AI 服务」不在切换时重新挂载/重打 IPC），并把右栏滚动复位到顶部，不再对整页 `scrollIntoView`；搜索跳转改为「先切到目标分区 Tab，再在面板内滚动 + 高亮」。「插件设置」（当前 server 无插件设置项）与「关于」（应用信息未就绪）导航项不出现，保证每个导航项都有已渲染面板；分区集合变化后当前 Tab 不存在时自动回退到「通用」。
 - **置顶频道改为应用内可视化编辑**：服务器卡菜单「编辑置顶频道」不再用系统默认程序打开本机 `channel-pins.json`，改为打开应用内弹窗，支持搜索频道、置顶 / 取消置顶、拖拽或方向按钮排序，并一次性保存整份有序列表；顺序即频道栏置顶分组的展示顺序，用户无需再手动编辑 JSON。新增 Rust `channel_pins_set_order` 命令与 `channel_pin_order` 纯逻辑校验，移除 `channel_pins_file_path` / `channel_pins_open_file` 与对应错误文案。
 - **内置插件入口图标更贴合语义**：`theme` 工具栏入口 `palette` → `contrast`（面向亮/暗/跟随系统的外观切换，不再被误读为配色）、`group-notice` `notification` → `loudspeaker`（避免与宿主 `@提醒` 铃铛同形）、`ai-summary` `city-12` → `ai-article`（AI 摘要文档）；插件面板标题与群公告气泡图标同步更新。
@@ -20,8 +26,14 @@
 - 新增设置搜索与插件设置分区中英文键值（搜索占位/清空/结果计数/空态、插件设置分区标题与副标题、插件来源标签）。
 - ai-summary 插件新增后端设置项中英文文案（档位标签与逐档说明、保存失败、仅客户端 AI 未配置提示）。
 
+### 修复
+- **自带插件升级后设置页「插件设置」分区反复消失、编辑被重置**：本地源插件的加载版本以本地源注册表为准（如 ai-summary 升至 0.2.0），但历史落盘的安装记录（mock 模式 localStorage 播种状态、服务端安装记录）仍保留旧版本 0.1.0，运行时协调器据「已加载版本 ≠ 安装记录版本」在每次 `ensureLoaded`（进聊天页 / 设置页 / 切服）时卸载并重挂插件，表现为「插件设置」分区与导航反复消失（当前 Tab 被重置回「通用」）、正在编辑的插件设置表单被重置。现于安装态查询出口统一将本地源插件版本对齐到本地源注册表（`alignInstalledStateWithLocalSource`，`enabled` / `status` / `lastError` 用户意图保持不变），tauri 与 mock 两个适配器均生效，并新增协调器「版本一致跳过重挂」回归测试。
+- **release 下自带插件（如 ai-summary）显示已禁用且启用不生效**：本地源插件运行期经 `ctx.storage` 写 KV 存储会在 `plugins/{server_id}/{plugin_id}/` 创建目录（storage.json），而 Rust `plugins_list_installed` 曾把该目录下**任何**子目录都当作已安装插件——无 `current.json` 时 `enabled` 恒为 `false`，形成幻影「已安装·已禁用」记录；前端本地源的默认启用态合并因该记录已存在而被跳过，且本地源「启用」只清 localStorage 停用标记、不写 Rust，导致每次刷新（重进插件中心 / 重启应用）都被打回已禁用。现 Rust 侧仅将「有 `current.json` 或至少一个版本目录」的插件视为已安装（`is_actually_installed`，`list_installed` / `get_installed` 一致生效）；同时前端安装态查询确立「本地源权威」：本地源插件的安装态（含停用标记推导）整体覆盖 Rust 侧同名残留记录，与 entry 解析既有的「本地源优先」规则对齐（`listLocalInstalledStates`，`getInstalledState` 对本地源插件不再发起 Rust 查询）。dev 下 mock 不走 Rust 目录扫描故不复现，本问题为 release 独有。
+
 ### 代码质量
 - **依赖安全升级**：rustls-webpki 0.103.15 → 0.103.16、wasmtime 48.0.6 → 48.0.7、webpki-root-certs 1.0.9 → 1.0.10，修复 RUSTSEC-2026-0378 / 0379 / 0382 / 0383，CI `cargo deny check` 的 advisories 恢复通过；`deny.toml` 清理依赖升级后已失效的旧 ignore 项，并补充 zbus 5.x 系列 unmaintained 公告（RUSTSEC-2026-0370 / 0371 / 0372）的忽略说明。
+- **0.6.1 发版前的依赖公告跟进（2026-10-24）**：ctutils 0.4.3 → 0.4.5 修复 RUSTSEC-2026-0385（digest → sqlx → sea-orm 链）、tokio 1.53.2 → 1.54.1 修复 RUSTSEC-2026-0386（`AsyncFd` 构造器违反 I/O 安全）；RUSTSEC-2026-0387（crypto-bigint 0.5.x 常时运算时序差异）修复版本 >=0.7.6 与 elliptic-curve 0.13（p256/p384 0.13 → dtls → webrtc）不兼容、本仓无法直接升级，按上游不可修惯例在 `deny.toml` 补充带理由忽略并同步 CI `cargo audit` ignore 列表。
+- **修复 CI 全量测试抖动**：`SettingsPage.test.ts` 两个页面用例在全量并行负载下动态 import + 挂载会超过 Vitest 默认 5s 超时（单文件跑约 3.7s，全量并行时必超），显式放宽到 20s。
 
 ## [0.6.0] - 2026-10-03
 

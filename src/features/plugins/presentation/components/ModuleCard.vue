@@ -202,7 +202,7 @@ function domainColor(colorVar: string): string {
     background-color var(--cp-fast) var(--cp-ease);
 }
 
-/* hover 只变底色/描边，不做上浮（与设置页行列表一致） */
+/* hover 只变底色/描边，不做上浮（与工作台行列表一致） */
 .cp-module-card:hover {
   border-color: var(--cp-highlight-border);
   background: color-mix(in oklab, var(--cp-panel) 88%, var(--cp-hover-bg));

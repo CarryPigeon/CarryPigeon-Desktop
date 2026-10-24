@@ -6,7 +6,6 @@
 
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
-import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { useChannelBansPage } from "@/features/chat/room-governance/presentation/page-models/useChannelBansPage";
 import ErrorBoundary from '@/shared/ui/ErrorBoundary.vue';
@@ -52,8 +51,8 @@ const {
       </template>
       <template #default>
         <div v-if="bans.length === 0" class="cp-bans__empty">{{ t("no_bans") }}</div>
-        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
-        <PanelGroup v-else>
+        <!-- 封禁行直接落在内容区上，不再叠加分组卡框 -->
+        <template v-else>
           <article v-for="b in bans" :key="b.uid" class="cp-banCard">
             <AvatarBadge :name="b.nickname || b.uid" :size="40" />
             <div class="cp-banCard__info">
@@ -70,7 +69,7 @@ const {
               </button>
             </div>
           </article>
-        </PanelGroup>
+        </template>
       </template>
     </GovernancePageShell>
 
@@ -113,18 +112,14 @@ const {
   @include cp-pill-button(primary);
 }
 
-/* 封禁行：分组容器内的一行；相邻行 1px 细分隔线 */
+/* 封禁行：分组容器内的一行；行间不画分隔线 */
 .cp-banCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding: 12px 14px;
+  padding: 8px 10px;
   transition: background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-banCard + .cp-banCard {
-  border-top: 1px solid var(--cp-border-light);
 }
 
 /* 行 hover 只变底色，不做位移 */

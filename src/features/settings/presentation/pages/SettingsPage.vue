@@ -33,7 +33,6 @@ import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import PanelRow from "@/shared/ui/panel/PanelRow.vue";
 import PanelSwitch from "@/shared/ui/panel/PanelSwitch.vue";
 import SectionHead from "@/shared/ui/SectionHead.vue";
-import { AiProviderSettings } from "@/features/ai/components";
 import {
   SETTINGS_CATALOG,
   SETTINGS_PLUGINS_SECTION_ID,
@@ -99,7 +98,6 @@ const appInfo = ref<AppInfo | null>(null);
 const SECTION_ICONS: Record<SettingsSectionId, string> = {
   general: "setting",
   business: "notification",
-  ai: "ai-article",
   data: "package",
   plugins: "plug",
   about: "info-circle",
@@ -753,30 +751,6 @@ async function handleResetDefaults(): Promise<void> {
             </div>
           </section>
 
-          <!-- 分区：AI 服务 -->
-          <section
-            id="settings-section-ai"
-            v-show="activeSectionId === 'ai'"
-            class="cp-settings__section"
-            role="tabpanel"
-            aria-labelledby="settings-nav-ai"
-            data-testid="settings-section-ai"
-          >
-            <div class="cp-settings__sectionBody">
-              <SectionHead
-                :icon="SECTION_ICONS.ai"
-                :title="t('settings_ai_service')"
-                :subtitle="t('settings_ai_service_sub')"
-              />
-
-              <PanelGroup padded data-settings-item="ai-provider">
-                <ErrorBoundary>
-                  <AiProviderSettings />
-                </ErrorBoundary>
-              </PanelGroup>
-            </div>
-          </section>
-
           <!-- 分区：数据管理 -->
           <section
             id="settings-section-data"
@@ -1041,36 +1015,39 @@ async function handleResetDefaults(): Promise<void> {
 
 <style scoped lang="scss">
 /* 样式：SettingsPage */
-/* 选择器：`.cp-settings`｜用途：页面容器（纵向布局） */
+/* 选择器：`.cp-settings`｜用途：页面容器（工作台骨架：8px 留白 + 单张玻璃面，页面根不滚动） */
 .cp-settings {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
-/* 选择器：`.cp-settings__layout`｜用途：左右布局容器（左侧导航 + 右侧内容） */
+/* 选择器：`.cp-settings__layout`｜用途：左右布局容器（左侧导航 + 右侧内容，栏间 0 间距） */
 .cp-settings__layout {
   flex: 1;
   display: flex;
-  gap: 16px;
+  gap: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
-/* 选择器：`.cp-settings__navWrap`｜用途：左侧固定宽导航侧栏 */
+/* 选择器：`.cp-settings__navWrap`｜用途：左侧固定宽导航侧栏（透明区域） */
 .cp-settings__navWrap {
   flex: 0 0 auto;
   width: 240px;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
 }
 
-/* 选择器：`.cp-settings__rail`｜用途：左栏面板容器（搜索固定在上，导航/结果列表滚动） */
+/* 选择器：`.cp-settings__rail`｜用途：左栏容器（搜索固定在上，导航/结果列表滚动） */
 .cp-settings__rail {
-  @include cp-glass-panel;
+  @include cp-region;
 
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 8px;
   min-height: 0;
 }
 
@@ -1143,10 +1120,10 @@ async function handleResetDefaults(): Promise<void> {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 2px;
+  padding: 4px 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .cp-settings__resultsHead {
@@ -1170,12 +1147,12 @@ async function handleResetDefaults(): Promise<void> {
   border: 1px solid transparent;
   background: transparent;
   color: var(--cp-text);
-  border-radius: 10px;
-  padding: 9px 10px;
+  border-radius: var(--cp-radius-sm);
+  padding: 6px 8px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   text-align: left;
   transition: background-color var(--cp-fast) var(--cp-ease), border-color var(--cp-fast) var(--cp-ease);
 }
@@ -1208,49 +1185,22 @@ async function handleResetDefaults(): Promise<void> {
   border-radius: 12px;
 }
 
-/* 选择器：`.cp-settings__nav`｜用途：设置 section 纵向导航 */
+/* 选择器：`.cp-settings__nav`｜用途：设置 section 纵向导航（工作台紧凑行列表） */
 .cp-settings__nav {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 2px;
+  gap: 1px;
   min-height: 0;
   overflow: auto;
-  padding: 2px;
+  padding: 4px 6px;
 }
 
+/* 导航行：工作台行列表规格（30px 高、4/6 行距、选中 highlight + inset 竖条） */
 .cp-settings__navBtn {
-  display: flex;
-  align-items: center;
+  @include cp-nav-row;
+
   gap: 10px;
-  width: 100%;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--cp-text-muted);
-  font-size: 13px;
-  line-height: 1.4;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background-color var(--cp-fast) var(--cp-ease),
-    border-color var(--cp-fast) var(--cp-ease),
-    color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-settings__navBtn:hover {
-  background: var(--cp-hover-bg);
-  color: var(--cp-text);
-}
-
-/* 选中态：低饱和高亮底 + 左侧细条，避免整圈描边带来的“聚焦框”感 */
-.cp-settings__navBtn[data-active="true"] {
-  border-color: var(--cp-highlight-border);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
-  box-shadow: inset 2px 0 0 var(--cp-highlight);
 }
 
 .cp-settings__navIcon {
@@ -1269,9 +1219,9 @@ async function handleResetDefaults(): Promise<void> {
   white-space: nowrap;
 }
 
-/* 选择器：`.cp-settings__sections`｜用途：右侧 Tab 面板容器（一次只显示一个分区，超高时容器内滚动） */
+/* 选择器：`.cp-settings__sections`｜用途：右侧内容区域（一次只显示一个分区，超高时容器内滚动） */
 .cp-settings__sections {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
@@ -1283,8 +1233,8 @@ async function handleResetDefaults(): Promise<void> {
 /* 选择器：`.cp-settings__section`｜用途：单个设置分区（非当前 Tab 由 v-show 隐藏） */
 .cp-settings__section {
   flex: 0 0 auto;
-  padding: 28px 32px 40px;
-  scroll-margin-top: 12px;
+  padding: 20px 24px 28px;
+  scroll-margin-top: 8px;
 }
 
 /* 选择器：`.cp-settings__sectionBody`｜用途：内容列（限制行宽，避免宽屏下标签与控件相距过远） */
@@ -1478,14 +1428,15 @@ async function handleResetDefaults(): Promise<void> {
 /* 响应式：宽屏收窄分区内边距 */
 @media (max-width: 1180px) {
   .cp-settings__section {
-    padding: 24px 24px 32px;
+    padding: 18px 20px 24px;
   }
 }
 
-/* 响应式：窄窗口改为纵向布局，导航回到顶部横向换行 */
+/* 响应式：窄窗口改为纵向布局，导航回到顶部横向换行，滚动交给布局区 */
 @media (max-width: 900px) {
   .cp-settings__layout {
     flex-direction: column;
+    overflow: auto;
   }
 
   .cp-settings__navWrap {
@@ -1501,12 +1452,17 @@ async function handleResetDefaults(): Promise<void> {
 
   .cp-settings__navBtn {
     width: auto;
-    min-height: 34px;
-    padding: 6px 10px;
+    min-height: 30px;
+    padding: 6px 8px;
   }
 
   .cp-settings__navBtn[data-active="true"] {
     box-shadow: none;
+  }
+
+  .cp-settings__sections {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .cp-settings__results {
@@ -1514,18 +1470,14 @@ async function handleResetDefaults(): Promise<void> {
   }
 
   .cp-settings__section {
-    padding: 20px 16px 28px;
+    padding: 16px 16px 20px;
   }
 }
 
-/* 响应式：极窄窗口压缩页面留白并让分段控件占满整行 */
+/* 响应式：极窄窗口只压缩内容内边距，页面留白保持 8px 与玻璃面 inset 对齐 */
 @media (max-width: 640px) {
-  .cp-settings {
-    padding: 10px;
-  }
-
   .cp-settings__section {
-    padding: 16px 12px 24px;
+    padding: 12px 12px 16px;
   }
 
   .cp-settings__seg {

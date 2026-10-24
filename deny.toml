@@ -34,6 +34,9 @@ unknown-git = "warn"
 # CI 基线：`cargo deny check`（cargo-deny 0.19.4）。ignore 仅支持 id + reason。
 # 2026-10-21 更新：rustls-webpki / wasmtime / webpki-root-certs 已升级到修复版本；
 # 同时清理依赖升级后已不再触发的旧忽略项（避免 CI 输出 advisory-not-detected 噪音）。
+# 2026-10-24 更新：ctutils 0.4.3 → 0.4.5 修复 RUSTSEC-2026-0385（真升级，无需忽略）；
+# crypto-bigint 0.5.x 时序侧信道（RUSTSEC-2026-0387）被 elliptic-curve 0.13 锁死，
+# 需等 p256/p384 0.14 生态与 webrtc/dtls 上游跟进，暂按不可修上游忽略。
 # 下列条目请在 2027-10-21 前重新评估是否仍需忽略。
 ignore = [
     # proc-macro-error 已停止维护，但仍被 sea-orm 宏链间接引入，暂无替代。
@@ -42,4 +45,6 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant 5.x is unmaintained (merged into zbus 6); transitive via zbus 5.x used by notify-rust / secret-service / xcap / tauri-plugin-opener. Upstream migration pending." },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names 4.x is unmaintained (merged into zbus 6); transitive via zbus 5.x used by notify-rust / secret-service / xcap / tauri-plugin-opener. Upstream migration pending." },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive 5.x is unmaintained (merged into zbus 6); transitive via zvariant 5.x used by the zbus 5.x stack. Upstream migration pending." },
+    # crypto-bigint 0.5.x 常时运算存在时序差异；修复版本 >=0.7.6 与 elliptic-curve 0.13（p256/p384 0.13 → dtls → webrtc）不兼容，无法在本仓直接升级。
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5.5 timing variability; fixed only in >=0.7.6 which is incompatible with elliptic-curve 0.13 pinned by p256/p384 0.13 via dtls/webrtc. Revisit when the RustCurve 0.14 ecosystem lands upstream." },
 ]

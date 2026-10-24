@@ -27,6 +27,7 @@ mod json_io;
 mod net_fetch;
 mod origin;
 mod paths;
+mod secrets;
 mod state;
 mod storage;
 mod tls;
@@ -40,8 +41,8 @@ use hash::{eq_hash_hex, sha256_hex};
 use origin::to_http_origin;
 use paths::{base_plugins_dir, manifest_file_path, plugin_root_dir, plugin_version_dir, safe_join};
 use state::{
-    PluginCurrent, PluginStateFile, build_installed_state, read_current, write_current,
-    write_state_file,
+    PluginCurrent, PluginStateFile, build_installed_state, is_actually_installed, read_current,
+    write_current, write_state_file,
 };
 use tls::build_server_client;
 use unpack::unpack_plugin_zip;
@@ -132,7 +133,14 @@ pub async fn list_installed(
         if plugin_id.trim().is_empty() {
             continue;
         }
-        out.push(build_installed_state(&server_id, &plugin_id).await?);
+        let state = build_installed_state(&server_id, &plugin_id).await?;
+        // 仅凭目录存在不代表“已安装”：本地源插件的 KV 存储（storage.json）也会
+        // 创建同名目录。缺少 current.json 且无版本目录时跳过，避免幻影
+        // “已安装·已禁用”记录覆盖前端本地源的默认启用态（表现为启用不生效）。
+        if !is_actually_installed(&state) {
+            continue;
+        }
+        out.push(state);
     }
     Ok(out)
 }
@@ -160,7 +168,13 @@ pub async fn get_installed(
     if tokio::fs::metadata(&root).await.is_err() {
         return Ok(None);
     }
-    Ok(Some(build_installed_state(&server_id, plugin_id).await?))
+    let state = build_installed_state(&server_id, plugin_id).await?;
+    // 与 list_installed 一致：仅剩运行期数据（storage.json 等）的目录视为未安装，
+    // 避免本地源插件被误报为“已安装·已禁用”。
+    if !is_actually_installed(&state) {
+        return Ok(None);
+    }
+    Ok(Some(state))
 }
 
 /// 获取插件“当前版本”的运行时入口信息。
@@ -672,6 +686,7 @@ pub async fn clear_error(
 }
 
 pub use net_fetch::network_fetch;
+pub use secrets::{secret_clear, secret_set, secret_status};
 pub use storage::{storage_get, storage_set};
 
 /// 禁用已安装插件。
@@ -913,5 +928,90 @@ mod tests {
             err.to_string()
                 .contains("Cross-origin plugin download rejected by default")
         );
+    }
+
+    /// 构造带 server-id 缓存的临时 app_data_dir，避免安装态查询触发网络请求。
+    fn setup_store_dir_with_server_cache(prefix: &str, origin: &str, server_id: &str) -> PathBuf {
+        let _ = crate::shared::app_data_dir::reset_app_data_dir();
+        let app_dir = unique_temp_dir(prefix);
+        crate::shared::app_data_dir::init_app_data_dir(app_dir.clone()).expect("init app data dir");
+        let plugins = app_dir.join("plugins");
+        std::fs::create_dir_all(&plugins).expect("create plugins dir");
+        std::fs::write(
+            plugins.join("server-id-cache.json"),
+            format!(r#"{{"{}":"{}"}}"#, origin, server_id),
+        )
+        .expect("write server id cache");
+        app_dir
+    }
+
+    #[tokio::test]
+    async fn list_installed_skips_storage_only_plugin_dirs() {
+        let app_dir = setup_store_dir_with_server_cache(
+            "plugin-store-phantom",
+            "http://127.0.0.1:19999",
+            "srv-1",
+        );
+        let plugins = app_dir.join("plugins");
+
+        // 本地源插件运行期 KV 存储创建的目录：只有 storage.json，无版本目录与 current.json
+        let storage_only = plugins.join("srv-1").join("ai-summary");
+        std::fs::create_dir_all(&storage_only).expect("create storage-only dir");
+        std::fs::write(storage_only.join("storage.json"), b"{}").expect("write storage");
+
+        // 幻影目录不应出现在已安装列表
+        let listed = list_installed("http://127.0.0.1:19999", None, None)
+            .await
+            .expect("list installed");
+        assert!(
+            listed.iter().all(|s| s.plugin_id != "ai-summary"),
+            "storage-only dir must not be reported as installed, got {:?}",
+            listed
+        );
+
+        // 单插件查询也应视为未安装
+        let single = get_installed("http://127.0.0.1:19999", "ai-summary", None, None)
+            .await
+            .expect("get installed");
+        assert!(single.is_none());
+
+        cleanup_dir(&app_dir);
+    }
+
+    #[tokio::test]
+    async fn list_installed_reports_real_install_footprint() {
+        let app_dir = setup_store_dir_with_server_cache(
+            "plugin-store-real",
+            "http://127.0.0.1:19998",
+            "srv-2",
+        );
+        let plugins = app_dir.join("plugins");
+
+        // 真实安装：版本目录 + current.json（enabled=true）
+        let version_dir = plugins.join("srv-2").join("demo").join("1.0.0");
+        std::fs::create_dir_all(&version_dir).expect("create version dir");
+        std::fs::write(version_dir.join("plugin.json"), b"{}").expect("write manifest");
+        std::fs::write(
+            plugins.join("srv-2").join("demo").join("current.json"),
+            r#"{"version":"1.0.0","enabled":true}"#,
+        )
+        .expect("write current");
+
+        let listed = list_installed("http://127.0.0.1:19998", None, None)
+            .await
+            .expect("list installed");
+        let demo = listed
+            .iter()
+            .find(|s| s.plugin_id == "demo")
+            .expect("demo should be listed");
+        assert_eq!(demo.current_version.as_deref(), Some("1.0.0"));
+        assert!(demo.enabled);
+
+        let single = get_installed("http://127.0.0.1:19998", "demo", None, None)
+            .await
+            .expect("get installed");
+        assert!(single.is_some());
+
+        cleanup_dir(&app_dir);
     }
 }

@@ -72,232 +72,217 @@ function switchAuthMethod(method: "email" | "password"): void {
   <!-- 区块：<main> .cp-login -->
   <main class="cp-login">
     <ErrorBoundary>
-      <section class="cp-login__left">
-        <header class="cp-login__leftHead">
-          <div class="cp-login__brand">
-            <div class="cp-login__brandMark" aria-hidden="true"></div>
-            <div class="cp-login__brandText">
-              <div class="cp-login__brandName">CarryPigeon</div>
-              <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
-            </div>
-          </div>
-          <div class="cp-login__stageWrap">
-            <div class="cp-login__stage">
-              <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">{{ t("stage_handshake") }}</span>
-              <span class="cp-login__stageSep">→</span>
-              <span class="cp-login__stageItem" :data-active="stage === 'Auth'">{{ t("stage_auth") }}</span>
-            </div>
-            <div class="cp-login__kbdHint">{{ t("hotkey_hint") }}</div>
-          </div>
-        </header>
-
-        <div class="cp-login__rack">
-          <div class="cp-login__label">{{ t("rack_overview") }}</div>
-
-          <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
-            <t-input v-model="socketDraft" :placeholder="t('server_socket_placeholder')" clearable />
-            <div class="cp-login__fieldHint">
-              <MonoTag :value="currentServerSocket || '—'" :title="t('current_server_socket')" :copyable="true" />
-              <button class="cp-login__miniBtn" type="button" @click="handleConnect">{{ t("login_connect") }}</button>
-            </div>
-          </div>
-
-          <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">{{ t("login_field_connection") }}</div>
-            <ConnectionPill
-              :state="connectionPillState"
-              :label="t('conn_server_link')"
-              :detail="connectionDetail"
-              :action-label="connectionPhase === 'failed' ? t('conn_retry') : ''"
-              @action="retryLast"
-            />
-          </div>
-
-          <div class="cp-login__field">
-            <div class="cp-login__fieldLabel">{{ t("server_id_label") }}</div>
-            <div class="cp-login__fieldHint">
-              <MonoTag :value="serverInfo?.serverId || '—'" :title="t('server_id_label')" :copyable="true" />
-            </div>
-            <div class="cp-login__transportHint">
-              {{ t("login_server_id_hint") }}
-            </div>
+      <header class="cp-login__console">
+        <div class="cp-login__brand">
+          <div class="cp-login__brandMark" aria-hidden="true"></div>
+          <div class="cp-login__brandText">
+            <div class="cp-login__brandName">CarryPigeon</div>
+            <div class="cp-login__brandSub">{{ t("app_tagline") }}</div>
           </div>
         </div>
+        <div class="cp-login__consoleRight">
+          <div class="cp-login__stage">
+            <span class="cp-login__stageItem" :data-active="stage === 'Handshake'">{{ t("stage_handshake") }}</span>
+            <span class="cp-login__stageSep">→</span>
+            <span class="cp-login__stageItem" :data-active="stage === 'Auth'">{{ t("stage_auth") }}</span>
+          </div>
+          <div class="cp-login__kbdHint">{{ t("hotkey_hint") }}</div>
+        </div>
+      </header>
 
-        <div class="cp-login__leftFoot">
-          <div class="cp-login__monoBlock">
+      <div class="cp-login__cols">
+        <section class="cp-login__left">
+          <div class="cp-login__label">{{ t("rack_overview") }}</div>
+
+          <div class="cp-login__rackCard">
+            <div class="cp-login__field">
+              <div class="cp-login__fieldLabel">{{ t("server_socket") }}</div>
+              <t-input v-model="socketDraft" :placeholder="t('server_socket_placeholder')" clearable />
+              <div class="cp-login__fieldHint">
+                <MonoTag :value="currentServerSocket || '—'" :title="t('current_server_socket')" :copyable="true" />
+                <button class="cp-login__miniBtn" type="button" @click="handleConnect">{{ t("login_connect") }}</button>
+              </div>
+            </div>
+
+            <div class="cp-login__field">
+              <div class="cp-login__fieldLabel">{{ t("login_field_connection") }}</div>
+              <ConnectionPill
+                :state="connectionPillState"
+                :label="t('conn_server_link')"
+                :detail="connectionDetail"
+                :action-label="connectionPhase === 'failed' ? t('conn_retry') : ''"
+                @action="retryLast"
+              />
+            </div>
+
+            <div class="cp-login__field">
+              <div class="cp-login__fieldLabel">{{ t("server_id_label") }}</div>
+              <div class="cp-login__fieldHint">
+                <MonoTag :value="serverInfo?.serverId || '—'" :title="t('server_id_label')" :copyable="true" />
+              </div>
+              <div class="cp-login__transportHint">
+                {{ t("login_server_id_hint") }}
+              </div>
+            </div>
+          </div>
+
+          <div class="cp-login__tipCard">
             <div class="cp-login__monoTitle">{{ t("tip_title") }}</div>
             <div class="cp-login__monoText">
               {{ t("login_tip_power_latch") }}
             </div>
           </div>
-          <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">{{ t("login_open_server_manager") }}</button>
-          <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
-        </div>
-      </section>
 
-      <section class="cp-login__right">
-        <div class="cp-login__panel">
-          <div class="cp-login__panelTitle">{{ t("register_create_account") }}</div>
-          <div class="cp-login__panelSub">{{ t("register_create_account_desc") }}</div>
-
-          <div class="cp-login__methodTabs" role="tablist">
-            <button
-              class="cp-login__methodTab"
-              type="button"
-              role="tab"
-              :aria-selected="authMethod === 'password'"
-              :data-active="authMethod === 'password'"
-              @click="switchAuthMethod('password')"
-            >
-              {{ t("login_method_password") }}
-            </button>
-            <button
-              class="cp-login__methodTab"
-              type="button"
-              role="tab"
-              :aria-selected="authMethod === 'email'"
-              :data-active="authMethod === 'email'"
-              @click="switchAuthMethod('email')"
-            >
-              {{ t("login_method_email") }}
-            </button>
+          <div class="cp-login__leftFoot">
+            <button class="cp-login__ghost" type="button" @click="$router.push('/servers')">{{ t("login_open_server_manager") }}</button>
+            <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
           </div>
+        </section>
 
-          <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
-            {{ authMethod === "email" ? emailBanner : passwordBanner }}
-          </div>
+        <section class="cp-login__right">
+          <div class="cp-login__panel">
+            <div class="cp-login__panelTitle">{{ t("register_create_account") }}</div>
+            <div class="cp-login__panelSub">{{ t("register_create_account_desc") }}</div>
 
-          <div v-if="authMethod === 'password'" class="cp-login__form">
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_field_username") }}</div>
-              <t-input v-model="username" :placeholder="t('login_username_placeholder')" clearable />
-            </div>
-
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_field_password") }}</div>
-              <t-input v-model="password" type="password" :placeholder="t('login_password_placeholder')" clearable />
-            </div>
-
-            <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn" @click="handlePasswordAuth">
-              {{ passwordLoggingIn ? t("register_creating") : t("register_create_account") }}
-            </button>
-
-            <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
-              <span style="font-size: 12px; color: var(--cp-text-muted);">{{ t("register_already_have") }}</span>
-              <button class="cp-login__ghost" type="button" @click="$router.push('/login')" style="margin-top: 6px;">
-                {{ t("register_sign_in") }}
+            <div class="cp-login__methodTabs" role="tablist">
+              <button
+                class="cp-login__methodTab"
+                type="button"
+                role="tab"
+                :aria-selected="authMethod === 'password'"
+                :data-active="authMethod === 'password'"
+                @click="switchAuthMethod('password')"
+              >
+                {{ t("login_method_password") }}
+              </button>
+              <button
+                class="cp-login__methodTab"
+                type="button"
+                role="tab"
+                :aria-selected="authMethod === 'email'"
+                :data-active="authMethod === 'email'"
+                @click="switchAuthMethod('email')"
+              >
+                {{ t("login_method_email") }}
               </button>
             </div>
 
-            <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
-          </div>
-
-          <div v-else class="cp-login__form">
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
-              <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
+            <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
+              {{ authMethod === "email" ? emailBanner : passwordBanner }}
             </div>
 
-            <div class="cp-login__formRow">
-              <div class="cp-login__fieldLabel">{{ t("login_code") }}</div>
-              <div class="cp-login__codeRow">
-                <t-input v-model="code" :placeholder="t('login_code_placeholder')" clearable />
-                <button
-                  class="cp-login__sendBtn"
-                  type="button"
-                  :disabled="sending || countdown > 0"
-                  @click="handleSendCode"
-                >
-                  {{ countdown > 0 ? t("resend_in", { n: countdown }) : sending ? t("sending") : t("send_code") }}
+            <div v-if="authMethod === 'password'" class="cp-login__form">
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_field_username") }}</div>
+                <t-input v-model="username" :placeholder="t('login_username_placeholder')" clearable />
+              </div>
+
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_field_password") }}</div>
+                <t-input v-model="password" type="password" :placeholder="t('login_password_placeholder')" clearable />
+              </div>
+
+              <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn" @click="handlePasswordAuth">
+                {{ passwordLoggingIn ? t("register_creating") : t("register_create_account") }}
+              </button>
+
+              <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
+                <span style="font-size: 12px; color: var(--cp-text-muted);">{{ t("register_already_have") }}</span>
+                <button class="cp-login__ghost" type="button" @click="$router.push('/login')" style="margin-top: 6px;">
+                  {{ t("register_sign_in") }}
                 </button>
               </div>
+
+              <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
             </div>
 
-            <button class="cp-login__primary" type="button" :disabled="emailLoggingIn" @click="handleLogin">
-              {{ emailLoggingIn ? t("register_creating") : t("register_create_account") }}
-            </button>
+            <div v-else class="cp-login__form">
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
+                <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
+              </div>
 
-            <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
-              <span style="font-size: 12px; color: var(--cp-text-muted);">{{ t("register_already_have") }}</span>
-              <button class="cp-login__ghost" type="button" @click="$router.push('/login')" style="margin-top: 6px;">
-                {{ t("register_sign_in") }}
+              <div class="cp-login__formRow">
+                <div class="cp-login__fieldLabel">{{ t("login_code") }}</div>
+                <div class="cp-login__codeRow">
+                  <t-input v-model="code" :placeholder="t('login_code_placeholder')" clearable />
+                  <button
+                    class="cp-login__sendBtn"
+                    type="button"
+                    :disabled="sending || countdown > 0"
+                    @click="handleSendCode"
+                  >
+                    {{ countdown > 0 ? t("resend_in", { n: countdown }) : sending ? t("sending") : t("send_code") }}
+                  </button>
+                </div>
+              </div>
+
+              <button class="cp-login__primary" type="button" :disabled="emailLoggingIn" @click="handleLogin">
+                {{ emailLoggingIn ? t("register_creating") : t("register_create_account") }}
               </button>
-            </div>
 
-            <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
+              <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
+                <span style="font-size: 12px; color: var(--cp-text-muted);">{{ t("register_already_have") }}</span>
+                <button class="cp-login__ghost" type="button" @click="$router.push('/login')" style="margin-top: 6px;">
+                  {{ t("register_sign_in") }}
+                </button>
+              </div>
+
+              <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </ErrorBoundary>
   </main>
 </template>
 
 <style scoped lang="scss">
 /* RegisterPage styles — reuses LoginPage CSS via same class names */
-/* 样式：RegisterPage｜规格：左右两栏一级玻璃面板 + 内嵌卡片 */
+/* 样式：RegisterPage｜规格：无缝工作台——整页一张共享玻璃面（cp-workspace），左连接栏 + 右注册栏，栏间 0 间距无分割线 */
 .cp-login {
-  height: 100%;
-  display: grid;
-  grid-template-columns: 1fr minmax(360px, 460px);
-  gap: var(--cp-page-gap);
-  padding: var(--cp-page-pad);
+  @include cp-workspace;
 }
 
-/* 左右两栏各自为一级玻璃面板 */
-.cp-login__left,
-.cp-login__right {
-  @include cp-glass-panel;
-
-  overflow: hidden;
-  min-width: 0;
-}
-
-.cp-login__left {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-}
-
-.cp-login__leftHead {
-  padding: 14px;
-  border-bottom: 1px solid var(--cp-border-light);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+/* 控制台头：品牌 + 阶段指示 + 快捷键提示，紧凑节奏、不画底部分割线 */
+.cp-login__console {
+  @include cp-console;
 }
 
 .cp-login__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .cp-login__brandMark {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   border: 1px solid var(--cp-highlight-border);
   background:
-    radial-gradient(10px 10px at 30% 35%, color-mix(in oklab, var(--cp-accent) 86%, transparent), transparent 60%),
-    radial-gradient(12px 12px at 68% 60%, color-mix(in oklab, var(--cp-accent-2) 84%, transparent), transparent 60%),
+    radial-gradient(9px 9px at 30% 35%, color-mix(in oklab, var(--cp-accent) 86%, transparent), transparent 60%),
+    radial-gradient(11px 11px at 68% 60%, color-mix(in oklab, var(--cp-accent-2) 84%, transparent), transparent 60%),
     color-mix(in oklab, var(--cp-panel-solid) 72%, var(--cp-bg));
   box-shadow: var(--cp-elev-1, var(--cp-shadow-soft));
 }
 
 .cp-login__brandName {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 16px;
-  color: var(--cp-text);
+  @include cp-console-title;
 }
 
 .cp-login__brandSub {
+  @include cp-console-sub;
+
   margin-top: 2px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+}
+
+.cp-login__consoleRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 /* 阶段指示：握手 → 认证；当前阶段用 accent（连接进程） */
@@ -308,17 +293,10 @@ function switchAuthMethod(method: "email" | "password"): void {
   border: 1px solid var(--cp-border);
   background: var(--cp-panel-muted);
   border-radius: 999px;
-  padding: 8px 12px;
-}
-
-.cp-login__stageWrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  padding: 6px 12px;
 }
 
 .cp-login__kbdHint {
-  margin-top: 8px;
   font-size: 11px;
   color: var(--cp-text-muted);
 }
@@ -337,8 +315,29 @@ function switchAuthMethod(method: "email" | "password"): void {
   opacity: 0.55;
 }
 
-.cp-login__rack {
-  padding: 14px;
+/* 无缝双栏：左侧连接信息栏 + 右侧注册表单栏，共享玻璃面、0 间距、无分割线 */
+.cp-login__cols {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+  gap: 0;
+}
+
+.cp-login__left,
+.cp-login__right {
+  @include cp-region;
+}
+
+.cp-login__left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px;
+  overflow: auto;
+}
+
+.cp-login__right {
   overflow: auto;
 }
 
@@ -349,10 +348,19 @@ function switchAuthMethod(method: "email" | "password"): void {
   color: var(--cp-text-muted);
 }
 
+/* 机架概览分组：共享玻璃面上的内嵌卡片，字段间不再画分割线 */
+.cp-login__rackCard {
+  @include cp-card;
+
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .cp-login__field {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--cp-border-light);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Field label：普通字段标签（用户内容不做大写变换） */
@@ -385,28 +393,14 @@ function switchAuthMethod(method: "email" | "password"): void {
   background: color-mix(in oklab, var(--cp-accent) 20%, transparent);
 }
 
-/* 分段控件：使用统一 mixin */
-.cp-login__seg {
-  @include cp-segmented;
-}
-
-.cp-login__segBtn {
-  @include cp-segmented-item;
-}
-
 .cp-login__transportHint {
   margin-top: 8px;
   font-size: 12px;
   color: var(--cp-text-muted);
 }
 
-.cp-login__leftFoot {
-  border-top: 1px solid var(--cp-border-light);
-  padding: 14px;
-}
-
 /* 提示块：内嵌卡片（虚化底） */
-.cp-login__monoBlock {
+.cp-login__tipCard {
   @include cp-card;
 
   border-style: dashed;
@@ -428,32 +422,28 @@ function switchAuthMethod(method: "email" | "password"): void {
   line-height: 1.45;
 }
 
-.cp-login__right {
-  display: grid;
-  place-items: center;
-  padding: 14px;
+.cp-login__leftFoot {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-/* 注册面板：内嵌卡片，不再叠加一层玻璃/阴影 */
+/* 注册面板：右栏内透明居中列（margin auto 居中，溢出时仍可滚动） */
 .cp-login__panel {
-  @include cp-card;
-
   width: min(440px, 100%);
-  padding: 16px;
+  margin: auto;
+  padding: 14px 10px;
 }
 
 .cp-login__panelTitle {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
+  @include cp-section-title;
 }
 
 .cp-login__panelSub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--cp-text-muted);
+  @include cp-console-sub;
+
+  margin-top: 4px;
 }
 
 /* 反馈条：校验提示 / 验证码已发送 */
@@ -518,7 +508,6 @@ function switchAuthMethod(method: "email" | "password"): void {
 }
 
 .cp-login__miniBtn:focus-visible,
-.cp-login__segBtn:focus-visible,
 .cp-login__sendBtn:focus-visible,
 .cp-login__primary:focus-visible,
 .cp-login__ghost:focus-visible {
@@ -527,12 +516,15 @@ function switchAuthMethod(method: "email" | "password"): void {
 }
 
 @media (max-width: 980px) {
-  .cp-login {
-    grid-template-columns: 1fr;
+  .cp-login__cols {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
   }
 
+  .cp-login__left,
   .cp-login__right {
-    place-items: stretch;
+    overflow: visible;
   }
 
   .cp-login__panel {
@@ -542,20 +534,8 @@ function switchAuthMethod(method: "email" | "password"): void {
   }
 }
 
-@media (max-width: 640px) {
-  .cp-login {
-    gap: var(--cp-page-gap);
-    padding: 10px;
-  }
-
-  .cp-login__leftHead {
-    padding: 12px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .cp-login__miniBtn,
-  .cp-login__segBtn,
   .cp-login__sendBtn,
   .cp-login__primary,
   .cp-login__ghost {

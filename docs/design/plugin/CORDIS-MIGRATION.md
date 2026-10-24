@@ -136,8 +136,8 @@ serverCtx = new Context()                 // 每 server 一个独立 root，断�
 │
 ├─ pluginCtx(markdown)   = serverCtx.isolate('storage').isolate('domains')
 ├─ pluginCtx(theme)      = serverCtx.isolate('storage').isolate('domains').isolate('ui')
-├─ pluginCtx(ai-summary) = serverCtx.isolate('storage').isolate('domains').isolate('ai')
-│                                     .isolate('messages').isolate('ui')
+├─ pluginCtx(ai-summary) = serverCtx.isolate('storage').isolate('domains').isolate('network')
+│                                     .isolate('secrets').isolate('messages').isolate('ui')
 └─ pluginCtx(voice-call) = serverCtx.isolate('storage').isolate('domains').isolate('ipc').isolate('ui')
 ```
 
@@ -153,7 +153,7 @@ serverCtx = new Context()                 // 每 server 一个独立 root，断�
 // src/features/plugins/runtime/applyPlugin.ts
 import type { Context, Plugin } from "@cordisjs/core"
 
-const CAPS = ["storage", "domains", "network", "ai", "messages", "ui", "ipc"] as const
+const CAPS = ["storage", "domains", "network", "secrets", "messages", "ui", "ipc"] as const
 
 export function applyPlugin(
   serverCtx: Context,
@@ -175,7 +175,7 @@ export function applyPlugin(
       ctx.set("storage", makeStorageService(serverCtx, runtime))
       ctx.set("domains", makeDomainsService(registry, runtime)) // dispose 时清理该插件注册
       if (perms.has("network"))       ctx.set("network",  makeNetworkService(serverCtx, runtime))
-      if (perms.has("ai"))            ctx.set("ai",       makeAiService(serverCtx, runtime))
+      if (perms.has("secrets"))       ctx.set("secrets",  makeSecretsService(serverCtx, runtime))
       if (perms.has("messages:read")) ctx.set("messages", makeMessagesService(serverCtx, runtime))
       if (perms.has("ui"))            ctx.set("ui",       makeUiService(serverCtx, runtime, chatPluginUiBridge))
       if (perms.has("invoke") || perms.has("events")) {
@@ -218,8 +218,9 @@ export function applyPlugin(
 | （永远） | `storage` | `pluginsStorageGet` / `pluginsStorageSet`（按 serverId + pluginId 隔离） |
 | （永远） | `domains` | 写入共享 `DomainsRegistry`，dispose 时清空 |
 | `ui` | `ui` | `chatPluginUiBridge`（overlay / toolbar）+ 共享 `PluginSettingsRegistry`（`registerSettingsItem`，设置页「插件设置」分区） |
-| `network` | `network` | `pluginsNetworkFetch`（Rust 侧同源强制） |
-| `ai` | `ai` | `getAiCapabilities()`（密钥宿主代持） |
+| `network` | `network` | `pluginsNetworkFetch`（Rust 侧默认同源强制） |
+| `network:external` | （放宽 `network.fetch` 的跨源边界） | Rust 侧按已安装 manifest 校验；外源走系统证书校验 + 禁重定向 |
+| `secrets` | `secrets` | `pluginsSecretSet/Status/Clear`（keyring 三段命名空间，只写不读；`@secret()` 头引用解析） |
 | `messages:read` | `messages.readCurrentChannel` / `messages.loadMoreHistory` | `chatPluginMessagesBridge` |
 | `messages:send` | `messages.send` | `hostBridge.sendMessage` |
 | `invoke` | `ipc.invoke` | 前缀白名单 = manifest `ipcPrefixes` |
@@ -285,7 +286,7 @@ ctx.domains.contract({ domain, domainVersion, payloadSchema, constraints })
 | `ctx.host.mountOverlay` | `ctx.ui.mountOverlay` |
 | `ctx.host.registerToolbarAction` | `ctx.ui.registerToolbarAction`（自动随 fiber 解绑） |
 | `ctx.host.network.fetch` | `ctx.network.fetch` |
-| `ctx.host.ai.*` | `ctx.ai.*` |
+| `ctx.host.secrets.*` | `ctx.secrets.*` |
 | `ctx.host.messages.*` | `ctx.messages.*` |
 | `ctx.host.invoke` / `onEvent` | `ctx.ipc.invoke` / `ctx.ipc.onEvent` |
 | `ctx.onDispose(cb)` | `ctx.effect(() => cb)` / `ctx.on("dispose", cb)` |
@@ -378,7 +379,7 @@ runtime/
 | markdown | `["domains"]` | — | 注册式改造，`activate/deactivate` 全删 | ★ |
 | theme | `["ui"]` | — | **保留直读 `carrypigeon:theme`**；`matchMedia` 监听改 `ctx.effect` | ★★ |
 | group-notice | `["ui","network"]` | — | 删除 `bindContext`，ctx 由 `apply` 闭包持有 | ★★ |
-| ai-summary | `["ui","ai","messages"]` | — | 删除 `host/bridge.ts` | ★★ |
+| ai-summary | `["ui","network","secrets","messages"]` | `network:external` / `secrets` 权限 | 删除 `host/bridge.ts`；AI provider 配置自管（`ctx.storage` + `ctx.secrets`，经 `ctx.network.fetch` 直连） | ★★ |
 | voice-call | `["ui","ipc","storage","domains"]` | `ipcPrefixes: ["voice_call:"]` | 事件改 `ctx.on`；`renderer` 注册；`onEvent/invoke` → `ctx.ipc` | ★★★★ |
 
 统一改造模式：删除各插件中的

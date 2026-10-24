@@ -495,11 +495,13 @@ watch(showLogoutConfirm, (visible) => {
 </template>
 
 <style scoped lang="scss">
-/* 样式：服务器管理页｜布局：PageHeader + 一级玻璃面板（新增/维护/列表）｜约束：列表内滚动、rack 行为分组行 */
+/* 样式：服务器管理页｜布局：工作台骨架 + PageHeader + 表单卡/透明列表区｜约束：桌面列表内滚动、窄屏整页滚动 */
 
-/* 页面骨架：14px 留白 + 12px 节奏 */
+/* 页面骨架：8px 留白 + 单张玻璃面 */
 .cp-servers {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
 /* PageHeader 右侧 active socket 区 */
@@ -515,22 +517,23 @@ watch(showLogoutConfirm, (visible) => {
   @include cp-section-label;
 }
 
-/* 三块一级玻璃面板 */
+/* 新增/维护模块：共享玻璃面上的内容卡 */
 .cp-servers__create,
-.cp-servers__maintenance,
-.cp-servers__listWrap {
-  @include cp-glass-panel;
+.cp-servers__maintenance {
+  @include cp-card;
 
-  padding: 14px;
+  padding: 12px;
 }
 
-/* 列表面板：头部固定，行列表内部滚动 */
+/* 列表区域：共享玻璃面上的透明区域，头部固定、行列表内部滚动 */
 .cp-servers__listWrap {
+  @include cp-region;
+
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   overflow: hidden;
 }
 
@@ -630,14 +633,13 @@ watch(showLogoutConfirm, (visible) => {
   @include cp-pill-button(danger);
 }
 
-/* 列表面板头部：微标签 + 计数 */
+/* 列表面板头部：微标签 + 计数（工作台内不画分隔线） */
 .cp-servers__listHead {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 4px 2px 0;
 }
 
 .cp-servers__listTitle {
@@ -662,7 +664,7 @@ watch(showLogoutConfirm, (visible) => {
   font-variant-numeric: tabular-nums;
 }
 
-/* 分组容器：一张内嵌卡承载所有 rack 行，行间 1px 细分隔线 */
+/* 分组容器：一张内容卡承载所有 rack 行，行间不画分隔线 */
 .cp-servers__list {
   @include cp-card;
 
@@ -671,21 +673,17 @@ watch(showLogoutConfirm, (visible) => {
   overflow: auto;
   display: flex;
   flex-direction: column;
+  gap: 1px;
 }
 
-/* rack 行：分组行（无独立圆角/阴影），hover 只变底色 */
+/* rack 行：紧凑行（无独立圆角/阴影），hover 只变底色 */
 .cp-rackRow {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 12px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--cp-border-light);
+  padding: 8px 10px;
   transition: background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-rackRow:first-child {
-  border-top: 0;
 }
 
 .cp-rackRow:hover {
@@ -883,6 +881,15 @@ watch(showLogoutConfirm, (visible) => {
 }
 
 @media (max-width: 900px) {
+  .cp-servers {
+    overflow: auto;
+  }
+
+  .cp-servers__listWrap {
+    flex: 0 0 auto;
+    min-height: 320px;
+  }
+
   .cp-servers__field.wide {
     grid-column: auto;
   }
@@ -896,11 +903,11 @@ watch(showLogoutConfirm, (visible) => {
   }
 }
 
-/* 响应式：≤640px 压缩页面留白 */
+/* 响应式：≤640px 只压缩内容内边距，页面留白保持 8px */
 @media (max-width: 640px) {
-  .cp-servers {
+  .cp-servers__create,
+  .cp-servers__maintenance {
     padding: 10px;
-    gap: 10px;
   }
 }
 </style>

@@ -163,20 +163,21 @@ const {
 </template>
 
 <style scoped lang="scss">
-/* 样式：RequiredSetupPage｜规格：页面骨架（banner + body + footer 三段玻璃面板） */
+/* 样式：RequiredSetupPage｜规格：工作台骨架（banner + body + footer 共享一张玻璃面） */
 /* Page wrapper (banner + body + footer) */
 .cp-required {
-  @include cp-page;
+  @include cp-workspace;
 
   display: grid;
   grid-template-rows: auto 1fr auto;
+  overflow: hidden;
 }
 
-/* Banner (power latch status)：一级玻璃面板 */
+/* Banner (power latch status)：顶部状态卡 */
 .cp-required__banner {
-  @include cp-glass-panel;
+  @include cp-card;
 
-  padding: 14px;
+  padding: 12px;
   transition:
     border-color var(--cp-fast) var(--cp-ease),
     background-color var(--cp-fast) var(--cp-ease),
@@ -254,9 +255,9 @@ const {
   flex-wrap: wrap;
 }
 
-/* Body panel (required list container)：一级玻璃面板 */
+/* Body panel (required list container)：透明内容区域 */
 .cp-required__body {
-  @include cp-glass-panel;
+  @include cp-region;
 
   overflow: hidden;
   display: flex;
@@ -266,8 +267,7 @@ const {
 
 /* Body header */
 .cp-required__bodyHead {
-  padding: 14px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 8px 10px 4px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -276,11 +276,7 @@ const {
 
 /* Body title */
 .cp-required__bodyTitle {
-  font-family: var(--cp-font-display);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  font-size: 18px;
-  color: var(--cp-text);
+  @include cp-section-title;
 }
 
 /* Body meta row */
@@ -318,11 +314,11 @@ const {
 
 /* Required items grid */
 .cp-required__list {
-  padding: 14px;
+  padding: 10px;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--cp-page-gap);
+  gap: 10px;
   min-height: 0;
 }
 
@@ -330,7 +326,7 @@ const {
 .cp-required__item {
   @include cp-card;
 
-  padding: 14px;
+  padding: 12px;
 }
 
 /* Required item ok variant */
@@ -420,11 +416,11 @@ const {
   background: color-mix(in oklab, var(--cp-accent) 20%, transparent);
 }
 
-/* Footer actions row：一级玻璃面板 */
+/* Footer actions row：共享玻璃面上的透明操作区 */
 .cp-required__footer {
-  @include cp-glass-panel;
+  @include cp-region;
 
-  padding: 14px;
+  padding: 8px 10px;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;

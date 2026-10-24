@@ -5,7 +5,8 @@
  * 说明：jsdom 无布局引擎，无法断言真实渲染结果，因此沿用 patchbayNarrowLayout.test.ts 的做法，
  * 以「样式源码 / 页面源码中的声明」为契约，经 Vite 的 `?raw` 导入读取文本。只钉住本次重构的
  * 结构性视觉决策：
- * 1) `.cp-main` 的 8px 页面留白 + 无列间距 + 透明背景，玻璃表面由 `.cp-main::before` 统一承载；
+ * 1) 聊天主窗口复用 `cp-workspace`：8px 页面留白 + 无列间距 + 透明背景，玻璃表面由 mixin 的
+ *    `::before` 统一承载，供全应用页面共享同一配方；
  * 2) rail/center 不再各自套 `cp-glass-panel`，全部透明地铺在同一张表面上（无描边/圆角/投影）；
  * 3) resizer 8px 宽、左右 -4px 负 margin，净占 0 宽叠在交界处，静态无引导线，仅悬停/拖拽时显示高亮线；
  * 4) 栏头/栏脚/搜索区/顶栏/工具条/行列表不画分割线，行列表 padding 4/6、gap 1；
@@ -16,6 +17,8 @@
 
 import { describe, expect, it } from "vitest";
 import patchbayScss from "./patchbay.scss?raw";
+import uiScss from "@/styles/_ui.scss?raw";
+import appSource from "@/App.vue?raw";
 import mainPageSource from "../page/MainPage.vue?raw";
 import channelRailSource from "../components/layout/ChannelRail.vue?raw";
 import serverRailSource from "../components/layout/ServerRail.vue?raw";
@@ -71,27 +74,29 @@ function sharedRuleBody(source: string, selectorList: string): string {
 }
 
 describe("聊天主窗口无缝紧凑布局契约", () => {
-  it(".cp-main 使用 8px 页面留白 + 无列间距，四栏共享一张玻璃表面", () => {
-    const bodies = ruleBodies(patchbayScss, ".cp-main");
-    expect(bodies.length).toBeGreaterThan(0);
-    const body = bodies[0] ?? "";
-    expect(declares(body, "padding: 8px")).toBe(true);
-    // 旧版 4px 列间距会把四栏切成拼接卡片，本次改为一张无缝共享表面
-    expect(declares(body, "gap: 0")).toBe(true);
-    expect(declares(body, "gap: 4px")).toBe(false);
-    expect(declares(body, "background: transparent")).toBe(true);
-    // isolation：把负层级伪元素锁在 .cp-main 的层叠上下文内
-    expect(declares(body, "isolation: isolate")).toBe(true);
+  it("聊天主窗口复用 cp-workspace：8px 留白 + 无列间距 + 单张玻璃面", () => {
+    const body = ruleBodies(patchbayScss, ".cp-main")[0] ?? "";
+    expect(body).toContain("@include cp-workspace;");
+    expect(declares(body, "flex-direction: row")).toBe(true);
+    // 配方已收敛到 mixin，页面选择器不再重复声明留白/玻璃面
+    expect(declares(body, "padding: 8px")).toBe(false);
+    expect(patchbayScss).not.toContain(".cp-main::before");
 
-    const surface = ruleBodies(patchbayScss, ".cp-main::before")[0] ?? "";
-    expect(surface).not.toBe("");
-    expect(surface).toContain("z-index: -1");
-    expect(declares(surface, "inset: 8px")).toBe(true);
-    expect(declares(surface, "border-radius: var(--cp-radius-lg)")).toBe(true);
-    expect(declares(surface, "background: var(--cp-surface)")).toBe(true);
-    expect(declares(surface, "backdrop-filter: var(--cp-glass-blur)")).toBe(true);
-    expect(declares(surface, "box-shadow: var(--cp-shadow-soft)")).toBe(true);
-    expect(declares(surface, "pointer-events: none")).toBe(true);
+    // 单一真源：留白 token 在 App.vue，玻璃面配方在 _ui.scss 的 cp-workspace
+    expect(appSource).toMatch(/--cp-workspace-pad:\s*8px;/);
+    expect(uiScss).toContain("@mixin cp-workspace");
+    expect(uiScss).toMatch(/padding:\s*\$pad;/);
+    expect(uiScss).toMatch(/position:\s*fixed;/);
+    expect(uiScss).toMatch(/inset:\s*\$pad;/);
+    expect(uiScss).toMatch(/gap:\s*0;/);
+    expect(uiScss).toMatch(/isolation:\s*isolate;/);
+    expect(uiScss).toMatch(/background:\s*transparent;/);
+    expect(uiScss).toMatch(/z-index:\s*-1;/);
+    expect(uiScss).toMatch(/border-radius:\s*var\(--cp-radius-lg\);/);
+    expect(uiScss).toMatch(/background:\s*var\(--cp-surface\);/);
+    expect(uiScss).toMatch(/backdrop-filter:\s*var\(--cp-glass-blur\);/);
+    expect(uiScss).toMatch(/box-shadow:\s*var\(--cp-shadow-soft\);/);
+    expect(uiScss).toMatch(/pointer-events:\s*none;/);
   });
 
   it("rail 与 center 不再各自成为玻璃面板，透明铺在共享表面上", () => {

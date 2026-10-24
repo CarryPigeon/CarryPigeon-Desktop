@@ -10,7 +10,7 @@ import type { PluginLifecycleCommandPort } from "@/features/plugins/domain/ports
 import type { PluginInstallQueryPort } from "@/features/plugins/domain/ports/PluginInstallQueryPort";
 import { createPluginOperationError } from "@/features/plugins/domain/errors/PluginOperationError";
 import type { InstalledPluginState, PluginProgressHandler } from "@/features/plugins/domain/types/pluginTypes";
-import { DEFAULT_ENABLED_PLUGIN_IDS } from "@/features/plugins/data/localPluginSource";
+import { DEFAULT_ENABLED_PLUGIN_IDS, alignInstalledStateWithLocalSource } from "@/features/plugins/data/localPluginSource";
 
 /**
  * 将持久化的 mock 状态转换为领域层的 installed state 结构。
@@ -43,11 +43,18 @@ function emitProgress(onProgress: PluginProgressHandler | undefined, payload: Pa
 
 /**
  * 查询已安装插件列表。
+ *
+ * 说明：本地源插件的版本经 `alignInstalledStateWithLocalSource` 以本地源注册表
+ * 为准对齐——mock 状态在 localStorage 中持久化，插件升级（如 ai-summary
+ * 0.1.0 → 0.2.0）后旧记录不会自动刷新，若不对齐，运行时协调器会因
+ * 「已加载版本 ≠ 安装记录版本」在每次 ensureLoaded 时反复重挂插件。
  */
 async function listInstalled(serverSocket: string): Promise<InstalledPluginState[]> {
   ensureDefaultEnabledMockPlugins(serverSocket, DEFAULT_ENABLED_PLUGIN_IDS);
   const raw = getMockPluginsState(serverSocket);
-  return Object.keys(raw).map((id) => stateToInstalled(id, raw[id]));
+  return Object.keys(raw)
+    .map((id) => stateToInstalled(id, raw[id]))
+    .map(alignInstalledStateWithLocalSource);
 }
 
 /**
@@ -57,7 +64,7 @@ async function getInstalledState(serverSocket: string, pluginId: string): Promis
   ensureDefaultEnabledMockPlugins(serverSocket, DEFAULT_ENABLED_PLUGIN_IDS);
   const raw = getMockPluginsState(serverSocket);
   if (!raw[pluginId]) return null;
-  return stateToInstalled(pluginId, raw[pluginId]);
+  return alignInstalledStateWithLocalSource(stateToInstalled(pluginId, raw[pluginId]));
 }
 
 async function install(

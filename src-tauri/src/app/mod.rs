@@ -443,12 +443,9 @@ pub fn run() -> anyhow::Result<()> {
             crate::features::plugins::di::commands::plugins_storage_get,
             crate::features::plugins::di::commands::plugins_storage_set,
             crate::features::plugins::di::commands::plugins_network_fetch,
-            // ai（客户端可替换 AI provider：密钥保管 + OpenAI 兼容调用）
-            crate::features::ai::di::commands::ai_secret_set,
-            crate::features::ai::di::commands::ai_secret_status,
-            crate::features::ai::di::commands::ai_secret_clear,
-            crate::features::ai::di::commands::ai_chat_completion,
-            crate::features::ai::di::commands::ai_list_models,
+            crate::features::plugins::di::commands::plugins_secret_set,
+            crate::features::plugins::di::commands::plugins_secret_status,
+            crate::features::plugins::di::commands::plugins_secret_clear,
             // voice_message
             crate::features::voice_message::di::commands::start_voice_recording,
             crate::features::voice_message::di::commands::stop_voice_recording,

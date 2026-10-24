@@ -66,8 +66,9 @@ export type MessageSender = {
  * 被转发源消息快照（合并转发的条目 / 单条转发的来源）。
  *
  * 说明：
- * - 服务端快照仅携带 userId，不含昵称；
- * - `authorName` 为展示投影字段，由视图层解析填充；缺失时 UI 回退显示 userId。
+ * - 服务端快照仅携带 userId / channelId，不含昵称与频道名；
+ * - `authorName` / `channelName` 为展示投影字段，由视图层解析填充；
+ *   缺失时 UI 回退显示 userId / channelId。
  */
 export type ForwardedMessageEntry = {
   messageId: string;
@@ -77,6 +78,8 @@ export type ForwardedMessageEntry = {
   sentTime: number;
   /** 展示投影字段：作者昵称；由视图层解析，缺失时回退 userId。 */
   authorName?: string;
+  /** 展示投影字段：来源频道名；由视图层解析，缺失时回退 channelId。 */
+  channelName?: string;
 };
 
 /**

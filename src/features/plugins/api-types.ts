@@ -6,7 +6,7 @@
 
 import type { Component } from "vue";
 import type { DomainBinding, DomainRegistryHostBridge } from "./contracts/domainRegistry";
-import type { PluginAiApi, PluginAiFailureCode, PluginAiSummarizeResult, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle, PluginSettingsContribution, PluginSettingsItemInput } from "./domain/types/pluginRuntimeTypes";
+import type { PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle, PluginSecretsApi, PluginSecretStatus, PluginSettingsContribution, PluginSettingsItemInput } from "./domain/types/pluginRuntimeTypes";
 import type {
   InstalledPluginState,
   PluginCatalogEntryLike,
@@ -22,7 +22,7 @@ import type {
   UpdatePluginToLatestOutcome,
 } from "./application/pluginCommandOutcome";
 
-export type { DomainRegistryHostBridge, PluginAiApi, PluginAiFailureCode, PluginAiSummarizeResult, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle, PluginSettingsContribution, PluginSettingsItemInput };
+export type { DomainRegistryHostBridge, PluginChannelHistoryLoadResult, PluginChannelMessage, PluginChatContext, PluginComposerPayload, PluginContext, PluginCurrentChannelMessagesSnapshot, PluginMessagesApi, PluginOverlayMountHandle, PluginSecretsApi, PluginSecretStatus, PluginSettingsContribution, PluginSettingsItemInput };
 
 /**
  * 宿主 chat UI 桥（Task 4 实现 mountOverlay / registerToolbarAction）。

@@ -87,6 +87,9 @@ error.plugins_clear_error_failed: "插件错误清除失败"
 error.plugins_storage_get_failed: "插件存储读取失败"
 error.plugins_storage_set_failed: "插件存储写入失败"
 error.plugins_network_fetch_failed: "插件网络请求失败"
+error.plugins_secret_set_failed: "插件密钥保存失败"
+error.plugins_secret_status_failed: "插件密钥状态查询失败"
+error.plugins_secret_clear_failed: "插件密钥清除失败"
 
 # settings
 error.settings_get_config_failed: "配置读取失败"
@@ -156,12 +159,3 @@ error.network_tcp_scope_mock_rejection: "mock:// 套接字仅在调试构建中�
 error.network_tcp_scope_unsupported_scheme: "不支持的传输协议"
 error.network_tcp_service_not_found: "TCP服务未找到"
 
-# ai provider
-error.ai_secret_store_unavailable: "安全存储不可用，无法保存 AI 密钥"
-error.ai_secret_set_failed: "AI 密钥保存失败"
-error.ai_secret_clear_failed: "AI 密钥清除失败"
-error.ai_invalid_provider_id: "AI 服务商标识无效"
-error.ai_invalid_base_url: "AI 服务地址无效"
-error.ai_invalid_request: "AI 请求参数无效"
-error.ai_request_failed: "AI 请求失败"
-error.ai_models_request_failed: "AI 模型列表请求失败"

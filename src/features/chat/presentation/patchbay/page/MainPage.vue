@@ -298,7 +298,6 @@ onBeforeUnmount(() => {
         :register-signal-pane="page.chatViewport.setSignalPaneRef"
         :on-open-channel-settings-menu="page.chatViewport.openChannelSettingsMenu"
         :on-message-context-menu="page.chatViewport.handleMessageContextMenu"
-        :on-more-click="page.chatViewport.handleMoreClick"
         :on-reference-context-menu="page.chatViewport.handleReferenceContextMenu"
         :on-jump-reference="page.chatViewport.handleJumpReference"
         :on-install-hint="page.chatViewport.handleInstallHint"

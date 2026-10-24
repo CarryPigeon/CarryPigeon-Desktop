@@ -100,7 +100,7 @@ function clearSearch(): void {
       </button>
     </div>
 
-    <!-- 区块：状态筛选｜用途：分段控件（与设置页分段同规格） -->
+    <!-- 区块：状态筛选｜用途：分段控件（与工作台分段同规格） -->
     <div class="cp-plugins__group">
       <div class="cp-plugins__label">{{ t("plugin_filter") }}</div>
       <div class="cp-seg" role="group" :aria-label="t('plugin_filter')">
@@ -171,14 +171,14 @@ function clearSearch(): void {
 </template>
 
 <style scoped lang="scss">
-/* 样式：插件中心筛选栏｜规格：一级玻璃 rail（搜索字段 / 微标签 / 分段控件 / 分组卡） */
+/* 样式：插件中心筛选栏｜规格：共享玻璃面上的透明栏位（搜索字段 / 微标签 / 分段控件 / 分组卡） */
 .cp-plugins__filters {
-  @include cp-glass-panel;
+  @include cp-region;
 
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 8px;
   overflow: auto;
   min-height: 0;
 }
@@ -191,7 +191,8 @@ function clearSearch(): void {
 .cp-plugins__filtersTitle {
   @include cp-section-title;
 
-  font-size: 16px;
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -202,7 +203,7 @@ function clearSearch(): void {
   color: var(--cp-text-muted);
 }
 
-/* 搜索字段：与设置页 rail 搜索同规格 */
+/* 搜索字段：与工作台 rail 搜索同规格 */
 .cp-plugins__search {
   display: flex;
   align-items: center;
@@ -273,16 +274,15 @@ function clearSearch(): void {
   background: var(--cp-hover-bg);
 }
 
-/* 分组：微标签 + 内容 */
+/* 分组：微标签 + 内容；工作台内不画分隔线，用上间距分组 */
 .cp-plugins__group {
-  padding-top: 12px;
-  border-top: 1px solid var(--cp-border-light);
+  padding-top: 8px;
 }
 
 .cp-plugins__label {
   @include cp-section-label;
 
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 /* 分段控件：容器/选项成对使用；rail 内允许换行 */

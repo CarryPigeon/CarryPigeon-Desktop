@@ -152,36 +152,30 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-/* 样式：Domain Catalog 页｜布局：PageHeader 风格头部 + 玻璃控制条 + 玻璃列表 + 内嵌分组卡 */
+/* 样式：Domain Catalog 页｜布局：工作台骨架 + 紧凑控制台头部 + 透明控制条/列表 + 内嵌分组卡 */
 .cp-domains {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
-/* 头部：一级玻璃面板 */
+/* 头部：工作台控制台（无独立玻璃面） */
 .cp-domains__head {
-  @include cp-glass-panel;
+  @include cp-console;
 
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: var(--cp-page-pad);
+  padding: 8px 10px;
 }
 
 .cp-domains__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  font-size: 18px;
-  line-height: 1.2;
-  letter-spacing: 0.06em;
-  color: var(--cp-text);
+  @include cp-console-title;
 }
 
 .cp-domains__sub {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--cp-text-muted);
+  @include cp-console-sub;
 }
 
 .cp-domains__meta {
@@ -192,15 +186,15 @@ onMounted(() => {
   min-width: 0;
 }
 
-/* 控制条：搜索字段 + 操作胶囊 */
+/* 控制条：共享玻璃面上的透明工具区 */
 .cp-domains__controls {
-  @include cp-glass-panel;
+  @include cp-region;
 
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 8px 10px;
 }
 
 .cp-domains__field {
@@ -248,17 +242,17 @@ onMounted(() => {
   color: var(--cp-text);
 }
 
-/* 列表面板：一级玻璃 + 内部滚动 */
+/* 列表区域：共享玻璃面上的透明滚动区 */
 .cp-domains__list {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px;
 }
 
 /* domain 卡片：内嵌分组卡（无阴影） */
@@ -379,9 +373,12 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
-  .cp-domains {
-    padding: 10px;
-    gap: 10px;
+  .cp-domains__controls {
+    padding: 6px 8px;
+  }
+
+  .cp-domains__list {
+    padding: 8px;
   }
 }
 </style>

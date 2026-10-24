@@ -6,7 +6,6 @@
 
 import { useI18n } from "vue-i18n";
 import AvatarBadge from "@/shared/ui/AvatarBadge.vue";
-import PanelGroup from "@/shared/ui/panel/PanelGroup.vue";
 import GovernancePageShell from "@/features/chat/room-governance/presentation/components/GovernancePageShell.vue";
 import { UserProfilePopover } from "@/features/account/components";
 import { useChannelMembersPage } from "@/features/chat/room-governance/presentation/page-models/useChannelMembersPage";
@@ -43,53 +42,47 @@ const {
     >
       <template #loading>{{ t("loading") }}</template>
       <template #default>
-        <!-- 分组行容器：行间 1px 分隔线，hover 只变底色 -->
-        <PanelGroup>
-          <div v-for="m in members" :key="m.uid" class="cp-memberCard">
-            <UserProfilePopover
-              :user-id="m.uid"
-              :username="m.nickname"
-              trigger="hover"
-            >
-              <AvatarBadge :name="m.nickname" :size="40" />
-            </UserProfilePopover>
-            <div class="cp-memberCard__info">
-              <div class="cp-memberCard__name">{{ m.nickname }}</div>
-              <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>
-              <div class="cp-memberCard__time">{{ t("joined_at") }}: {{ formatJoinTime(m.joinTime) }}</div>
-            </div>
-            <div class="cp-memberCard__actions">
-              <button v-if="canPromoteMember(m)" class="cp-memberCard__btn" type="button" @click="handleSetAdmin(m.uid)">
-                {{ t("set_admin") }}
-              </button>
-              <button v-if="canDemoteAdmin(m)" class="cp-memberCard__btn" type="button" @click="handleRemoveAdmin(m.uid)">
-                {{ t("remove_admin") }}
-              </button>
-              <button v-if="canKickMember(m)" class="cp-memberCard__btn danger" type="button" @click="handleKick(m.uid)">
-                {{ t("kick_member") }}
-              </button>
-            </div>
+        <!-- 成员行直接落在内容区上，不再叠加分组卡框 -->
+        <div v-for="m in members" :key="m.uid" class="cp-memberCard">
+          <UserProfilePopover
+            :user-id="m.uid"
+            :username="m.nickname"
+            trigger="hover"
+          >
+            <AvatarBadge :name="m.nickname" :size="40" />
+          </UserProfilePopover>
+          <div class="cp-memberCard__info">
+            <div class="cp-memberCard__name">{{ m.nickname }}</div>
+            <div class="cp-memberCard__role" :data-role="m.role">{{ roleLabel(m.role) }}</div>
+            <div class="cp-memberCard__time">{{ t("joined_at") }}: {{ formatJoinTime(m.joinTime) }}</div>
           </div>
-        </PanelGroup>
+          <div class="cp-memberCard__actions">
+            <button v-if="canPromoteMember(m)" class="cp-memberCard__btn" type="button" @click="handleSetAdmin(m.uid)">
+              {{ t("set_admin") }}
+            </button>
+            <button v-if="canDemoteAdmin(m)" class="cp-memberCard__btn" type="button" @click="handleRemoveAdmin(m.uid)">
+              {{ t("remove_admin") }}
+            </button>
+            <button v-if="canKickMember(m)" class="cp-memberCard__btn danger" type="button" @click="handleKick(m.uid)">
+              {{ t("kick_member") }}
+            </button>
+          </div>
+        </div>
       </template>
     </GovernancePageShell>
   </ErrorBoundary>
 </template>
 
 <style scoped lang="scss">
-/* 样式：ChannelMembersPage｜规格：分组行（容器 + 分隔线 + hover）+ 胶囊按钮 */
-/* 成员行：分组容器内的一行；相邻行 1px 细分隔线 */
+/* 样式：ChannelMembersPage｜规格：工作台紧凑分组行（无分隔线 + hover）+ 胶囊按钮 */
+/* 成员行：分组容器内的一行；行间不画分隔线 */
 .cp-memberCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding: 12px 14px;
+  padding: 8px 10px;
   transition: background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-memberCard + .cp-memberCard {
-  border-top: 1px solid var(--cp-border-light);
 }
 
 /* 行 hover 只变底色，不做位移 */

@@ -1,12 +1,13 @@
 {
   "pluginId": "ai-summary",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "entry": "index.js",
   "permissions": [
     "ui",
     "network",
+    "network:external",
+    "secrets",
     "storage",
-    "ai",
     "messages:read"
   ],
   "providesDomains": [

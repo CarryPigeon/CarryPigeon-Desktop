@@ -23,12 +23,16 @@
 
 - `storage` 不需要声明：宿主默认提供按 `server_id` 隔离的存储能力。
 - `network/clipboard/notifications` 等能力需显式声明。
+- `network`：经 `ctx.network.fetch` 访问**当前 server origin**（Rust 侧强制同源）。
+- `network:external`：允许 `ctx.network.fetch` 访问任意外部 http/https 目标
+  （例如 OpenAI 兼容 provider、本地 Ollama）。属高危权限，安装/更新时需用户显式确认；
+  外源请求使用系统证书校验（不继承聊天服务器自签 TLS 策略），重定向一律不跟随。
+- `secrets`：插件密钥保管箱（`ctx.secrets`）。密钥写入系统凭据管理器
+  （按 `server_id + plugin_id + name` 三段隔离），只写不读——插件无法回读明文；
+  网络请求头值中的 `@secret(<name>)` 引用由宿主 Rust 侧解析替换，明文不进入 WebView。
+  属高危权限，安装/更新时需用户显式确认。
 - `invoke` / `events`：分别门控 `ctx.ipc.invoke` / `ctx.ipc.onEvent`；命令与事件均受
   `ipc_prefixes`（清单）+ 宿主可暴露命名空间白名单双重约束。
-- `ai`：使用客户端自配 AI provider（OpenAI 兼容）生成总结。属高危权限，
-  安装/更新时需用户显式确认；密钥由宿主代持，插件只能调用
-  `host.ai.summarize()`，无法读取密钥或传入任意提示词。
-  详见 `docs/design/client/PLUGIN-RUNTIME.md` §5.2。
 - `messages:read`：读取**当前频道**已载入的消息（供 AI 总结等面板型插件使用）。属高危权限，
   安装/更新时需用户显式确认；宿主只提供 `host.messages.readCurrentChannel()` 与
   `host.messages.loadMoreHistory()`，不接受任意 channelId，单次最多 500 条，

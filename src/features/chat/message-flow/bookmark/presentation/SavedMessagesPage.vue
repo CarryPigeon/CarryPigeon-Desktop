@@ -165,19 +165,21 @@ function fmtTime(ms: number): string {
 </template>
 
 <style scoped lang="scss">
-/* 样式：SavedMessagesPage｜规格：cp-page 骨架 + PageHeader + 玻璃列表面板 + 行分隔 */
+/* 样式：SavedMessagesPage｜规格：工作台骨架 + PageHeader + 透明列表区域 + 紧凑行（无分隔线） */
 .cp-savedMessages {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
-/* 列表面板：一级玻璃面板 */
+/* 列表面板：共享玻璃面上的透明区域 */
 .cp-savedMessages__panel {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
 }
 
 /* 清空收藏：危险胶囊 */
@@ -201,20 +203,20 @@ function fmtTime(ms: number): string {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-/* 收藏行：行间 1px 分隔线，hover 只变底色 */
+/* 收藏行：紧凑行 + hover 底色，行间不画分隔线 */
 .cp-savedMessages__item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 8px 10px;
+  border-radius: var(--cp-radius-sm);
   cursor: pointer;
   transition: background-color var(--cp-fast) var(--cp-ease);
-}
-
-.cp-savedMessages__item + .cp-savedMessages__item {
-  border-top: 1px solid var(--cp-border-light);
 }
 
 .cp-savedMessages__item:hover {

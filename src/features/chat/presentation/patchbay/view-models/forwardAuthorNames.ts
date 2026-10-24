@@ -1,10 +1,11 @@
 /**
  * @fileoverview forwardAuthorNames.ts
- * @description chat｜view-model：转发条目作者昵称解析的纯函数助手。
+ * @description chat｜view-model：转发条目作者昵称 / 来源频道名解析的纯函数助手。
  *
  * 说明：
- * - 转发快照（服务端）仅携带 userId，不含昵称；
- * - 展示层在消息投影阶段为每条转发条目补充 `authorName`，缺失时 UI 回退显示 userId；
+ * - 转发快照（服务端）仅携带 userId / channelId，不含昵称与频道名；
+ * - 展示层在消息投影阶段为每条转发条目补充 `authorName` / `channelName`，
+ *   缺失时 UI 回退显示 userId / channelId；
  * - 本模块保持纯函数：不做 IO、不持有状态，异步补拉由调用方（useChatCenterModel）编排。
  */
 
@@ -77,4 +78,42 @@ export function collectUnresolvedForwardAuthorUids(
     }
   }
   return out;
+}
+
+/**
+ * 为消息中的转发条目补充解析后的来源频道名。
+ *
+ * @param m - 原始消息。
+ * @param resolveChannelName - channelId → 频道名解析器；返回空串表示不可解析。
+ * @returns 任一条目解析成功时返回浅拷贝（不改写原对象）；无需变更时原样返回。
+ */
+export function withResolvedForwardChannelNames(
+  m: ChatMessage,
+  resolveChannelName: (channelId: string) => string,
+): ChatMessage {
+  const forwardedFrom = m.forwardedFrom;
+  const forwardedMessages = m.forwardedMessages;
+  if (!forwardedFrom && !forwardedMessages) return m;
+
+  let changed = false;
+  const mapEntry = (entry: ForwardedMessageEntry): ForwardedMessageEntry => {
+    const name = String(resolveChannelName(entry.channelId) ?? "").trim();
+    if (!name || entry.channelName === name) return entry;
+    changed = true;
+    return { ...entry, channelName: name };
+  };
+
+  const nextForwardedFrom = forwardedFrom ? mapEntry(forwardedFrom) : undefined;
+  const nextForwardedMessages = forwardedMessages
+    ? forwardedMessages.map(mapEntry)
+    : undefined;
+
+  if (!changed) return m;
+  const clone = { ...m } as ChatMessage & {
+    forwardedFrom?: ForwardedMessageEntry;
+    forwardedMessages?: ForwardedMessageEntry[];
+  };
+  clone.forwardedFrom = nextForwardedFrom;
+  clone.forwardedMessages = nextForwardedMessages;
+  return clone;
 }

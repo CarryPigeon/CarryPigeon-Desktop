@@ -41,6 +41,7 @@ import type { PinSummary } from "@/features/chat/presentation/patchbay/component
 import {
   collectUnresolvedForwardAuthorUids,
   withResolvedForwardAuthorNames,
+  withResolvedForwardChannelNames,
 } from "./forwardAuthorNames";
 import {
   collectUnresolvedAuthorUids,
@@ -121,8 +122,8 @@ type ChatCenterRawModel = {
   highlightedMessageId: ComputedRef<string>;
   /** 消息定位请求（视图层据此把目标消息滚入视口）。 */
   messageReveal: Ref<MessageRevealRequest>;
-  /** 跳转到被回复 / 被引用消息的位置。 */
-  jumpToReferencedMessage(messageId: string): Promise<void>;
+  /** 跳转到被回复 / 被引用 / 被转发来源消息的位置；channelId 存在时先切换频道（跨频道转发跳转）。 */
+  jumpToReferencedMessage(messageId: string, channelId?: string): Promise<void>;
   /** 置顶消息摘要列表。 */
   pins: Ref<PinSummary[]>;
   /** 是否正在加载置顶消息。 */
@@ -221,6 +222,12 @@ export type UseChatCenterModelDeps = {
    */
   resolveSenderName?: (uid: string) => string;
   /**
+   * 转发来源频道名解析：转发快照仅携带 channelId，展示层按频道目录补齐频道名。
+   *
+   * 说明：可选；未提供时转发块回退显示原始 channelId。
+   */
+  resolveChannelName?: (channelId: string) => string;
+  /**
    * 批量补拉用户昵称（转发条目作者可能不在当前频道成员目录内）。
    *
    * 说明：可选；入参为去重后的 uid 列表，返回 uid → nickname 映射（缺失项可省略）。
@@ -294,6 +301,16 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   /**
+   * 转发来源频道名解析：按频道目录把 channelId 解析为频道名。
+   *
+   * @param channelId - 转发来源频道 id。
+   * @returns 解析出的频道名；不可解析时返回空串（UI 回退显示 channelId）。
+   */
+  function resolveForwardChannelName(channelId: string): string {
+    return deps.resolveChannelName?.(channelId)?.trim() ?? "";
+  }
+
+  /**
    * 调度补拉缺失昵称的用户：去重、debounce 合并为一次批量请求（`GET /users?ids=`）。
    *
    * 说明：
@@ -348,18 +365,21 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   /**
-   * 统一作者名投影：发送者 → 提及目标 → 内联引用作者 → 转发条目作者。
+   * 统一作者名 / 转发来源频道名投影：发送者 → 提及目标 → 内联引用作者 → 转发条目作者 / 来源频道。
    *
    * @param message - 原始消息（store 内对象，不被改写）。
-   * @returns 作者名已解析（或无需解析）的消息。
+   * @returns 作者名与转发来源频道名已解析（或无需解析）的消息。
    */
   function withResolvedAuthorNames(message: ChatMessage): ChatMessage {
-    return withResolvedForwardAuthorNames(
-      withResolvedQuoteReplyName(
-        withResolvedMentionNames(withResolvedSenderName(message, resolveAuthorName), resolveAuthorName),
+    return withResolvedForwardChannelNames(
+      withResolvedForwardAuthorNames(
+        withResolvedQuoteReplyName(
+          withResolvedMentionNames(withResolvedSenderName(message, resolveAuthorName), resolveAuthorName),
+          resolveAuthorName,
+        ),
         resolveAuthorName,
       ),
-      resolveAuthorName,
+      resolveForwardChannelName,
     );
   }
 
@@ -575,13 +595,14 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   }
 
   /**
-   * 跳转到被回复 / 被引用消息的位置。
+   * 跳转到被回复 / 被引用 / 被转发来源消息的位置。
    *
    * @param messageId - 被引用的消息 id。
+   * @param channelId - 目标消息所在频道；跨频道转发跳转时提供，与当前频道不同则先切换频道。
    * @returns 定位请求完成后的 Promise。
    */
-  async function jumpToReferencedMessage(messageId: string): Promise<void> {
-    await revealMessage(messageId);
+  async function jumpToReferencedMessage(messageId: string, channelId?: string): Promise<void> {
+    await revealMessage(messageId, channelId);
   }
 
   /**

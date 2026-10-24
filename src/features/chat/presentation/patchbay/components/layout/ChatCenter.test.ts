@@ -134,7 +134,6 @@ function mountCenter(messages: readonly ChatMessage[]) {
       registerSignalPane: () => undefined,
       onOpenChannelSettingsMenu: () => undefined,
       onMessageContextMenu: () => undefined,
-      onMoreClick: () => undefined,
       onReferenceContextMenu: () => undefined,
       onJumpReference: () => undefined,
       onInstallHint: () => undefined,

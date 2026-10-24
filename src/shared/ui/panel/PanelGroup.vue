@@ -56,7 +56,7 @@ withDefaults(
 </template>
 
 <style scoped lang="scss">
-/* 样式：PanelGroup｜规格：cp-card + 组头/行/脚注分隔线 */
+/* 样式：PanelGroup｜规格：cp-card + 无分隔线的工作台分组（靠间距与底色区分） */
 .cp-panel-group {
   @include cp-card;
 
@@ -65,7 +65,7 @@ withDefaults(
 
 /* 分组之间保持固定节奏 */
 .cp-panel-group + .cp-panel-group {
-  margin-top: var(--cp-page-gap);
+  margin-top: 10px;
 }
 
 .cp-panel-group__head {
@@ -73,8 +73,7 @@ withDefaults(
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--cp-border-light);
+  padding: 10px 12px 4px;
 }
 
 .cp-panel-group__heading {
@@ -108,12 +107,11 @@ withDefaults(
 }
 
 .cp-panel-group__body--padded {
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .cp-panel-group__foot {
-  padding: 10px 16px 12px;
-  border-top: 1px solid var(--cp-border-light);
+  padding: 8px 12px 10px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--cp-text-muted);

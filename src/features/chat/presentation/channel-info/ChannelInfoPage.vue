@@ -99,23 +99,25 @@ const membershipStatusText = computed(() =>
 </template>
 
 <style scoped lang="scss">
-/* 样式：ChannelInfoPage｜规格：cp-page 骨架 + PageHeader + 玻璃内容面板 + cp-card */
+/* 样式：ChannelInfoPage｜规格：工作台骨架 + PageHeader + 透明内容区 + cp-card */
 /* 布局与变量说明：使用全局 `--cp-*` 变量；内容区为两列网格，部分卡片跨全宽。 */
 .cp-info {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
-/* 内容面板：一级玻璃面板 */
+/* 内容区域：共享玻璃面上的透明网格 */
 .cp-info__body {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--cp-page-pad);
+  padding: 10px;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--cp-page-gap);
+  gap: 10px;
 }
 
 /* 资料卡：内嵌卡片 */

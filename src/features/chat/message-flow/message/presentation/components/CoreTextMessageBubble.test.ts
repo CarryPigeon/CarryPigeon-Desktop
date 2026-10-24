@@ -1,6 +1,6 @@
 /**
  * @fileoverview CoreTextMessageBubble.test.ts
- * @description message-flow｜presentation：消息引用块（回复 / 引用预览）右键跳转事件验证。
+ * @description message-flow｜presentation：消息引用块（回复 / 引用预览 / 转发来源）右键与跳转事件验证。
  */
 
 import { describe, expect, it } from "vitest";
@@ -111,7 +111,8 @@ describe("CoreTextMessageBubble 引用块跳转按钮", () => {
 
     await button.trigger("click");
 
-    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["m0"]);
+    // 第二个参数为可选的跨频道目标（回复 / 引用恒在当前频道，故为 undefined）。
+    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["m0", undefined]);
   });
 
   it("内联引用渲染跳转按钮并派发被引用消息 id", async () => {
@@ -124,7 +125,7 @@ describe("CoreTextMessageBubble 引用块跳转按钮", () => {
 
     await button.trigger("click");
 
-    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["q1"]);
+    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["q1", undefined]);
   });
 
   it("仅有 replyToId 的迷你引用渲染跳转按钮", async () => {
@@ -135,7 +136,7 @@ describe("CoreTextMessageBubble 引用块跳转按钮", () => {
 
     await button.trigger("click");
 
-    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["m0"]);
+    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["m0", undefined]);
   });
 
   it("原消息不可用时不渲染跳转按钮", () => {
@@ -144,5 +145,79 @@ describe("CoreTextMessageBubble 引用块跳转按钮", () => {
     });
 
     expect(wrapper.find(".cp-coreText__reply .cp-jumpRef").exists()).toBe(false);
+  });
+});
+
+describe("CoreTextMessageBubble 转发来源块", () => {
+  const forwardedFrom = {
+    messageId: "src-1",
+    channelId: "c-origin",
+    userId: "u9",
+    preview: "original message",
+    sentTime: 1699999999000,
+  };
+
+  it("渲染来源频道名（缺失时回退 channelId）与原消息预览", () => {
+    const named = mountBubble({
+      forwardedFrom: { ...forwardedFrom, channelName: "开发频道", authorName: "Alice" },
+    });
+    const block = named.find(".cp-forwardedFrom");
+    expect(block.exists()).toBe(true);
+    expect(block.text()).toContain("开发频道");
+    expect(block.text()).not.toContain("c-origin");
+    expect(block.text()).toContain("Alice");
+    expect(block.text()).toContain("original message");
+
+    const unnamed = mountBubble({ forwardedFrom });
+    expect(unnamed.find(".cp-forwardedFrom").text()).toContain("c-origin");
+    expect(unnamed.find(".cp-forwardedFrom").text()).toContain("u9");
+  });
+
+  it("点击转发来源块派发跨频道跳转（携带源频道 id）", async () => {
+    const wrapper = mountBubble({ forwardedFrom });
+
+    const block = wrapper.find(".cp-forwardedFrom");
+    expect(block.classes()).toContain("cp-forwardedFrom--jumpable");
+
+    await block.trigger("click");
+
+    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["src-1", "c-origin"]);
+  });
+
+  it("转发来源块跳转按钮派发跨频道跳转", async () => {
+    const wrapper = mountBubble({ forwardedFrom });
+
+    const button = wrapper.find(".cp-forwardedFrom .cp-jumpRef");
+    expect(button.exists()).toBe(true);
+    expect(button.attributes("aria-label")).toBe(zh_cn.jump_to_forwarded_message);
+
+    await button.trigger("click");
+
+    expect(wrapper.emitted("jumpReference")?.[0]).toEqual(["src-1", "c-origin"]);
+  });
+
+  it("右键转发来源块派发引用菜单载荷（含源频道 id）", async () => {
+    const wrapper = mountBubble({ forwardedFrom });
+
+    await wrapper.find(".cp-forwardedFrom").trigger("contextmenu");
+
+    const events = wrapper.emitted("openReferenceMenu");
+    expect(events?.[0]?.[0]).toMatchObject({ messageId: "src-1", channelId: "c-origin" });
+  });
+
+  it("来源快照缺少 mid 时不可跳转且不拦截点击", async () => {
+    const wrapper = mountBubble({
+      forwardedFrom: { ...forwardedFrom, messageId: "  " },
+    });
+
+    const block = wrapper.find(".cp-forwardedFrom");
+    expect(block.classes()).not.toContain("cp-forwardedFrom--jumpable");
+    expect(wrapper.find(".cp-forwardedFrom .cp-jumpRef").exists()).toBe(false);
+
+    await block.trigger("click");
+    await block.trigger("contextmenu");
+
+    expect(wrapper.emitted("jumpReference")).toBeUndefined();
+    expect(wrapper.emitted("openReferenceMenu")).toBeUndefined();
   });
 });

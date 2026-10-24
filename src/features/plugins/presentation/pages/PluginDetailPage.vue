@@ -263,33 +263,30 @@ onMounted(handleMounted);
 </template>
 
 <style scoped lang="scss">
-/* 样式：插件详情页｜布局：PageHeader 风格头部 + 一级玻璃内容面板 + 内嵌分组卡 */
+/* 样式：插件详情页｜布局：工作台骨架 + 紧凑控制台头部 + 透明内容区 + 内嵌分组卡 */
 .cp-plugin-detail {
-  @include cp-page;
+  @include cp-workspace;
+
+  overflow: hidden;
 }
 
-/* 头部：一级玻璃面板，与 PageHeader 同规格 */
+/* 头部：工作台控制台（无独立玻璃面） */
 .cp-plugin-detail__head {
-  @include cp-glass-panel;
+  @include cp-console;
 
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: var(--cp-page-pad);
+  padding: 8px 10px;
 }
 
 .cp-plugin-detail__name {
-  font-family: var(--cp-font-display);
-  font-weight: 900;
-  font-size: 18px;
-  line-height: 1.2;
-  letter-spacing: 0.04em;
-  color: var(--cp-text);
+  @include cp-console-title;
 }
 
 .cp-plugin-detail__meta {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -300,7 +297,7 @@ onMounted(handleMounted);
 .cp-plugin-detail__mono {
   min-width: 0;
   font-family: var(--cp-font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--cp-text-muted);
   overflow-wrap: anywhere;
@@ -321,9 +318,9 @@ onMounted(handleMounted);
   justify-content: flex-end;
 }
 
-/* 内容面板：一级玻璃，内部滚动 */
+/* 内容区域：共享玻璃面上的透明网格，内部滚动 */
 .cp-plugin-detail__body {
-  @include cp-glass-panel;
+  @include cp-region;
 
   flex: 1 1 auto;
   min-height: 0;
@@ -331,8 +328,8 @@ onMounted(handleMounted);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 10px;
 }
 
 /* 内嵌分组卡：无阴影 */
@@ -489,16 +486,16 @@ onMounted(handleMounted);
   @include cp-pill-button(primary);
 }
 
-/* 空态面板：一级玻璃 + 居中 */
+/* 空态面板：内容卡 + 居中 */
 .cp-plugin-detail__empty {
-  @include cp-glass-panel;
+  @include cp-card;
 
   flex: 1 1 auto;
   display: grid;
   place-items: center;
   align-content: center;
   gap: 12px;
-  padding: 32px;
+  padding: 24px;
 }
 
 .cp-plugin-detail__emptyText {
@@ -514,9 +511,9 @@ onMounted(handleMounted);
 }
 
 @media (max-width: 640px) {
-  .cp-plugin-detail {
-    padding: 10px;
-    gap: 10px;
+  .cp-plugin-detail__body {
+    padding: 8px;
+    gap: 8px;
   }
 }
 </style>

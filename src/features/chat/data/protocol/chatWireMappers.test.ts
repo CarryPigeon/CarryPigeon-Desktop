@@ -468,6 +468,60 @@ describe("mapChatMessageWire wrapper domains", () => {
     expect(result.forwardedMessages?.[0].messageId).toBe("msg1");
     expect(result.forwardedMessages?.[1].messageId).toBe("msg2");
   });
+
+  it("should fall back to legacy top-level forward metadata when data lacks it", () => {
+    // 旧版服务端把 forwarded_from / forwarded_messages 放在消息顶层；
+    // data 内优先，顶层仅在 data 缺失对应字段时兜底，避免跨频道转发来源丢失。
+    const single = mapChatMessageWire({
+      mid: "msg-fwd-legacy",
+      cid: "ch1",
+      uid: "u1",
+      domain: "Core:Forward",
+      domain_version: "1.0.0",
+      data: { domain: "Core:Text", domain_version: "1.0.0" },
+      send_time: 1700000000000,
+      forwarded_from: { mid: "msg1", cid: "ch2", uid: "u2", preview: "Hello", send_time: 1699999999000 },
+    } as any);
+    expect(single.forwardedFrom?.messageId).toBe("msg1");
+    expect(single.forwardedFrom?.channelId).toBe("ch2");
+    expect(single.forwardedFrom?.preview).toBe("Hello");
+
+    const merged = mapChatMessageWire({
+      mid: "msg-fwd-legacy-merged",
+      cid: "ch1",
+      uid: "u1",
+      domain: "Core:Forward",
+      domain_version: "1.0.0",
+      data: { domain: "Core:Text", domain_version: "1.0.0" },
+      send_time: 1700000000000,
+      forwarded_messages: [
+        { mid: "msg1", cid: "ch2", uid: "u2", preview: "A", send_time: 1699999999000 },
+        { mid: "msg2", cid: "ch3", uid: "u3", preview: "B", send_time: 1699999999100 },
+      ],
+    } as any);
+    expect(merged.forwardedMessages).toHaveLength(2);
+    expect(merged.forwardedMessages?.[0].channelId).toBe("ch2");
+    expect(merged.forwardedMessages?.[1].channelId).toBe("ch3");
+  });
+
+  it("should prefer data-carried forward metadata over legacy top-level fields", () => {
+    const result = mapChatMessageWire({
+      mid: "msg-fwd-both",
+      cid: "ch1",
+      uid: "u1",
+      domain: "Core:Forward",
+      domain_version: "1.0.0",
+      data: {
+        domain: "Core:Text",
+        domain_version: "1.0.0",
+        forwarded_from: { mid: "msg-data", cid: "ch-data", uid: "u2", preview: "from data", send_time: 1699999999000 },
+      },
+      send_time: 1700000000000,
+      forwarded_from: { mid: "msg-top", cid: "ch-top", uid: "u9", preview: "from top", send_time: 1 },
+    } as any);
+    expect(result.forwardedFrom?.messageId).toBe("msg-data");
+    expect(result.forwardedFrom?.channelId).toBe("ch-data");
+  });
 });
 
 // ── mapChatReadStateInput (domain → wire) ──
