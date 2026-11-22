@@ -23,11 +23,11 @@ import type {
   ChatQuoteReplyRecord,
   ChatReadStateInput,
   ChatReadStateResponse,
+  ChatChannelReadState,
   ChatReplyMessageData,
   ChatSendMessageInput,
   ChatUnreadState,
   ChatUserRecord,
-  ChatMessageAttachmentUploadResult,
 } from "@/features/chat/domain/types/chatApiModels";
 // ChatMessageMentionRecord 仅在领域模型内部使用，wire 上的 mentions 已改为 string[]。
 import type {
@@ -52,13 +52,13 @@ import type {
   ChatChannelWire,
   ChatForwardedFromWire,
   ChatMentionWire,
-  ChatMessageAttachmentUploadWire,
   ChatMessagePageWire,
   ChatMessageReplyWire,
   ChatMessageWire,
   ChatPinWire,
   ChatQuoteReplyWire,
   ChatReadStateResponseWire,
+  ChatChannelReadStateWire,
   ChatReadStateWire,
   ChatReplyMessageWireData,
   ChatSendMessageWire,
@@ -81,7 +81,7 @@ import type {
   ChatMessageRecalledEventPayloadWire,
 } from "./chatWireEvents";
 
-import { asTrimmedString, asOptionalString, asSafeNumber, asEpochMillis } from "@/shared/data/wireMapperUtils";
+import { asTrimmedString, asOptionalString, asSafeNumber } from "@/shared/data/wireMapperUtils";
 
 /**
  * 将用户 wire 模型映射为领域用户记录。
@@ -142,16 +142,6 @@ function recordsToWireMentionUids(records: ChatMessageMentionRecord[] | undefine
   return uids.length > 0 ? uids : undefined;
 }
 
-function mapChatMessageReplyRecord(input: ChatMessageReplyRecord): ChatMessageReplyWire {
-  return {
-    mid: asTrimmedString(input.messageId),
-    sender_name: asTrimmedString(input.senderName),
-    preview: asTrimmedString(input.preview),
-    created_at: asSafeNumber(input.createdAt),
-    unavailable: Boolean(input.unavailable),
-  };
-}
-
 function mapChatQuoteReplyWire(wire: ChatQuoteReplyWire | undefined): ChatQuoteReplyRecord | undefined {
   if (!wire) return undefined;
   const messageId = asTrimmedString(wire.mid);
@@ -163,15 +153,6 @@ function mapChatQuoteReplyWire(wire: ChatQuoteReplyWire | undefined): ChatQuoteR
   };
 }
 
-function mapChatQuoteReplyRecord(input: ChatQuoteReplyRecord | undefined): ChatQuoteReplyWire | undefined {
-  if (!input) return undefined;
-  return {
-    mid: asTrimmedString(input.messageId),
-    uid: asTrimmedString(input.userId),
-    preview: asTrimmedString(input.preview),
-  };
-}
-
 /**
  * 将频道 wire 模型映射为领域频道记录。
  */
@@ -180,6 +161,8 @@ export function mapChatChannelWire(wire: ChatChannelWire): ChatChannelRecord {
   return {
     id,
     name: asTrimmedString(wire.name) || id,
+    systemChannel: wire.system_channel,
+    createdAt: wire.created_at == null ? undefined : asSafeNumber(wire.created_at),
     brief: asOptionalString(wire.brief),
     avatar: asOptionalString(wire.avatar),
     ownerUserId: asOptionalString(wire.owner_uid),
@@ -196,13 +179,23 @@ export function mapChatChannelWire(wire: ChatChannelWire): ChatChannelRecord {
 /**
  * 将未读状态 wire 模型映射为领域未读状态。
  */
+function normalizeUnreadCount(value: unknown): number {
+  return Math.min(10_000, Math.max(0, Math.trunc(asSafeNumber(value))));
+}
+
+export function mapChatChannelReadStateWire(wire: ChatChannelReadStateWire): ChatChannelReadState {
+  return {
+    channelId: asTrimmedString(wire.cid),
+    userId: asTrimmedString(wire.uid),
+    lastReadMid: wire.last_read_mid === null ? null : asTrimmedString(wire.last_read_mid),
+    unreadCount: normalizeUnreadCount(wire.unread_count),
+  };
+}
+
 export function mapChatUnreadStateWire(wire: ChatUnreadStateWire): ChatUnreadState {
   return {
     channelId: asTrimmedString(wire.cid),
-    unreadCount: Math.max(0, asSafeNumber(wire.unread_count)),
-    mentionUnreadCount:
-      wire.mention_unread_count !== undefined ? Math.max(0, asSafeNumber(wire.mention_unread_count)) : undefined,
-    lastReadTime: asSafeNumber(wire.last_read_time),
+    unreadCount: normalizeUnreadCount(wire.unread_count),
   };
 }
 
@@ -219,29 +212,6 @@ function mapChatForwardedFromWire(wire: ChatForwardedFromWire | undefined): Chat
   };
 }
 
-function mapChatForwardedFromRecord(input: ChatForwardedFromRecord | undefined): ChatForwardedFromWire | undefined {
-  if (!input) return undefined;
-  const messageId = asTrimmedString(input.messageId);
-  if (!messageId) return undefined;
-  return {
-    mid: messageId,
-    cid: asTrimmedString(input.channelId),
-    uid: asTrimmedString(input.userId),
-    preview: asTrimmedString(input.preview),
-    send_time: asSafeNumber(input.sentTime),
-  };
-}
-
-function mapChatReplyMessageDataToWire(data: ChatReplyMessageData): ChatReplyMessageWireData {
-  return {
-    content: data.content,
-    reply_to_mid: asOptionalString(data.replyToMessageId),
-    reply_to: data.replyTo ? mapChatMessageReplyRecord(data.replyTo) : undefined,
-    quote_reply: data.quoteReply ? mapChatQuoteReplyRecord(data.quoteReply) : undefined,
-    link_preview: data.linkPreview,
-  };
-}
-
 function mapChatReplyMessageWireDataToRecord(data: ChatReplyMessageWireData): ChatReplyMessageData {
   return {
     content: data.content,
@@ -249,21 +219,6 @@ function mapChatReplyMessageWireDataToRecord(data: ChatReplyMessageWireData): Ch
     replyTo: mapChatMessageReplyWire(data.reply_to),
     quoteReply: mapChatQuoteReplyWire(data.quote_reply),
     linkPreview: data.link_preview as ChatLinkPreview | undefined,
-  };
-}
-
-function mapChatForwardMessageDataToWire(data: ChatForwardMessageData): ChatForwardMessageWireData {
-  const forwardMessages = Array.isArray(data.forwardedMessages)
-    ? data.forwardedMessages
-        .map(mapChatForwardedFromRecord)
-        .filter((m): m is ChatForwardedFromWire => m != null)
-    : undefined;
-  return {
-    domain: asTrimmedString(data.domain),
-    domain_version: asTrimmedString(data.domainVersion),
-    content: data.content,
-    forwarded_from: mapChatForwardedFromRecord(data.forwardedFrom),
-    forwarded_messages: forwardMessages,
   };
 }
 
@@ -292,7 +247,9 @@ function mapChatForwardMessageWireDataToRecord(data: ChatForwardMessageWireData)
  * `status` 为 `recalled` 时回填 `recalledAt`，触发撤回态展示。
  */
 export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
-  const domain = asTrimmedString(wire.domain);
+  const versioned = /^(.*):V(\d+)$/.exec(asTrimmedString(wire.domain));
+  const wireDomain = versioned?.[1] ?? asTrimmedString(wire.domain);
+  const domain = wireDomain === "Core:Attachment" ? "Core:File" : wireDomain;
   const sendTime = asSafeNumber(wire.send_time);
   const uid = asTrimmedString(wire.uid);
   const sender = mapChatUserWire(wire.sender);
@@ -306,16 +263,27 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   let linkPreview: ChatLinkPreview | undefined;
 
   let data: unknown = wire.data;
-  if (domain === "Core:ReplyText") {
-    const replyData = mapChatReplyMessageWireDataToRecord(wire.data as ChatReplyMessageWireData);
+  const payload = wire.data && typeof wire.data === "object" ? wire.data as Record<string, unknown> : {};
+  if (domain === "Core:Text") {
+    data = { ...payload, text: typeof payload.content === "string" ? payload.content : payload.text };
+    replyToMessageId = asOptionalString(payload.reply_to_mid);
+  } else if (domain === "Core:ReplyText") {
+    const replyData = mapChatReplyMessageWireDataToRecord(payload as ChatReplyMessageWireData);
     data = replyData;
     replyToMessageId = replyData.replyToMessageId;
     replyTo = replyData.replyTo;
     quoteReply = replyData.quoteReply;
     if (replyData.linkPreview != null) linkPreview = replyData.linkPreview;
   } else if (domain === "Core:Forward") {
-    const forwardData = mapChatForwardMessageWireDataToRecord(wire.data as ChatForwardMessageWireData);
-    data = forwardData;
+    const forwardData = mapChatForwardMessageWireDataToRecord(payload as ChatForwardMessageWireData);
+    const sourceChannelId = asTrimmedString(payload.source_channel_id);
+    const ids = Array.isArray(payload.message_ids) ? payload.message_ids.map(asTrimmedString).filter(Boolean) : [];
+    data = { ...payload, ...forwardData };
+    if (sourceChannelId && ids.length) {
+      forwardData.forwardedMessages ??= ids.map((messageId) => ({
+        messageId, channelId: sourceChannelId, userId: "", preview: "", sentTime: 0,
+      }));
+    }
     // 现行契约要求 forward 快照封装在 data 内；旧版服务端放在消息顶层，这里做回退兼容
     //（data 内优先，顶层仅在 data 缺失时兜底），避免跨频道转发来源丢失导致转发消息不可见。
     forwardedFrom = forwardData.forwardedFrom ?? mapChatForwardedFromWire(wire.forwarded_from);
@@ -337,7 +305,7 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
     sender: sender ? { ...sender, id: sender.id || uid } : undefined,
     sentTime: sendTime,
     domain,
-    domainVersion: asTrimmedString(wire.domain_version),
+    domainVersion: versioned ? `${versioned[2]}.0.0` : asTrimmedString(wire.domain_version),
     data,
     preview: asOptionalString(wire.preview),
     replyToMessageId,
@@ -351,19 +319,6 @@ export function mapChatMessageWire(wire: ChatMessageWire): ChatMessageRecord {
   };
 }
 
-/** Map message attachment upload wire → domain record. */
-export function mapChatMessageAttachmentUploadWire(
-  wire: ChatMessageAttachmentUploadWire,
-): ChatMessageAttachmentUploadResult {
-  return {
-    objectKey: asTrimmedString(wire.object_key),
-    shareKey: asTrimmedString(wire.share_key),
-    filename: asTrimmedString(wire.filename),
-    mimeType: asTrimmedString(wire.mime_type),
-    size: asSafeNumber(wire.size),
-  };
-}
-
 /**
  * 将消息分页结果从 wire 结构映射为领域分页结构。
  */
@@ -371,7 +326,7 @@ export function mapChatMessagePageWire(wire: ChatMessagePageWire): ChatMessagePa
   const items = Array.isArray(wire.items) ? wire.items.map(mapChatMessageWire) : [];
   return {
     items,
-    nextCursor: asOptionalString(wire.next_cursor),
+    nextCursor: typeof wire.next_cursor === "string" ? wire.next_cursor : undefined,
     hasMore: Boolean(wire.has_more),
   };
 }
@@ -383,10 +338,9 @@ export function mapChatChannelMemberWire(wire: ChatChannelMemberWire): ChatChann
   return {
     userId: asTrimmedString(wire.uid),
     role: asTrimmedString(wire.role) || "member",
-    nickname: asTrimmedString(wire.nickname),
+    nickname: asTrimmedString(wire.username),
     avatar: asOptionalString(wire.avatar),
-    // 服务端 Instant 经 Jackson 常以 epoch 秒序列化；领域层统一为毫秒
-    joinTime: asEpochMillis(wire.join_time),
+    joinTime: asSafeNumber(wire.join_time),
   };
 }
 
@@ -433,9 +387,9 @@ export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanR
   return {
     channelId: asTrimmedString(wire.cid),
     userId: asTrimmedString(wire.uid),
-    until: asSafeNumber(wire.expires_at),
+    until: asSafeNumber(wire.until),
     reason: asTrimmedString(wire.reason),
-    createTime: wire.created_at == null ? undefined : asSafeNumber(wire.created_at),
+    createTime: asSafeNumber(wire.create_time),
   };
 }
 
@@ -446,32 +400,30 @@ export function mapChatChannelBanWire(wire: ChatChannelBanWire): ChatChannelBanR
  * - Core:ReplyText 的 reply/quote/link_preview 关系元数据封装在 `data` 内；
  * - Core:Forward 的 forward 快照封装在 `data` 内。
  */
-export function mapChatSendMessageInput(input: ChatSendMessageInput): ChatSendMessageWire {
-  const domain = asTrimmedString(input.domain);
-  const isReplyText = domain === "Core:ReplyText";
-  const isForward = domain === "Core:Forward";
-
-  let data: unknown = input.data;
-  if (isReplyText && input.data) {
-    const replyData = input.data as ChatReplyMessageData;
-    data = mapChatReplyMessageDataToWire({
-      content: replyData.content,
-      replyToMessageId: replyData.replyToMessageId ?? input.replyToMessageId,
-      replyTo: replyData.replyTo ?? input.replyTo,
-      quoteReply: replyData.quoteReply ?? input.quoteReply,
-      linkPreview: replyData.linkPreview ?? input.linkPreview,
-    });
-  } else if (isForward && input.data) {
-    data = mapChatForwardMessageDataToWire(input.data as ChatForwardMessageData);
+export function toMessageWireDomain(raw: string, version?: string): string {
+  const name = asTrimmedString(raw);
+  if (/^Core:(Text|ReplyText)(:V1)?$/.test(name)) return "Core:Text:V1";
+  if (/^Core:(File|Attachment)(:V1)?$/.test(name)) return "Core:Attachment:V1";
+  if (/^Core:(Image|Voice|Forward)$/.test(name)) return `${name}:V1`;
+  if (!name.startsWith("Core:") && !/:V\d+$/.test(name) && /^\d+(?:\.|$)/.test(version ?? "")) {
+    return `${name}:V${version?.split(".")[0]}`;
   }
+  return name;
+}
 
-  return {
-    domain,
-    domain_version: asTrimmedString(input.domainVersion),
-    data,
-    mentions: recordsToWireMentionUids(input.mentions),
-    client_message_id: asOptionalString(input.clientMessageId),
-  };
+export function mapChatSendMessageInput(input: ChatSendMessageInput): ChatSendMessageWire {
+  const domain = toMessageWireDomain(input.domain, input.domainVersion);
+  const payload = input.data != null && typeof input.data === "object" ? input.data as Record<string, unknown> : {};
+  let data = input.data;
+  if (domain === "Core:Text:V1") {
+    const rawContent = payload.content ?? payload.text ?? input.data;
+    const content = typeof rawContent === "string" ? rawContent : asTrimmedString((rawContent as { text?: unknown } | null)?.text);
+    const replyMid = asOptionalString(input.replyToMessageId ?? payload.replyToMessageId ?? payload.reply_to_mid);
+    data = { content, ...(replyMid ? { reply_to_mid: replyMid } : {}) };
+  } else if (/^Core:(Image|Voice|Attachment):V1$/.test(domain)) {
+    data = { share_key: asTrimmedString(payload.share_key ?? payload.shareKey) };
+  }
+  return { domain, data, mentions: recordsToWireMentionUids(input.mentions) ?? [] };
 }
 
 /**
@@ -480,7 +432,6 @@ export function mapChatSendMessageInput(input: ChatSendMessageInput): ChatSendMe
 export function mapChatReadStateInput(input: ChatReadStateInput): ChatReadStateWire {
   return {
     last_read_mid: asTrimmedString(input.lastReadMessageId),
-    last_read_time: asSafeNumber(input.lastReadTime),
   };
 }
 
@@ -492,7 +443,6 @@ export function mapChatReadStateResponseWire(wire: ChatReadStateResponseWire): C
     channelId: asTrimmedString(wire.cid),
     userId: asTrimmedString(wire.uid),
     lastReadMid: asTrimmedString(wire.last_read_mid),
-    lastReadTime: asSafeNumber(wire.last_read_time),
   };
 }
 
@@ -523,10 +473,13 @@ export function mapChatChannelCreateInput(
 }
 
 function mapMessageCreatedPayload(wire: ChatMessageCreatedEventPayloadWire): ChatMessageCreatedEvent {
-  return {
-    channelId: asTrimmedString(wire.cid),
-    message: mapChatMessageWire(wire.message),
+  if (!wire || typeof wire !== "object") return { channelId: "" };
+  if ("channel_id" in wire) return {
+    channelId: asTrimmedString(wire.channel_id),
+    messageId: asTrimmedString(wire.message_id),
+    eventSequence: asSafeNumber(wire.event_sequence),
   };
+  return { channelId: asTrimmedString(wire.cid), message: wire.message ? mapChatMessageWire(wire.message) : undefined };
 }
 
 function mapMessageDeletedPayload(wire: ChatMessageDeletedEventPayloadWire): ChatMessageDeletedEvent {
@@ -541,7 +494,6 @@ function mapReadStateUpdatedPayload(wire: ChatReadStateUpdatedEventPayloadWire):
     channelId: asTrimmedString(wire.cid),
     userId: asTrimmedString(wire.uid),
     lastReadMessageId: asTrimmedString(wire.last_read_mid),
-    lastReadTime: asSafeNumber(wire.last_read_time),
   };
 }
 
@@ -573,12 +525,15 @@ function mapMessageUnpinnedPayload(wire: ChatMessageUnpinnedEventPayloadWire): C
   };
 }
 
-function mapMessageRecalledPayload(wire: ChatMessageRecalledEventPayloadWire): ChatMessageRecalledEvent {
+function mapMessageRecalledPayload(wire: ChatMessageRecalledEventPayloadWire, serverTime: number): ChatMessageRecalledEvent {
+  if (!wire || typeof wire !== "object") return { channelId: "", messageId: "", recalledAt: serverTime, recalledByUserId: "" };
+  if ("channel_id" in wire) return {
+    channelId: asTrimmedString(wire.channel_id), messageId: asTrimmedString(wire.message_id),
+    recalledAt: serverTime, recalledByUserId: "", eventSequence: asSafeNumber(wire.event_sequence),
+  };
   return {
-    channelId: asTrimmedString(wire.cid),
-    messageId: asTrimmedString(wire.mid),
-    recalledAt: asSafeNumber(wire.recall_time),
-    recalledByUserId: "",
+    channelId: asTrimmedString(wire.cid), messageId: asTrimmedString(wire.mid),
+    recalledAt: asSafeNumber(wire.recall_time), recalledByUserId: "",
   };
 }
 
@@ -694,7 +649,7 @@ export function mapChatWsEventWire(wire: ChatWsEventWire): ChatEventEnvelope {
     return {
       ...base,
       eventType: "message.recalled",
-      payload: mapMessageRecalledPayload(wire.payload as ChatMessageRecalledEventPayloadWire),
+      payload: mapMessageRecalledPayload(wire.payload as ChatMessageRecalledEventPayloadWire, base.serverTime),
     };
   }
 

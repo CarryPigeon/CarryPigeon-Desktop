@@ -38,6 +38,7 @@ export const composerDraft = computed({
  * 当前频道是否还有可继续加载的历史消息。
  */
 export const currentChannelHasMore = computed(() => resolveMessageFlowStore().currentChannelHasMore.value);
+export const currentChannelHasNewer = computed(() => resolveMessageFlowStore().currentChannelHasNewer.value);
 /**
  * 当前频道 id。
  */
@@ -137,8 +138,12 @@ export function getMessageById(channelId: string, messageId: string): ChatMessag
 /**
  * 对当前频道执行历史翻页。
  */
-export function loadMoreMessages(): Promise<void> {
-  return resolveMessageFlowStore().loadMoreMessages();
+export function loadLatestMessages(): Promise<void> {
+  return resolveMessageFlowStore().loadLatestMessages();
+}
+
+export function loadMoreMessages(direction?: "older" | "newer"): Promise<void> {
+  return resolveMessageFlowStore().loadMoreMessages(direction);
 }
 
 /**

@@ -14,21 +14,21 @@ const PAGE = "http://127.0.0.1:1420";
 describe("shouldUseDevApiProxy", () => {
   it("rewrites loopback CarryPigeon-Server from the Vite preview origin", () => {
     expect(
-      shouldUseDevApiProxy("http://127.0.0.1:8080", {
+      shouldUseDevApiProxy("http://127.0.0.1:18080", {
         pageOrigin: PAGE,
         isTauri: false,
         isDev: true,
       }),
     ).toBe(true);
     expect(
-      shouldUseDevApiProxy("127.0.0.1:8080", {
+      shouldUseDevApiProxy("127.0.0.1:18080", {
         pageOrigin: PAGE,
         isTauri: false,
         isDev: true,
       }),
     ).toBe(true);
     expect(
-      shouldUseDevApiProxy("localhost:8080", {
+      shouldUseDevApiProxy("localhost:18080", {
         pageOrigin: "http://localhost:1420",
         isTauri: false,
         isDev: true,
@@ -38,14 +38,14 @@ describe("shouldUseDevApiProxy", () => {
 
   it("does not rewrite Tauri, production, remote hosts, or same-origin sockets", () => {
     expect(
-      shouldUseDevApiProxy("http://127.0.0.1:8080", {
+      shouldUseDevApiProxy("http://127.0.0.1:18080", {
         pageOrigin: PAGE,
         isTauri: true,
         isDev: true,
       }),
     ).toBe(false);
     expect(
-      shouldUseDevApiProxy("http://127.0.0.1:8080", {
+      shouldUseDevApiProxy("http://127.0.0.1:18080", {
         pageOrigin: PAGE,
         isTauri: false,
         isDev: false,

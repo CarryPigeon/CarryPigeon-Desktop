@@ -4,11 +4,9 @@
  */
 
 import type { ChatReadStateReporterPort } from "@/features/chat/domain/ports/runtimePorts";
-import { shouldAdvanceReadMarker } from "@/features/chat/domain/utils/readMarker";
-import { pickReportableLastMid } from "../utils/unreadRecompute";
+import { compareMessageIdForReadOrder } from "@/features/chat/domain/utils/readMarker";
 import { createLogger } from "@/shared/utils/logger";
 import type {
-  SessionMessageCachePort,
   SessionReadMarkerStatePort,
   SessionReadStateApiPort,
   SessionScopePort,
@@ -30,7 +28,7 @@ export type ReadStateReporterDeps = {
   api: SessionReadStateApiPort;
   scope: SessionScopePort;
   state: SessionReadMarkerStatePort;
-  messageCache: Pick<SessionMessageCachePort, "listMessages">;
+  refreshChannelReadState(cid: string): Promise<void>;
 };
 
 /**
@@ -47,7 +45,7 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
    *
    * 约束：
    * - 必须单调递增；
-   * - 即便同一毫秒内多次推进，也会强制 +1，避免被服务端视为旧值。
+   * - 同一毫秒内多次推进时强制 +1，仅用于本地视图和上报调度。
    */
   function advanceLocalReadTime(cid: string, nowMs: number): number {
     const channelId = String(cid).trim();
@@ -59,15 +57,8 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
     return nextReadTime;
   }
 
-  function syncLocalReadMarker(cid: string, lastMid: string, lastReadTimeMs: number): void {
-    const channelId = String(cid).trim();
-    const mid = String(lastMid).trim();
-    if (!channelId || !mid) return;
-    const nextReadTime = Math.trunc(Number(lastReadTimeMs) || 0);
-    const prevReadTime = deps.state.readLastReadTimeMs(channelId);
-    const prevReadMid = deps.state.readLastReadMessageId(channelId);
-    if (!shouldAdvanceReadMarker(prevReadTime, prevReadMid, nextReadTime, mid)) return;
-    deps.state.writeLastReadTimeMs(channelId, nextReadTime);
+  function syncLocalReadMarker(channelId: string, mid: string): void {
+    if (compareMessageIdForReadOrder(mid, deps.state.readLastReadMessageId(channelId)) <= 0) return;
     deps.state.writeLastReadMessageId(channelId, mid);
   }
 
@@ -82,7 +73,7 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
   async function reportIfAllowed(
     cid: string,
     lastMid: string,
-    lastReadTimeMs: number,
+    _lastReadTimeMs: number,
     nowMs: number,
     minIntervalMs: number = 1500,
   ): Promise<boolean> {
@@ -98,9 +89,6 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
     const channelId = String(cid).trim();
     const mid = String(lastMid).trim();
     if (!channelId || !mid) return false;
-    // 跳过已撤回/删除的尾部消息，避免服务端因消息不存在而拒绝标记已读、导致游标卡死。
-    const reportableMid = pickReportableLastMid(deps.messageCache.listMessages(channelId), mid);
-    syncLocalReadMarker(channelId, reportableMid, lastReadTimeMs);
     const now = Number.isFinite(nowMs) ? Math.trunc(nowMs) : Date.now();
     if (!canReportNow(channelId, now, minIntervalMs)) return false;
 
@@ -109,13 +97,14 @@ export function createReadStateReporter(deps: ReadStateReporterDeps): ReadStateR
     const requestSocket = socket;
     const requestScopeVersion = deps.scope.getActiveScopeVersion();
 
-    const req = { lastReadMessageId: reportableMid, lastReadTime: Math.trunc(Number(lastReadTimeMs) || 0) };
+    const req = { lastReadMessageId: mid };
     try {
       const res: ChatReadStateResponse = await deps.api.updateReadState(socket, token, channelId, req);
       if (deps.scope.getActiveServerSocket() !== requestSocket) return false;
       if (deps.scope.getActiveScopeVersion() !== requestScopeVersion) return false;
-      syncLocalReadMarker(channelId, res.lastReadMid, res.lastReadTime);
-      deps.state.writeLastReportAtMs(channelId, now);
+      syncLocalReadMarker(channelId, res.lastReadMid);
+      deps.state.writeLastReportAtMs(channelId, Math.max(now, deps.state.readLastReportAtMs(channelId)));
+      void deps.refreshChannelReadState(channelId);
       return true;
     } catch (error) {
       logger.warn("Action: chat_read_state_report_failed", { channelId, error: String(error) });

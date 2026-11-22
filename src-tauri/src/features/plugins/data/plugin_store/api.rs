@@ -93,6 +93,23 @@ pub(super) async fn get_cached_server_id(origin: &str) -> Option<String> {
     cached
 }
 
+fn parse_server_info(mut body: serde_json::Value) -> anyhow::Result<ApiServerInfo> {
+    if let Some(code) = body.get("code").and_then(serde_json::Value::as_i64) {
+        if code != 0 {
+            let message = body
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("Request failed");
+            anyhow::bail!("GET /api/server business error {code}: {message}");
+        }
+        body = body
+            .get_mut("data")
+            .context("GET /api/server response has no data")?
+            .take();
+    }
+    serde_json::from_value(body).context("Invalid /api/server data")
+}
+
 async fn fetch_server_id_network(origin: &str, client: &reqwest::Client) -> anyhow::Result<String> {
     let key = origin.trim().to_string();
     let url = format!("{}/api/server", origin);
@@ -104,10 +121,11 @@ async fn fetch_server_id_network(origin: &str, client: &reqwest::Client) -> anyh
         .context("Failed to request /api/server")?
         .error_for_status()
         .context("GET /api/server returned an error status")?;
-    let info: ApiServerInfo = res
+    let body: serde_json::Value = res
         .json()
         .await
         .context("Failed to parse /api/server JSON")?;
+    let info = parse_server_info(body)?;
     let id = info.server_id.trim().to_string();
     if id.is_empty() {
         return Err(anyhow::anyhow!("Missing server_id in /api/server response"));

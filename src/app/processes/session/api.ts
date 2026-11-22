@@ -77,6 +77,10 @@ async function redirectIfRequiredSetupNeeded(router: Router, serverSocket: strin
  * @returns 鉴权失败时返回 `true`。
  */
 function isSessionAuthFailure(error: unknown): boolean {
+  const apiError = isApiRequestError(error)
+    ? error
+    : error instanceof Error && "cause" in error && isApiRequestError(error.cause) ? error.cause : null;
+  if (apiError && (apiError.code === 11001 || apiError.code === 11002 || apiError.code === 11003)) return true;
   if (isApiRequestError(error)) return error.status === 401 || error.status === 403;
   if (!accountCapabilities.profileErrors.isProfileError(error)) return false;
   const status = typeof (error as { status?: unknown }).status === "number" ? (error as { status: number }).status : null;

@@ -26,7 +26,7 @@
         "default-src": "'self' app:",
         "script-src": "'self' app:",
         "style-src": "'self' 'unsafe-inline' app:",
-        "img-src": "'self' app: data: blob: https:",
+        "img-src": "'self' app: data: blob: https: http://127.0.0.1:18080 http://localhost:18080",
         "font-src": "'self' data:",
         "connect-src": "'self' http: https: ws: wss: app:",
         "object-src": "'none'",

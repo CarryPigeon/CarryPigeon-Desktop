@@ -46,6 +46,7 @@ export type AuthSignInOutcome =
         redirectTo: "/required-setup";
       }
     >
+  | SuccessOutcome<"registered", { loginError: AuthFlowErrorInfo }>
   | FailureOutcome<"sign_in_rejected", AuthFlowErrorCode>;
 
 export function toAuthFlowErrorInfo(error: unknown): AuthFlowErrorInfo {

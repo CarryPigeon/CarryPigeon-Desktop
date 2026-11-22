@@ -3,10 +3,8 @@
  * @description chat｜数据层 wire contract：HTTP/WS snake_case payload models。
  *
  * 说明：
- * - 服务端 canonical 消息 envelope 固定 10 字段（见 `ChannelMessageV1Response`）；
- *   关系元数据（reply / quote / forward / link_preview）只在 `data` 内按 domain 分支约定放置；
- * - `mentions` 在信封顶层为 `string[]`（snowflake UID），服务端只接受 UID 列表；
- * - `status` 取值 `sent` / `recalled`，标识服务端当前存储的消息可见性状态。
+ * - 消息域版本写在 `domain` 中；历史扩展字段仅作读取兼容。
+ * - `mentions` 在信封顶层为十进制 UID 字符串数组。
  */
 
 /**
@@ -15,6 +13,8 @@
 export type ChatChannelWire = {
   cid: string;
   name: string;
+  system_channel?: boolean;
+  created_at?: number;
   brief?: string;
   avatar?: string;
   owner_uid?: string;
@@ -67,8 +67,8 @@ export type ChatQuoteReplyWire = {
 export type ChatChannelMemberWire = {
   uid: string;
   role: "owner" | "admin" | "member" | string;
-  nickname: string;
-  avatar?: string;
+  username: string;
+  avatar?: string | null;
   join_time: number;
 };
 
@@ -81,7 +81,7 @@ export type ChatChannelApplicationWire = {
   uid: string;
   reason: string;
   apply_time: number;
-  status: "pending" | "approved" | "rejected" | string;
+  status: "pending" | "accepted" | "rejected" | string;
 };
 
 /**
@@ -90,11 +90,11 @@ export type ChatChannelApplicationWire = {
 export type ChatChannelBanWire = {
   cid: string;
   uid: string;
-  /** 禁言到期时间(epoch 毫秒)。对应服务端响应字段 expires_at(API.md §5.14)。 */
-  expires_at: number;
+  /** 禁言到期时间，单位为毫秒。 */
+  until: number;
   reason: string;
-  /** 禁言创建时间(epoch 毫秒)。对应服务端响应字段 created_at(API.md §5.14)。 */
-  created_at?: number;
+  /** 禁言创建时间，单位为毫秒。 */
+  create_time: number;
 };
 
 export type ChatForwardedFromWire = {
@@ -146,7 +146,7 @@ export type ChatMessageWire = {
   uid: string;
   cid: string;
   domain: string;
-  domain_version: string;
+  domain_version?: string;
   data: unknown;
   send_time: number;
   /**
@@ -163,7 +163,7 @@ export type ChatMessageWire = {
   /** 消息预览；服务端保证不为 null（缺失时规范化为 ""）。 */
   preview: string;
   /** 消息状态；缺失时按文档默认 "sent"。 */
-  status: "sent" | "recalled";
+  status?: "sent" | "recalled";
   /**
    * 顶层转发来源快照（旧版服务端兼容）。
    *
@@ -176,37 +176,19 @@ export type ChatMessageWire = {
 };
 
 /**
- * 消息附件上传响应 wire（`POST /channels/{cid}/messages/attachments`）。
- */
-export type ChatMessageAttachmentUploadWire = {
-  object_key: string;
-  share_key: string;
-  filename: string;
-  mime_type: string;
-  size: number;
-};
-
-/**
  * 分页消息列表的 wire 表示。
  */
 export type ChatMessagePageWire = {
   items: ChatMessageWire[];
-  next_cursor?: string;
+  next_cursor?: string | null;
   has_more?: boolean;
 };
 
-/**
- * 发送消息请求体的 wire 表示（对齐服务端 `SendChannelMessageRequest`）。
- *
- * 服务端只接受顶层 `domain` / `domain_version` / `data` / `mentions`(string[]) /
- * `client_message_id`；reply/quote/link_preview 关系元数据由 `data` 承载，不能放顶层。
- */
+/** 发送消息请求；版本随 domain 传输。 */
 export type ChatSendMessageWire = {
   domain: string;
-  domain_version: string;
   data: unknown;
-  mentions?: string[];
-  client_message_id?: string;
+  mentions: string[];
 };
 
 /**
@@ -215,9 +197,7 @@ export type ChatSendMessageWire = {
 export type ChatUnreadStateWire = {
   cid: string;
   unread_count: number;
-  /** 客户端兼容字段；当前服务端 Unread 响应不返回 @ 未读计数。 */
-  mention_unread_count?: number;
-  last_read_time: number;
+
 };
 
 /**
@@ -225,7 +205,6 @@ export type ChatUnreadStateWire = {
  */
 export type ChatReadStateWire = {
   last_read_mid: string;
-  last_read_time: number;
 };
 
 /**
@@ -235,7 +214,11 @@ export type ChatReadStateResponseWire = {
   cid: string;
   uid: string;
   last_read_mid: string;
-  last_read_time: number;
+};
+
+export type ChatChannelReadStateWire = Omit<ChatReadStateResponseWire, "last_read_mid"> & {
+  last_read_mid: string | null;
+  unread_count: number;
 };
 
 export type ChatMessageSearchQueryWire = {
@@ -287,6 +270,6 @@ export type ChatMentionWire = {
 
 export type ChatMentionPageWire = {
   items: ChatMentionWire[];
-  next_cursor?: string;
-  has_more?: boolean;
+  next_cursor: string | null;
+  has_more: boolean;
 };

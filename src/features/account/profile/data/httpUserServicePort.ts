@@ -12,7 +12,6 @@ import {
   httpListUsers,
   httpUpdateUserEmail,
   httpUpdateUserProfile,
-  httpUploadBackgroundImage,
 } from "./httpUserApi";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { mapUserMeWire, mapUserPublicWire } from "./userWireMappers";
@@ -46,8 +45,8 @@ export function createHttpUserServicePort(serverSocket: string): UserServicePort
       const accessToken = await ensureValidAccessToken(socket);
       await httpUpdateUserProfile(socket, accessToken, input);
     },
-    async updateUserBackgroundImage(accessToken: string, file: File): Promise<string> {
-      return httpUploadBackgroundImage(socket, accessToken, file);
+    async updateUserBackgroundImage(_accessToken: string, file: File): Promise<string> {
+      return URL.createObjectURL(file);
     },
   };
 }

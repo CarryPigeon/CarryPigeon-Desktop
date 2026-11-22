@@ -147,7 +147,7 @@ async fn execute_json_request_impl(args: ApiHttpRequest) -> anyhow::Result<ApiHt
     let status = res.status().as_u16();
     let ok = res.status().is_success();
 
-    if status == 204 {
+    if status == 204 || url.ends_with("/internal/readiness") {
         return Ok(ApiHttpResponse {
             ok,
             status,

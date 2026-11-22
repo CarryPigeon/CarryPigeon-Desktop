@@ -82,6 +82,7 @@ function makeModel(messages: readonly ChatMessage[]): ChatCenterModel {
     currentChannelId: computed(() => "cid-prod"),
     currentChannelName: computed(() => "General"),
     currentChannelHasMore: computed(() => false),
+    currentChannelHasNewer: computed(() => false),
     loadingMoreMessages: computed(() => false),
     messageRows: rows,
     currentUserId: computed(() => "u-1"),

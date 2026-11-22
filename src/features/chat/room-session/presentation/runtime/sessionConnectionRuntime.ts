@@ -19,7 +19,6 @@ import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventMo
 import {
   createPollingFallback,
   createPreferenceCatchUpScheduler,
-  createResumeFailedCatchUp,
   createSessionWsManager,
   RoomSessionConnectionApplicationService,
 } from "@/features/chat/room-session/internal";
@@ -62,7 +61,6 @@ export type ChatSessionConnectionRuntimeDeps = {
 
 const POLL_INTERVAL_MS = 8000;
 const PREFERENCE_CATCH_UP_INTERVAL_MS = 20000;
-const CATCH_UP_PREFETCH_LIMIT = 5;
 
 /**
  * 创建会话连接生命周期 runtime。
@@ -112,18 +110,6 @@ export function createChatSessionConnectionRuntime(
     connectionApplicationService.teardownSessionHooks();
   }
 
-  const catchUpAfterResumeFailed = createResumeFailedCatchUp({
-    logger,
-    getActiveServerSocket: scope.getActiveServerSocket,
-    getActiveScopeVersion: scope.getActiveScopeVersion,
-    getCurrentChannelId: () => currentChannelId.value.trim(),
-    listChannels: () => channelsRef.value,
-    refreshChannels: governance.refreshChannels,
-    refreshChannelLatestPage: messageFlow.refreshChannelLatestPage,
-    refreshMembersRail: governance.refreshMembersRail,
-    prefetchLimit: CATCH_UP_PREFETCH_LIMIT,
-  });
-
   /**
    * 连接链路相关的 application 规则统一收束在一个对象里，
    * runtime 自己不再持有 ensure-ready 细节。
@@ -153,8 +139,14 @@ export function createChatSessionConnectionRuntime(
     startAutoRefresh: startAuthSessionAutoRefresh,
     onAuthSessionChanged,
     onWsEvent,
-    onResumeFailed: (socketKey, reason) => {
-      void catchUpAfterResumeFailed(socketKey, reason);
+    onReconnected: () => {
+      const cid = currentChannelId.value.trim();
+      if (cid) void messageFlow.loadChannelMessages(cid).catch((error) => {
+        logger.warn("Action: chat_reconnect_latest_messages_failed", { cid, error: String(error) });
+      });
+      void governance.refreshChannels().catch((error) => {
+        logger.warn("Action: chat_reconnect_channels_failed", { error: String(error) });
+      });
     },
   });
 

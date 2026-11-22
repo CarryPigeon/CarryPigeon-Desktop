@@ -48,8 +48,11 @@ export type UseSignalViewportDeps = {
   currentChannelId: StringRef;
   currentMessageCount: CountRef;
   currentChannelHasMore: BoolRef;
+  currentChannelHasNewer: BoolRef;
   loadingMoreMessages: BoolRef;
   loadMoreMessages(): Promise<void>;
+  loadNewerMessages(): Promise<void>;
+  loadLatestMessages(): Promise<void>;
   reportCurrentReadState(): Promise<void>;
   onAsyncError(action: string, error: unknown): void;
 };
@@ -62,7 +65,7 @@ export type SignalViewportModel = {
   showJumpToBottom: Ref<boolean>;
   setSignalPaneRef(el: HTMLElement | null): void;
   handleSignalScroll(): void;
-  handleLoadMoreMessages(): Promise<void>;
+  handleLoadMoreMessages(direction?: "older" | "newer"): Promise<void>;
   handleJumpToBottom(): void;
   /** 自己发送消息后调用：等待消息入列后强制跳到底部。 */
   notifyOwnMessageSent(): Promise<void>;
@@ -88,6 +91,7 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
   const showJumpToBottom = ref(false);
 
   let lastAutoLoadAt = 0;
+  let loadingPage = false;
   let pendingScrollToBottom = false;
   /** 自己发送的消息待入列标记：入列后无论视口位置都强制跳到底部。 */
   let pendingOwnSendScroll = false;
@@ -254,7 +258,7 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
    * 尽力上报已读状态：当用户到达底部时认为已读。
    */
   function maybeReportReadState(): void {
-    if (!isSignalAtBottom()) return;
+    if (deps.currentChannelHasNewer.value || !isSignalAtBottom()) return;
     runAsyncTask(deps.reportCurrentReadState(), "chat_report_read_state_failed");
   }
 
@@ -280,21 +284,28 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
   }
 
   /**
-   * 加载更早一页消息，同时保持滚动位置稳定。
+   * 加载一页消息，同时保持滚动位置稳定。
    */
-  async function handleLoadMoreMessages(): Promise<void> {
+  async function handleLoadMoreMessages(direction: "older" | "newer" = "older"): Promise<void> {
+    if (deps.loadingMoreMessages.value || loadingPage) return;
     const el = signalPaneRef.value;
-    if (!el) {
-      await deps.loadMoreMessages();
-      return;
+    const cid = deps.currentChannelId.value;
+    const prevHeight = el?.scrollHeight ?? 0;
+    const prevTop = el?.scrollTop ?? 0;
+    const newer = direction === "newer";
+    loadingPage = true;
+    if (newer) cancelStickToBottom();
+    try {
+      await (newer ? deps.loadNewerMessages() : deps.loadMoreMessages());
+      await nextTick();
+      if (el && el === signalPaneRef.value && cid === deps.currentChannelId.value) {
+        el.scrollTop = newer ? prevTop : prevTop + el.scrollHeight - prevHeight;
+      }
+    } catch (error) {
+      deps.onAsyncError("chat_load_more_messages_failed", error);
+    } finally {
+      loadingPage = false;
     }
-    const prevHeight = el.scrollHeight;
-    const prevTop = el.scrollTop;
-    await deps.loadMoreMessages();
-    await nextTick();
-    const nextHeight = el.scrollHeight;
-    const delta = nextHeight - prevHeight;
-    el.scrollTop = prevTop + delta;
   }
 
   /**
@@ -303,23 +314,33 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
   function handleSignalScroll(): void {
     const el = signalPaneRef.value;
     if (!el) return;
-    showJumpToBottom.value = !isSignalAtBottom();
+    showJumpToBottom.value = deps.currentChannelHasNewer.value || !isSignalAtBottom();
     maybeReportReadState();
     if (!deps.currentChannelHasMore.value || deps.loadingMoreMessages.value) return;
     if (el.scrollTop > TOP_AUTO_LOAD_THRESHOLD_PX) return;
     const now = Date.now();
     if (now - lastAutoLoadAt < AUTO_LOAD_COOLDOWN_MS) return;
     lastAutoLoadAt = now;
-    runAsyncTask(handleLoadMoreMessages(), "chat_load_more_messages_failed");
+    void handleLoadMoreMessages();
   }
 
   /**
    * “跳到底部”按钮处理。
    */
-  function handleJumpToBottom(): void {
+  async function jumpToLatest(): Promise<void> {
+    const cid = deps.currentChannelId.value;
+    if (deps.currentChannelHasNewer.value) {
+      await deps.loadLatestMessages();
+      await nextTick();
+      if (cid !== deps.currentChannelId.value || deps.currentChannelHasNewer.value) return;
+    }
     scrollSignalToBottom();
     startStickToBottom();
     maybeReportReadState();
+  }
+
+  function handleJumpToBottom(): void {
+    runAsyncTask(jumpToLatest(), "chat_jump_to_latest_failed");
   }
 
   /**
@@ -362,9 +383,7 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
     if (!pendingOwnSendScroll) return;
     pendingOwnSendScroll = false;
     if (deps.currentMessageCount.value <= 0) return;
-    scrollSignalToBottom();
-    startStickToBottom();
-    maybeReportReadState();
+    await jumpToLatest().catch((error) => deps.onAsyncError("chat_jump_to_latest_failed", error));
   }
 
   async function handlePendingScrollOnMessageCount(nextCount: number): Promise<boolean> {
@@ -376,7 +395,7 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
   }
 
   async function handleIncrementalMessageAppend(nextCount: number, prevCount: number): Promise<void> {
-    if (nextCount <= prevCount) return;
+    if (nextCount <= prevCount || loadingPage || deps.currentChannelHasNewer.value) return;
     if (pendingOwnSendScroll) {
       // 自己发送的消息已入列：无论用户当前滚动到何处，都直接跳到最底部。
       pendingOwnSendScroll = false;
@@ -413,6 +432,12 @@ export function useSignalViewport(deps: UseSignalViewportDeps): SignalViewportMo
     () => deps.currentMessageCount.value,
     onMessageCountChanged,
   );
+
+  watch(deps.currentChannelHasNewer, (hasNewer) => {
+    if (!hasNewer) return;
+    cancelStickToBottom();
+    showJumpToBottom.value = true;
+  });
 
   // 组件卸载时清理贴底吸附轮询，避免悬挂定时器。
   onScopeDispose(cancelStickToBottom);

@@ -6,6 +6,8 @@
  */
 
 import { computed, reactive, ref, type Ref } from "vue";
+import type { MessageContextEdges } from "../../domain/ports";
+import { compareMessageIdForReadOrder } from "@/features/chat/domain/utils/readMarker";
 import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
 import { createLocalStorageDraftStorage } from "@/features/chat/message-flow/draft/data/localStorageDraftStorage";
 
@@ -34,13 +36,20 @@ export function createChatMessageFlowState(deps: CreateChatMessageFlowStateDeps)
   const selectedMessageIds = ref<Set<string>>(new Set());
 
   const messagesByChannel = reactive<Record<string, ChatMessage[]>>({});
+  const contextEdgesByChannel = reactive<Record<string, MessageContextEdges>>({});
   const nextCursorByChannel = reactive<Record<string, string>>({});
   const hasMoreByChannel = reactive<Record<string, boolean>>({});
   const loadingMoreByChannel = reactive<Record<string, boolean>>({});
   const searchState = ref<MessageSearchState>({ query: "", loading: false, error: "", results: [] });
   const highlightedMessageId = ref<string>("");
 
-  const currentMessages = computed(() => messagesByChannel[deps.currentChannelId.value] ?? []);
+  const currentMessages = computed(() => {
+    const cid = deps.currentChannelId.value;
+    const messages = messagesByChannel[cid] ?? [];
+    const edge = contextEdgesByChannel[cid]?.after;
+    return edge ? messages.filter((message) => compareMessageIdForReadOrder(message.id, edge) <= 0) : messages;
+  });
+  const currentChannelHasNewer = computed(() => Boolean(contextEdgesByChannel[deps.currentChannelId.value]?.after));
   const currentChannelHasMore = computed(() => Boolean(hasMoreByChannel[deps.currentChannelId.value]));
   const currentChannelLoadingMore = computed(() => Boolean(loadingMoreByChannel[deps.currentChannelId.value]));
 
@@ -75,6 +84,7 @@ export function createChatMessageFlowState(deps: CreateChatMessageFlowStateDeps)
     replyToMessageId,
     messageActionError,
     messagesByChannel,
+    contextEdgesByChannel,
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
@@ -82,6 +92,7 @@ export function createChatMessageFlowState(deps: CreateChatMessageFlowStateDeps)
     highlightedMessageId,
     currentMessages,
     currentChannelHasMore,
+    currentChannelHasNewer,
     currentChannelLoadingMore,
     readChannelDraft,
     saveChannelDraft,

@@ -16,6 +16,9 @@ import type {
   ChatChannelPatchInput,
   ChatChannelRecord,
   ChatMentionPage,
+  ChatMentionRecord,
+  ChatChannelReadState,
+  ChatMessageContext,
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
@@ -23,8 +26,6 @@ import type {
   ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
-  ChatMessageAttachmentType,
-  ChatMessageAttachmentUploadResult,
 } from "../types/chatApiModels";
 
 /**
@@ -36,6 +37,10 @@ import type {
  */
 export type ChatApiPort = {
   listChannels(serverSocket: string, accessToken: string): Promise<ChatChannelRecord[]>;
+  batchGetChannels(serverSocket: string, accessToken: string, channelIds: readonly string[]): Promise<{ total: number; items: ChatChannelRecord[] }>;
+  transferChannel(serverSocket: string, accessToken: string, cid: string, newOwner: string): Promise<void>;
+  quitChannel(serverSocket: string, accessToken: string, cid: string): Promise<void>;
+  listMyChannelApplications(serverSocket: string, accessToken: string): Promise<ChatChannelApplicationRecord[]>;
   getUnreads(serverSocket: string, accessToken: string): Promise<ChatUnreadState[]>;
   listChannelMessages(
     serverSocket: string,
@@ -44,28 +49,14 @@ export type ChatApiPort = {
     cursor?: string,
     limit?: number,
   ): Promise<ChatMessagePage>;
-  sendChannelMessage(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    req: ChatSendMessageInput,
-    idempotencyKey?: string,
-  ): Promise<ChatMessageRecord>;
-  uploadMessageAttachment(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    file: File,
-    messageType?: ChatMessageAttachmentType,
-  ): Promise<ChatMessageAttachmentUploadResult>;
-  recallMessage(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    mid: string,
-  ): Promise<ChatMessageRecord>;
+  listChannelMessagesAfter(serverSocket: string, accessToken: string, cid: string, cursor: string, limit?: number): Promise<ChatMessagePage>;
+  getMessage(serverSocket: string, accessToken: string, mid: string): Promise<ChatMessageRecord>;
+  getMessagesByIds(serverSocket: string, accessToken: string, messageIds: string[]): Promise<{ total: number; items: ChatMessageRecord[] }>;
+  sendChannelMessage(serverSocket: string, accessToken: string, cid: string, req: ChatSendMessageInput): Promise<ChatMessageRecord>;
+  recallMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void>;
+  getChannelReadState(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelReadState>;
   updateReadState(serverSocket: string, accessToken: string, cid: string, req: ChatReadStateInput): Promise<ChatReadStateResponse>;
-  applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void>;
+  applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<ChatChannelApplicationRecord>;
   patchChannel(
     serverSocket: string,
     accessToken: string,
@@ -83,7 +74,7 @@ export type ChatApiPort = {
     cid: string,
     applicationId: string,
     decision: "approve" | "reject",
-  ): Promise<void>;
+  ): Promise<ChatChannelApplicationRecord>;
   listChannelBans(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelBanRecord[]>;
   putChannelBan(
     serverSocket: string,
@@ -110,7 +101,7 @@ export type ChatApiPort = {
     aroundMid: string,
     before?: number,
     after?: number,
-  ): Promise<ChatMessagePage>;
+  ): Promise<ChatMessageContext>;
   pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void>;
   unpinMessage(serverSocket: string, accessToken: string, cid: string, mid: string): Promise<void>;
   listPins(serverSocket: string, accessToken: string, cid: string, cursor?: string, limit?: number): Promise<{ items: ChatPinRecord[]; nextCursor?: string; hasMore?: boolean }>;
@@ -118,9 +109,11 @@ export type ChatApiPort = {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
+    req: { targetCid: string; sourceChannelId?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord>;
   listMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPage>;
-  markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void>;
-  batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void>;
+  getMention(serverSocket: string, accessToken: string, mentionId: string): Promise<ChatMentionRecord>;
+  getMentionsByIds(serverSocket: string, accessToken: string, mentionIds: string[]): Promise<ChatMentionRecord[]>;
+  markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void>;
+  batchMarkMentionsRead(serverSocket: string, accessToken: string, throughMentionId?: string, cid?: string): Promise<void>;
 };

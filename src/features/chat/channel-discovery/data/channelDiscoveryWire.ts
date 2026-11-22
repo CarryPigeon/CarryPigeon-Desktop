@@ -7,7 +7,7 @@ export type ChannelDiscoverItemWire = {
   cid: string;
   name: string;
   brief?: string;
-  avatar?: string;
+  avatar?: string | null;
   member_count: number;
   requires_application: boolean;
   type?: string;
@@ -15,7 +15,7 @@ export type ChannelDiscoverItemWire = {
 
 export type ChannelDiscoverPageWire = {
   items: ChannelDiscoverItemWire[];
-  next_cursor?: string;
+  next_cursor?: string | null;
   has_more?: boolean;
 };
 

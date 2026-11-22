@@ -1,5 +1,6 @@
 export { buildFileDownloadUrl } from "./buildFileDownloadUrl";
 export { httpFileServicePort } from "./httpFileServicePort";
+export { uploadFileContent } from "./uploadFileContent";
 export type { FileServicePort } from "./fileServicePort";
 export type { FileUploadRequest, FileUploadResult, UploadDescriptor } from "./types";
 export { GetDownloadUrl } from "./usecases/GetDownloadUrl";

@@ -17,7 +17,6 @@ import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { createReadStateReporter, RoomSessionCatalogApplicationService } from "@/features/chat/room-session/internal";
 import type { ChatApiGateway } from "@/features/chat/composition/contracts/chatGateway";
-import type { ChatMessage } from "@/features/chat/message-flow/api-types";
 import type { ChatRuntimeScopePort } from "@/features/chat/composition/contracts/chatScopePort";
 import type { ChatSessionStateSlice } from "./sessionRuntimePorts";
 import {
@@ -55,6 +54,7 @@ export type ChatSessionSharedContext = {
    * - catch-up / reconnect 之后的目录重取
    */
   refreshChannels(): Promise<void>;
+  refreshChannelReadState(cid: string): Promise<void>;
   /**
    * 已读状态推进与限流上报器。
    */
@@ -102,26 +102,6 @@ export function createChatSessionSharedContext(
     lastReadReportAtMsByChannel: deps.lastReadReportAtMsByChannel,
   });
 
-  const messageCache = {
-    listMessages(channelId: string): readonly ChatMessage[] {
-      return deps.messagesByChannel[channelId] ?? [];
-    },
-    findMessageById(channelId: string, messageId: string): ChatMessage | null {
-      const list = deps.messagesByChannel[channelId] ?? [];
-      return list.find((entry) => entry.id === messageId) ?? null;
-    },
-    clearAllMessageCaches(): void {
-      for (const key of Object.keys(deps.messagesByChannel)) delete deps.messagesByChannel[key];
-    },
-  };
-
-  const readStateReporter = createReadStateReporter({
-    api: deps.api,
-    scope,
-    state: readMarkerState,
-    messageCache,
-  });
-
   /**
    * 目录刷新逻辑统一下沉到 application service，
    * shared context 只负责把 scope 与状态端口装配进去。
@@ -131,12 +111,14 @@ export function createChatSessionSharedContext(
     scope,
     directoryState,
     readMarkerState,
-    messageCache,
   });
 
+  const refreshChannelReadState = (cid: string) => catalogApplicationService.refreshChannelReadState(cid);
+  const readStateReporter = createReadStateReporter({ api: deps.api, scope, state: readMarkerState, refreshChannelReadState });
   return {
     scope,
     refreshChannels: () => catalogApplicationService.refreshChannels(),
+    refreshChannelReadState,
     readStateReporter,
   };
 }

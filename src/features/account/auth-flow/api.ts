@@ -24,8 +24,10 @@ import {
   type SendVerificationCodeOutcome,
   toAuthFlowErrorInfo,
 } from "./application/authFlowOutcome";
+import type { EmailCodePurpose } from "./domain/ports/EmailServicePort";
 import { signInWithEmailCode, signInWithPassword, registerAndSignInWithPassword } from "./application/loginSessionCoordinator";
 import {
+  getAuthServicePort,
   getCheckRequiredGateUsecase,
   getRevokeTokenUsecase,
   getSendVerificationCodeUsecase,
@@ -42,10 +44,11 @@ export type {
 } from "./application/authFlowOutcome";
 
 export type AuthFlowServerCapabilities = {
-  sendVerificationCode(email: string): Promise<SendVerificationCodeOutcome>;
+  sendVerificationCode(email: string, purpose: EmailCodePurpose): Promise<SendVerificationCodeOutcome>;
+  changePassword(password: string, code: string): Promise<void>;
   signInWithEmailCode(email: string, code: string): Promise<AuthSignInOutcome>;
   signInWithPassword(username: string, password: string): Promise<AuthSignInOutcome>;
-  registerAndSignInWithPassword(username: string, password: string): Promise<AuthSignInOutcome>;
+  registerAndSignInWithPassword(username: string, password: string, email: string, code: string): Promise<AuthSignInOutcome>;
   revokeToken(refreshToken: string): Promise<RevokeTokenOutcome>;
   checkRequiredSetup(): Promise<AuthRequiredSetupOutcome>;
 };
@@ -77,9 +80,12 @@ export function createAuthFlowCapabilities(): AuthFlowCapabilities {
     },
     forServer(serverSocket: string): AuthFlowServerCapabilities {
       return {
-        async sendVerificationCode(email: string): Promise<SendVerificationCodeOutcome> {
+        changePassword(password, code) {
+          return getAuthServicePort(serverSocket).changePassword(password, code);
+        },
+        async sendVerificationCode(email: string, purpose: EmailCodePurpose): Promise<SendVerificationCodeOutcome> {
           try {
-            await getSendVerificationCodeUsecase(serverSocket).execute(email);
+            await getSendVerificationCodeUsecase(serverSocket).execute(email, purpose);
             return {
               ok: true,
               kind: "verification_code_sent",
@@ -99,8 +105,8 @@ export function createAuthFlowCapabilities(): AuthFlowCapabilities {
         signInWithPassword(username: string, password: string): Promise<AuthSignInOutcome> {
           return signInWithPassword(serverSocket, username, password);
         },
-        registerAndSignInWithPassword(username: string, password: string): Promise<AuthSignInOutcome> {
-          return registerAndSignInWithPassword(serverSocket, username, password);
+        registerAndSignInWithPassword(username: string, password: string, email: string, code: string): Promise<AuthSignInOutcome> {
+          return registerAndSignInWithPassword(serverSocket, username, password, email, code);
         },
         async revokeToken(refreshToken: string): Promise<RevokeTokenOutcome> {
           try {

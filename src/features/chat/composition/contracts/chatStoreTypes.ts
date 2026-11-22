@@ -78,12 +78,14 @@ export type MessageFlowRuntimeStore = {
   messageActionError: Ref<ChatMessageActionErrorInfo | null>;
   currentMessages: Readonly<Ref<ChatMessage[]>>;
   currentChannelHasMore: Readonly<Ref<boolean>>;
+  currentChannelHasNewer: Readonly<Ref<boolean>>;
   loadingMoreMessages: Readonly<Ref<boolean>>;
   searchState: Ref<MessageSearchState>;
   highlightedMessageId: Ref<string>;
   availableDomains(): MessageDomain[];
   getMessageById(channelId: string, messageId: string): ChatMessage | null;
-  loadMoreMessages(): Promise<void>;
+  loadMoreMessages(direction?: "older" | "newer"): Promise<void>;
+  loadLatestMessages(): Promise<void>;
   startReply(message: ChatMessage): void;
   cancelReply(): void;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
@@ -130,7 +132,8 @@ export type ChatRuntimeAggregateStore =
   & MessageFlowRuntimeStore
   & RoomGovernanceRuntimeStore
   & {
-    forwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<ChatMessage>;
+    forwardMessage(mid: string, req: { targetCid: string; mergedMids?: string[] }): Promise<ChatMessage>;
+    sendForwardComment(targetCid: string, text: string): void;
   };
 
 /**

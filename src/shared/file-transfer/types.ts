@@ -10,7 +10,7 @@ export type FileUploadRequest = {
   filename: string;
   mimeType: string;
   sizeBytes: number;
-  sha256?: string;
+  sha256: string;
 };
 
 /**
@@ -21,6 +21,7 @@ export type UploadDescriptor = {
   url: string;
   headers?: Record<string, string>;
   expiresAt: number;
+  hasSame: boolean;
 };
 
 /**

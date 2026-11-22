@@ -29,8 +29,6 @@ const sendInput: ChatSendMessageInput = {
 const unread: ChatUnreadState = {
   channelId: "c1",
   unreadCount: 2,
-  mentionUnreadCount: 1,
-  lastReadTime: 1,
 };
 
 void replyRecord;

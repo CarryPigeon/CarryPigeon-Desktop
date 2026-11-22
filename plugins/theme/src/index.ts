@@ -117,7 +117,9 @@ export function apply(ctx: Context): void {
     detachSystemListener = () => {};
     if (current !== "system" || !media) return;
     const onChange = (): void => {
-      applyCurrent();
+      if ((readHostPreference() ?? current) === "system") {
+        applyThemeName(resolveThemeName("system", media.matches));
+      }
     };
     media.addEventListener("change", onChange);
     detachSystemListener = () => media.removeEventListener("change", onChange);
@@ -164,7 +166,7 @@ export function apply(ctx: Context): void {
 
   /** 点击主题图标：亮 → 暗 → 跟随系统 → 亮，并写回宿主 key。 */
   function cycle(): void {
-    const next = nextThemePreference(current ?? readAppliedTheme());
+    const next = nextThemePreference(readHostPreference() ?? current ?? readAppliedTheme());
     setPreference(next, true);
     logger.info("theme_switched", { theme: next });
   }

@@ -196,9 +196,14 @@ export function createMessageMapper(deps: MessageModelDeps) {
 /**
  * 比较两条消息的稳定顺序。
  *
- * 先按发送时间排序，再按消息 id 兜底，保证合并结果可重放且稳定。
+ * 服务端消息按十进制 MID 数值升序展示；本地占位消息按时间兜底。
  */
 export function compareMessages(a: ChatMessage, b: ChatMessage): number {
+  if (/^\d+$/.test(a.id) && /^\d+$/.test(b.id)) {
+    const aId = BigInt(a.id);
+    const bId = BigInt(b.id);
+    return aId < bId ? -1 : aId > bId ? 1 : 0;
+  }
   if (a.timeMs !== b.timeMs) return a.timeMs < b.timeMs ? -1 : 1;
   return a.id.localeCompare(b.id);
 }

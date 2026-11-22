@@ -40,6 +40,7 @@ const props = defineProps<{
    * 回复预览文本（仅 core-text 使用）。
    */
   replyText?: string;
+  pinned?: boolean;
   /**
    * domain registry（来自父级 store）。
    */
@@ -134,7 +135,7 @@ const sendFailedError = computed<string | undefined>(() => {
  * 初始实现通过消息属性判断，后续接入 pin 列表时填充真实数据。
  */
 const isPinned = computed(() => {
-  return (props.message as { isPinned?: boolean }).isPinned ?? false;
+  return props.pinned === true || (props.message as { isPinned?: boolean }).isPinned === true;
 });
 
 const isMergedForward = computed(() => {
@@ -177,7 +178,8 @@ const voiceMessageData = computed<{ shareKey?: string; durationMs?: number } | n
 /**
  * 判断当前消息是否为 Core:File。
  */
-const isCoreFileMessage = computed(() => props.message.domain.id === "Core:File");
+const isCoreImageRef = computed(() => props.message.domain.id === "Core:Image" && props.message.kind === "domain_message");
+const isCoreFileMessage = computed(() => props.message.domain.id === "Core:File" || isCoreImageRef.value);
 
 /**
  * Core:File 消息数据。
@@ -197,7 +199,7 @@ const coreFileData = computed<{
   return {
     shareKey,
     filename: String(data.filename ?? data.text ?? shareKey).trim() || shareKey,
-    mimeType: String(data.mime_type ?? data.mimeType ?? "").trim() || undefined,
+    mimeType: String(data.mime_type ?? data.mimeType ?? "").trim() || (isCoreImageRef.value ? "image/*" : undefined),
     sizeBytes: Number(data.size ?? data.sizeBytes ?? 0) || undefined,
   };
 });

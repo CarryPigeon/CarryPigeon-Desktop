@@ -23,6 +23,7 @@ import type {
   ChatChannelPatchInput,
   ChatChannelRecord,
   ChatMentionPage,
+  ChatMessageContext,
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
@@ -32,7 +33,6 @@ import type {
   ChatUnreadState,
 } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatEventEnvelope } from "@/features/chat/domain/types/chatEventModels";
-import { getRoomSessionCapabilities } from "@/features/chat/room-session/api";
 
 /**
  * `ChatCoreApplicationService` 的依赖集合。
@@ -46,7 +46,9 @@ export type ChatCoreApplicationServiceDeps = {
     ChatApiPort,
     | "listChannels"
     | "getUnreads"
+    | "getChannelReadState"
     | "listChannelMessages"
+    | "getMessage"
     | "sendChannelMessage"
     | "recallMessage"
     | "updateReadState"
@@ -106,31 +108,28 @@ export class ChatCoreApplicationService {
     return this.deps.api.listChannelMessages(serverSocket, accessToken, channelId, cursor, limit);
   }
 
-  /**
-   * 向指定频道发送一条消息。
-   *
-   * @param idempotencyKey - 可选幂等键，用于避免重复发送。
-   */
-  sendMessage(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    request: ChatSendMessageInput,
-    idempotencyKey?: string,
-  ): Promise<ChatMessageRecord> {
-    return this.deps.api.sendChannelMessage(serverSocket, accessToken, channelId, request, idempotencyKey);
+  getMessage(serverSocket: string, accessToken: string, messageId: string): Promise<ChatMessageRecord> {
+    return this.deps.api.getMessage(serverSocket, accessToken, messageId);
+  }
+
+  sendMessage(serverSocket: string, accessToken: string, channelId: string, request: ChatSendMessageInput): Promise<ChatMessageRecord> {
+    return this.deps.api.sendChannelMessage(serverSocket, accessToken, channelId, request);
   }
 
   /**
    * 撤回一条消息。
    */
-  recallMessage(serverSocket: string, accessToken: string, channelId: string, messageId: string): Promise<ChatMessageRecord> {
+  recallMessage(serverSocket: string, accessToken: string, channelId: string, messageId: string): Promise<void> {
     return this.deps.api.recallMessage(serverSocket, accessToken, channelId, messageId);
   }
 
   /**
    * 上报频道读状态。
    */
+  getChannelReadState(serverSocket: string, accessToken: string, cid: string) {
+    return this.deps.api.getChannelReadState(serverSocket, accessToken, cid);
+  }
+
   updateReadState(
     serverSocket: string,
     accessToken: string,
@@ -143,7 +142,7 @@ export class ChatCoreApplicationService {
   /**
    * 发起加入频道申请。
    */
-  applyJoinChannel(serverSocket: string, accessToken: string, channelId: string, reason: string): Promise<void> {
+  applyJoinChannel(serverSocket: string, accessToken: string, channelId: string, reason: string): Promise<ChatChannelApplicationRecord> {
     return this.deps.api.applyJoinChannel(serverSocket, accessToken, channelId, reason);
   }
 
@@ -175,7 +174,7 @@ export class ChatCoreApplicationService {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
+    req: { targetCid: string; sourceChannelId?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord> {
     return this.deps.api.forwardMessage(serverSocket, accessToken, mid, req);
   }
@@ -184,16 +183,12 @@ export class ChatCoreApplicationService {
     return this.deps.api.listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
   }
 
-  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void> {
-    await this.deps.api.markMentionRead(serverSocket, accessToken, mentionId, cid);
-    // 服务端两套未读体系不联动：标记提及已读后频道红点仍残留，本地补偿归零。
-    if (cid) getRoomSessionCapabilities().directory.zeroChannelUnreadLocally(cid);
+  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void> {
+    await this.deps.api.markMentionRead(serverSocket, accessToken, mentionId);
   }
 
-  async batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
-    await this.deps.api.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
-    // 服务端两套未读体系不联动：标记提及已读后频道红点仍残留，本地补偿归零。
-    if (cid) getRoomSessionCapabilities().directory.zeroChannelUnreadLocally(cid);
+  async batchMarkMentionsRead(serverSocket: string, accessToken: string, throughMentionId?: string, cid?: string): Promise<void> {
+    await this.deps.api.batchMarkMentionsRead(serverSocket, accessToken, throughMentionId, cid);
   }
 
   searchChannelMessages(
@@ -212,7 +207,7 @@ export class ChatCoreApplicationService {
     aroundMid: string,
     before?: number,
     after?: number,
-  ): Promise<ChatMessagePage> {
+  ): Promise<ChatMessageContext> {
     return this.deps.api.listChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
   }
 
@@ -301,7 +296,7 @@ export class ChatGovernanceApplicationService {
     channelId: string,
     applicationId: string,
     decision: "approve" | "reject",
-  ): Promise<void> {
+  ): Promise<ChatChannelApplicationRecord> {
     return this.deps.api.decideChannelApplication(serverSocket, accessToken, channelId, applicationId, decision);
   }
 

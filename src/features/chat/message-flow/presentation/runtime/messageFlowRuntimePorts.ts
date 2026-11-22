@@ -24,6 +24,7 @@ export type ChatMessageFlowStateSlice = Pick<
   ChatStoreState,
   | "currentChannelId"
   | "messagesByChannel"
+  | "contextEdgesByChannel"
   | "nextCursorByChannel"
   | "hasMoreByChannel"
   | "loadingMoreByChannel"
@@ -53,7 +54,7 @@ export type ChatMessageTimelinePort = {
  */
 export type ChatMessageFlowRuntimePort = ChatMessageTimelinePort & {
   availableDomains(): MessageDomain[];
-  loadMoreMessages(): Promise<void>;
+  loadMoreMessages(direction?: "older" | "newer"): Promise<void>;
   recallMessage(messageId: string): Promise<RecallChatMessageOutcome>;
   startReply(message: ChatMessage): void;
   cancelReply(): void;

@@ -151,7 +151,7 @@ async function verifyHttpApi(serverSocket: string): Promise<void> {
       // 这里再附加明确关键字以驱动 UI 文案分支。
       if (isApiRequestError(error)) {
         // 404 或非 /api/server 风格的 reason 视为“不是 CarryPigeon 服务器”。
-        if (error.status === 404 || error.reason === "http_error") {
+        if (error.status === 404 || error.code === 10003 || error.reason === "http_error") {
           throw new Error(`not a carrypigeon server: GET /api/server returned status=${error.status}`);
         }
         throw error;

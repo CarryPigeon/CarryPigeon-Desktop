@@ -117,20 +117,19 @@ export async function registerAndSignInWithPassword(
   serverSocket: string,
   username: string,
   password: string,
+  email: string,
+  code: string,
 ): Promise<AuthSignInOutcome> {
   try {
-    await getRegisterWithPasswordUsecase(serverSocket).execute(username, password);
-    const login = await getLoginWithPasswordUsecase(serverSocket).execute(username, password);
-    return await finalizeSignedInSession(
-      serverSocket,
-      { ...login, isNewUser: true },
-      { username },
-    );
+    await getRegisterWithPasswordUsecase(serverSocket).execute(username, password, email, code);
   } catch (error) {
-    return {
-      ok: false,
-      kind: "sign_in_rejected",
-      error: toAuthFlowErrorInfo(error),
-    };
+    return { ok: false, kind: "sign_in_rejected", error: toAuthFlowErrorInfo(error) };
+  }
+
+  try {
+    const login = await getLoginWithPasswordUsecase(serverSocket).execute(username, password);
+    return await finalizeSignedInSession(serverSocket, { ...login, isNewUser: true }, { email, username });
+  } catch (error) {
+    return { ok: true, kind: "registered", loginError: toAuthFlowErrorInfo(error) };
   }
 }

@@ -20,7 +20,6 @@ export const httpFileServicePort: FileServicePort = {
   ): Promise<FileUploadResult> {
     const res = await httpRequestFileUpload(serverSocket, accessToken, {
       filename: request.filename,
-      mime_type: request.mimeType,
       size_bytes: request.sizeBytes,
       sha256: request.sha256,
     });
@@ -32,6 +31,7 @@ export const httpFileServicePort: FileServicePort = {
         url: res.upload.url,
         headers: res.upload.headers,
         expiresAt: res.upload.expires_at,
+        hasSame: res.upload.has_same,
       },
     };
   },
@@ -50,6 +50,7 @@ export const httpFileServicePort: FileServicePort = {
         url: upload.url,
         headers: upload.headers,
         expires_at: upload.expiresAt,
+        has_same: upload.hasSame,
       },
       body,
     );

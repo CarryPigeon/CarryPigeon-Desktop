@@ -241,18 +241,6 @@ onMounted(() => {
         clearable
         @update:model-value="props.model.setChannelSearch"
       />
-      <select
-        v-if="props.model.channelTab === 'discover'"
-        class="cp-channelSearch__type"
-        :value="props.model.discoverType"
-        :aria-label="t('channel_discover_type')"
-        @change="props.model.setDiscoverType(($event.target as HTMLSelectElement).value)"
-      >
-        <option value="">{{ t("channel_discover_type_all") }}</option>
-        <option value="public">{{ t("channel_discover_type_public") }}</option>
-        <option value="private">{{ t("channel_discover_type_private") }}</option>
-        <option value="system">{{ t("channel_discover_type_system") }}</option>
-      </select>
     </div>
 
     <!-- 区块：频道列表（joined/discover） -->

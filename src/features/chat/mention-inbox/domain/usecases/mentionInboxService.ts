@@ -22,6 +22,8 @@ export type MentionInboxApplicationServiceDeps = {
  * 提及收件箱远端同步服务。
  */
 export class MentionInboxApplicationService {
+  private pageRequest = 0;
+
   constructor(private readonly deps: MentionInboxApplicationServiceDeps) {}
 
   /**
@@ -36,6 +38,7 @@ export class MentionInboxApplicationService {
    */
   async setUnreadOnly(value: boolean): Promise<void> {
     this.deps.state.setUnreadOnly(Boolean(value));
+    this.deps.state.replaceItems([]);
     await this.loadPage({ append: false });
   }
 
@@ -44,6 +47,7 @@ export class MentionInboxApplicationService {
    */
   async setChannelId(channelId: string): Promise<void> {
     this.deps.state.setChannelId(String(channelId ?? "").trim());
+    this.deps.state.replaceItems([]);
     await this.loadPage({ append: false });
   }
 
@@ -79,11 +83,11 @@ export class MentionInboxApplicationService {
    * 批量标记全部已读。
    */
   async markAllRead(): Promise<void> {
+    const channelId = this.deps.state.readChannelId();
     const session = await this.deps.scope.getSocketAndValidToken();
     if (!session[0] || !session[1]) return;
-    this.deps.state.markAllLocalRead();
+    if (channelId === this.deps.state.readChannelId()) this.deps.state.markAllLocalRead();
     try {
-      const channelId = this.deps.state.readChannelId();
       if (channelId) {
         await this.deps.api.batchMarkMentionsRead(session[0], session[1], undefined, channelId);
       } else {
@@ -120,16 +124,17 @@ export class MentionInboxApplicationService {
   }
 
   private async loadPage(options: { append: boolean; cursor?: string }): Promise<void> {
-    const session = await this.deps.scope.getSocketAndValidToken();
-    if (!session[0] || !session[1]) {
-      this.deps.state.replaceItems([]);
-      this.deps.state.setUnreadCount(0, false);
-      return;
-    }
-    const [socket, token] = session;
+    const request = ++this.pageRequest;
     this.deps.state.setLoading(true);
     this.deps.state.setError("");
     try {
+      const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+      if (request !== this.pageRequest) return;
+      if (!socket || !token) {
+        this.deps.state.replaceItems([]);
+        this.deps.state.setUnreadCount(0, false);
+        return;
+      }
       const listQuery = this.buildListQuery(options.cursor);
       const unreadQuery: MentionInboxQuery = {
         limit: PAGE_LIMIT,
@@ -140,14 +145,16 @@ export class MentionInboxApplicationService {
         this.deps.api.listMentions(socket, token, listQuery),
         this.deps.api.listMentions(socket, token, unreadQuery),
       ]);
+      if (request !== this.pageRequest) return;
       if (options.append) this.deps.state.appendItems(page.items, page.nextCursor, page.hasMore);
       else this.deps.state.replaceItems(page.items, page.nextCursor, page.hasMore);
       this.deps.state.setUnreadCount(unreadPage.items.length, Boolean(unreadPage.hasMore));
     } catch (error) {
+      if (request !== this.pageRequest) return;
       logger.warn("Action: chat_mention_inbox_refresh_failed", { error: String(error) });
       this.deps.state.setError(error instanceof Error ? error.message : String(error));
     } finally {
-      this.deps.state.setLoading(false);
+      if (request === this.pageRequest) this.deps.state.setLoading(false);
     }
   }
 }

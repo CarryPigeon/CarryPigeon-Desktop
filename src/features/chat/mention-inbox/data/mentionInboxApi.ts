@@ -34,8 +34,8 @@ export function createMentionInboxApi(): MentionInboxApiPort {
     markMentionRead(serverSocket, accessToken, mentionId) {
       return httpChatApiPort.markMentionRead(serverSocket, accessToken, mentionId);
     },
-    batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, channelId) {
-      return httpChatApiPort.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, channelId);
+    batchMarkMentionsRead(serverSocket, accessToken, throughMentionId, channelId) {
+      return httpChatApiPort.batchMarkMentionsRead(serverSocket, accessToken, throughMentionId, channelId);
     },
   };
 }

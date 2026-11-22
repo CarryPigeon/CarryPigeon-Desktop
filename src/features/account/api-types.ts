@@ -13,6 +13,7 @@ import type {
   SendVerificationCodeOutcome,
 } from "./auth-flow/api";
 import type { UserPublic } from "./profile/domain/types/UserTypes";
+import type { EmailCodePurpose } from "./auth-flow/domain/ports/EmailServicePort";
 import type {
   UpdateUserEmailOutcome,
   UpdateUserProfileOutcome,
@@ -112,7 +113,8 @@ export type AccountServerCapabilities = {
    * @param email - 需要接收验证码的邮箱地址。
    * @returns 显式发码结果；失败时返回结构化错误信息而非抛出业务分支异常。
    */
-  sendVerificationCode(email: string): Promise<SendVerificationCodeOutcome>;
+  sendVerificationCode(email: string, purpose: EmailCodePurpose): Promise<SendVerificationCodeOutcome>;
+  changePassword(password: string, code: string): Promise<void>;
 
   /**
    * 检查当前服务器 required 插件是否已满足。

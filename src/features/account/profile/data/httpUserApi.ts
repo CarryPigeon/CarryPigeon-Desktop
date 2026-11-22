@@ -7,38 +7,41 @@
  */
 
 import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
+import { resolveServerUrl } from "@/shared/net/http/serverOrigin";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
 import { ProfileError } from "../domain/errors/ProfileErrors";
 
+function resolveAvatar<T extends { avatar?: string | null }>(serverSocket: string, user: T): T {
+  const avatar = user.avatar?.trim();
+  if (!avatar || /^[a-z][a-z\d+.-]*:/i.test(avatar)) return user;
+  return { ...user, avatar: resolveServerUrl(serverSocket, avatar) };
+}
+
 /**
  * `/users/me` 响应：当前用户资料。
- * 服务端实际字段：`uid`、`email`、`nickname`、`avatar`（无 `background_url` / `brief`）。
+ * 详情回读使用 `username` 及 `bio`。
  */
 export type ApiUserMe = {
   uid: string;
-  email?: string;
+  email?: string | null;
+  username?: string;
   nickname?: string;
-  avatar?: string;
+  avatar?: string | null;
+  bio?: string | null;
+  sex?: number;
+  birthday?: number;
 };
 
-/**
- * 用户公开资料（对外展示）。
- * 服务端实际字段：`uid`、`nickname`、`avatar`（无 `bio`、`background_url`）。
- */
+/** 批量公开资料与详情响应的共同字段，以及仅由详情回读的可选字段。 */
 export type ApiUserPublic = {
   uid: string;
-  nickname: string;
-  avatar?: string;
-  email?: string;
-  bio?: string;
-  background_url?: string;
-};
-
-/**
- * 上传背景图片响应（服务端 snake_case）。
- */
-export type ApiUploadBackgroundResponse = {
-  background_url: string;
+  username?: string;
+  nickname?: string;
+  avatar?: string | null;
+  email?: string | null;
+  bio?: string | null;
+  sex?: number;
+  birthday?: number;
 };
 
 type ApiUsersBatchResponse = {
@@ -51,13 +54,9 @@ type ApiUpdateUserEmailRequest = {
 };
 
 type ApiUpdateUserProfileRequest = {
-  username: string;
-  /** 服务端 @NotNull；调用方可省略，http 层会发 "" */
   avatar?: string;
-  brief: string;
-  /** 性别编码（API.md §4.5 示例为数值；省略时发 0）。 */
+  brief?: string;
   sex?: number;
-  /** 生日（epoch 毫秒；省略时发 0）。 */
   birthday?: number;
 };
 
@@ -94,7 +93,7 @@ function rethrowProfileError(code: ProfileError["code"], fallback: string, error
 export async function httpGetCurrentUser(serverSocket: string, accessToken: string): Promise<ApiUserMe> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   try {
-    return await client.requestJson<ApiUserMe>("GET", "/users/me");
+    return resolveAvatar(serverSocket, await client.requestJson<ApiUserMe>("GET", "/users/me"));
   } catch (e) {
     rethrowProfileError("get_me_failed", "Get current user failed", e);
   }
@@ -113,7 +112,8 @@ export async function httpGetUser(serverSocket: string, accessToken: string, uid
   const userId = String(uid).trim();
   if (!userId) throw new ProfileError({ code: "missing_uid", message: "Missing uid." });
   try {
-    return await client.requestJson<ApiUserPublic>("GET", `/users/${encodeURIComponent(userId)}`);
+    const user = await client.requestJson<ApiUserPublic>("GET", `/users/${encodeURIComponent(userId)}/detail`);
+    return resolveAvatar(serverSocket, user);
   } catch (e) {
     rethrowProfileError("get_user_failed", "Get user failed", e);
   }
@@ -142,7 +142,7 @@ export async function httpListUsers(serverSocket: string, accessToken: string, i
   const csv = Array.from(unique).join(",");
   try {
     const res = await client.requestJson<ApiUsersBatchResponse>("GET", `/users?ids=${encodeURIComponent(csv)}`);
-    return Array.isArray(res?.items) ? res.items : [];
+    return Array.isArray(res?.items) ? res.items.map((user) => resolveAvatar(serverSocket, user)) : [];
   } catch (e) {
     rethrowProfileError("list_users_failed", "List users failed", e);
   }
@@ -171,7 +171,7 @@ export async function httpUpdateUserEmail(
     throw new ProfileError({ code: "update_email_failed", message: "Missing email or verification code." });
   }
   try {
-    await client.requestJson<void>("PUT", "/users/me/email", body);
+    await client.requestJson<void>("PUT", "/auth/me/email", body);
   } catch (e) {
     rethrowProfileError("update_email_failed", "Update user email failed", e);
   }
@@ -190,58 +190,15 @@ export async function httpUpdateUserProfile(
   input: ApiUpdateUserProfileRequest,
 ): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  // 服务端 PatchCurrentUserProfileRequest：username / avatar / brief 均为 @NotNull；
-  // sex / birthday 为文档示例字段（API.md §4.5），未提供时按示例默认值 0 发送。
-  const body: { username: string; brief: string; avatar: string; sex: number; birthday: number } = {
-    username: String(input.username ?? "").trim(),
-    brief: String(input.brief ?? ""),
-    avatar: input.avatar != null ? String(input.avatar).trim() : "",
-    sex: Number.isFinite(input.sex) ? Math.trunc(input.sex as number) : 0,
-    birthday: Number.isFinite(input.birthday) ? Math.trunc(input.birthday as number) : 0,
-  };
-  if (!body.username) {
-    throw new ProfileError({ code: "update_profile_failed", message: "Missing username." });
-  }
+  const body: ApiUpdateUserProfileRequest = {};
+  if (input.avatar !== undefined) body.avatar = input.avatar.trim();
+  if (input.brief !== undefined) body.brief = input.brief;
+  if (input.sex !== undefined && Number.isFinite(input.sex)) body.sex = Math.trunc(input.sex);
+  if (input.birthday !== undefined && Number.isFinite(input.birthday)) body.birthday = Math.trunc(input.birthday);
   try {
     await client.requestJson<void>("PATCH", "/users/me", body);
   } catch (e) {
     rethrowProfileError("update_profile_failed", "Update user profile failed", e);
-  }
-}
-
-/**
- * 上传用户背景图片。
- *
- * @param serverSocket - 服务端 socket。
- * @param accessToken - Access token。
- * @param file - 图片文件。
- * @returns 背景图片 URL。
- */
-export async function httpUploadBackgroundImage(
-  serverSocket: string,
-  accessToken: string,
-  file: File,
-): Promise<string> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  try {
-    const formData = new FormData();
-    formData.append("background", file);
-    const res = await client.requestFormData<ApiUploadBackgroundResponse>(
-      "POST",
-      "/users/me/background",
-      formData,
-    );
-    // 优先 snake_case（真实服务端）；兼容 protocol mock 的 camelCase
-    const url = String(res.background_url ?? (res as { backgroundUrl?: string }).backgroundUrl ?? "").trim();
-    if (!url) {
-      throw new ProfileError({
-        code: "upload_background_failed",
-        message: "Upload background image failed: missing background_url",
-      });
-    }
-    return url;
-  } catch (e) {
-    rethrowProfileError("upload_background_failed", "Upload background image failed", e);
   }
 }
 

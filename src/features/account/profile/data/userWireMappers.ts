@@ -10,8 +10,7 @@ import { asTrimmedString, asOptionalString } from "@/shared/data/wireMapperUtils
 /**
  * 将用户 wire 模型（当前用户）映射为领域模型。
  *
- * 说明：`GET /users/me` 仅保证 `uid/email/nickname/avatar`；
- * 背景图由本地上传快照维护，不在此映射。
+ * 将服务端用户名和个人简介映射为客户端资料字段。
  */
 export function mapUserMeWire(wire: ApiUserMe): UserMe {
   if (!wire) {
@@ -22,8 +21,11 @@ export function mapUserMeWire(wire: ApiUserMe): UserMe {
   return {
     uid: asTrimmedString(wire.uid),
     email: asOptionalString(wire.email),
-    nickname: asOptionalString(wire.nickname),
+    nickname: asOptionalString(wire.username ?? wire.nickname),
     avatar: asOptionalString(wire.avatar),
+    brief: asOptionalString(wire.bio),
+    sex: wire.sex,
+    birthday: wire.birthday,
   };
 }
 
@@ -42,10 +44,11 @@ export function mapUserPublicWire(wire: ApiUserPublic): UserPublic {
   }
   return {
     uid: asTrimmedString(wire.uid),
-    nickname: asTrimmedString(wire.nickname),
+    nickname: asTrimmedString(wire.username ?? wire.nickname),
     avatar: asOptionalString(wire.avatar),
     email: asOptionalString(wire.email),
     bio: asOptionalString(wire.bio),
-    backgroundUrl: asOptionalString(wire.background_url),
+    sex: wire.sex,
+    birthday: wire.birthday,
   };
 }

@@ -12,6 +12,7 @@ import type {
   ChatChannelPatchInput,
   ChatChannelRecord,
   ChatMentionPage,
+  ChatMessageContext,
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
@@ -19,8 +20,6 @@ import type {
   ChatReadStateResponse,
   ChatSendMessageInput,
   ChatUnreadState,
-  ChatMessageAttachmentType,
-  ChatMessageAttachmentUploadResult,
 } from "../../domain/types/chatApiModels";
 import {
   httpAddChannelAdmin,
@@ -30,9 +29,14 @@ import {
   httpDeleteChannel,
   httpDeleteChannelBan,
   httpDecideChannelApplication,
-  httpForwardMessage,
+  httpGetMessage,
+  httpGetMessagesByIds,
+  httpListChannelMessagesAfter,
   httpGetChannel,
   httpGetUnreads,
+  httpGetChannelReadState,
+  httpGetMention,
+  httpGetMentionsByIds,
   httpKickChannelMember,
   httpListChannelApplications,
   httpListChannelBans,
@@ -52,7 +56,10 @@ import {
   httpSendChannelMessage,
   httpUnpinMessage,
   httpUpdateReadState,
-  httpUploadMessageAttachment,
+  httpBatchGetChannels,
+  httpTransferChannel,
+  httpQuitChannel,
+  httpListMyChannelApplications,
 } from "./httpChatApi";
 import {
   mapChatChannelApplicationWire,
@@ -62,15 +69,58 @@ import {
   mapChatChannelPatchInput,
   mapChatChannelWire,
   mapChatMentionWire,
-  mapChatMessageAttachmentUploadWire,
+  toMessageWireDomain,
   mapChatMessagePageWire,
   mapChatMessageWire,
   mapChatPinWire,
+  mapChatChannelReadStateWire,
   mapChatReadStateInput,
   mapChatReadStateResponseWire,
   mapChatSendMessageInput,
   mapChatUnreadStateWire,
 } from "../protocol/chatWireMappers";
+
+// 新版只传引用 ID；权限不足或原消息消失时保留引用，详情补查失败不影响主请求。
+async function populateMessageReferences(serverSocket: string, accessToken: string, messages: ChatMessageRecord[]): Promise<ChatMessageRecord[]> {
+  const originals = new Map(messages.map((message) => [message.id, message]));
+  const ids = new Set<string>();
+  for (const message of messages) {
+    if (message.recalledAt) continue;
+    if (!message.replyTo && message.replyToMessageId) ids.add(message.replyToMessageId);
+    for (const source of message.forwardedMessages ?? []) {
+      if (!source.userId) ids.add(source.messageId);
+    }
+  }
+  const missing = [...ids].filter((id) => /^[0-9]+$/.test(id) && !originals.has(id));
+  for (let offset = 0; offset < missing.length; offset += 50) {
+    const result = await httpGetMessagesByIds(serverSocket, accessToken, missing.slice(offset, offset + 50)).catch(() => null);
+    for (const wire of result?.items ?? []) {
+      const original = mapChatMessageWire(wire);
+      originals.set(original.id, original);
+    }
+  }
+  if (!ids.size) return messages;
+  return messages.map((message) => {
+    if (message.recalledAt) return message;
+    const replied = message.replyToMessageId ? originals.get(message.replyToMessageId) : undefined;
+    const replyTo = message.replyTo ?? (replied?.channelId === message.channelId && !replied.recalledAt ? {
+      messageId: replied.id,
+      senderName: replied.sender?.nickname || `用户 ${replied.userId}`,
+      preview: replied.preview ?? "",
+      createdAt: replied.sentTime,
+    } : undefined);
+    const forwardedMessages = message.forwardedMessages?.map((source) => {
+      const original = originals.get(source.messageId);
+      if (source.userId || original?.channelId !== source.channelId || original.recalledAt) return source;
+      return { ...source, userId: original.userId, preview: original.preview ?? "", sentTime: original.sentTime };
+    });
+    return { ...message, replyTo, forwardedMessages };
+  });
+}
+
+async function populateMessagePage(serverSocket: string, accessToken: string, page: ChatMessagePage): Promise<ChatMessagePage> {
+  return { ...page, items: await populateMessageReferences(serverSocket, accessToken, page.items) };
+}
 
 /**
  * chat HTTP API 端口实现。
@@ -81,6 +131,15 @@ import {
  * - 不承载任何业务编排或 presentation 语义。
  */
 export const httpChatApiPort: ChatApiPort = {
+  async batchGetChannels(serverSocket, accessToken, channelIds) {
+    const result = await httpBatchGetChannels(serverSocket, accessToken, channelIds);
+    return { total: result.total, items: result.items.map(mapChatChannelWire) };
+  },
+  transferChannel: httpTransferChannel,
+  quitChannel: httpQuitChannel,
+  async listMyChannelApplications(serverSocket, accessToken) {
+    return (await httpListMyChannelApplications(serverSocket, accessToken)).map(mapChatChannelApplicationWire);
+  },
   async listChannels(serverSocket: string, accessToken: string): Promise<ChatChannelRecord[]> {
     const list = await httpListChannels(serverSocket, accessToken);
     return list.map(mapChatChannelWire);
@@ -96,37 +155,33 @@ export const httpChatApiPort: ChatApiPort = {
     cursor?: string,
     limit?: number,
   ): Promise<ChatMessagePage> {
-    const page = await httpListChannelMessages(serverSocket, accessToken, cid, cursor, limit ?? 50);
-    return mapChatMessagePageWire(page);
+    const page = await httpListChannelMessages(serverSocket, accessToken, cid, cursor, limit);
+    return populateMessagePage(serverSocket, accessToken, mapChatMessagePageWire(page));
+  },
+  async listChannelMessagesAfter(serverSocket, accessToken, cid, cursor, limit) {
+    return populateMessagePage(serverSocket, accessToken, mapChatMessagePageWire(await httpListChannelMessagesAfter(serverSocket, accessToken, cid, cursor, limit)));
+  },
+  async getMessage(serverSocket, accessToken, mid) {
+    const message = mapChatMessageWire(await httpGetMessage(serverSocket, accessToken, mid));
+    const [populated] = await populateMessageReferences(serverSocket, accessToken, [message]);
+    return populated;
+  },
+  async getMessagesByIds(serverSocket, accessToken, messageIds) {
+    const { total, items } = await httpGetMessagesByIds(serverSocket, accessToken, messageIds);
+    return { total, items: items.map(mapChatMessageWire) };
   },
   async sendChannelMessage(
     serverSocket: string,
     accessToken: string,
     cid: string,
     req: ChatSendMessageInput,
-    idempotencyKey?: string,
   ): Promise<ChatMessageRecord> {
-    const created = await httpSendChannelMessage(serverSocket, accessToken, cid, mapChatSendMessageInput(req), idempotencyKey);
+    const created = await httpSendChannelMessage(serverSocket, accessToken, cid, mapChatSendMessageInput(req));
     return mapChatMessageWire(created);
   },
-  async uploadMessageAttachment(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    file: File,
-    messageType?: ChatMessageAttachmentType,
-  ): Promise<ChatMessageAttachmentUploadResult> {
-    const wire = await httpUploadMessageAttachment(serverSocket, accessToken, cid, file, messageType ?? "file");
-    return mapChatMessageAttachmentUploadWire(wire);
-  },
-  async recallMessage(
-    serverSocket: string,
-    accessToken: string,
-    cid: string,
-    mid: string,
-  ): Promise<ChatMessageRecord> {
-    const recalled = await httpRecallMessage(serverSocket, accessToken, cid, mid);
-    return mapChatMessageWire(recalled);
+  recallMessage: httpRecallMessage,
+  async getChannelReadState(serverSocket, accessToken, cid) {
+    return mapChatChannelReadStateWire(await httpGetChannelReadState(serverSocket, accessToken, cid));
   },
   async updateReadState(
     serverSocket: string,
@@ -137,8 +192,8 @@ export const httpChatApiPort: ChatApiPort = {
     const wire = await httpUpdateReadState(serverSocket, accessToken, cid, mapChatReadStateInput(req));
     return mapChatReadStateResponseWire(wire);
   },
-  async applyJoinChannel(serverSocket: string, accessToken: string, cid: string, reason: string): Promise<void> {
-    return httpApplyJoinChannel(serverSocket, accessToken, cid, reason);
+  async applyJoinChannel(serverSocket, accessToken, cid, reason) {
+    return mapChatChannelApplicationWire(await httpApplyJoinChannel(serverSocket, accessToken, cid, reason));
   },
   async patchChannel(
     serverSocket: string,
@@ -172,8 +227,8 @@ export const httpChatApiPort: ChatApiPort = {
     cid: string,
     applicationId: string,
     decision: "approve" | "reject",
-  ): Promise<void> {
-    return httpDecideChannelApplication(serverSocket, accessToken, cid, applicationId, decision);
+  ): Promise<ChatChannelApplicationRecord> {
+    return mapChatChannelApplicationWire(await httpDecideChannelApplication(serverSocket, accessToken, cid, applicationId, decision));
   },
   async listChannelBans(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelBanRecord[]> {
     const list = await httpListChannelBans(serverSocket, accessToken, cid);
@@ -219,11 +274,9 @@ export const httpChatApiPort: ChatApiPort = {
       cursor: query.cursor,
       limit: query.limit,
       sender_uid: query.senderUid,
-      domain: query.domain,
-      before_mid: query.beforeMid,
-      after_mid: query.afterMid,
+      domain: query.domain ? toMessageWireDomain(query.domain) : undefined,
     });
-    return mapChatMessagePageWire(page);
+    return populateMessagePage(serverSocket, accessToken, mapChatMessagePageWire(page));
   },
   async listChannelMessagesAround(
     serverSocket: string,
@@ -232,9 +285,10 @@ export const httpChatApiPort: ChatApiPort = {
     aroundMid: string,
     before?: number,
     after?: number,
-  ): Promise<ChatMessagePage> {
-    const page = await httpListChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
-    return mapChatMessagePageWire(page);
+  ): Promise<ChatMessageContext> {
+    const context = await httpListChannelMessagesAround(serverSocket, accessToken, cid, aroundMid, before, after);
+    const items = await populateMessageReferences(serverSocket, accessToken, context.items.map(mapChatMessageWire));
+    return { items };
   },
   async pinMessage(serverSocket: string, accessToken: string, cid: string, mid: string, note?: string): Promise<void> {
     return httpPinMessage(serverSocket, accessToken, cid, mid, note);
@@ -254,13 +308,12 @@ export const httpChatApiPort: ChatApiPort = {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
+    req: { targetCid: string; sourceChannelId?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord> {
-    const forwarded = await httpForwardMessage(serverSocket, accessToken, mid, {
-      target_cid: req.targetCid,
-      comment: req.comment,
-      idempotency_key: req.idempotencyKey,
-      merged_mids: req.mergedMids,
+    const sourceChannelId = req.sourceChannelId || (await httpGetMessage(serverSocket, accessToken, mid)).cid;
+    const messageIds = req.mergedMids?.length ? req.mergedMids : [mid];
+    const forwarded = await httpSendChannelMessage(serverSocket, accessToken, req.targetCid, {
+      domain: "Core:Forward:V1", data: { source_channel_id: sourceChannelId, message_ids: messageIds }, mentions: [],
     });
     return mapChatMessageWire(forwarded);
   },
@@ -268,14 +321,20 @@ export const httpChatApiPort: ChatApiPort = {
     const wire = await httpListMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
     return {
       items: Array.isArray(wire.items) ? wire.items.map(mapChatMentionWire) : [],
-      nextCursor: wire.next_cursor,
-      hasMore: Boolean(wire.has_more),
+      nextCursor: wire.has_more ? wire.next_cursor ?? undefined : undefined,
+      hasMore: wire.has_more,
     };
   },
-  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void> {
-    return httpMarkMentionRead(serverSocket, accessToken, mentionId, cid);
+  async getMention(serverSocket, accessToken, mentionId) {
+    return mapChatMentionWire(await httpGetMention(serverSocket, accessToken, mentionId));
   },
-  async batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
-    return httpBatchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
+  async getMentionsByIds(serverSocket, accessToken, mentionIds) {
+    return (await httpGetMentionsByIds(serverSocket, accessToken, mentionIds)).map(mapChatMentionWire);
+  },
+  async markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void> {
+    return httpMarkMentionRead(serverSocket, accessToken, mentionId);
+  },
+  async batchMarkMentionsRead(serverSocket: string, accessToken: string, throughMentionId?: string, cid?: string): Promise<void> {
+    return httpBatchMarkMentionsRead(serverSocket, accessToken, throughMentionId, cid);
   },
 };

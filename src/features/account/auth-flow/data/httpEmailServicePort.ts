@@ -5,7 +5,7 @@
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
-import type { EmailServicePort } from "../domain/ports/EmailServicePort";
+import type { EmailCodePurpose, EmailServicePort } from "../domain/ports/EmailServicePort";
 import { AuthError } from "../domain/errors/AuthErrors";
 
 /**
@@ -17,13 +17,13 @@ import { AuthError } from "../domain/errors/AuthErrors";
 export function createHttpEmailServicePort(serverSocket: string): EmailServicePort {
   const client = new HttpJsonClient({ serverSocket, apiVersion: 1 });
   return {
-    async sendCode(email: string): Promise<void> {
+    async sendCode(email: string, purpose: EmailCodePurpose): Promise<void> {
       const value = email.trim();
       if (!value) {
         throw new AuthError({ code: "missing_email", message: "Missing email." });
       }
       try {
-        await client.requestJson<void>("POST", "/auth/email_codes", { email: value });
+        await client.requestJson<void>("POST", "/auth/email_codes", { email: value, purpose });
       } catch (e) {
         if (e instanceof AuthError) throw e;
         if (isApiRequestError(e)) {

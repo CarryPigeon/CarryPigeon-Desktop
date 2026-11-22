@@ -13,6 +13,7 @@ describe("toHttpOrigin", () => {
 
   it("maps loopback HTTP default ports to http for CarryPigeon-Server", () => {
     expect(toHttpOrigin("127.0.0.1:8080")).toBe("http://127.0.0.1:8080");
+    expect(toHttpOrigin("127.0.0.1:18080")).toBe("http://127.0.0.1:18080");
     expect(toHttpOrigin("localhost:8080")).toBe("http://localhost:8080");
     expect(toHttpOrigin("localhost")).toBe("http://localhost");
     expect(toHttpOrigin("127.0.0.1:80")).toBe("http://127.0.0.1");

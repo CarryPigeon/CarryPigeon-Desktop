@@ -20,6 +20,8 @@ export type ChatLinkPreview = {
 export type ChatChannelRecord = {
   id: string;
   name: string;
+  systemChannel?: boolean;
+  createdAt?: number;
   brief?: string;
   avatar?: string;
   ownerUserId?: string;
@@ -178,11 +180,12 @@ export type ChatMessageRecord = {
   linkPreview?: ChatLinkPreview;
 };
 
+export type ChatMessageContext = { items: ChatMessageRecord[] };
+
 /**
  * 消息分页结果。
  */
-export type ChatMessagePage = {
-  items: ChatMessageRecord[];
+export type ChatMessagePage = ChatMessageContext & {
   nextCursor?: string;
   hasMore?: boolean;
 };
@@ -208,9 +211,7 @@ export type ChatSendMessageInput = {
 export type ChatUnreadState = {
   channelId: string;
   unreadCount: number;
-  /** 客户端兼容字段；当前服务端 Unread 响应不返回 @ 未读计数。 */
-  mentionUnreadCount?: number;
-  lastReadTime: number;
+
 };
 
 /**
@@ -218,7 +219,6 @@ export type ChatUnreadState = {
  */
 export type ChatReadStateInput = {
   lastReadMessageId: string;
-  lastReadTime: number;
 };
 
 /**
@@ -228,7 +228,11 @@ export type ChatReadStateResponse = {
   channelId: string;
   userId: string;
   lastReadMid: string;
-  lastReadTime: number;
+};
+
+export type ChatChannelReadState = Omit<ChatReadStateResponse, "lastReadMid"> & {
+  lastReadMid: string | null;
+  unreadCount: number;
 };
 
 /**
@@ -275,18 +279,5 @@ export type ChatMentionPage = {
   hasMore?: boolean;
 };
 
-/**
- * 频道消息附件上传结果（`POST /channels/{cid}/messages/attachments`）。
- */
-export type ChatMessageAttachmentUploadResult = {
-  objectKey: string;
-  shareKey: string;
-  filename: string;
-  mimeType: string;
-  size: number;
-};
-
-/**
- * 消息附件类型（multipart `message_type`）。
- */
+/** 消息附件类型。 */
 export type ChatMessageAttachmentType = "file" | "voice";

@@ -5,7 +5,7 @@
  */
 
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getAuthFlowCapabilities } from "@/features/account/auth-flow/api";
 import { useLoginWizard } from "../composables/useLoginWizard";
@@ -16,6 +16,7 @@ import LabelBadge from "@/shared/ui/LabelBadge.vue";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 
 const router = useRouter();
+const route = useRoute();
 const { t } = useI18n();
 const authFlowCapabilities = getAuthFlowCapabilities();
 
@@ -277,6 +278,9 @@ function switchAuthMethod(method: "email" | "password"): void {
               </button>
             </div>
 
+            <div v-if="route.query.registration === 'complete'" class="cp-login__banner" role="status">
+              {{ t("registration_complete_sign_in") }}
+            </div>
             <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
               {{ authMethod === "email" ? emailBanner : passwordBanner }}
             </div>

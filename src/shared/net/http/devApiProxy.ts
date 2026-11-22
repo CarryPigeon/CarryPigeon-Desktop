@@ -13,12 +13,12 @@ import { isTauriRuntimeAvailable } from "@/shared/tauri/runtime";
 import { toHttpOrigin } from "./serverOrigin";
 
 /** 与 CarryPigeon-Server 默认 `server.port` 对齐的 Vite HTTP 代理目标。 */
-export const DEFAULT_DEV_API_PROXY_TARGET = "http://127.0.0.1:8080";
+export const DEFAULT_DEV_API_PROXY_TARGET = "http://127.0.0.1:18080";
 
 /**
  * 读取开发态 HTTP 代理目标 origin。
  *
- * @returns 例如 `http://127.0.0.1:8080`。
+ * @returns 例如 `http://127.0.0.1:18080`。
  */
 export function getDevApiProxyTargetOrigin(): string {
   const raw = String(import.meta.env.VITE_DEV_API_PROXY_TARGET ?? DEFAULT_DEV_API_PROXY_TARGET).trim();

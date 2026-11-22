@@ -44,6 +44,7 @@ function timelineSnapshot(messages: ChatMessage[]): MessageTimelineSnapshot {
     currentMessages: messages,
     currentMessageCount: messages.length,
     hasMoreHistory: false,
+    hasNewerMessages: false,
     isLoadingHistory: false,
     search: { query: "", loading: false, error: "", results: [] },
     highlightedMessageId: "",
@@ -100,6 +101,8 @@ function mountCenter(options: CenterOptions = {}): {
   clearHighlightedMessage: ReturnType<typeof vi.fn>;
   selectChannel: ReturnType<typeof vi.fn>;
   timeline: ReturnType<typeof capability<MessageTimelineSnapshot>>;
+  onForwardMessage: ReturnType<typeof vi.fn>;
+  onSendForwardComment: ReturnType<typeof vi.fn>;
 } {
   const timelineBase = capability<MessageTimelineSnapshot>(timelineSnapshot(options.messages ?? [placeholderMessage()]));
   const clearHighlightedMessage = vi.fn(() => {
@@ -141,7 +144,8 @@ function mountCenter(options: CenterOptions = {}): {
     domainRegistryView: ref(null),
     onLoadMoreMessages: () => {},
     onMessageContextMenu: () => {},
-    onForwardMessage: async () => {},
+    onForwardMessage: vi.fn(async () => {}),
+    onSendForwardComment: vi.fn(async () => {}),
     selectChannel,
     resolveSenderName: options.resolveSenderName ?? (() => ""),
     resolveChannelName: options.resolveChannelName ?? (() => ""),
@@ -160,7 +164,12 @@ function mountCenter(options: CenterOptions = {}): {
       plugins: [createI18n({ legacy: false, locale: "zh_cn", messages: { zh_cn: {} } })],
     },
   });
-  return { model: model as unknown as ChatCenterModel, fetchUserNames, loadContextAroundMessage, clearHighlightedMessage, selectChannel, timeline };
+  return {
+    model: model as unknown as ChatCenterModel,
+    fetchUserNames, loadContextAroundMessage, clearHighlightedMessage, selectChannel, timeline,
+    onForwardMessage: deps.onForwardMessage,
+    onSendForwardComment: deps.onSendForwardComment,
+  };
 }
 
 let wrapper: VueWrapper | null = null;
@@ -306,6 +315,25 @@ describe("useChatCenterModel 消息定位", () => {
 
     expect(selectChannel).not.toHaveBeenCalled();
     expect(model.messageReveal.messageId).toBe("m0");
+  });
+});
+
+describe("useChatCenterModel 转发附言", () => {
+  it("先转发，再向目标频道发送普通文本附言", async () => {
+    const { model, onForwardMessage, onSendForwardComment } = mountCenter();
+    model.handleSingleForward("3001");
+    await model.handleForwardConfirm({ targetCid: "cid-2", comment: "  附言  " });
+    expect(onForwardMessage).toHaveBeenCalledWith("3001", { targetCid: "cid-2", sourceChannelId: "cid-1" }, undefined);
+    expect(onSendForwardComment).toHaveBeenCalledExactlyOnceWith("cid-2", "附言", undefined);
+    expect(onForwardMessage.mock.invocationCallOrder[0]).toBeLessThan(onSendForwardComment.mock.invocationCallOrder[0]);
+  });
+
+  it("转发未成功时不发送附言", async () => {
+    const { model, onForwardMessage, onSendForwardComment } = mountCenter();
+    onForwardMessage.mockRejectedValueOnce(new Error("Forward rejected"));
+    model.handleSingleForward("3001");
+    await model.handleForwardConfirm({ targetCid: "cid-2", comment: "附言" });
+    expect(onSendForwardComment).not.toHaveBeenCalled();
   });
 });
 

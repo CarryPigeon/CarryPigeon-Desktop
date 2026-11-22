@@ -15,6 +15,7 @@ const authFlowCapabilities = getAuthFlowCapabilities();
 export type UseLoginPasswordAuthDeps = {
   router: Router;
   mode?: "login" | "register";
+  registration?: { email: Ref<string>; code: Ref<string> };
   onRequiredSetup?: (outcome: Extract<AuthSignInOutcome, { kind: "required_setup" }>) => void;
 };
 
@@ -73,7 +74,12 @@ export function useLoginPasswordAuth(deps: UseLoginPasswordAuthDeps): LoginPassw
     try {
       const outcome =
         deps.mode === "register"
-          ? await authServer.registerAndSignInWithPassword(credential.username, credential.password)
+          ? await authServer.registerAndSignInWithPassword(
+              credential.username,
+              credential.password,
+              deps.registration?.email.value ?? "",
+              deps.registration?.code.value ?? "",
+            )
           : await authServer.signInWithPassword(credential.username, credential.password);
 
       if (outcome.ok && outcome.kind === "signed_in") {
@@ -90,6 +96,10 @@ export function useLoginPasswordAuth(deps: UseLoginPasswordAuthDeps): LoginPassw
         } else {
           void router.replace("/required-setup");
         }
+        return;
+      }
+      if (outcome.ok) {
+        void router.replace({ path: "/login", query: { registration: "complete" } });
         return;
       }
       banner.value = outcome.error.message;

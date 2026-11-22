@@ -10,11 +10,8 @@
 /**
  * 邮箱验证码服务端口（领域层）。
  */
+export type EmailCodePurpose = "REGISTER" | "LOGIN" | "CHANGE_EMAIL" | "password_change";
+
 export interface EmailServicePort {
-  /**
-   * 请求服务端向指定邮箱发送验证码。
-   *
-   * @param email - 目标邮箱地址。
-   */
-  sendCode(email: string): Promise<void>;
+  sendCode(email: string, purpose: EmailCodePurpose): Promise<void>;
 }

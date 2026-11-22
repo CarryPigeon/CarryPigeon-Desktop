@@ -38,6 +38,18 @@ fn map_socket_to_url_candidate(raw: &str) -> String {
     if raw.starts_with("http://") || raw.starts_with("https://") {
         return raw.to_string();
     }
+    let address = raw.split(['/', '?', '#']).next().unwrap_or_default();
+    let (host, port) = match address.rsplit_once(':') {
+        Some((host, port)) if !address.ends_with(']') => (host, port),
+        _ => (address, ""),
+    };
+    let loopback = matches!(
+        host.to_ascii_lowercase().as_str(),
+        "localhost" | "127.0.0.1" | "[::1]"
+    );
+    if port == "80" || (loopback && matches!(port, "" | "8080" | "18080")) {
+        return format!("http://{raw}");
+    }
     format!("https://{}", raw)
 }
 
@@ -166,6 +178,19 @@ mod tests {
         assert_eq!(
             map_socket_to_url_candidate("example.com:443"),
             "https://example.com:443"
+        );
+    }
+
+    #[test]
+    fn map_bare_loopback_default_http_port() {
+        assert_eq!(
+            to_http_origin("127.0.0.1:18080").unwrap(),
+            "http://127.0.0.1:18080"
+        );
+        assert_eq!(to_http_origin("[::1]:18080").unwrap(), "http://[::1]:18080");
+        assert_eq!(
+            to_http_origin("example.com:18080").unwrap(),
+            "https://example.com:18080"
         );
     }
 

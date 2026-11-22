@@ -12,7 +12,7 @@ import type { ChatChannel } from "@/features/chat/room-session/domain/contracts"
 /**
  * room-session 频道目录读取所需的最小 API 能力。
  */
-export type SessionChannelCatalogApiPort = Pick<ChatApiPort, "listChannels" | "getUnreads">;
+export type SessionChannelCatalogApiPort = Pick<ChatApiPort, "listChannels" | "getUnreads" | "getChannelReadState">;
 
 /**
  * room-session 读状态上报所需的最小 API 能力。

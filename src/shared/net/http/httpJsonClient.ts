@@ -14,7 +14,7 @@
  *   走 Tauri(Rust reqwest) 的 `api_request_json` 命令作为替代实现。
  */
 
-import { ApiRequestError, parseApiErrorEnvelope, type ApiErrorEnvelope } from "./apiErrors";
+import { ApiRequestError, parseApiErrorEnvelope, unwrapApiResponse, type ApiErrorEnvelope } from "./apiErrors";
 import { getDevProxiedApiBaseUrl, shouldUseDevApiProxy } from "./devApiProxy";
 import { toHttpOrigin } from "./serverOrigin";
 import { createLogger } from "@/shared/utils/logger";
@@ -122,6 +122,27 @@ function logAndBuildApiRequestError(args: {
   return err;
 }
 
+export type ServerReadiness = "ready" | "unavailable" | "forbidden";
+
+/** 读取部署探针状态。探针不携带账号令牌，响应也不走业务 JSON 解包。 */
+export async function probeServerReadiness(serverSocket: string): Promise<ServerReadiness> {
+  const path = "/internal/readiness";
+  const origin = toHttpOrigin(serverSocket);
+  if (!origin) throw new Error("Missing server origin");
+  if (USE_MOCK_TRANSPORT) return "ready";
+
+  const status = shouldUseTauriHttpTransport({ url: origin, isTauriRuntime: isTauriRuntimeAvailable() })
+    ? (await tauriRequestJson(serverSocket, "GET", path, {}, undefined, true)).status
+    : (await fetch(`${origin}${path}`, { cache: "no-store", redirect: "error" })).status;
+
+  switch (status) {
+    case 204: return "ready";
+    case 503: return "unavailable";
+    case 403: return "forbidden";
+    default: throw new ApiRequestError(parseApiErrorEnvelope(undefined, status));
+  }
+}
+
 type TauriApiResponse = {
   ok: boolean;
   status: number;
@@ -145,9 +166,9 @@ async function tauriRequestJson(
   path: string,
   headers: Record<string, string>,
   body?: unknown,
+  readiness = false,
 ): Promise<TauriApiResponse> {
-  const normalizedPath = normalizeApiPath(path);
-  const apiPath = `/api${normalizedPath}`;
+  const apiPath = readiness ? "/internal/readiness" : `/api${normalizeApiPath(path)}`;
   const tls = getServerTlsConfig(serverSocket);
   // 传归一化后的 HTTP origin 而非原始 socket：Rust 侧 `to_http_origin` 对裸 `host:port`
   // 默认按 https 处理，与前端回环明文端口的推断规则不一致，这里显式统一。
@@ -326,8 +347,7 @@ export class HttpJsonClient {
           raw: res.error,
         });
       }
-      if (res.status === 204) return undefined as T;
-      return res.body as T;
+      return unwrapApiResponse(res.body, res.status) as T;
     }
 
     if (shouldUseTauriHttpTransport({ url, isTauriRuntime: isTauriRuntimeAvailable() })) {
@@ -338,13 +358,14 @@ export class HttpJsonClient {
             transport: "tauri",
             method,
             url,
-            envelope: tauriRes.error as ApiErrorEnvelope,
+            envelope: parseApiErrorEnvelope(tauriRes.error, tauriRes.status),
             raw: tauriRes.error,
           });
         }
-        if (tauriRes.status === 204) return undefined as T;
-        return tauriRes.body as T;
+        return unwrapApiResponse(tauriRes.body, tauriRes.status) as T;
       } catch (e) {
+        // 已收到服务端响应的请求不应再通过另一传输重复执行。
+        if (e instanceof ApiRequestError) throw e;
         // 当 invoke 不可用（例如 Web 预览）或命令失败时，回退到 WebView fetch。
         // 对自签证书场景 fetch 仍可能失败，但可以保持行为一致性。
         logger.warn("Action: http_tauri_invoke_failed_fallback_to_fetch", { method, url, error: String(e) });
@@ -381,8 +402,7 @@ export class HttpJsonClient {
     // 204 No Content：对很多端点来说属于合法成功响应。
     if (res.status === 204) return undefined as T;
 
-    const json = await readJsonSafe(res);
-    return json as T;
+    return unwrapApiResponse(await readJsonSafe(res), res.status) as T;
   }
 
   /**
@@ -421,8 +441,7 @@ export class HttpJsonClient {
           raw: res.error,
         });
       }
-      if (res.status === 204) return undefined as T;
-      return res.body as T;
+      return unwrapApiResponse(res.body, res.status) as T;
     }
 
     // Tauri 不支持传递 FormData 跨调用边界，所以直接走 fetch
@@ -464,8 +483,7 @@ export class HttpJsonClient {
     // 204 No Content：对很多端点来说属于合法成功响应。
     if (res.status === 204) return undefined as T;
 
-    const json = await readJsonSafe(res);
-    return json as T;
+    return unwrapApiResponse(await readJsonSafe(res), res.status) as T;
   }
 }
 

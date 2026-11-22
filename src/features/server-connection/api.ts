@@ -21,6 +21,7 @@ import type {
 } from "./api-types";
 
 export { currentServerSocket } from "./rack/presentation/store/currentServer";
+export { probeServerReadiness } from "@/shared/net/http/httpJsonClient";
 
 /**
  * 创建 server-connection capability 对象。

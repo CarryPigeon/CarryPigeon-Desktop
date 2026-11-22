@@ -19,7 +19,7 @@ export class RegisterWithPassword {
    * @param password - 密码。
    * @returns 注册结果（uid / username）。
    */
-  execute(username: string, password: string): Promise<AuthRegisterResult> {
-    return this.authService.registerWithPassword(username, password);
+  execute(username: string, password: string, email: string, code: string): Promise<AuthRegisterResult> {
+    return this.authService.registerWithPassword(username, password, email, code);
   }
 }

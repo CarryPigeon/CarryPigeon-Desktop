@@ -21,6 +21,9 @@ export type MessageEventRouterDeps = {
    * - 收到创建/撤回事件后，如何更新本地时间线与未读数
    */
   scope: Pick<MessageFlowScopePort, "getActiveServerSocket">;
+  getScopeVersion?: () => number;
+  loadMessage?: (mid: string) => Promise<ChatMessageRecord | undefined>;
+  onLoadError?: (error: unknown) => void;
   timelineState: Pick<MessageTimelineStatePort, "readCurrentChannelId" | "appendMessageIfMissing" | "markMessageRecalled">;
   unreadProjection: ChannelUnreadProjectionPort;
   mapWireMessage: (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
@@ -35,6 +38,20 @@ export type MessageEventRouterDeps = {
  * 该路由器只理解消息创建/撤回事件，并把它们投影到本地时间线与未读计数。
  */
 export function createMessageEventRouter(deps: MessageEventRouterDeps) {
+  const inFlight = new Set<string>();
+  const recalled = new Map<string, number>();
+  let currentScope = "";
+  function readScope(): string {
+    return JSON.stringify([deps.scope.getActiveServerSocket(), deps.getScopeVersion?.()]);
+  }
+  function append(cid: string, msg: ChatMessageRecord, key: string): void {
+    const recalledAt = recalled.get(key);
+    const mapped = deps.mapWireMessage(deps.scope.getActiveServerSocket(), recalledAt ? { ...msg, recalledAt } : msg);
+    const inserted = deps.timelineState.appendMessageIfMissing(cid, mapped, deps.compareMessages);
+    if (!inserted || mapped.recalledAt) return;
+    if (deps.timelineState.readCurrentChannelId() !== cid) deps.unreadProjection.incrementChannelUnread(cid);
+    deps.onNewMessage?.(cid, mapped);
+  }
   /**
    * 路由一条消息相关事件。
    *
@@ -43,25 +60,36 @@ export function createMessageEventRouter(deps: MessageEventRouterDeps) {
    * - `false`：该事件不属于 message-flow，应由其他子域继续尝试处理
    */
   return function routeMessageEvent(eventType: string, payload: Record<string, unknown> | null): boolean {
+    if (eventType !== "message.created" && eventType !== "message.recalled") return false;
+    const cid = String(payload?.channelId ?? "").trim();
+    const msg = (payload?.message ?? null) as ChatMessageRecord | null;
+    const mid = String(payload?.messageId ?? msg?.id ?? "").trim();
+    if (!cid || !mid) return true;
+    const scope = readScope();
+    if (scope !== currentScope) {
+      currentScope = scope;
+      recalled.clear();
+    }
+    const key = JSON.stringify([scope, cid, mid]);
     if (eventType === "message.created") {
-      const cid = String(payload?.channelId ?? "").trim();
-      const msg = (payload?.message ?? null) as ChatMessageRecord | null;
-      if (!cid || !msg) return true;
-
-      const mapped = deps.mapWireMessage(deps.scope.getActiveServerSocket(), msg);
-      const inserted = deps.timelineState.appendMessageIfMissing(cid, mapped, deps.compareMessages);
-      if (inserted && deps.timelineState.readCurrentChannelId() !== cid) deps.unreadProjection.incrementChannelUnread(cid);
-      deps.onNewMessage?.(cid, mapped);
+      if (msg) append(cid, msg, key);
+      else if (deps.loadMessage && !inFlight.has(key) && !recalled.has(key)) {
+        inFlight.add(key);
+        void deps.loadMessage(mid).then((record) => {
+          if (record?.id === mid && record.channelId === cid && readScope() === scope) append(cid, record, key);
+        }).catch(deps.onLoadError ?? (() => undefined)).finally(() => inFlight.delete(key));
+      }
       return true;
     }
 
     if (eventType === "message.recalled") {
-      const cid = String(payload?.channelId ?? "").trim();
-      const mid = String(payload?.messageId ?? "").trim();
-      const recalledAt = Number(payload?.recalledAt ?? 0);
+      const recalledAt = Number(payload?.recalledAt) || Date.now();
       const recalledBy = String(payload?.recalledByUserId ?? "").trim();
-      if (!cid || !mid) return true;
-
+      recalled.set(key, recalledAt);
+      if (recalled.size > 1000) {
+        const oldest = recalled.keys().next().value;
+        if (oldest !== undefined) recalled.delete(oldest);
+      }
       deps.timelineState.markMessageRecalled(cid, mid, recalledAt, recalledBy);
       // 撤回消息仍留在时间线，但应被排除在未读之外，需重算角标。
       deps.unreadProjection.recomputeChannelUnreadLocally(cid);

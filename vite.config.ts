@@ -2,13 +2,15 @@ import { defineConfig, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import { TDesignResolver } from '@tdesign-vue-next/auto-import-resolver';
 
+const configDirectory = fileURLToPath(new URL(".", import.meta.url));
 const host = process.env.TAURI_DEV_HOST;
 
-const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8")) as {
+const pkg = JSON.parse(fs.readFileSync(path.resolve(configDirectory, "package.json"), "utf-8")) as {
   version: string;
 };
 
@@ -82,7 +84,7 @@ function localPluginAssetsPlugin(): Plugin {
         // /plugins/<id>/<rel> -> plugins/<id>/dist/<rel>
         const pluginMatch = /^\/plugins\/([A-Za-z0-9._-]+)\/(.+)$/.exec(pathname);
         if (pluginMatch) {
-          const base = path.resolve(__dirname, "plugins", pluginMatch[1], "dist");
+          const base = path.resolve(configDirectory, "plugins", pluginMatch[1], "dist");
           const file = path.resolve(base, pluginMatch[2]);
           if (file.startsWith(base + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {
             serveFile(res, file);
@@ -138,7 +140,7 @@ function localPluginAssetsPlugin(): Plugin {
             }
             // 预构建 metadata 尚未就绪（极早期请求）时退回真实产物，行为等同修复前。
           }
-          const base = path.resolve(__dirname, "public", "vendor");
+          const base = path.resolve(configDirectory, "public", "vendor");
           const file = path.resolve(base, vendorMatch[1]);
           if (file.startsWith(base + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {
             serveFile(res, file);
@@ -175,7 +177,7 @@ export default defineConfig(({ command }) => {
     ],
     resolve: {
       alias: [
-        { find: "@", replacement: path.resolve(__dirname, "src") },
+        { find: "@", replacement: path.resolve(configDirectory, "src") },
         // build 产物仍 external vue/tdesign，由 index.html import map 指向 /vendor/vendor.mjs。
         // Vite 8 的 import-analysis 不能把 URL `/vendor/vendor.mjs` 解析成 dev 模块；
         // 若 alias 到 public/vendor/vendor.mjs，会被当成静态资源且缺少 `Text` 等 named export。
@@ -224,7 +226,7 @@ export default defineConfig(({ command }) => {
           changeOrigin: true,
         },
         "/api": {
-          target: process.env.VITE_DEV_API_PROXY_TARGET || "http://127.0.0.1:8080",
+          target: process.env.VITE_DEV_API_PROXY_TARGET || "http://127.0.0.1:18080",
           changeOrigin: true,
         },
       },

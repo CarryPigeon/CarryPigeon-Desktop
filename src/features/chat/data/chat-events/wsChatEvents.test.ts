@@ -99,6 +99,35 @@ describe("wsChatEvents 连接健康度", () => {
     vi.restoreAllMocks();
   });
 
+  it("只发送 token 鉴权，重连认证不携带事件游标；reauth 不触发补拉", async () => {
+    const onAuthenticated = vi.fn();
+    const onEvent = vi.fn();
+    const handle = connectChatWs("host-protocol:8080", "token", onEvent, { onAuthenticated });
+    const first = currentClient();
+    first.open();
+    expect(JSON.parse(first.sent[0])).toEqual({ type: "auth", id: expect.any(String), data: { access_token: "token" } });
+    const frame = (id: string) => ({ type: "event", id: null, error: null, data: {
+      event_id: id, event_type: "message.created", server_time: 1700000000000,
+      payload: { channel_id: "2001", message_id: id, event_sequence: 1 },
+    } });
+    first.serverPush(frame("10"));
+    expect(onEvent).not.toHaveBeenCalled();
+    first.serverPush(authOkFrame());
+    first.serverPush(frame("10"));
+    first.close();
+    await vi.advanceTimersByTimeAsync(2000);
+    const second = currentClient();
+    expect(second).not.toBe(first);
+    second.open();
+    expect(JSON.parse(second.sent[0]).data).toEqual({ access_token: "token" });
+    second.serverPush(authOkFrame());
+    second.serverPush(frame("9"));
+    second.serverPush({ type: "reauth.ok" });
+    expect(onAuthenticated.mock.calls).toEqual([[false], [true]]);
+    expect(onEvent.mock.calls.map(([frame]) => frame.data.event_id)).toEqual(["10", "9"]);
+    handle.close();
+  });
+
   it("首次 auth.err 会关闭当前连接并回调 onAuthError（不静默保活）", () => {
     const onAuthError = vi.fn();
     connectChatWs("host-a:8080", "token", () => {}, { onAuthError });

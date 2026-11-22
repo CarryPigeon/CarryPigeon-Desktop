@@ -103,7 +103,7 @@ function buildHarness(initialToken = "t1"): Harness {
     startAutoRefresh: () => ({ stop: () => undefined }),
     onAuthSessionChanged: () => () => undefined,
     onWsEvent: () => undefined,
-    onResumeFailed: () => undefined,
+    onReconnected: () => undefined,
   };
 
   const service = new RoomSessionConnectionApplicationService(deps);

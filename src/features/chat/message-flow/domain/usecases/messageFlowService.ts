@@ -11,7 +11,9 @@
  * 这样 runtime 不需要再分别拼装多个零散 action/paging factory。
  */
 
-import type { ChatMessagePage, ChatMessageRecord, ChatReplyMessageData, ChatSendMessageInput } from "@/features/chat/domain/types/chatApiModels";
+import { compareMessages, dedupeMessages } from "../mappers/messageModel";
+import { compareMessageIdForReadOrder } from "@/features/chat/domain/utils/readMarker";
+import type { ChatMessagePage, ChatMessageRecord, ChatSendMessageInput } from "@/features/chat/domain/types/chatApiModels";
 import type {
   ChatMessage,
   ComposerSubmitPayload,
@@ -32,7 +34,8 @@ import type {
 type MapWireMessage = (serverSocket: string, msg: ChatMessageRecord) => ChatMessage;
 type MergeMessages = (existing: ChatMessage[], incoming: ChatMessage[]) => Promise<ChatMessage[]>;
 
-const LATEST_PAGE_LIMIT = 50;
+const LATEST_PAGE_LIMIT = 20;
+const CONTEXT_LIMIT = 25;
 
 /**
  * `MessageFlowApplicationService` 的依赖集合。
@@ -53,6 +56,7 @@ export type MessageFlowApplicationServiceDeps = {
 
 type LatestPage = {
   requestSocket: string;
+  requestScopeVersion: number;
   channelId: string;
   mapped: ChatMessage[];
   nextCursor: string;
@@ -69,6 +73,7 @@ type LatestPage = {
  */
 export class MessageFlowApplicationService {
   private searchSeq = 0;
+  private contextSeq = 0;
 
   constructor(private readonly deps: MessageFlowApplicationServiceDeps) {}
 
@@ -80,19 +85,28 @@ export class MessageFlowApplicationService {
   private async replaceTimelineMerged(
     channelId: string,
     incoming: ChatMessage[],
-    replaceExisting = false,
-  ): Promise<void> {
+    replaceExisting: boolean,
+    shouldApply: () => boolean,
+  ): Promise<boolean> {
     const existing = [...this.deps.timelineState.listMessages(channelId)];
-    const beforeIds = new Set(existing.map((message) => message.id));
-    const base = replaceExisting ? [] : existing;
-    const merged = await this.deps.mergeMessages(base, incoming);
-    const latest = [...this.deps.timelineState.listMessages(channelId)];
-    const arrivedDuringMerge = latest.filter((message) => !beforeIds.has(message.id));
-    const final =
-      arrivedDuringMerge.length > 0
-        ? await this.deps.mergeMessages(merged, arrivedDuringMerge)
-        : merged;
-    this.deps.timelineState.replaceTimeline(channelId, final);
+    const before = new Map(existing.map((message) => [message.id, message]));
+    // 即时撤回若未由 HTTP DTO 显式表示，仍保留本次会话中已经确认的撤回态。
+    const page = incoming.map((message) => {
+      const old = before.get(message.id);
+      return old?.recalledAt && !message.recalledAt ? old : message;
+    });
+    const incomingIds = new Set(page.map((message) => message.id));
+    const base = replaceExisting ? [] : existing.filter((message) => !incomingIds.has(message.id));
+    const merged = await this.deps.mergeMessages(base, page);
+    if (!shouldApply()) return false;
+    const latest = this.deps.timelineState.listMessages(channelId);
+    const updates = new Map(latest.filter((message) => before.get(message.id) !== message).map((message) => [message.id, message]));
+    for (const message of merged) {
+      const update = updates.get(message.id);
+      updates.set(message.id, update?.recalledAt || (!message.recalledAt && update) ? update : message);
+    }
+    this.deps.timelineState.replaceTimeline(channelId, [...updates.values()].sort(compareMessages));
+    return true;
   }
 
   /**
@@ -181,53 +195,15 @@ export class MessageFlowApplicationService {
     try {
       const mentions = payload?.mentions ?? this.deps.composerState.listDraftMentions().map((m) => ({ userId: m.userId, displayName: m.displayName, type: m.type }));
 
-      let req: ChatSendMessageInput;
-      const hasReplyContext = Boolean(finalReplyToMid) || Boolean(replyDraft) || Boolean(quoteReply);
-      const isAttachmentDomain = apiDomain === "Core:File" || apiDomain === "Core:Voice";
-      if (hasReplyContext && !isAttachmentDomain) {
-        // 回复/引用消息使用 Core:ReplyText 包装域：
-        // data 内封装嵌套内容、reply_to_mid / reply_to / quote_reply 与 link_preview。
-        // mentions 与 Core:Text 语义一致放在 message 顶层 string[]，由 send mapper 转换。
-        const replyData: ChatReplyMessageData = {
-          content: data,
-          replyToMessageId: finalReplyToMid,
-          replyTo: replyDraft
-            ? {
-                messageId: replyDraft.messageId,
-                senderName: replyDraft.senderName,
-                preview: replyDraft.preview,
-                createdAt: replyDraft.createdAt,
-                unavailable: replyDraft.unavailable,
-              }
-            : undefined,
-          quoteReply: quoteReply
-            ? {
-                messageId: quoteReply.messageId,
-                userId: quoteReply.userId,
-                preview: quoteReply.preview,
-              }
-            : undefined,
-          linkPreview: payload?.linkPreview,
-        };
-        req = {
-          domain: "Core:ReplyText",
-          domainVersion: "1.0.0",
-          data: replyData,
-          mentions: mentions.length > 0 ? mentions : undefined,
-        };
-      } else {
-        // 服务端 Core:Text 顶层只接受 mentions(string[])，link_preview 不在顶层支持；
-        // 普通文本消息的链接预览由本地展示层处理，不通过服务端携带。
-        req = {
-          domain: apiDomain,
-          domainVersion: apiVersion,
-          data,
-          mentions: mentions.length > 0 ? mentions : undefined,
-          linkPreview: payload?.linkPreview,
-        };
-      }
-
-      const created = await this.deps.api.sendChannelMessage(socket, token, cid, req, this.createIdempotencyKey());
+      const replyId = finalReplyToMid || quoteReply?.messageId;
+      const req: ChatSendMessageInput = {
+        domain: apiDomain,
+        domainVersion: apiVersion,
+        data,
+        mentions: mentions.length > 0 ? mentions : undefined,
+        replyToMessageId: replyId,
+      };
+      const created = await this.deps.api.sendChannelMessage(socket, token, cid, req);
       const mapped = this.deps.mapWireMessage(socket, created);
       if (this.isScopeStale(requestSocket, requestScopeVersion)) {
         return rejectMessageAction(
@@ -242,7 +218,7 @@ export class MessageFlowApplicationService {
       this.deps.timelineState.appendMessageIfMissing(
         cid,
         mapped,
-        (a, b) => (a.timeMs === b.timeMs ? a.id.localeCompare(b.id) : a.timeMs - b.timeMs),
+        compareMessages,
       );
       this.deps.composerState.clearReplyDraft();
       this.deps.composerState.clearQuoteReplyDraft();
@@ -272,9 +248,7 @@ export class MessageFlowApplicationService {
   /**
    * 撤回一条消息。
    *
-   * 调用 `POST /channels/{cid}/messages/{mid}/recall`，服务端返回更新后的 canonical
-   * message envelope（`status:"recalled"`），并将其映射回本地 timeline。同时服务端会
-   * 通过 `message.recalled` 事件推送给所有客户端。
+   * HTTP 成功没有消息对象；按 MID 更新本地时间线，后续 WS 事件可幂等重复标记。
    */
   async recallMessage(messageId: string): Promise<RecallChatMessageOutcome> {
     const mid = String(messageId).trim();
@@ -295,7 +269,7 @@ export class MessageFlowApplicationService {
     const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
 
     try {
-      const recalledRecord = await this.deps.api.recallMessage(socket, token, channelId, mid);
+      await this.deps.api.recallMessage(socket, token, channelId, mid);
       if (this.isScopeStale(requestSocket, requestScopeVersion)) {
         return rejectMessageAction(
           "chat_message_recall_rejected",
@@ -303,10 +277,7 @@ export class MessageFlowApplicationService {
           "Chat runtime changed before the recall result could be applied.",
         );
       }
-      // 服务端返回的 envelope 已带 status:"recalled"，映射后 timelineState 中对应
-      // 消息的 recalledAt 会被填充，触发撤回态展示。
-      const mapped = this.deps.mapWireMessage(socket, recalledRecord);
-      this.deps.timelineState.updateMessage(channelId, mid, () => mapped);
+      this.deps.timelineState.markMessageRecalled(channelId, mid, Date.now(), this.deps.currentUserId);
       return {
         ok: true,
         kind: "chat_message_recalled",
@@ -394,24 +365,39 @@ export class MessageFlowApplicationService {
     if (!mid) return;
     const cid = this.deps.timelineState.readCurrentChannelId();
     if (!cid) return;
-    const existing = this.deps.timelineState.listMessages(cid).some((message) => message.id === mid);
+    const state = this.deps.timelineState;
+    const seq = ++this.contextSeq;
+    const edge = state.readContextEdges(cid)?.after;
+    const existing = (!edge || compareMessageIdForReadOrder(mid, edge) <= 0) &&
+      state.listMessages(cid).some((message) => message.id === mid);
     if (existing) {
       this.deps.timelineState.setHighlightedMessageId(mid);
       return;
     }
-    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
-    if (!socket || !token) return;
-    const requestSocket = socket;
     const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
+    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+    const isCurrent = () => seq === this.contextSeq && state.readCurrentChannelId() === cid &&
+      !this.isScopeStale(socket, requestScopeVersion);
+    if (!socket || !token || !isCurrent()) return;
     try {
-      const page = await this.deps.api.listChannelMessagesAround(socket, token, cid, mid, 20, 20);
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
-      const mapped = page.items.map((item) => this.deps.mapWireMessage(socket, item));
-      this.deps.timelineState.replaceTimeline(cid, mapped);
-      this.deps.timelineState.setHighlightedMessageId(mid);
+      const page = await this.deps.api.listChannelMessagesAround(socket, token, cid, mid, CONTEXT_LIMIT, CONTEXT_LIMIT);
+      if (!isCurrent()) return;
+      const mapped = this.mapContextMessages(socket, page.items);
+      const anchorIndex = mapped.findIndex((message) => message.id === mid);
+      if (anchorIndex < 0 || !await this.replaceTimelineMerged(cid, mapped, true, isCurrent)) return;
+      const before = anchorIndex >= CONTEXT_LIMIT ? mapped[0].id : "";
+      const after = mapped.length - anchorIndex - 1 >= CONTEXT_LIMIT ? mapped[mapped.length - 1].id : "";
+      state.writeContextEdges(cid, { before, after });
+      state.writeNextCursor(cid, "");
+      state.writeHasMore(cid, Boolean(before));
+      state.setHighlightedMessageId(mid);
     } catch {
-      // Context load failed, leave current timeline intact
+      // 锚点不存在或请求失败时保留当前时间线。
     }
+  }
+
+  private mapContextMessages(socket: string, items: ChatMessageRecord[]): ChatMessage[] {
+    return dedupeMessages(items.map((item) => this.deps.mapWireMessage(socket, item))).sort(compareMessages);
   }
 
   /**
@@ -427,6 +413,7 @@ export class MessageFlowApplicationService {
    * 清除搜索状态。
    */
   clearSearch(): void {
+    this.contextSeq += 1;
     this.deps.timelineState.writeSearchState({ query: "", loading: false, error: "", results: [] });
     this.clearHighlightedMessage();
   }
@@ -439,11 +426,16 @@ export class MessageFlowApplicationService {
    * - 当前频道切换后重建时间线
    */
   async loadChannelMessages(cid: string): Promise<void> {
+    const state = this.deps.timelineState;
+    const edges = state.readContextEdges(cid.trim());
     const page = await this.fetchLatestPage(cid);
     if (!page) return;
-    await this.replaceTimelineMerged(page.channelId, page.mapped, true);
-    this.deps.timelineState.writeNextCursor(page.channelId, page.nextCursor);
-    this.deps.timelineState.writeHasMore(page.channelId, page.hasMore && Boolean(page.nextCursor));
+    const isCurrent = () => !this.isScopeStale(page.requestSocket, page.requestScopeVersion) &&
+      state.readContextEdges(page.channelId) === edges;
+    if (!isCurrent() || !await this.replaceTimelineMerged(page.channelId, page.mapped, true, isCurrent)) return;
+    state.writeContextEdges(page.channelId);
+    state.writeNextCursor(page.channelId, page.nextCursor);
+    state.writeHasMore(page.channelId, page.hasMore && Boolean(page.nextCursor));
   }
 
   /**
@@ -457,62 +449,71 @@ export class MessageFlowApplicationService {
   async refreshChannelLatestPage(cid: string): Promise<void> {
     const page = await this.fetchLatestPage(cid);
     if (!page) return;
-    await this.replaceTimelineMerged(page.channelId, page.mapped);
+    const state = this.deps.timelineState;
+    const edges = state.readContextEdges(page.channelId);
+    const isCurrent = () => !this.isScopeStale(page.requestSocket, page.requestScopeVersion) &&
+      state.readContextEdges(page.channelId) === edges;
+    if (!await this.replaceTimelineMerged(page.channelId, page.mapped, false, isCurrent)) return;
 
-    if (!this.deps.timelineState.readNextCursor(page.channelId) && !this.deps.timelineState.readHasMore(page.channelId)) {
-      this.deps.timelineState.writeNextCursor(page.channelId, page.nextCursor);
-      this.deps.timelineState.writeHasMore(page.channelId, page.hasMore && Boolean(page.nextCursor));
+    if (!edges && !state.readNextCursor(page.channelId) && !state.readHasMore(page.channelId)) {
+      state.writeNextCursor(page.channelId, page.nextCursor);
+      state.writeHasMore(page.channelId, page.hasMore && Boolean(page.nextCursor));
     }
   }
 
   /**
-   * 沿当前频道的 cursor 继续向旧消息方向翻页。
+   * 首页沿游标向旧消息翻页，锚点上下文沿两侧边缘消息继续浏览。
    */
-  async loadMoreMessages(): Promise<void> {
-    const channelId = this.deps.timelineState.readCurrentChannelId();
-    if (!channelId) return;
-    if (!this.deps.timelineState.readHasMore(channelId)) return;
-
-    const cursor = this.deps.timelineState.readNextCursor(channelId);
-    if (this.deps.timelineState.isLoadingMore(channelId)) return;
-    if (!cursor) {
-      this.deps.timelineState.writeHasMore(channelId, false);
+  async loadMoreMessages(direction: "older" | "newer" = "older"): Promise<void> {
+    const state = this.deps.timelineState;
+    const channelId = state.readCurrentChannelId();
+    if (!channelId || state.isLoadingMore(channelId)) return;
+    const edges = state.readContextEdges(channelId);
+    const key = direction === "older" ? "before" : "after";
+    const anchor = edges?.[key];
+    if (edges ? !anchor : direction === "newer" || !state.readHasMore(channelId)) return;
+    const cursor = edges ? "" : state.readNextCursor(channelId);
+    if (!edges && !cursor) {
+      state.writeHasMore(channelId, false);
       return;
     }
 
-    const [socket, token] = await this.deps.scope.getSocketAndValidToken();
-    if (!socket || !token) return;
-    const requestSocket = socket;
+    const requestSocket = this.deps.scope.getActiveServerSocket();
     const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
+    const isCurrent = () => !this.isScopeStale(requestSocket, requestScopeVersion) &&
+      state.readCurrentChannelId() === channelId && state.readContextEdges(channelId) === edges;
 
-    this.deps.timelineState.setLoadingMore(channelId, true);
+    state.setLoadingMore(channelId, true);
     try {
-      const res: ChatMessagePage = await this.deps.api.listChannelMessages(socket, token, channelId, cursor, LATEST_PAGE_LIMIT);
-      if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
-      const items = Array.isArray(res.items) ? res.items : [];
-      const mapped: ChatMessage[] = [];
-      for (const message of items) mapped.push(this.deps.mapWireMessage(socket, message));
+      const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+      if (!token || socket !== requestSocket || !isCurrent()) return;
+      if (edges && anchor) {
+        const older = direction === "older";
+        const { items } = await this.deps.api.listChannelMessagesAround(socket, token, channelId, anchor,
+          older ? LATEST_PAGE_LIMIT : 0, older ? 0 : LATEST_PAGE_LIMIT);
+        if (!isCurrent()) return;
+        const mapped = this.mapContextMessages(socket, items);
+        if (!mapped.some((message) => message.id === anchor)) return;
+        if (!await this.replaceTimelineMerged(channelId, mapped, false, isCurrent)) return;
+        // 响应中包含重复的锚点，只用该方向的新消息数判断是否还可继续。
+        const next = mapped.length > LATEST_PAGE_LIMIT ? mapped[older ? 0 : mapped.length - 1].id : "";
+        state.writeContextEdges(channelId, { ...edges, [key]: next });
+        if (older) state.writeHasMore(channelId, Boolean(next));
+        return;
+      }
 
-      await this.replaceTimelineMerged(channelId, mapped);
-
-      const nextCursor = String(res.nextCursor ?? "").trim();
-      const hasMore = Boolean(res.hasMore);
-      this.deps.timelineState.writeNextCursor(channelId, nextCursor);
-      this.deps.timelineState.writeHasMore(channelId, hasMore && Boolean(nextCursor));
+      const page = await this.deps.api.listChannelMessages(socket, token, channelId, cursor, LATEST_PAGE_LIMIT);
+      if (!isCurrent()) return;
+      const mapped = page.items.map((item) => this.deps.mapWireMessage(socket, item));
+      if (!await this.replaceTimelineMerged(channelId, mapped, false, isCurrent)) return;
+      const nextCursor = page.nextCursor ?? "";
+      state.writeNextCursor(channelId, nextCursor);
+      state.writeHasMore(channelId, Boolean(page.hasMore && nextCursor));
     } finally {
       if (!this.isScopeStale(requestSocket, requestScopeVersion)) {
-        this.deps.timelineState.setLoadingMore(channelId, false);
+        state.setLoadingMore(channelId, false);
       }
     }
-  }
-
-  /**
-   * 生成消息发送的幂等键。
-   */
-  private createIdempotencyKey(): string {
-    const uuid = globalThis.crypto?.randomUUID?.();
-    if (typeof uuid === "string" && uuid.trim()) return uuid;
-    return `msg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 
   /**
@@ -529,20 +530,20 @@ export class MessageFlowApplicationService {
    * 抓取某频道的最新一页，并做统一的 scope 一致性校验与 DTO 映射。
    */
   private async fetchLatestPage(cid: string): Promise<LatestPage | null> {
+    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
     const [socket, token] = await this.deps.scope.getSocketAndValidToken();
     const channelId = String(cid).trim();
-    if (!socket || !token || !channelId) return null;
+    if (!socket || !token || !channelId || this.isScopeStale(socket, requestScopeVersion)) return null;
     const requestSocket = socket;
-    const requestScopeVersion = this.deps.scope.getActiveScopeVersion();
 
     const res: ChatMessagePage = await this.deps.api.listChannelMessages(socket, token, channelId, undefined, LATEST_PAGE_LIMIT);
     if (this.isScopeStale(requestSocket, requestScopeVersion)) return null;
     const items = Array.isArray(res.items) ? res.items : [];
     const mapped: ChatMessage[] = [];
     for (const message of items) mapped.push(this.deps.mapWireMessage(socket, message));
-    const nextCursor = String(res.nextCursor ?? "").trim();
+    const nextCursor = res.nextCursor ?? "";
     const hasMore = Boolean(res.hasMore);
-    return { requestSocket, channelId, mapped, nextCursor, hasMore };
+    return { requestSocket, requestScopeVersion, channelId, mapped, nextCursor, hasMore };
   }
 }
 

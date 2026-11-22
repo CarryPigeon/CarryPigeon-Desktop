@@ -684,13 +684,15 @@ function selectSystemMention(type: "everyone" | "here"): void {
   padding: 6px 8px;
 }
 
-/* 发送按钮：highlight = 主操作（工作台主按钮语义，不用品牌 accent） */
+/* 发送按钮：由主题提供主操作填色与文字色。 */
 .cp-composer__send {
+  --send-surface: var(--cp-highlight-bg);
+  --send-hover-surface: var(--cp-highlight-bg-strong);
   min-height: 32px;
   padding: 0 14px;
   border: 1px solid var(--cp-highlight-border-strong);
-  background: var(--cp-highlight-bg);
-  color: var(--cp-text);
+  background: var(--cp-send-bg, var(--send-surface));
+  color: var(--cp-on-accent, var(--cp-text));
   border-radius: 999px;
   font-size: 12.5px;
   line-height: 1.4;
@@ -702,29 +704,31 @@ function selectSystemMention(type: "everyone" | "here"): void {
 }
 
 .cp-composer__send:hover:enabled {
-  background: var(--cp-highlight-bg-strong);
+  background: var(--cp-send-hover, var(--send-hover-surface));
   border-color: var(--cp-highlight-border-strong);
 }
 
 .cp-composer__send:disabled {
-  opacity: 0.55;
+  background: var(--cp-send-disabled-bg, var(--send-surface));
+  color: var(--cp-text-muted);
+  border-color: var(--cp-field-border);
+  opacity: var(--cp-send-disabled-opacity, 0.55);
   cursor: not-allowed;
 }
 
 /* 内嵌发送按钮：绝对定位贴文本域右下角，z-index 高于文本层；不透明底保证与下层文字的可读性 */
 .cp-composer__send--overlay {
+  --send-surface: color-mix(in oklab, var(--cp-highlight) 12%, var(--cp-panel));
+  --send-hover-surface: color-mix(in oklab, var(--cp-highlight) 18%, var(--cp-panel));
   position: absolute;
   right: 8px;
   bottom: 8px;
   z-index: 5;
-  background: color-mix(in oklab, var(--cp-highlight) 12%, var(--cp-panel));
   box-shadow: 0 2px 8px color-mix(in oklab, var(--cp-text) 10%, transparent);
 }
 
-.cp-composer__send--overlay:hover:enabled {
-  /* 绝对定位元素不做位移，避免 hover 时在文本域内跳动 */
-  transform: none;
-  background: color-mix(in oklab, var(--cp-highlight) 18%, var(--cp-panel));
+.cp-composer__send:focus-visible {
+  box-shadow: var(--cp-focus-ring, var(--cp-ring));
 }
 
 /* 回复条：cp-inline-status(info) 语义 */

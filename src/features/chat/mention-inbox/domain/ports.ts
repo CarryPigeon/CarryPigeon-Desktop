@@ -7,7 +7,7 @@ import type { MentionInboxItem, MentionInboxPage, MentionInboxQuery } from "./co
 export type MentionInboxApiPort = {
   listMentions(serverSocket: string, accessToken: string, query: MentionInboxQuery): Promise<MentionInboxPage>;
   markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void>;
-  batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, channelId?: string): Promise<void>;
+  batchMarkMentionsRead(serverSocket: string, accessToken: string, throughMentionId?: string, channelId?: string): Promise<void>;
 };
 
 export type MentionInboxStatePort = {

@@ -3,7 +3,7 @@
  * @description chat/room-session｜application：read_state.updated 事件路由器。
  */
 
-import { shouldAdvanceReadMarker } from "@/features/chat/domain/utils/readMarker";
+import { compareMessageIdForReadOrder } from "@/features/chat/domain/utils/readMarker";
 import type { RoomSessionStatePort } from "../ports";
 
 /**
@@ -13,12 +13,10 @@ export type ReadStateEventRouterDeps = {
   getCurrentUserId: () => string;
   state: Pick<
     RoomSessionStatePort,
-    | "readLastReadTimeMs"
     | "readLastReadMessageId"
-    | "writeLastReadTimeMs"
     | "writeLastReadMessageId"
-    | "markChannelReadLocally"
   >;
+  refreshChannelReadState: (cid: string) => void;
 };
 
 /**
@@ -34,17 +32,12 @@ export function createReadStateEventRouter(deps: ReadStateEventRouterDeps) {
     const cid = String(payload?.channelId ?? "").trim();
     const uid = String(payload?.userId ?? "").trim();
     const lastReadMid = String(payload?.lastReadMessageId ?? "").trim();
-    const t = Number(payload?.lastReadTime ?? 0);
-    if (!cid || !uid || !Number.isFinite(t)) return true;
-
-    if (uid !== deps.getCurrentUserId()) return true;
-    const nextTime = Math.trunc(t);
-    const prevReadTime = deps.state.readLastReadTimeMs(cid);
+    if (!cid || !uid || !lastReadMid || uid !== deps.getCurrentUserId()) return true;
     const prevReadMid = deps.state.readLastReadMessageId(cid);
-    if (!shouldAdvanceReadMarker(prevReadTime, prevReadMid, nextTime, lastReadMid)) return true;
-    deps.state.writeLastReadTimeMs(cid, nextTime);
-    if (lastReadMid) deps.state.writeLastReadMessageId(cid, lastReadMid);
-    deps.state.markChannelReadLocally(cid);
+    const comparison = compareMessageIdForReadOrder(lastReadMid, prevReadMid);
+    if (comparison < 0) return true;
+    if (comparison > 0) deps.state.writeLastReadMessageId(cid, lastReadMid);
+    deps.refreshChannelReadState(cid);
     return true;
   };
 }

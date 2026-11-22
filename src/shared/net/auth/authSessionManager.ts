@@ -13,7 +13,6 @@
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 import { createLogger } from "@/shared/utils/logger";
-import { getDeviceId } from "@/shared/utils/deviceId";
 import { readAuthSession, writeAuthSession, type AuthSession } from "@/shared/utils/localState";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
 
@@ -107,7 +106,6 @@ async function refreshViaHttp(serverSocket: string, refreshToken: string): Promi
   try {
     const res = await client.requestJson<ApiTokenResponse>("POST", "/auth/refresh", {
       refresh_token: rt,
-      client: { device_id: getDeviceId() },
     });
     const accessToken = String(res.access_token ?? "").trim();
     const nextRefreshToken = String(res.refresh_token ?? "").trim();
@@ -283,7 +281,7 @@ export async function revokeAndClearSession(serverSocket: string): Promise<void>
   if (!refreshToken) return;
   const client = new HttpJsonClient({ serverSocket: socket, apiVersion: 1 });
   try {
-    await client.requestJson<void>("POST", "/auth/revoke", { refresh_token: refreshToken, client: { device_id: getDeviceId() } });
+    await client.requestJson<void>("POST", "/auth/revoke", { refresh_token: refreshToken });
   } catch (e) {
     if (isApiRequestError(e)) {
       logger.warn("Action: auth_session_revoke_failed_best_effort", { socket, reason: e.reason, status: e.status });

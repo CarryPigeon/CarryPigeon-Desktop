@@ -312,8 +312,11 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
     currentMessageCount: computed(() => messageTimelineSnapshot.value.currentMessageCount),
     currentChannelHasMore: computed(() => messageTimelineSnapshot.value.hasMoreHistory),
+    currentChannelHasNewer: computed(() => messageTimelineSnapshot.value.hasNewerMessages),
     loadingMoreMessages: computed(() => messageTimelineSnapshot.value.isLoadingHistory),
     loadMoreMessages: currentChannelMessageFlow.loadMoreHistory,
+    loadNewerMessages: currentChannelMessageFlow.loadNewerMessages,
+    loadLatestMessages: currentChannelMessageFlow.loadLatestMessages,
     reportCurrentReadState: currentSession.reportReadState,
     onAsyncError: logAsyncError,
   });
@@ -325,6 +328,12 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     openChannelSettingsMenu,
     closeChannelMenu,
   } = useChannelSettingsMenu();
+
+  const membersSnapshot = useObservedCapabilitySnapshot(roomGovernance.currentChannel.members);
+  const currentUserRole = computed(() => {
+    const member = membersSnapshot.value.find((m) => m.id === currentUserId.value);
+    return member?.role ?? "member";
+  });
 
   const {
     showCreateChannel,
@@ -341,6 +350,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
   } = useChannelDialogs({
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
     currentUserId,
+    currentUserRole,
     channels: computed(() => roomDirectorySnapshot.value.visibleChannels),
     findChannelById,
     selectChannel: currentSession.selectChannel,
@@ -503,6 +513,7 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     if (!token) return;
     try {
       await httpChatApiPort.pinMessage(s, token, cid, messageId);
+      void chatCenter.loadPins();
       void toast.success(t("pinned_message"));
     } catch (error) {
       logger.error("Action: chat_pin_message_failed", { messageId, error: String(error) });
@@ -525,7 +536,8 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     if (!token) return;
     try {
       await httpChatApiPort.unpinMessage(s, token, cid, messageId);
-      void toast.success(t("pinned_message"));
+      void chatCenter.loadPins();
+      void toast.success(t("unpin_message"));
     } catch (error) {
       logger.error("Action: chat_unpin_message_failed", { messageId, error: String(error) });
       void toast.error(`${t("unpin_failed")}：${String(error)}`);
@@ -674,12 +686,6 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     return channel?.name ?? currentSessionSnapshot.value.currentChannelId;
   });
 
-  const membersSnapshot = useObservedCapabilitySnapshot(roomGovernance.currentChannel.members);
-  const currentUserRole = computed(() => {
-    const member = membersSnapshot.value.find((m) => m.id === currentUserId.value);
-    return member?.role ?? "member";
-  });
-
   const chatCenter = useChatCenterModel({
     currentSession,
     currentTimeline: currentChannelMessageFlow,
@@ -696,19 +702,28 @@ export function usePatchbayPageModel(): PatchbayPageModel {
     domainRegistryView,
     onLoadMoreMessages: handleLoadMoreMessages,
     onMessageContextMenu: handleMessageContextMenu,
-    onForwardMessage: async (mid, req) => {
+    onForwardMessage: async (mid, req, s) => {
       if (IS_STORE_MOCK) {
         await getChatAggregateStore().forwardMessage(mid, req);
         return;
       }
-      const s = socket.value;
-      if (!s) return;
+      if (!s || socket.value !== s) throw new Error("Chat session unavailable");
       const token = (await ensureValidAccessToken(s)).trim();
-      if (!token) return;
-      await httpChatApiPort.forwardMessage(s, token, mid, {
-        targetCid: req.targetCid,
-        comment: req.comment,
-        mergedMids: req.mergedMids,
+      if (!token || socket.value !== s) throw new Error("Chat session unavailable");
+      await httpChatApiPort.forwardMessage(s, token, mid, req);
+    },
+    onSendForwardComment: async (targetCid, comment, s) => {
+      if (IS_STORE_MOCK) {
+        getChatAggregateStore().sendForwardComment(targetCid, comment);
+        return;
+      }
+      if (!s || socket.value !== s) throw new Error("Chat session unavailable");
+      const token = (await ensureValidAccessToken(s)).trim();
+      if (!token || socket.value !== s) throw new Error("Chat session unavailable");
+      await httpChatApiPort.sendChannelMessage(s, token, targetCid, {
+        domain: "Core:Text",
+        domainVersion: "1.0.0",
+        data: { text: comment },
       });
     },
     linkPreview,

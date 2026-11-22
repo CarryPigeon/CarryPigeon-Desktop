@@ -30,7 +30,9 @@ export interface AuthServicePort {
    * @param password - 密码。
    * @returns 注册结果（uid / username）。
    */
-  registerWithPassword(username: string, password: string): Promise<AuthRegisterResult>;
+  registerWithPassword(username: string, password: string, email: string, code: string): Promise<AuthRegisterResult>;
+
+  changePassword(password: string, code: string): Promise<void>;
 
   /**
    * 使用用户名 + 密码登录并获取 token。

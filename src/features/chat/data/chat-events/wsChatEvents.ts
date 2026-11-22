@@ -10,10 +10,7 @@
 
 import { getDevProxiedWsUrl, shouldUseDevApiProxy } from "@/shared/net/http/devApiProxy";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
-import { compareEventId } from "@/shared/net/ws/eventId";
-import { getDeviceId } from "@/shared/utils/deviceId";
 import { createLogger } from "@/shared/utils/logger";
-import { readLastEventId, writeLastEventId } from "@/shared/utils/localState";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 import { connectProtocolMockChatWs } from "@/shared/mock/protocol/protocolMockTransport";
 import { getKnownServerId, rememberServerId } from "@/shared/serverIdentity";
@@ -109,7 +106,7 @@ export type ChatWsConnectOptions = {
    *
    * 约定：客户端必须走 HTTP 补拉（频道列表 / 未读 / 消息列表）。
    */
-  onResumeFailed?: (reason: string) => void;
+  onAuthenticated?: (reconnect: boolean) => void;
   /**
    * 当服务端拒绝 `auth/reauth`（例如 token 过期）时回调。
    */
@@ -246,6 +243,7 @@ export function connectChatWs(
   let closedByUser = false;
   /** 当前连接是否已完成过认证（auth.ok / reauth.ok）。 */
   let hasAuthenticated = false;
+  let everAuthenticated = false;
   /** 连续“未完成认证即断开”的次数（用于判定连接丢失并触发降级回调）。 */
   let consecutiveConnectFailures = 0;
   /**
@@ -342,25 +340,10 @@ export function connectChatWs(
   /**
    * 在当前连接上发送 `auth` 命令。
    *
-   * 重要约定：`resume.last_event_id` 必须是“最后已处理事件”的 `event_id`。
-   *
    * @returns 无返回值。
    */
-  async function sendAuth(): Promise<void> {
-    const id = createRequestId();
-    const lastEventId = await readLastEventId(socket);
-    const resume = lastEventId ? { last_event_id: lastEventId } : undefined;
-    const msg = {
-      type: "auth",
-      id,
-      data: {
-        access_token: token,
-        device_id: getDeviceId(),
-        resume,
-      },
-    };
-    logger.info("Action: chat_ws_auth_opened", { wsUrl, hasResume: Boolean(lastEventId) });
-    ws?.send(JSON.stringify(msg));
+  function sendAuth(): void {
+    ws?.send(JSON.stringify({ type: "auth", id: createRequestId(), data: { access_token: token } }));
     startPing();
   }
 
@@ -382,49 +365,14 @@ export function connectChatWs(
       return;
     }
 
-    if (parsed && typeof parsed === "object" && parsed.type === "resume.failed") {
-      const msg = parsed as WsResumeFailed;
-      const reason = String(msg.data?.reason ?? "").trim() || "resume_failed";
-      logger.warn("Action: chat_ws_resume_failed", { wsUrl, reason });
-      writeLastEventId(socket, "");
-      options?.onResumeFailed?.(reason);
-      return;
-    }
-
-    if (parsed && typeof parsed === "object" && parsed.type === "event") {
+    if (parsed?.type === "event") {
       const env = parsed as WsEventEnvelope;
-      const eid = String(env.data?.event_id ?? "").trim();
-      if (!eid) {
-        logger.warn("Action: chat_ws_event_missing_event_id_ignored", { wsUrl, eventType: String(env.data?.event_type ?? "").trim() });
-        return;
-      }
-
-      const last = readLastEventId(socket);
-      const trimmedLast = last.trim();
-      if (trimmedLast && compareEventId(eid, trimmedLast) <= 0) {
-        logger.debug("Action: chat_ws_event_ignored_duplicate_or_out_of_order", {
-          wsUrl,
-          eid,
-          last: trimmedLast,
-          eventType: String(env.data?.event_type ?? "").trim(),
-        });
-        return;
-      }
-
+      if (!hasAuthenticated || !env.data?.event_id || !env.data.event_type) return;
       try {
         onEvent(env);
-      } catch (e) {
-        // 重要：消费端失败时，不能前移 last_event_id，否则会丢事件。
-        logger.error("Action: chat_ws_event_handler_failed_kept_last_event_id", {
-          wsUrl,
-          eid,
-          eventType: String(env.data?.event_type ?? "").trim(),
-          error: String(e),
-        });
-        return;
+      } catch (error) {
+        logger.warn("Action: chat_ws_event_handler_failed", { wsUrl, error: String(error) });
       }
-
-      writeLastEventId(socket, eid);
       return;
     }
 
@@ -453,11 +401,15 @@ export function connectChatWs(
       return;
     }
 
+    if (!parsed || typeof parsed !== "object") return;
     const ok = parsed as WsCommandOk;
     logger.debug("Action: chat_ws_message_received", { type: ok.type, id: ok.id ?? "" });
 
-    if (ok.type === "auth.ok" || ok.type === "reauth.ok") {
+    if (ok.type === "auth.ok" && !hasAuthenticated) {
+      const reconnect = everAuthenticated;
+      everAuthenticated = true;
       markAuthenticated();
+      options?.onAuthenticated?.(reconnect);
     }
 
     // 兜底恢复 `server_id`：服务端在 `auth.ok` 帧中回显 `data.server_id`。
@@ -517,9 +469,12 @@ export function connectChatWs(
 
     openHandler = () => {
       reconnectAttempt = 0;
-      void sendAuth().catch((error) => {
-        logger.warn("Action: chat_ws_auth_failed_last_event_load_failed", { wsUrl, error: String(error) });
-      });
+      try {
+        sendAuth();
+      } catch (error) {
+        logger.warn("Action: chat_ws_auth_send_failed", { wsUrl, error: String(error) });
+        ws?.close();
+      }
     };
     closeHandler = () => {
       stopPing();

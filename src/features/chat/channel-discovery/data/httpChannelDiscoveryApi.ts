@@ -20,7 +20,6 @@ export function createHttpChannelDiscoveryApi(): ChannelDiscoveryApiPort {
       if (keyword) q.push(`q=${encodeURIComponent(keyword)}`);
       if (query.cursor) q.push(`cursor=${encodeURIComponent(query.cursor)}`);
       if (query.limit != null) q.push(`limit=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(query.limit)))))}`);
-      if (query.type) q.push(`type=${encodeURIComponent(query.type)}`);
       const path = `/channels/discover${q.length ? `?${q.join("&")}` : ""}`;
       const wire = await client.requestJson<ChannelDiscoverPageWire>("GET", path);
       return mapChannelDiscoverPageWire(wire);

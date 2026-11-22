@@ -47,6 +47,8 @@ export type MessageFlowScopePort = {
   getActiveScopeVersion(): number;
 };
 
+export type MessageContextEdges = { before: string; after: string };
+
 /**
  * message-flow 时间线状态读写端口。
  *
@@ -55,6 +57,8 @@ export type MessageFlowScopePort = {
  * - 禁止直接拿到 `Record<string, ChatMessage[]>` 或 Vue 容器。
  */
 export type MessageTimelineStatePort = {
+  readContextEdges(channelId: string): MessageContextEdges | undefined;
+  writeContextEdges(channelId: string, edges?: MessageContextEdges): void;
   readCurrentChannelId(): string;
   listMessages(channelId: string): readonly ChatMessage[];
   replaceTimeline(channelId: string, messages: readonly ChatMessage[]): void;

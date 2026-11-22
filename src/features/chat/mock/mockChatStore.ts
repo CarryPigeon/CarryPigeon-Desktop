@@ -186,6 +186,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
   const members = computed(() => state.members);
   const currentMessages = computed(() => state.messagesByChannel[currentChannelId.value] ?? []);
   const currentChannelHasMore = computed(() => false);
+  const currentChannelHasNewer = computed(() => false);
   const loadingMoreMessages = computed(() => false);
   const currentChannelLastReadTimeMs = computed(() => state.lastReadTimeMsByChannel[currentChannelId.value] ?? 0);
   const currentChannelLastReadMid = computed(() => state.lastReadMidByChannel[currentChannelId.value] ?? "");
@@ -973,21 +974,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     if (!mid) return;
     const cid = currentChannelId.value.trim();
     if (!cid) return;
-    // Ensure the target message exists in the mock timeline
-    const existing = state.messagesByChannel[cid] ?? [];
-    if (!existing.some((m) => m.id === mid)) {
-      state.messagesByChannel[cid] = [
-        ...existing,
-        {
-          id: mid,
-          kind: "core_text" as const,
-          from: { id: "u-1", name: "Operator", avatarUrl: "https://i.pravatar.cc/80?u=u-1" },
-          timeMs: Date.now() - 1000 * 60,
-          domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" as const },
-          text: "Message from search result",
-        },
-      ];
-    }
+    if (!state.messagesByChannel[cid]?.some((message) => message.id === mid)) return;
     highlightedMessageId.value = mid;
   }
 
@@ -1023,7 +1010,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
    */
   async function forwardMessage(
     mid: string,
-    req: { targetCid: string; comment?: string; mergedMids?: string[] },
+    req: { targetCid: string; mergedMids?: string[] },
   ): Promise<ChatMessage> {
     const now = Date.now();
     const f = { id: String(currentChatUser.value.id || "u-1"), name: currentChatUsername.value || "Operator", avatarUrl: currentChatUser.value.avatarUrl || undefined };
@@ -1069,7 +1056,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
         from: f,
         timeMs: now,
         domain: { id: "Core:Forward", label: "Core:Forward", colorVar: "--cp-domain-core" },
-        text: req.comment ?? "",
+        text: "",
         forwardedMessages: fwds,
       };
       targetList.push(newMsg);
@@ -1097,11 +1084,27 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
       from: f,
       timeMs: now,
       domain: { id: "Core:Forward", label: "Core:Forward", colorVar: "--cp-domain-core" },
-      text: req.comment ?? "",
+      text: "",
       forwardedFrom,
     };
     targetList.push(newMsg);
     return newMsg;
+  }
+
+  function sendForwardComment(targetCid: string, text: string): void {
+    const messages = state.messagesByChannel[targetCid] ?? (state.messagesByChannel[targetCid] = []);
+    messages.push({
+      id: `m-${Date.now()}-note-${messages.length}`,
+      kind: "core_text",
+      from: {
+        id: String(currentChatUser.value.id || "u-1"),
+        name: currentChatUsername.value || "Operator",
+        avatarUrl: currentChatUser.value.avatarUrl || undefined,
+      },
+      timeMs: Date.now(),
+      domain: { id: "Core:Text", label: "Core:Text", colorVar: "--cp-domain-core" },
+      text,
+    });
   }
 
   /**
@@ -1162,6 +1165,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     currentChannelId,
     currentMessages,
     currentChannelHasMore,
+    currentChannelHasNewer,
     loadingMoreMessages,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
@@ -1174,6 +1178,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     reportCurrentReadState,
     markChannelReadLocally() {},
     loadMoreMessages,
+    loadLatestMessages: async () => {},
     applyJoin,
     updateChannelMeta,
     updateAnnouncement,
@@ -1182,6 +1187,7 @@ export function createMockChatStore(): ChatRuntimeAggregateStore {
     recallMessage,
     sendComposerMessage,
     forwardMessage,
+    sendForwardComment,
     listMentionCandidates,
     searchCurrentChannel,
     loadContextAroundMessage,

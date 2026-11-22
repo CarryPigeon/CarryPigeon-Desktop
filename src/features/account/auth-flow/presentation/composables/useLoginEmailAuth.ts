@@ -105,7 +105,7 @@ export function useLoginEmailAuth(deps: UseLoginEmailAuthDeps): LoginEmailAuthMo
 
     sending.value = true;
     try {
-      const outcome = await authServer.sendVerificationCode(emailValue);
+      const outcome = await authServer.sendVerificationCode(emailValue, deps.mode === "register" ? "REGISTER" : "LOGIN");
       if (outcome.ok) {
         startCountdown(outcome.cooldownSec);
         banner.value = "Code sent.";
@@ -129,10 +129,6 @@ export function useLoginEmailAuth(deps: UseLoginEmailAuthDeps): LoginEmailAuthMo
     try {
       const outcome = await authServer.signInWithEmailCode(credential.email, credential.code);
       if (outcome.ok && outcome.kind === "signed_in") {
-        if (deps.mode === "register" && !outcome.login.isNewUser) {
-          banner.value = "Account already exists. Please sign in instead.";
-          return;
-        }
         void router.replace({ path: outcome.redirectTo, query: outcome.login.isNewUser ? { welcome: "new" } : undefined });
         return;
       }
@@ -145,7 +141,7 @@ export function useLoginEmailAuth(deps: UseLoginEmailAuthDeps): LoginEmailAuthMo
         }
         return;
       }
-      banner.value = outcome.error.message;
+      if (!outcome.ok) banner.value = outcome.error.message;
     } finally {
       loggingIn.value = false;
     }

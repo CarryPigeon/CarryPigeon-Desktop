@@ -126,6 +126,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     api: deps.api,
     currentChannelId,
     messagesByChannel: state.messagesByChannel,
+    contextEdgesByChannel: state.contextEdgesByChannel,
     nextCursorByChannel: state.nextCursorByChannel,
     hasMoreByChannel: state.hasMoreByChannel,
     loadingMoreByChannel: state.loadingMoreByChannel,
@@ -146,6 +147,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
   const timelineState = createMessageTimelineStatePort({
     currentChannelId,
     messagesByChannel: state.messagesByChannel,
+    contextEdgesByChannel: state.contextEdgesByChannel,
     nextCursorByChannel: state.nextCursorByChannel,
     hasMoreByChannel: state.hasMoreByChannel,
     loadingMoreByChannel: state.loadingMoreByChannel,
@@ -154,9 +156,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
   });
   const unreadProjection = createSessionUnreadProjectionPort({
     channelsRef,
-    messagesByChannel,
-    lastReadTimeMsByChannel,
-    lastReadMidByChannel,
+    refreshChannelReadState: sessionSharedContext.refreshChannelReadState,
   });
   const readStateProjection = createSessionReadStateEventProjectionPort({
     channelsRef,
@@ -184,10 +184,16 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
   const onWsEvent = createChatEventRouter({
     logger: deps.logger,
     getServerSocket: sessionSharedContext.scope.getActiveServerSocket,
+    getScopeVersion: sessionSharedContext.scope.getActiveScopeVersion,
+    async loadMessage(mid) {
+      const [socket, token] = await sessionSharedContext.scope.getSocketAndValidToken();
+      return socket && token ? deps.api.getMessage(socket, token, mid) : undefined;
+    },
     getCurrentUserId: getCurrentChatUserId,
     timelineState,
     unreadProjection,
     readStateProjection,
+    refreshChannelReadState: (cid) => { void sessionSharedContext.refreshChannelReadState(cid); },
     refreshChannels: () => dedupeAsyncByKey("refreshChannels", () => governance.refreshChannels()),
     refreshChannelLatestPage: (channelId: string) =>
       dedupeAsyncByKey(`refreshChannelLatestPage:${channelId}`, () => messageFlow.refreshChannelLatestPage(channelId)),
@@ -220,6 +226,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     lastReadTimeMsByChannel,
     lastReadMidByChannel,
     lastReadReportAtMsByChannel,
+    contextEdgesByChannel: state.contextEdgesByChannel,
     nextCursorByChannel: state.nextCursorByChannel,
     hasMoreByChannel: state.hasMoreByChannel,
     loadingMoreByChannel: state.loadingMoreByChannel,
@@ -233,6 +240,7 @@ export function assembleChatStoreRuntime(deps: ChatStoreAssemblyDeps) {
     messageFlow,
     scope: sessionSharedContext.scope,
     readStateReporter: sessionSharedContext.readStateReporter,
+    refreshChannelReadState: sessionSharedContext.refreshChannelReadState,
     onWsEvent,
     listNonAllNotificationChannels,
   });

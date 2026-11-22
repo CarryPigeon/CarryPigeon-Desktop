@@ -105,25 +105,13 @@ describe("mapChatChannelWire", () => {
 // ── mapChatUnreadStateWire ──
 
 describe("mapChatUnreadStateWire", () => {
-  it("should map unread state fields", () => {
-    const wire = { cid: "ch1", unread_count: 10, mention_unread_count: 3, last_read_time: 1699999999000 };
-    const result = mapChatUnreadStateWire(wire as any);
-    expect(result.channelId).toBe("ch1");
-    expect(result.unreadCount).toBe(10);
-    expect(result.mentionUnreadCount).toBe(3);
-    expect(result.lastReadTime).toBe(1699999999000);
+  it("maps the aggregate unread item without requiring a read marker", () => {
+    expect(mapChatUnreadStateWire({ cid: "2001", unread_count: 10 })).toEqual({ channelId: "2001", unreadCount: 10 });
   });
 
-  it("should never have negative unread count", () => {
-    const wire = { cid: "ch2", unread_count: -5, last_read_time: 0 };
-    const result = mapChatUnreadStateWire(wire as any);
-    expect(result.unreadCount).toBe(0);
-  });
-
-  it("should leave mentionUnreadCount undefined when server omits mention_unread_count", () => {
-    const wire = { cid: "ch3", unread_count: 2, last_read_time: 1699999999000 };
-    const result = mapChatUnreadStateWire(wire as any);
-    expect(result.mentionUnreadCount).toBeUndefined();
+  it("clamps unread count to the supported range", () => {
+    expect(mapChatUnreadStateWire({ cid: "2001", unread_count: -5 }).unreadCount).toBe(0);
+    expect(mapChatUnreadStateWire({ cid: "2001", unread_count: 10_001 }).unreadCount).toBe(10_000);
   });
 });
 
@@ -232,7 +220,7 @@ describe("mapChatMessagePageWire", () => {
 
 describe("mapChatChannelMemberWire", () => {
   it("should map member fields", () => {
-    const wire = { uid: "u1", nickname: "Alice", role: "admin", join_time: 1700000000000, avatar: "" };
+    const wire = { uid: "u1", username: "Alice", role: "admin", join_time: 1700000000000, avatar: null };
     const result = mapChatChannelMemberWire(wire as any);
     expect(result.userId).toBe("u1");
     expect(result.nickname).toBe("Alice");
@@ -246,16 +234,9 @@ describe("mapChatChannelMemberWire", () => {
     expect(result.role).toBe("member");
   });
 
-  it("should convert Instant epoch seconds join_time to milliseconds", () => {
-    const wire = { uid: "u3", nickname: "Carol", join_time: 1700000000 };
-    const result = mapChatChannelMemberWire(wire as any);
-    expect(result.joinTime).toBe(1700000000000);
-  });
-
-  it("should convert numeric-string Instant seconds join_time to milliseconds", () => {
-    const wire = { uid: "u4", nickname: "Dave", join_time: "1700000000.5" };
-    const result = mapChatChannelMemberWire(wire as any);
-    expect(result.joinTime).toBe(1700000000500);
+  it("preserves millisecond values below the old epoch heuristic", () => {
+    const result = mapChatChannelMemberWire({ uid: "u3", username: "Carol", role: "member", join_time: 1700000000 });
+    expect(result.joinTime).toBe(1700000000);
   });
 });
 
@@ -315,7 +296,7 @@ describe("mapChatChannelBanWire", () => {
   it("should map ban to domain record", () => {
     const wire = {
       cid: "ch1", uid: "u1", reason: "Spam",
-      expires_at: 1710000000000, created_at: 1700000000000,
+      until: 1710000000000, create_time: 1700000000000,
     };
     const result = mapChatChannelBanWire(wire as any);
     expect(result.channelId).toBe("ch1");
@@ -340,9 +321,9 @@ describe("mapChatSendMessageInput", () => {
       linkPreview: { url: "https://example.com", title: "Example" },
     } as any;
     const result = mapChatSendMessageInput(input);
-    expect(result.domain).toBe("Core:Text");
-    expect(result.domain_version).toBe("1.0.0");
-    expect(result.data).toEqual({ text: "Hello" });
+    expect(result.domain).toBe("Core:Text:V1");
+    expect(result).not.toHaveProperty("domain_version");
+    expect(result.data).toEqual({ content: "Hello", reply_to_mid: "reply1" });
     // Core:Text 顶层不承载 reply/quote/link_preview 关系元数据
     expect((result as any).reply_to_mid).toBeUndefined();
     expect((result as any).reply_to).toBeUndefined();
@@ -352,7 +333,7 @@ describe("mapChatSendMessageInput", () => {
     expect(result.mentions).toEqual(["u3"]);
   });
 
-  it("should put reply metadata and linkPreview inside data for Core:ReplyText", () => {
+  it("should encode a legacy reply composer as versioned text with reply_to_mid", () => {
     const input = {
       domain: "Core:ReplyText",
       domainVersion: "1.0.0",
@@ -366,21 +347,7 @@ describe("mapChatSendMessageInput", () => {
       linkPreview: { url: "https://example.com", title: "Example" },
     } as any;
     const result = mapChatSendMessageInput(input);
-    expect(result.domain).toBe("Core:ReplyText");
-    // 关系元数据放在 data 内，顶层不出现
-    expect((result as any).reply_to_mid).toBeUndefined();
-    expect((result as any).reply_to).toBeUndefined();
-    expect((result as any).quote_reply).toBeUndefined();
-    expect((result as any).link_preview).toBeUndefined();
-    // mentions 仍在信封顶层为 string[]（snowflake UID），不放入 data
-    expect(result.mentions).toEqual(["u3"]);
-    expect(result.data).toEqual({
-      content: { text: "Reply text" },
-      reply_to_mid: "reply1",
-      reply_to: { mid: "r1", sender_name: "Bob", preview: "Hi", created_at: 1, unavailable: false },
-      quote_reply: { mid: "q1", uid: "u2", preview: "Hey" },
-      link_preview: input.linkPreview,
-    });
+    expect(result).toEqual({ domain: "Core:Text:V1", data: { content: "Reply text", reply_to_mid: "reply1" }, mentions: ["u3"] });
   });
 });
 
@@ -528,10 +495,8 @@ describe("mapChatMessageWire wrapper domains", () => {
 
 describe("mapChatReadStateInput", () => {
   it("should map read state input to snake_case wire", () => {
-    const input = { lastReadMessageId: "m10", lastReadTime: 1700000000000 };
-    const result = mapChatReadStateInput(input as any);
-    expect(result.last_read_mid).toBe("m10");
-    expect(result.last_read_time).toBe(1700000000000);
+    const input = { lastReadMessageId: "9007199254740993" };
+    expect(mapChatReadStateInput(input)).toEqual({ last_read_mid: "9007199254740993" });
   });
 });
 

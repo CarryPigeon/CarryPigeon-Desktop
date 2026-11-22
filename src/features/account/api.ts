@@ -46,8 +46,11 @@ export function createAccountCapabilities(): AccountCapabilities {
     forServer(serverSocket) {
       const authServer = authFlowCapabilities.forServer(serverSocket);
       return {
-        sendVerificationCode(email) {
-          return authServer.sendVerificationCode(email);
+        sendVerificationCode(email, purpose) {
+          return authServer.sendVerificationCode(email, purpose);
+        },
+        changePassword(password, code) {
+          return authServer.changePassword(password, code);
         },
         checkRequiredSetup() {
           return authServer.checkRequiredSetup();

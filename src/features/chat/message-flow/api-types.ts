@@ -41,6 +41,7 @@ export type MessageTimelineSnapshot = {
   currentMessages: readonly ChatMessage[];
   currentMessageCount: number;
   hasMoreHistory: boolean;
+  hasNewerMessages: boolean;
   isLoadingHistory: boolean;
   search: MessageSearchState;
   highlightedMessageId: string;
@@ -55,6 +56,8 @@ export type MessageTimelineSnapshot = {
 export type MessageTimelineCapabilities = ReadableCapability<MessageTimelineSnapshot> & {
   findMessageById(messageId: string): ChatMessage | null;
   loadMoreHistory(): Promise<void>;
+  loadNewerMessages(): Promise<void>;
+  loadLatestMessages(): Promise<void>;
   /**
    * 进入回复态。
    *

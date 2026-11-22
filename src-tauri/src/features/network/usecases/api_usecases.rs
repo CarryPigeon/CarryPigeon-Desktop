@@ -140,7 +140,11 @@ pub async fn api_request_json(
 
     let socket = normalize_server_socket(&server_socket)?;
     let method = normalize_method(&method)?;
-    let path = normalize_api_path(&path)?;
+    let path = if method == "GET" && path.trim() == "/internal/readiness" {
+        "/internal/readiness".to_string()
+    } else {
+        normalize_api_path(&path)?
+    };
 
     let origin = to_http_origin(&socket)?;
     let url = format!("{}{}", origin, path);

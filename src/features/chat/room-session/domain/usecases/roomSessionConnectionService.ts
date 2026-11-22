@@ -64,7 +64,8 @@ export type RoomSessionConnectionApplicationServiceDeps = {
   startAutoRefresh: (socketKey: string) => { stop: () => void };
   onAuthSessionChanged: (socketKey: string, listener: (session: { accessToken?: string } | null) => void) => () => void;
   onWsEvent: (evt: ChatEventEnvelope) => void;
-  onResumeFailed: (socketKey: string, reason: string) => void;
+  /** 物理连接重建后从最新页重新同步；无服务端事件回放。 */
+  onReconnected?: (socketKey: string) => void;
 };
 
 /**
@@ -221,8 +222,8 @@ export class RoomSessionConnectionApplicationService {
   private buildConnectOptions(socketKey: string): ChatEventsConnectOptions {
     return {
       wsUrlOverride: this.deps.getWsUrlOverride(socketKey),
-      onResumeFailed: (reason) => {
-        this.deps.onResumeFailed(socketKey, reason);
+      onAuthenticated: (reconnect) => {
+        if (reconnect && this.deps.getActiveServerSocket() === socketKey) this.deps.onReconnected?.(socketKey);
       },
       onAuthError: (reason) => {
         this.handleAuthError(socketKey, reason);

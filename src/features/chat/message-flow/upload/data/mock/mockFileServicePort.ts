@@ -34,6 +34,7 @@ export const mockFileServicePort: FileServicePort = {
         url: `https://mock-upload.example.com/${fileId}`,
         headers: { "Content-Type": request.mimeType },
         expiresAt: Date.now() + 3600000,
+        hasSame: false,
       },
     };
   },

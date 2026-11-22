@@ -15,7 +15,6 @@ import type {
 import type { ChatMember } from "@/features/chat/room-governance/api-types";
 import type { ChatMessage, ChatMessageActionErrorInfo, MessageReplySummary } from "@/features/chat/message-flow/api-types";
 import type { ChatChannel } from "@/features/chat/room-session/api-types";
-import { recomputeChannelUnread } from "@/features/chat/room-session/domain/utils/unreadRecompute";
 import {
   createSessionDirectoryStatePort,
   createSessionReadMarkerStatePort,
@@ -36,6 +35,7 @@ export type CreateRoomSessionStatePortDeps = {
   lastReadTimeMsByChannel: Record<string, number>;
   lastReadMidByChannel: Record<string, string>;
   lastReadReportAtMsByChannel: Record<string, number>;
+  contextEdgesByChannel: Record<string, unknown>;
   nextCursorByChannel: Record<string, string>;
   hasMoreByChannel: Record<string, boolean>;
   loadingMoreByChannel: Record<string, boolean>;
@@ -94,6 +94,7 @@ export function createRoomSessionStatePort(
       deps.members.value = [];
     },
     clearPaginationState(): void {
+      clearRecord(deps.contextEdgesByChannel);
       clearRecord(deps.nextCursorByChannel);
       clearRecord(deps.hasMoreByChannel);
       clearRecord(deps.loadingMoreByChannel);
@@ -117,9 +118,7 @@ export function createRoomSessionStatePort(
  */
 export type CreateSessionUnreadProjectionPortDeps = {
   channelsRef: Ref<ChatChannel[]>;
-  messagesByChannel: Record<string, ChatMessage[]>;
-  lastReadTimeMsByChannel: Record<string, number>;
-  lastReadMidByChannel: Record<string, string>;
+  refreshChannelReadState(channelId: string): Promise<void>;
 };
 
 /**
@@ -131,25 +130,10 @@ export function createSessionUnreadProjectionPort(
   const directoryState: Pick<SessionDirectoryStatePort, "incrementChannelUnread" | "readUnreadCount"> = createSessionDirectoryStatePort({
     channelsRef: deps.channelsRef,
   });
-  const readMarkerState = createSessionReadMarkerStatePort({
-    lastReadTimeMsByChannel: deps.lastReadTimeMsByChannel,
-    lastReadMidByChannel: deps.lastReadMidByChannel,
-    lastReadReportAtMsByChannel: {},
-  });
   return {
     ...directoryState,
     recomputeChannelUnreadLocally(channelId: string): void {
-      const list = deps.messagesByChannel[channelId];
-      if (!list || list.length === 0) return;
-      const currentUnread = directoryState.readUnreadCount(channelId);
-      const result = recomputeChannelUnread({
-        serverUnread: currentUnread,
-        messages: list,
-        lastReadTimeMs: readMarkerState.readLastReadTimeMs(channelId),
-        lastReadMessageId: readMarkerState.readLastReadMessageId(channelId),
-      });
-      if (result == null) return;
-      directoryState.incrementChannelUnread(channelId, result - currentUnread);
+      void deps.refreshChannelReadState(channelId);
     },
   };
 }

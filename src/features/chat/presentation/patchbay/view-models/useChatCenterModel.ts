@@ -4,7 +4,7 @@
  * 收敛 ChatCenter 所需的消息流、连接状态、composer 状态与交互动作，避免布局组件直接依赖多个 store。
  */
 
-import { computed, onBeforeUnmount, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, proxyRefs, ref, watch, type Component, type ComputedRef, type Ref, type ShallowUnwrapRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { createMessageActionError } from "@/features/chat/message-flow/domain/outcomes/messageActionOutcome";
 import { createLogger } from "@/shared/utils/logger";
@@ -51,6 +51,7 @@ import {
 } from "./authorNameResolution";
 import { normalizeUserId } from "@/features/chat/shared-kernel/userId";
 import { addBookmarks } from "@/features/chat/message-flow/bookmark/storage/localBookmarkStorage";
+import { observeChannelProjectionChanged } from "@/features/chat/presentation/shared/windowMessageEvents";
 
 type RefLike<T> = Ref<T> | ComputedRef<T>;
 type ChatConnectionPillStateView = "connected" | "reconnecting" | "offline";
@@ -102,6 +103,7 @@ type ChatCenterRawModel = {
   currentChannelId: ComputedRef<CurrentChannelSessionSnapshot["currentChannelId"]>;
   currentChannelName: ComputedRef<string>;
   currentChannelHasMore: ComputedRef<MessageTimelineSnapshot["hasMoreHistory"]>;
+  currentChannelHasNewer: ComputedRef<MessageTimelineSnapshot["hasNewerMessages"]>;
   loadingMoreMessages: ComputedRef<MessageTimelineSnapshot["isLoadingHistory"]>;
   messageRows: ComputedRef<MessageRow[]>;
   currentUserId: ComputedRef<string>;
@@ -157,7 +159,7 @@ type ChatCenterRawModel = {
   handleFileUploaded(result: { fileId: string; shareKey: string }): void;
   handleFileUploadError(error: string): void;
   handleSend(payload?: ComposerSubmitPayload): void;
-  safeLoadMore(): Promise<void>;
+  safeLoadMore(direction?: "older" | "newer"): Promise<void>;
   handleMentionQuery(query: string): Promise<void>;
   handleSelectMention(mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void;
   handleMentionMenuClose(): void;
@@ -203,9 +205,10 @@ export type UseChatCenterModelDeps = {
   connectionPillState: RefLike<ChatConnectionPillStateView>;
   retryConnection(): Promise<ServerWorkspaceConnectionOutcome>;
   domainRegistryView: RefLike<unknown>;
-  onLoadMoreMessages(): void | Promise<void>;
+  onLoadMoreMessages(direction?: "older" | "newer"): void | Promise<void>;
   onMessageContextMenu(e: MouseEvent, messageId: string): void;
-  onForwardMessage(mid: string, req: { targetCid: string; comment?: string; mergedMids?: string[] }): Promise<void>;
+  onForwardMessage(mid: string, req: { targetCid: string; sourceChannelId: string; mergedMids?: string[] }, serverSocket?: string): Promise<void>;
+  onSendForwardComment(targetCid: string, comment: string, serverSocket?: string): Promise<void>;
   selectChannel(channelId: string): Promise<void>;
   chatApi?: ChatApiPort;
   /** 当前服务器 socket（用于 API 调用）。 */
@@ -502,16 +505,26 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
   const pinsLoading = ref(false);
   const pinsError = ref<string | null>(null);
   const pinsDismissed = ref(false);
+  let pinRequest = 0;
+  const stopPinEvents = observeChannelProjectionChanged(({ channelId, projection }) => {
+    if (channelId === currentSessionSnapshot.value.currentChannelId && (!projection || projection === "messages")) {
+      void loadPins();
+    }
+  });
+  onBeforeUnmount(() => { stopPinEvents(); pinRequest++; });
 
   /** Reset pin state when channel changes. */
-  watch(() => currentSessionSnapshot.value.currentChannelId, () => {
+  watch([() => currentSessionSnapshot.value.currentChannelId, () => deps.serverSocket?.value], () => {
+    pinRequest++;
     pins.value = [];
     pinsLoading.value = false;
     pinsError.value = null;
     pinsDismissed.value = false;
     // 切频道：旧频道的高亮不应残留（切回原频道也不复现）。
     cancelHighlightAutoClear();
+    void loadPins();
   });
+  onMounted(() => { void loadPins(); });
 
   /**
    * Load pins for the current channel.
@@ -522,15 +535,14 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     const api = deps.chatApi;
     const socket = deps.serverSocket?.value;
     if (!api || !socket || !deps.getAccessToken) return;
+    const request = ++pinRequest;
     pinsLoading.value = true;
     pinsError.value = null;
     try {
       const token = (await deps.getAccessToken(socket))?.trim();
-      if (!token) {
-        pinsLoading.value = false;
-        return;
-      }
+      if (!token || request !== pinRequest) return;
       const result = await api.listPins(socket, token, cid);
+      if (request !== pinRequest) return;
       const summaries: PinSummary[] = result.items.map((pin) => ({
         pin,
         preview: pin.note ?? `Message ${pin.messageId.slice(-8)}`,
@@ -541,16 +553,15 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
       pins.value = summaries;
       pinsDismissed.value = false;
     } catch (err) {
-      pinsError.value = String(err);
+      if (request === pinRequest) pinsError.value = String(err);
       logger.error("Action: chat_load_pins_failed", { channelId: cid, error: String(err) });
     } finally {
-      pinsLoading.value = false;
+      if (request === pinRequest) pinsLoading.value = false;
     }
   }
 
   function dismissPins(): void {
     pinsDismissed.value = true;
-    pins.value = [];
   }
 
   async function selectPinnedMessage(messageId: string): Promise<void> {
@@ -622,6 +633,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
       await deps.selectChannel(channelId);
     }
     await deps.currentTimeline.loadContextAroundMessage(mid);
+    if (deps.currentTimeline.getSnapshot().highlightedMessageId !== mid) return;
     messageRevealNonce += 1;
     messageReveal.value = { messageId: mid, nonce: messageRevealNonce };
     scheduleHighlightAutoClear(mid);
@@ -727,51 +739,46 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     if (isForwarding.value) return;
 
     isForwarding.value = true;
-
-    if (forwardMode.value === "merged") {
-      try {
-        await deps.onForwardMessage(ids[0], {
-          targetCid: payload.targetCid,
-          comment: payload.comment || undefined,
-          mergedMids: ids,
-        });
-        clearSelection();
-        showForwardDialog.value = false;
-        isForwarding.value = false;
-        toast.success(t("forward_success", { count: ids.length }));
-        return;
-      } catch (err) {
-        clearSelection();
-        showForwardDialog.value = false;
-        isForwarding.value = false;
-        logger.error("Action: chat_forward_message_failed", { mid: ids[0], error: String(err) });
-        toast.warning(t("forward_failed", { failed: 1, total: ids.length }));
-        return;
-      }
-    }
-
+    const merged = forwardMode.value === "merged";
+    const serverSocket = deps.serverSocket?.value;
+    const sourceChannelId = currentSessionSnapshot.value.currentChannelId;
     let failed = 0;
-    for (const mid of ids) {
-      try {
-        await deps.onForwardMessage(mid, {
-          targetCid: payload.targetCid,
-          comment: payload.comment || undefined,
-        });
-      } catch (err) {
-        failed++;
-        logger.error("Action: chat_forward_message_failed", { mid, error: String(err) });
+    let commentFailed = false;
+    try {
+      for (const mid of merged ? ids.slice(0, 1) : ids) {
+        try {
+          await deps.onForwardMessage(mid, {
+            targetCid: payload.targetCid,
+            sourceChannelId,
+            mergedMids: merged ? ids : undefined,
+          }, serverSocket);
+        } catch (error) {
+          failed += merged ? ids.length : 1;
+          logger.error("Action: chat_forward_message_failed", { mid, error: String(error) });
+        }
       }
-    }
 
-    clearSelection();
-    showForwardDialog.value = false;
-    isForwarding.value = false;
+      const comment = payload.comment.trim();
+      if (failed < ids.length && comment) {
+        try {
+          await deps.onSendForwardComment(payload.targetCid, comment, serverSocket);
+        } catch (error) {
+          commentFailed = true;
+          logger.error("Action: chat_forward_comment_failed", { error: String(error) });
+        }
+      }
+    } finally {
+      clearSelection();
+      showForwardDialog.value = false;
+      isForwarding.value = false;
+    }
 
     if (failed > 0) {
       toast.warning(t("forward_failed", { failed, total: ids.length }));
     } else {
-      toast.success(t("forward_success", { count: ids.length - failed }));
+      toast.success(t("forward_success", { count: ids.length }));
     }
+    if (commentFailed) toast.warning(t("forward_comment_failed"));
   }
 
   function handleBatchBookmark(): void {
@@ -888,8 +895,8 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     });
   }
 
-  async function safeLoadMore(): Promise<void> {
-    await deps.onLoadMoreMessages();
+  async function safeLoadMore(direction?: "older" | "newer"): Promise<void> {
+    await deps.onLoadMoreMessages(direction);
   }
 
   /**
@@ -917,6 +924,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     currentChannelId: computed(() => currentSessionSnapshot.value.currentChannelId),
     currentChannelName: computed(() => deps.currentChannelName.value),
     currentChannelHasMore: computed(() => messageTimelineSnapshot.value.hasMoreHistory),
+    currentChannelHasNewer: computed(() => messageTimelineSnapshot.value.hasNewerMessages),
     loadingMoreMessages: computed(() => messageTimelineSnapshot.value.isLoadingHistory),
     messageRows,
     currentUserId,

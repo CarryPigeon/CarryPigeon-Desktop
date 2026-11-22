@@ -30,6 +30,7 @@ function buildDeps(overrides?: Partial<ChatWsEventRouterDeps>): ChatWsEventRoute
       markChannelReadLocally: vi.fn(),
     },
     refreshChannels: vi.fn(async () => undefined),
+    refreshChannelReadState: vi.fn(),
     refreshChannelLatestPage: vi.fn(async () => undefined),
     refreshMembersRail: vi.fn(async () => undefined),
     refreshMentionInbox: vi.fn(async () => undefined),

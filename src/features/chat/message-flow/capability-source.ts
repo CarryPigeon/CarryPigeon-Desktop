@@ -22,7 +22,7 @@ import {
   markError,
   updateProgress,
 } from "@/features/chat/message-flow/upload/presentation/runtime/fileAttachmentStore";
-import { httpChatApiPort } from "@/features/chat/data/chat-api/httpChatApiPort";
+import { uploadFileContent } from "@/shared/file-transfer/api";
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { readAuthToken } from "@/shared/utils/localState";
 import { IS_STORE_MOCK } from "@/shared/config/runtime";
@@ -34,6 +34,7 @@ import {
   clearSearch,
   composerDraft,
   currentChannelHasMore,
+  currentChannelHasNewer,
   currentChannelId,
   currentMessages,
   draftMentions,
@@ -42,6 +43,7 @@ import {
   listMentionCandidates,
   loadContextAroundMessage,
   loadMoreMessages,
+  loadLatestMessages,
   loadingMoreMessages,
   messageActionError,
   quoteReplyDraft,
@@ -89,6 +91,7 @@ function getTimelineSnapshot(): MessageTimelineSnapshot {
     currentMessages: clonePlainData(currentMessages.value),
     currentMessageCount: currentMessages.value.length,
     hasMoreHistory: currentChannelHasMore.value,
+    hasNewerMessages: currentChannelHasNewer.value,
     isLoadingHistory: loadingMoreMessages.value,
     search: { ...searchState.value },
     highlightedMessageId: highlightedMessageId.value,
@@ -178,12 +181,7 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
   }
 
   /**
-   * 发送消息前先上传所有待上传附件，并按服务端契约发送 Core:File。
-   *
-   * 流程：
-   * 1. `POST /channels/{cid}/messages/attachments` 上传每个 pending 附件；
-   * 2. 对每个成功附件发送一条 `Core:File` 消息；
-   * 3. 若仍有文本 draft 或显式 payload，再走原有 Core:Text / ReplyText 发送。
+   * 先上传待发送文件，拿到 share_key 后分别发送图片或附件消息，再发送草稿正文。
    *
    * @param payload - 可选的发送 payload。
    * @returns 发送结果。
@@ -205,42 +203,20 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       for (const att of pending) {
         try {
           updateProgress(att.id, 10);
-          let uploaded: {
-            shareKey: string;
-            objectKey: string;
-            filename: string;
-            mimeType: string;
-            size: number;
-          };
-          if (IS_STORE_MOCK) {
-            uploaded = {
-              shareKey: `mock-shr-${att.id}`,
-              objectKey: `mock/object/${att.id}`,
-              filename: att.file.name || "file",
-              mimeType: att.file.type || "application/octet-stream",
-              size: att.file.size,
-            };
-          } else {
-            uploaded = await httpChatApiPort.uploadMessageAttachment(
-              socket,
-              token,
-              cid,
-              att.file,
-              "file",
-            );
-          }
+          const shareKey = IS_STORE_MOCK
+            ? `mock-shr-${att.id}`
+            : (await uploadFileContent(socket, token, att.file)).shareKey;
           updateProgress(att.id, 80);
-          markDone(att.id, uploaded.shareKey);
+          markDone(att.id, shareKey);
 
           lastFileOutcome = await sendComposerMessage({
-            domain: "Core:File",
+            domain: !IS_STORE_MOCK && att.file.type.startsWith("image/") ? "Core:Image" : "Core:File",
             domainVersion: "1.0.0",
             data: {
-              share_key: uploaded.shareKey,
-              object_key: uploaded.objectKey,
-              filename: uploaded.filename || att.file.name || "file",
-              mime_type: uploaded.mimeType || att.file.type || "application/octet-stream",
-              size: uploaded.size || att.file.size,
+              share_key: shareKey,
+              filename: att.file.name || "file",
+              mime_type: att.file.type || "application/octet-stream",
+              size: att.file.size,
             },
           });
           if (!lastFileOutcome.ok) {
@@ -307,23 +283,16 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
     }
 
     try {
-      const uploaded = await httpChatApiPort.uploadMessageAttachment(
-        socket,
-        token,
-        cid,
-        input.file,
-        "voice",
-      );
+      const uploaded = await uploadFileContent(socket, token, input.file);
 
       return await sendComposerMessage({
         domain: "Core:Voice",
         domainVersion: "1.0.0",
         data: {
           share_key: uploaded.shareKey,
-          object_key: uploaded.objectKey,
-          filename: uploaded.filename || input.file.name || "voice.wav",
-          mime_type: uploaded.mimeType || input.file.type || "audio/wav",
-          size: uploaded.size || input.file.size,
+          filename: input.file.name || "voice.wav",
+          mime_type: input.file.type || "audio/wav",
+          size: input.file.size,
           duration_millis: Math.max(1, Math.trunc(input.durationMs)),
         },
       });
@@ -338,7 +307,9 @@ export function createMessageFlowCapabilitySource(): MessageFlowCapabilities {
       getSnapshot: getTimelineSnapshot,
       observeSnapshot: observeTimelineSnapshot,
       findMessageById: findCurrentChannelMessageById,
-      loadMoreHistory: loadMoreMessages,
+      loadMoreHistory: () => loadMoreMessages(),
+      loadNewerMessages: () => loadMoreMessages("newer"),
+      loadLatestMessages,
       beginReply(messageId: string, senderName?: string): void {
         const message = findCurrentChannelMessageById(messageId);
         if (!message) return;

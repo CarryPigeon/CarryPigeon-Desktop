@@ -13,7 +13,8 @@ import type {
   ChatChannelMemberWire,
   ChatChannelWire,
   ChatMentionPageWire,
-  ChatMessageForwardWire,
+  ChatMentionWire,
+  ChatChannelReadStateWire,
   ChatMessagePageWire,
   ChatMessageSearchQueryWire,
   ChatMessageWire,
@@ -22,27 +23,37 @@ import type {
   ChatReadStateWire,
   ChatSendMessageWire,
   ChatUnreadStateWire,
-  ChatMessageAttachmentUploadWire,
 } from "../protocol/chatWireModels";
 
-type ApiListChannelsResponse = {
-  channels: ChatChannelWire[];
+type ChannelPageWire<T> = {
+  items: T[];
+  page: number;
+  page_size: number;
+  total: number;
+  has_more: boolean;
 };
 
+async function listChannelPages<T>(
+  client: ReturnType<typeof createAuthedHttpJsonClient>,
+  path: string,
+): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await client.requestJson<ChannelPageWire<T>>("GET", `${path}?page=${page}&page_size=50`);
+    if (!Array.isArray(result?.items)) throw new Error("Invalid channel page response");
+    items.push(...result.items);
+    if (!result.has_more) return items;
+    if (result.page !== page || result.items.length === 0) throw new Error("Invalid channel page continuation");
+  }
+}
+
 type ApiUnreadsResponse = {
+  total: number;
   items: ChatUnreadStateWire[];
 };
 
 type ApiApplyJoinRequest = {
   reason: string;
-};
-
-type ApiListMembersResponse = {
-  items: ChatChannelMemberWire[];
-};
-
-type ApiListApplicationsResponse = {
-  items: ChatChannelApplicationWire[];
 };
 
 type ApiApplicationDecisionRequest = {
@@ -54,14 +65,27 @@ type ApiPutBanRequest = {
   reason: string;
 };
 
-type ApiListBansResponse = {
-  items: ChatChannelBanWire[];
-};
-
 export async function httpListChannels(serverSocket: string, accessToken: string): Promise<ChatChannelWire[]> {
+  return listChannelPages(createAuthedHttpJsonClient(serverSocket, accessToken), "/channels");
+}
+
+export async function httpBatchGetChannels(serverSocket: string, accessToken: string, cids: readonly string[]) {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const res = await client.requestJson<ApiListChannelsResponse>("GET", "/channels");
-  return Array.isArray(res?.channels) ? res.channels : [];
+  return client.requestJson<{ total: number; items: ChatChannelWire[] }>("POST", "/channels/list", cids);
+}
+
+export async function httpTransferChannel(serverSocket: string, accessToken: string, cid: string, newOwner: string): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  await client.requestJson<null>("PUT", `/channels/${encodeURIComponent(cid.trim())}/transfer`, { new_owner: newOwner.trim() });
+}
+
+export async function httpQuitChannel(serverSocket: string, accessToken: string, cid: string): Promise<void> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  await client.requestJson<null>("POST", `/channels/${encodeURIComponent(cid.trim())}/quit`);
+}
+
+export async function httpListMyChannelApplications(serverSocket: string, accessToken: string): Promise<ChatChannelApplicationWire[]> {
+  return listChannelPages(createAuthedHttpJsonClient(serverSocket, accessToken), "/channels/applications");
 }
 
 export async function httpGetUnreads(
@@ -78,16 +102,46 @@ export async function httpListChannelMessages(
   accessToken: string,
   cid: string,
   cursor?: string,
-  limit: number = 50,
+  limit: number = 20,
+): Promise<ChatMessagePageWire> {
+  return httpMessagePage(serverSocket, accessToken, cid, cursor ? "before" : "", cursor, limit);
+}
+
+export function httpListChannelMessagesAfter(
+  serverSocket: string, accessToken: string, cid: string, cursor: string, limit = 20,
+): Promise<ChatMessagePageWire> {
+  return httpMessagePage(serverSocket, accessToken, cid, "after", cursor, limit);
+}
+
+function httpMessagePage(
+  serverSocket: string, accessToken: string, cid: string, direction: "" | "before" | "after",
+  cursor: string | undefined, limit: number,
 ): Promise<ChatMessagePageWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
+  if (direction && !cursor) throw new Error("Missing cursor");
   const q: string[] = [];
   if (cursor) q.push(`cursor=${encodeURIComponent(cursor)}`);
-  q.push(`limit=${encodeURIComponent(String(Math.max(1, Math.trunc(limit))))}`);
-  const path = `/channels/${encodeURIComponent(channelId)}/messages?${q.join("&")}`;
-  return client.requestJson<ChatMessagePageWire>("GET", path);
+  q.push(`limit=${Math.max(1, Math.trunc(limit))}`);
+  const suffix = direction ? `/${direction}` : "";
+  return client.requestJson<ChatMessagePageWire>("GET", `/channels/${encodeURIComponent(channelId)}/messages${suffix}?${q.join("&")}`);
+}
+
+export function httpGetMessage(serverSocket: string, accessToken: string, mid: string): Promise<ChatMessageWire> {
+  const messageId = String(mid).trim();
+  if (!messageId) throw new Error("Missing mid");
+  return createAuthedHttpJsonClient(serverSocket, accessToken).requestJson<ChatMessageWire>(
+    "GET", `/channels/messages/${encodeURIComponent(messageId)}`,
+  );
+}
+
+export function httpGetMessagesByIds(
+  serverSocket: string, accessToken: string, messageIds: string[],
+): Promise<{ items: ChatMessageWire[]; total: number }> {
+  return createAuthedHttpJsonClient(serverSocket, accessToken).requestJson("POST", "/channels/messages/ids", {
+    message_ids: messageIds,
+  });
 }
 
 export async function httpSendChannelMessage(
@@ -95,40 +149,36 @@ export async function httpSendChannelMessage(
   accessToken: string,
   cid: string,
   req: ChatSendMessageWire,
-  idempotencyKey?: string,
 ): Promise<ChatMessageWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  const path = `/channels/${encodeURIComponent(channelId)}/messages`;
-  // 服务端 send 读取 body `client_message_id`，不读取 `Idempotency-Key`。
-  // 调用方若只传幂等头，这里同步写入 body，避免重复消息。
-  const key = String(idempotencyKey ?? req.client_message_id ?? "").trim();
-  const body: ChatSendMessageWire = key ? { ...req, client_message_id: key } : req;
-  const headers = key ? { "Idempotency-Key": key } : undefined;
-  return client.requestJsonWithHeaders<ChatMessageWire>("POST", path, body, headers);
+  return client.requestJson<ChatMessageWire>("POST", `/channels/${encodeURIComponent(channelId)}/messages`, req);
 }
 
-/**
- * POST /channels/{cid}/messages/{mid}/recall
- * 撤回一条消息；服务端将消息标记为 `status:"recalled"` 并推送 `message.recalled`
- * 事件。响应体携带更新后的 canonical message envelope。
- */
+/** 撤回成功时 data 为 null，客户端使用消息 ID 更新本地时间线。 */
 export async function httpRecallMessage(
   serverSocket: string,
   accessToken: string,
   cid: string,
   mid: string,
-): Promise<ChatMessageWire> {
+): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const messageId = String(mid).trim();
   if (!channelId) throw new Error("Missing cid");
   if (!messageId) throw new Error("Missing mid");
-  return client.requestJson<ChatMessageWire>(
+  await client.requestJson<null>(
     "POST",
     `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/recall`,
   );
+}
+
+export async function httpGetChannelReadState(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelReadStateWire> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const channelId = String(cid).trim();
+  if (!channelId) throw new Error("Missing cid");
+  return client.requestJson<ChatChannelReadStateWire>("GET", `/channels/${encodeURIComponent(channelId)}/read_state`);
 }
 
 export async function httpUpdateReadState(
@@ -152,12 +202,11 @@ export async function httpPatchChannel(
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  // 服务端成功返回 204；JSON 客户端会把空响应解析成 undefined。
-  // 治理层需要频道对象，因此在无 body 时再 GET 一次详情。
-  const next = await client.requestJson<ChatChannelWire | undefined>(
+  // 更新成功的 data 为 null；治理层仍需要频道详情。
+  const next = await client.requestJson<ChatChannelWire | null>(
     "PATCH",
     `/channels/${encodeURIComponent(channelId)}`,
-    patch,
+    { name: patch.name, brief: patch.brief },
   );
   if (next && typeof next === "object" && String(next.cid ?? "").trim()) {
     return next;
@@ -170,12 +219,12 @@ export async function httpApplyJoinChannel(
   accessToken: string,
   cid: string,
   reason: string,
-): Promise<void> {
+): Promise<ChatChannelApplicationWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
   const body: ApiApplyJoinRequest = { reason: String(reason ?? "") };
-  await client.requestJson<void>("POST", `/channels/${encodeURIComponent(channelId)}/applications`, body);
+  return client.requestJson<ChatChannelApplicationWire>("POST", `/channels/${encodeURIComponent(channelId)}/applications`, body);
 }
 
 export async function httpCreateChannel(
@@ -189,7 +238,6 @@ export async function httpCreateChannel(
   return client.requestJson<ChatChannelWire>("POST", "/channels", {
     name,
     brief: String(req?.brief ?? ""),
-    avatar: String(req?.avatar ?? ""),
   });
 }
 
@@ -208,8 +256,7 @@ export async function httpListChannelMembers(
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  const res = await client.requestJson<ApiListMembersResponse>("GET", `/channels/${encodeURIComponent(channelId)}/members`);
-  return Array.isArray(res?.items) ? res.items : [];
+  return listChannelPages(client, `/channels/${encodeURIComponent(channelId)}/members`);
 }
 
 export async function httpKickChannelMember(
@@ -262,8 +309,7 @@ export async function httpListChannelApplications(
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  const res = await client.requestJson<ApiListApplicationsResponse>("GET", `/channels/${encodeURIComponent(channelId)}/applications`);
-  return Array.isArray(res?.items) ? res.items : [];
+  return listChannelPages(client, `/channels/${encodeURIComponent(channelId)}/applications`);
 }
 
 export async function httpDecideChannelApplication(
@@ -272,13 +318,13 @@ export async function httpDecideChannelApplication(
   cid: string,
   applicationId: string,
   decision: ApiApplicationDecisionRequest["decision"],
-): Promise<void> {
+): Promise<ChatChannelApplicationWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   const aid = String(applicationId).trim();
   if (!channelId) throw new Error("Missing cid");
   if (!aid) throw new Error("Missing application_id");
-  await client.requestJson<void>(
+  return client.requestJson<ChatChannelApplicationWire>(
     "POST",
     `/channels/${encodeURIComponent(channelId)}/applications/${encodeURIComponent(aid)}/decisions`,
     { decision },
@@ -325,8 +371,7 @@ export async function httpListChannelBans(
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  const res = await client.requestJson<ApiListBansResponse>("GET", `/channels/${encodeURIComponent(channelId)}/bans`);
-  return Array.isArray(res?.items) ? res.items : [];
+  return listChannelPages(client, `/channels/${encodeURIComponent(channelId)}/bans`);
 }
 
 export async function httpGetChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelWire> {
@@ -341,18 +386,17 @@ export async function httpListChannelMessagesAround(
   accessToken: string,
   cid: string,
   aroundMid: string,
-  before?: number,
-  after?: number,
-): Promise<ChatMessagePageWire> {
+  before = 25,
+  after = 25,
+): Promise<{ items: ChatMessageWire[] }> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const channelId = String(cid).trim();
   if (!channelId) throw new Error("Missing cid");
-  const q: string[] = [];
-  q.push(`around_mid=${encodeURIComponent(aroundMid)}`);
-  if (before != null) q.push(`before=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(before)))))}`);
-  if (after != null) q.push(`after=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(after)))))}`);
-  const path = `/channels/${encodeURIComponent(channelId)}/messages?${q.join("&")}`;
-  return client.requestJson<ChatMessagePageWire>("GET", path);
+  const anchor = aroundMid.trim();
+  if (!anchor) throw new Error("Missing anchor_mid");
+  const count = (value: number) => Math.max(0, Math.min(50, Math.trunc(value) || 0));
+  const path = `/channels/${encodeURIComponent(channelId)}/messages/around?anchor_mid=${encodeURIComponent(anchor)}&before=${count(before)}&after=${count(after)}`;
+  return client.requestJson("GET", path);
 }
 
 export async function httpSearchChannelMessages(
@@ -370,8 +414,6 @@ export async function httpSearchChannelMessages(
   if (query.limit != null) q.push(`limit=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(query.limit)))))}`);
   if (query.sender_uid) q.push(`sender_uid=${encodeURIComponent(query.sender_uid)}`);
   if (query.domain) q.push(`domain=${encodeURIComponent(query.domain)}`);
-  if (query.before_mid) q.push(`before_mid=${encodeURIComponent(query.before_mid)}`);
-  if (query.after_mid) q.push(`after_mid=${encodeURIComponent(query.after_mid)}`);
   const path = `/channels/${encodeURIComponent(channelId)}/messages/search?${q.join("&")}`;
   return client.requestJson<ChatMessagePageWire>("GET", path);
 }
@@ -405,30 +447,32 @@ export async function httpListPins(serverSocket: string, accessToken: string, ci
   return client.requestJson<ChatPinListWire>("GET", path);
 }
 
-export async function httpForwardMessage(serverSocket: string, accessToken: string, mid: string, req: ChatMessageForwardWire): Promise<ChatMessageWire> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const messageId = String(mid).trim();
-  if (!messageId) throw new Error("Missing mid");
-  const headers = req.idempotency_key ? { "Idempotency-Key": req.idempotency_key } : undefined;
-  return client.requestJsonWithHeaders<ChatMessageWire>("POST", `/messages/${encodeURIComponent(messageId)}/forward`, req, headers);
-}
-
 export async function httpListMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPageWire> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const q: string[] = [];
   if (cursor) q.push(`cursor=${encodeURIComponent(cursor)}`);
   if (limit != null) q.push(`limit=${encodeURIComponent(String(Math.max(1, Math.min(50, Math.trunc(limit)))))}`);
   if (unreadOnly) q.push(`unread_only=true`);
-  if (cid) q.push(`cid=${encodeURIComponent(cid)}`);
-  const path = `/mentions${q.length ? `?${q.join("&")}` : ""}`;
+  const scopePath = cid ? `/channels/${encodeURIComponent(cid)}/mentions` : "/mentions";
+  const path = `${scopePath}${q.length ? `?${q.join("&")}` : ""}`;
   return client.requestJson<ChatMentionPageWire>("GET", path);
+}
+
+export async function httpGetMention(serverSocket: string, accessToken: string, mentionId: string): Promise<ChatMentionWire> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  return client.requestJson<ChatMentionWire>("GET", `/mentions/${encodeURIComponent(mentionId)}`);
+}
+
+export async function httpGetMentionsByIds(serverSocket: string, accessToken: string, mentionIds: string[]): Promise<ChatMentionWire[]> {
+  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
+  const result = await client.requestJson<{ items: ChatMentionWire[] }>("POST", "/mentions/ids", { mention_ids: mentionIds });
+  return result.items;
 }
 
 export async function httpMarkMentionRead(
   serverSocket: string,
   accessToken: string,
   mentionId: string,
-  _cid?: string,
 ): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const id = String(mentionId).trim();
@@ -436,35 +480,9 @@ export async function httpMarkMentionRead(
   await client.requestJson<void>("PUT", `/mentions/${encodeURIComponent(id)}/read`);
 }
 
-export async function httpBatchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void> {
+export async function httpBatchMarkMentionsRead(serverSocket: string, accessToken: string, throughMentionId?: string, cid?: string): Promise<void> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const body: Record<string, string> = {};
-  if (beforeMentionId) body.before_mention_id = beforeMentionId;
-  if (cid) body.cid = cid;
-  await client.requestJson<void>("PUT", "/mentions/read_state", Object.keys(body).length ? body : undefined);
-}
-
-/**
- * POST /channels/{cid}/messages/attachments
- * 上传频道消息附件（multipart `file` + 可选 `message_type=file|voice`）。
- */
-export async function httpUploadMessageAttachment(
-  serverSocket: string,
-  accessToken: string,
-  cid: string,
-  file: File,
-  messageType: "file" | "voice" = "file",
-): Promise<ChatMessageAttachmentUploadWire> {
-  const client = createAuthedHttpJsonClient(serverSocket, accessToken);
-  const channelId = String(cid).trim();
-  if (!channelId) throw new Error("Missing cid");
-  if (!file) throw new Error("Missing file");
-  const formData = new FormData();
-  formData.append("file", file, file.name || "attachment.bin");
-  formData.append("message_type", messageType === "voice" ? "voice" : "file");
-  return client.requestFormData<ChatMessageAttachmentUploadWire>(
-    "POST",
-    `/channels/${encodeURIComponent(channelId)}/messages/attachments`,
-    formData,
-  );
+  const path = cid ? `/channels/${encodeURIComponent(cid)}/mentions/read` : "/mentions/read";
+  const body = throughMentionId === undefined ? undefined : { through_mention_id: throughMentionId };
+  await client.requestJson<void>("PUT", path, body);
 }

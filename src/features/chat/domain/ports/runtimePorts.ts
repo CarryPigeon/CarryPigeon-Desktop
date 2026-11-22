@@ -16,6 +16,8 @@ import type {
   ChatChannelPatchInput,
   ChatChannelRecord,
   ChatMentionPage,
+  ChatChannelReadState,
+  ChatMessageContext,
   ChatMessagePage,
   ChatMessageRecord,
   ChatPinRecord,
@@ -46,26 +48,17 @@ export type ChatCoreApiPort = {
     cursor?: string,
     limit?: number,
   ): Promise<ChatMessagePage>;
-  sendChannelMessage(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    req: ChatSendMessageInput,
-    idempotencyKey?: string,
-  ): Promise<ChatMessageRecord>;
-  recallMessage(
-    serverSocket: string,
-    accessToken: string,
-    channelId: string,
-    messageId: string,
-  ): Promise<ChatMessageRecord>;
+  getMessage(serverSocket: string, accessToken: string, messageId: string): Promise<ChatMessageRecord>;
+  sendChannelMessage(serverSocket: string, accessToken: string, channelId: string, req: ChatSendMessageInput): Promise<ChatMessageRecord>;
+  recallMessage(serverSocket: string, accessToken: string, channelId: string, messageId: string): Promise<void>;
+  getChannelReadState(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelReadState>;
   updateReadState(
     serverSocket: string,
     accessToken: string,
     channelId: string,
     readState: ChatReadStateInput,
   ): Promise<ChatReadStateResponse>;
-  applyJoinChannel(serverSocket: string, accessToken: string, channelId: string, reason: string): Promise<void>;
+  applyJoinChannel(serverSocket: string, accessToken: string, channelId: string, reason: string): Promise<ChatChannelApplicationRecord>;
   patchChannel(
     serverSocket: string,
     accessToken: string,
@@ -79,11 +72,11 @@ export type ChatCoreApiPort = {
     serverSocket: string,
     accessToken: string,
     mid: string,
-    req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] },
+    req: { targetCid: string; sourceChannelId?: string; mergedMids?: string[] },
   ): Promise<ChatMessageRecord>;
   listMentions(serverSocket: string, accessToken: string, cursor?: string, limit?: number, unreadOnly?: boolean, cid?: string): Promise<ChatMentionPage>;
-  markMentionRead(serverSocket: string, accessToken: string, mentionId: string, cid?: string): Promise<void>;
-  batchMarkMentionsRead(serverSocket: string, accessToken: string, beforeMentionId?: string, cid?: string): Promise<void>;
+  markMentionRead(serverSocket: string, accessToken: string, mentionId: string): Promise<void>;
+  batchMarkMentionsRead(serverSocket: string, accessToken: string, throughMentionId?: string, cid?: string): Promise<void>;
   searchChannelMessages(
     serverSocket: string,
     accessToken: string,
@@ -97,7 +90,7 @@ export type ChatCoreApiPort = {
     aroundMid: string,
     before?: number,
     after?: number,
-  ): Promise<ChatMessagePage>;
+  ): Promise<ChatMessageContext>;
   getChannel(serverSocket: string, accessToken: string, cid: string): Promise<ChatChannelRecord>;
 };
 
@@ -138,7 +131,7 @@ export type ChatGovernanceApiPort = {
     channelId: string,
     applicationId: string,
     decision: "approve" | "reject",
-  ): Promise<void>;
+  ): Promise<ChatChannelApplicationRecord>;
   /**
    * 查询封禁列表。
    */

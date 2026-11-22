@@ -11,18 +11,20 @@
  */
 
 import { createAuthedHttpJsonClient } from "@/shared/net/http/authedHttpJsonClient";
+import { ApiRequestError, unwrapApiResponse } from "@/shared/net/http/apiErrors";
 import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
+import { handleProtocolMockApiRequest } from "@/shared/mock/protocol/protocolMockTransport";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
+import { getDevProxiedApiBaseUrl, shouldUseDevApiProxy } from "@/shared/net/http/devApiProxy";
 
 /**
  * 请求文件上传的参数。
  */
 export type ApiRequestUploadRequest = {
   filename: string;
-  mime_type: string;
   size_bytes: number;
-  sha256?: string;
+  sha256: string;
 };
 
 /**
@@ -33,6 +35,7 @@ export type ApiUploadDescriptor = {
   url: string;
   headers?: Record<string, string>;
   expires_at: number;
+  has_same: boolean;
 };
 
 /**
@@ -59,17 +62,16 @@ export async function httpRequestFileUpload(
 ): Promise<ApiRequestUploadResponse> {
   const client = createAuthedHttpJsonClient(serverSocket, accessToken);
   const filename = String(req?.filename ?? "").trim();
-  const mimeType = String(req?.mime_type ?? "").trim();
-  const sizeBytes = Number(req?.size_bytes ?? 0);
+  const sizeBytes = req?.size_bytes;
+  const sha256 = String(req?.sha256 ?? "").trim().toLowerCase();
   if (!filename) throw new Error("Missing filename");
-  if (!mimeType) throw new Error("Missing mime_type");
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) throw new Error("Invalid size_bytes");
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0) throw new Error("Invalid size_bytes");
+  if (!/^[0-9a-f]{64}$/.test(sha256)) throw new Error("Invalid sha256");
 
   return client.requestJson<ApiRequestUploadResponse>("POST", "/files/uploads", {
     filename,
-    mime_type: mimeType,
-    size_bytes: Math.trunc(sizeBytes),
-    sha256: String(req?.sha256 ?? "").trim() || undefined,
+    size_bytes: sizeBytes,
+    sha256,
   });
 }
 
@@ -77,8 +79,7 @@ export async function httpRequestFileUpload(
  * 使用 upload descriptor 执行实际上传。
  *
  * 说明：
- * - 该函数不会推断 content-type；由上传端点自行决定。
- * - 若服务端要求，可在 `upload.headers` 中携带 `Content-Type`。
+ * - 优先使用上传描述符中的 Content-Type，缺省时使用文件类型或通用二进制类型。
  * - 上传端点 `/api/files/uploads/{shareKey}` 受 Bearer 鉴权保护，必须附加 `Authorization` header。
  *
  * @param serverSocket - 服务端 socket，用于推导期望 origin。
@@ -93,21 +94,30 @@ export async function httpPerformFileUpload(
   upload: ApiUploadDescriptor,
   body: Blob | ArrayBuffer | Uint8Array,
 ): Promise<void> {
-  if (USE_MOCK_TRANSPORT) {
-    void serverSocket;
-    void accessToken;
-    void upload;
-    void body;
-    return;
-  }
-  const method = String(upload?.method ?? "PUT").trim().toUpperCase() || "PUT";
+  const method = String(upload?.method ?? "").trim().toUpperCase();
+  if (method !== "PUT") throw new Error("Invalid upload.method");
   const url = resolveUploadUrl(serverSocket, upload?.url ?? "");
   if (!url) throw new Error("Invalid upload.url");
 
   const headers: Record<string, string> = {};
-  for (const [k, v] of Object.entries(upload?.headers ?? {})) headers[k] = String(v);
+  let contentType = body instanceof Blob ? body.type : "";
+  for (const [name, value] of Object.entries(upload?.headers ?? {})) {
+    switch (name.trim().toLowerCase()) {
+      case "content-length": // WebView 根据固定长度的请求体生成该受限请求头。
+      case "authorization":
+      case "proxy-authorization":
+        break;
+      case "content-type":
+        contentType = value;
+        break;
+      default:
+        headers[name] = value;
+    }
+  }
+  headers["Content-Type"] = contentType || "application/octet-stream";
   const token = String(accessToken ?? "").trim();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (!token) throw new Error("Missing access token");
+  headers.Authorization = `Bearer ${token}`;
 
   /**
    * 将支持的二进制输入转换为 `fetch` 可接受的 body。
@@ -127,12 +137,35 @@ export async function httpPerformFileUpload(
     return copy.buffer;
   }
 
-  const res = await fetch(url, {
+  const requestBody = toFetchBody(body);
+  if (USE_MOCK_TRANSPORT) {
+    const path = new URL(url).pathname.replace(/^\/api(?=\/)/, "");
+    const res = await handleProtocolMockApiRequest({ serverSocket, method, path, headers, body: requestBody });
+    if (!res.ok) throw new ApiRequestError(res.error);
+    unwrapApiResponse(res.body, res.status);
+    return;
+  }
+
+  const target = new URL(url);
+  const requestUrl = target.pathname.startsWith("/api/") && shouldUseDevApiProxy(serverSocket)
+    ? `${getDevProxiedApiBaseUrl()}${target.pathname.slice(4)}${target.search}`
+    : url;
+  const res = await fetch(requestUrl, {
     method,
     headers,
-    body: toFetchBody(body),
+    body: requestBody,
+    redirect: "error",
   });
-  if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`);
+  const payload: unknown = await res.json().catch(() => null);
+  unwrapApiResponse(payload, res.status);
+  if (
+    !payload || typeof payload !== "object" ||
+    !("code" in payload) || payload.code !== 0 ||
+    !("message" in payload) || typeof payload.message !== "string" ||
+    !("data" in payload) || payload.data !== null
+  ) {
+    throw new Error(`Invalid upload response: HTTP ${res.status}`);
+  }
 }
 
 /**

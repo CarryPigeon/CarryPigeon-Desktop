@@ -8,6 +8,7 @@ import { getFileServicePort } from "@/features/chat/message-flow/upload/composit
 import { getActiveChatServerSocket } from "@/features/chat/composition/serverWorkspaceAdapter";
 import { ensureValidAccessToken } from "@/shared/net/auth/api";
 import { buildFileDownloadUrl } from "@/shared/file-transfer/buildFileDownloadUrl";
+import { uploadFileContent } from "@/shared/file-transfer/uploadFileContent";
 import type { FileUploadResult } from "@/shared/file-transfer/types";
 import { readAuthToken } from "@/shared/utils/localState";
 
@@ -78,17 +79,10 @@ export async function uploadFile(file: File): Promise<FileUploadResult> {
 
     const fileService = getFileServicePort();
 
-    // 第 1 步：请求 upload descriptor
     task.progress = 20;
-    const result = await fileService.requestUpload(socket, token, {
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
+    const result = await uploadFileContent(socket, token, file, fileService, () => {
+      task.progress = 50;
     });
-
-    // 第 2 步：执行实际上传（直接传递 File，让 fetch 以流式方式读取，避免整文件进内存）
-    task.progress = 50;
-    await fileService.performUpload(socket, token, result.upload, file);
 
     task.progress = 100;
     task.status = "success";

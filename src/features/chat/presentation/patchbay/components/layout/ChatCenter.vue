@@ -562,7 +562,7 @@ function getReplyText(m: ChatMessage): string {
           class="cp-historyMore__btn"
           type="button"
           :disabled="props.model.loadingMoreMessages"
-          @click="props.model.safeLoadMore"
+          @click="props.model.safeLoadMore('older')"
         >
           {{ props.model.loadingMoreMessages ? t("loading") : t("load_older") }}
         </button>
@@ -632,6 +632,7 @@ function getReplyText(m: ChatMessage): string {
                   :message="virtualListItems[vr.index].m"
                   :channel-id="props.model.currentChannelId"
                   :reply-text="getReplyText(virtualListItems[vr.index].m)"
+                  :pinned="props.model.pins.some((pin) => pin.pin.messageId === virtualListItems[vr.index].m.id)"
                   :domain-registry-store="props.model.domainRegistryStore"
                   @install="props.onInstallHint"
                   @openLightbox="openLightbox"
@@ -644,6 +645,17 @@ function getReplyText(m: ChatMessage): string {
             </div>
           </template>
         </div>
+      </div>
+
+      <div v-if="props.model.currentChannelHasNewer" class="cp-historyMore">
+        <button
+          class="cp-historyMore__btn"
+          type="button"
+          :disabled="props.model.loadingMoreMessages"
+          @click="props.model.safeLoadMore('newer')"
+        >
+          {{ props.model.loadingMoreMessages ? t("loading") : t("load_newer") }}
+        </button>
       </div>
 
       <button

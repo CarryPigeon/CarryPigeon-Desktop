@@ -53,7 +53,7 @@ export function createSessionDirectoryStatePort(
     incrementChannelUnread(channelId: string, delta: number = 1): void {
       const channel = deps.channelsRef.value.find((entry) => entry.id === channelId);
       if (!channel) return;
-      channel.unread = Math.max(0, channel.unread + Math.max(0, Math.trunc(delta)));
+      channel.unread = Math.min(10_000, Math.max(0, channel.unread + Math.trunc(delta)));
     },
     clearChannelDirectory(): void {
       deps.channelsRef.value = [];

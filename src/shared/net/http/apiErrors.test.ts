@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ApiRequestError, parseApiErrorEnvelope } from "./apiErrors";
+import { ApiRequestError, parseApiErrorEnvelope, unwrapApiResponse } from "./apiErrors";
 
 describe("parseApiErrorEnvelope", () => {
   it("keeps the CarryPigeon error envelope", () => {
@@ -36,6 +36,30 @@ describe("parseApiErrorEnvelope", () => {
     expect(parsed.error.status).toBe(404);
     expect(parsed.error.reason).toBe("not_found");
     expect(parsed.error.message).toBe("Not Found");
+  });
+});
+
+describe("unwrapApiResponse", () => {
+  it("unwraps payload and preserves explicit null", () => {
+    expect(unwrapApiResponse({ code: 0, message: "OK", data: { items: [] } }, 200)).toEqual({ items: [] });
+    expect(unwrapApiResponse({ code: 0, message: "OK", data: null }, 200)).toBeNull();
+  });
+
+  it("recognizes business errors even on HTTP 200", () => {
+    expect(() => unwrapApiResponse({ code: 11002, message: "expired" }, 200)).toThrow(
+      expect.objectContaining({ code: 11002, status: 200, reason: "access_token_expired", message: "expired" }),
+    );
+  });
+
+  it("retains HTTP status and numeric code on a binary endpoint error", () => {
+    expect(() => unwrapApiResponse({ code: 40003, message: "missing file" }, 404)).toThrow(
+      expect.objectContaining({ code: 40003, status: 404, message: "missing file" }),
+    );
+  });
+
+  it("rejects a wrapped success with no data and accepts legacy bare objects", () => {
+    expect(() => unwrapApiResponse({ code: 0, message: "OK" }, 200)).toThrow("missing data");
+    expect(unwrapApiResponse({ plugins: [] }, 200)).toEqual({ plugins: [] });
   });
 });
 

@@ -11,6 +11,9 @@ export type UserMe = {
   email?: string;
   nickname?: string;
   avatar?: string;
+  brief?: string;
+  sex?: number;
+  birthday?: number;
   backgroundUrl?: string;
 };
 
@@ -23,6 +26,8 @@ export type UserPublic = {
   avatar?: string;
   email?: string;
   bio?: string;
+  sex?: number;
+  birthday?: number;
   backgroundUrl?: string;
 };
 
@@ -31,11 +36,9 @@ export type UserPublic = {
  * 与服务端 `PATCH /api/users/me` 协议对齐。
  */
 export type UpdateUserProfileInput = {
-  username: string;
   avatar?: string;
-  brief: string;
-  /** 性别编码（服务端文档示例为数值，未知/未填写传 0）。 */
+  brief?: string;
   sex?: number;
-  /** 生日（epoch 毫秒；未填写传 0）。 */
+  /** 生日（epoch 毫秒）。 */
   birthday?: number;
 };

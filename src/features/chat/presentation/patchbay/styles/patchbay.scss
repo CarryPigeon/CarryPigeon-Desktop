@@ -109,8 +109,7 @@
   text-overflow: ellipsis;
 }
 
-/* 容器：rail/center 是共享玻璃表面上的栏位，自身不再有底色 / 描边 / 圆角 / 投影；
-   外轮廓由 cp-workspace 的共享玻璃面统一提供，栏与栏之间因此没有任何可见间隙。 */
+/* 侧栏使用共享工作台底色，消息区可由主题提供独立底色。 */
 .cp-rail,
 .cp-center {
   background: transparent;
@@ -137,6 +136,12 @@
 .cp-center {
   flex: 1 1 0;
   min-width: 240px;
+  background: var(--cp-chat-message-bg);
+}
+
+.cp-main:not(:has(.cp-rail--members)) .cp-center {
+  border-start-end-radius: var(--cp-radius-lg);
+  border-end-end-radius: var(--cp-radius-lg);
 }
 
 .cp-rail--members {

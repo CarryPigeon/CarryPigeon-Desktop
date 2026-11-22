@@ -53,11 +53,17 @@ export function createChatCoreApiGateway(deps: CreateChatApiGatewayDeps): ChatCo
     getUnreads(serverSocket, accessToken) {
       return deps.core.getUnreads(serverSocket, accessToken);
     },
+    getChannelReadState(serverSocket, accessToken, cid) {
+      return deps.core.getChannelReadState(serverSocket, accessToken, cid);
+    },
     listChannelMessages(serverSocket, accessToken, channelId, cursor, limit) {
       return deps.core.listChannelMessages(serverSocket, accessToken, channelId, cursor, limit);
     },
-    sendChannelMessage(serverSocket, accessToken, channelId, req, idempotencyKey) {
-      return deps.core.sendMessage(serverSocket, accessToken, channelId, req, idempotencyKey);
+    getMessage(serverSocket, accessToken, messageId) {
+      return deps.core.getMessage(serverSocket, accessToken, messageId);
+    },
+    sendChannelMessage(serverSocket, accessToken, channelId, req) {
+      return deps.core.sendMessage(serverSocket, accessToken, channelId, req);
     },
     recallMessage(serverSocket, accessToken, channelId, messageId) {
       return deps.core.recallMessage(serverSocket, accessToken, channelId, messageId);
@@ -80,17 +86,17 @@ patchChannel(serverSocket, accessToken, channelId, patch) {
     listPins(serverSocket, accessToken, cid, cursor, limit) {
       return deps.core.listPins(serverSocket, accessToken, cid, cursor, limit);
     },
-    forwardMessage(serverSocket, accessToken, mid, req: { targetCid: string; comment?: string; idempotencyKey?: string; mergedMids?: string[] }) {
+    forwardMessage(serverSocket, accessToken, mid, req: { targetCid: string; sourceChannelId?: string; mergedMids?: string[] }) {
       return deps.core.forwardMessage(serverSocket, accessToken, mid, req);
     },
     listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid) {
       return deps.core.listMentions(serverSocket, accessToken, cursor, limit, unreadOnly, cid);
     },
-    markMentionRead(serverSocket, accessToken, mentionId, cid) {
-      return deps.core.markMentionRead(serverSocket, accessToken, mentionId, cid);
+    markMentionRead(serverSocket, accessToken, mentionId) {
+      return deps.core.markMentionRead(serverSocket, accessToken, mentionId);
     },
-    batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid) {
-      return deps.core.batchMarkMentionsRead(serverSocket, accessToken, beforeMentionId, cid);
+    batchMarkMentionsRead(serverSocket, accessToken, throughMentionId, cid) {
+      return deps.core.batchMarkMentionsRead(serverSocket, accessToken, throughMentionId, cid);
     },
     searchChannelMessages(serverSocket, accessToken, cid, query) {
       return deps.core.searchChannelMessages(serverSocket, accessToken, cid, query);

@@ -22,6 +22,7 @@ export type ChatSessionStateSlice = Pick<
   | "lastReadTimeMsByChannel"
   | "lastReadMidByChannel"
   | "lastReadReportAtMsByChannel"
+  | "contextEdgesByChannel"
   | "nextCursorByChannel"
   | "hasMoreByChannel"
   | "loadingMoreByChannel"

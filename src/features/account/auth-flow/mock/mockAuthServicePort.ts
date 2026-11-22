@@ -47,6 +47,9 @@ export function createMockAuthServicePort(serverSocket: string): AuthServicePort
         isNewUser: false,
       };
     },
+    async changePassword(): Promise<void> {
+      await sleep(MOCK_LATENCY_MS);
+    },
     async registerWithPassword(username: string, password: string): Promise<AuthRegisterResult> {
       await sleep(MOCK_LATENCY_MS);
       const u = username.trim();

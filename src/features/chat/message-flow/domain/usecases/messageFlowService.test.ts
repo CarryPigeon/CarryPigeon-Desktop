@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MessageFlowApplicationService } from "./messageFlowService";
 import type { MessageFlowApplicationServiceDeps } from "./messageFlowService";
 import type { ChatMessage } from "../../domain/contracts";
+import type { MessageContextEdges } from "../ports";
 
 // ── Helpers ──
 
@@ -38,6 +39,7 @@ function makeMockDeps(overrides: Record<string, unknown> = {}): MessageFlowAppli
       }),
       recallMessage: vi.fn().mockResolvedValue({}),
       listChannelMessages: vi.fn().mockResolvedValue({ items: [], nextCursor: null, hasMore: false }),
+      listChannelMessagesAround: vi.fn().mockResolvedValue({ items: [] }),
     },
     scope: {
       getSocketAndValidToken: vi.fn().mockResolvedValue(["tcp://server", "token-abc"]),
@@ -45,6 +47,9 @@ function makeMockDeps(overrides: Record<string, unknown> = {}): MessageFlowAppli
       getActiveScopeVersion: vi.fn().mockReturnValue(1),
     },
     timelineState: {
+      readContextEdges: vi.fn(),
+      writeContextEdges: vi.fn(),
+      setHighlightedMessageId: vi.fn(),
       readCurrentChannelId: vi.fn().mockReturnValue("ch1"),
       appendMessageIfMissing: vi.fn(),
       listMessages: vi.fn().mockReturnValue([]),
@@ -206,18 +211,14 @@ describe("MessageFlowApplicationService", () => {
         expect.any(String),
         "ch1",
         expect.objectContaining({
-          domain: "Core:ReplyText",
-          data: expect.objectContaining({
-            content: expect.objectContaining({ text: "Hello" }),
-            replyToMessageId: "reply-to-1",
-            replyTo: expect.objectContaining({ messageId: "reply-to-1" }),
-          }),
+          domain: "Core:Text",
+          data: { text: "Hello" },
+          replyToMessageId: "reply-to-1",
         }),
-        expect.any(String),
       );
     });
 
-    it("should send Core:ReplyText with quote reply", async () => {
+    it("uses the quoted message as the reply target", async () => {
       const deps = makeMockDeps();
       deps.composerState.readQuoteReplyDraft = vi.fn().mockReturnValue({
         messageId: "quote-1",
@@ -233,17 +234,14 @@ describe("MessageFlowApplicationService", () => {
         expect.any(String),
         "ch1",
         expect.objectContaining({
-          domain: "Core:ReplyText",
-          data: expect.objectContaining({
-            content: expect.objectContaining({ text: "Hello" }),
-            quoteReply: expect.objectContaining({ messageId: "quote-1" }),
-          }),
+          domain: "Core:Text",
+          data: { text: "Hello" },
+          replyToMessageId: "quote-1",
         }),
-        expect.any(String),
       );
     });
 
-    it("should put linkPreview inside data and mentions at top level for Core:ReplyText", async () => {
+    it("keeps mentions and reply target without transmitting undocumented link-preview metadata", async () => {
       const deps = makeMockDeps();
       deps.composerState.listDraftMentions = vi.fn().mockReturnValue([
         { userId: "u2", displayName: "Bob", type: "user" },
@@ -266,15 +264,16 @@ describe("MessageFlowApplicationService", () => {
       const call = (deps.api.sendChannelMessage as ReturnType<typeof vi.fn>).mock.calls[0];
       const req = call[3] as {
         domain: string;
-        data: { content: unknown; linkPreview?: unknown };
+        data: { text: string };
+        replyToMessageId: string;
         mentions?: unknown[];
       };
-      expect(req.domain).toBe("Core:ReplyText");
-      expect(req.data.content).toEqual({ text: "Hello" });
+      expect(req.domain).toBe("Core:Text");
+      expect(req.replyToMessageId).toBe("reply-to-1");
+      expect(req.data).toEqual({ text: "Hello" });
       // mentions 在信封顶层（domain ChatSendMessageInput.mentions），不放入 data；
       // 由 wire mapper 在序列化时转为 string[] 写到 wire 顶层。
       expect(req.mentions).toEqual([{ userId: "u2", displayName: "Bob", type: "user" }]);
-      expect(req.data.linkPreview).toEqual({ url: "https://example.com", title: "Example" });
     });
 
     it("should handle send failure gracefully", async () => {
@@ -307,6 +306,7 @@ describe("MessageFlowApplicationService", () => {
       let listCalls = 0;
       const deps = makeMockDeps({
         timelineState: {
+          readContextEdges: vi.fn(),
           readCurrentChannelId: vi.fn().mockReturnValue("ch1"),
           listMessages: vi.fn(() => {
             listCalls += 1;
@@ -329,7 +329,7 @@ describe("MessageFlowApplicationService", () => {
       });
       const svc = new MessageFlowApplicationService(deps);
       await svc.refreshChannelLatestPage("ch1");
-      expect(deps.mergeMessages).toHaveBeenCalledTimes(2);
+      expect(deps.mergeMessages).toHaveBeenCalledTimes(1);
       expect(deps.timelineState.replaceTimeline).toHaveBeenCalledWith(
         "ch1",
         expect.arrayContaining([
@@ -337,6 +337,70 @@ describe("MessageFlowApplicationService", () => {
           expect.objectContaining({ id: "msg-live" }),
         ]),
       );
+    });
+  });
+
+  describe("锚点上下文", () => {
+    it("按数值排序，用两侧 MID 翻页并合并重复锚点", async () => {
+      const deps = makeMockDeps();
+      const state = deps.timelineState;
+      let edges: MessageContextEdges | undefined;
+      let messages = [makeMessage({ id: "1000" })];
+      vi.mocked(state.readContextEdges).mockImplementation(() => edges);
+      vi.mocked(state.writeContextEdges).mockImplementation((_cid, next) => { edges = next; });
+      vi.mocked(state.listMessages).mockImplementation(() => messages);
+      vi.mocked(state.replaceTimeline).mockImplementation((_cid, next) => { messages = [...next]; });
+      vi.mocked(deps.mergeMessages).mockImplementation(async (existing, incoming) => [...existing, ...incoming]);
+      const page = (low: number, high: number) => ({
+        items: Array.from({ length: high - low + 1 }, (_, index) => ({
+          id: String(high - index),
+          channelId: "ch1",
+          userId: "u1",
+          sentTime: 0,
+          domain: "Core:Text",
+          domainVersion: "1.0.0",
+          data: { text: "hello" },
+        })),
+      });
+      vi.mocked(deps.api.listChannelMessagesAround)
+        .mockResolvedValueOnce(page(75, 125))
+        .mockResolvedValueOnce(page(125, 145))
+        .mockResolvedValueOnce(page(145, 146))
+        .mockResolvedValueOnce(page(74, 75));
+
+      const service = new MessageFlowApplicationService(deps);
+      await service.loadContextAroundMessage("100");
+      expect(state.setHighlightedMessageId).toHaveBeenCalledWith("100");
+      expect(state.writeNextCursor).toHaveBeenCalledWith("ch1", "");
+      expect(edges).toEqual({ before: "75", after: "125" });
+      await service.loadMoreMessages("newer");
+      expect(edges).toEqual({ before: "75", after: "145" });
+      await service.loadMoreMessages("newer");
+      await service.loadMoreMessages("older");
+      await service.loadMoreMessages("newer");
+      await service.loadMoreMessages("older");
+
+      expect(vi.mocked(deps.api.listChannelMessagesAround).mock.calls).toEqual([
+        ["tcp://server", "token-abc", "ch1", "100", 25, 25],
+        ["tcp://server", "token-abc", "ch1", "125", 0, 20],
+        ["tcp://server", "token-abc", "ch1", "145", 0, 20],
+        ["tcp://server", "token-abc", "ch1", "75", 20, 0],
+      ]);
+      expect(edges).toEqual({ before: "", after: "" });
+      expect(deps.api.listChannelMessages).not.toHaveBeenCalled();
+      expect(messages.map(({ id }) => id)).toEqual(Array.from({ length: 73 }, (_, i) => String(74 + i)));
+    });
+
+    it("锚点不存在时保留时间线和分页状态", async () => {
+      const deps = makeMockDeps();
+      vi.mocked(deps.api.listChannelMessagesAround).mockRejectedValue({ code: 30001 });
+      const service = new MessageFlowApplicationService(deps);
+
+      await service.loadContextAroundMessage("100");
+
+      expect(deps.timelineState.replaceTimeline).not.toHaveBeenCalled();
+      expect(deps.timelineState.writeContextEdges).not.toHaveBeenCalled();
+      expect(deps.timelineState.setHighlightedMessageId).not.toHaveBeenCalled();
     });
   });
 

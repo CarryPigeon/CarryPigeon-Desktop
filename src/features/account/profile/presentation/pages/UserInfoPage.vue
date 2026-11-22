@@ -39,6 +39,7 @@ const router = useRouter();
 const isEditing = ref(false);
 const isSaving = ref(false);
 const isSendingEmailCode = ref(false);
+const passwordForm = reactive({ password: "", code: "", busy: false, message: "" });
 const backgroundFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadingBackground = ref(false);
 const { t } = useI18n();
@@ -140,9 +141,6 @@ function handleCancelEdit(): void {
 }
 
 function validateDraft(): string {
-  if (!draft.username.trim()) {
-    return t("profile_name_required");
-  }
   if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
     return t("email_invalid");
   }
@@ -166,7 +164,7 @@ async function handleSendEmailCode(): Promise<void> {
   formError.value = "";
   formSuccess.value = "";
   try {
-    const outcome = await accountCapabilities.forServer(readActiveServerSocket()).sendVerificationCode(draft.email.trim());
+    const outcome = await accountCapabilities.forServer(readActiveServerSocket()).sendVerificationCode(draft.email.trim(), "CHANGE_EMAIL");
     if (!outcome.ok) {
       formError.value = outcome.error.message;
       return;
@@ -176,6 +174,35 @@ async function handleSendEmailCode(): Promise<void> {
     formError.value = toErrorMessage(error, t("email_code_failed"));
   } finally {
     isSendingEmailCode.value = false;
+  }
+}
+
+async function sendPasswordCode(): Promise<void> {
+  passwordForm.busy = true;
+  passwordForm.message = "";
+  try {
+    const result = await accountCapabilities.forServer(readActiveServerSocket())
+      .sendVerificationCode(currentUser.value.email, "password_change");
+    passwordForm.message = result.ok ? t("email_code_sent") : result.error.message;
+  } catch (error) {
+    passwordForm.message = toErrorMessage(error, t("email_code_failed"));
+  } finally {
+    passwordForm.busy = false;
+  }
+}
+
+async function savePassword(): Promise<void> {
+  passwordForm.busy = true;
+  passwordForm.message = "";
+  try {
+    await accountCapabilities.forServer(readActiveServerSocket()).changePassword(passwordForm.password, passwordForm.code);
+    passwordForm.password = "";
+    passwordForm.code = "";
+    passwordForm.message = t("profile_password_changed");
+  } catch (error) {
+    passwordForm.message = toErrorMessage(error, t("profile_save_failed"));
+  } finally {
+    passwordForm.busy = false;
   }
 }
 
@@ -257,7 +284,6 @@ async function handleSaveEdit(): Promise<void> {
     }
 
 	    const profileOutcome = await server.updateUserProfile({
-	      username: draft.username.trim(),
 	      avatar: draft.avatarUrl.trim(),
 	      brief: draft.brief.trim(),
 	    });
@@ -267,7 +293,6 @@ async function handleSaveEdit(): Promise<void> {
     }
 
     currentUserCapabilities.applyLocalProfilePatch({
-      username: draft.username.trim(),
       email: draft.email.trim(),
       description: draft.brief.trim(),
       avatarUrl: draft.avatarUrl.trim(),
@@ -298,7 +323,7 @@ async function handleSaveEdit(): Promise<void> {
         <div v-if="isEditing" class="cp-info__hero-edit">
           <label class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("profile_name") }}</span>
-            <input v-model="draft.username" class="cp-info__input cp-field" type="text" autocomplete="name" />
+            <input :value="draft.username" class="cp-info__input cp-field" type="text" readonly />
           </label>
           <label class="cp-info__field">
             <span class="cp-info__fieldLabel">{{ t("email") }}</span>
@@ -366,6 +391,26 @@ async function handleSaveEdit(): Promise<void> {
           <div class="cp-info__k">bio</div>
           <div class="cp-info__v cp-info__bio">{{ bio || "—" }}</div>
         </div>
+        <details v-if="isOwnProfile && currentUser.email" class="cp-info__card wide">
+          <summary>{{ t("profile_change_password") }}</summary>
+          <form class="cp-info__hero-edit" @submit.prevent="savePassword">
+            <label class="cp-info__field">
+              <span class="cp-info__fieldLabel">{{ t("profile_new_password") }}</span>
+              <input v-model="passwordForm.password" class="cp-info__input cp-field" type="password" autocomplete="new-password" required />
+            </label>
+            <label class="cp-info__field">
+              <span class="cp-info__fieldLabel">{{ t("email_code") }}</span>
+              <span class="cp-info__inline">
+                <input v-model="passwordForm.code" class="cp-info__input cp-field" autocomplete="one-time-code" inputmode="numeric" required />
+                <button type="button" class="cp-info__smallBtn" :disabled="passwordForm.busy" @click="sendPasswordCode">{{ t("send_code") }}</button>
+              </span>
+            </label>
+            <div class="cp-info__editActions">
+              <div role="status">{{ passwordForm.message }}</div>
+              <button type="submit" class="cp-info__edit" :disabled="passwordForm.busy">{{ t("profile_change_password") }}</button>
+            </div>
+          </form>
+        </details>
       </section>
     </ErrorBoundary>
   </main>

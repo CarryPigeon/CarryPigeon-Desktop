@@ -159,6 +159,34 @@ fn http_client() -> &'static reqwest::Client {
     })
 }
 
+async fn download_response_error(mut response: reqwest::Response) -> String {
+    const MAX_ERROR_BYTES: usize = 8192;
+    let status = response.status();
+    let is_json = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("application/json") || value.contains("+json"));
+    let error = to_command_error("DOWNLOAD_HTTP_ERROR", "error.download_http_error", status);
+    if !is_json {
+        return format!("{error} (HTTP {status})");
+    }
+
+    let mut bytes = Vec::new();
+    while let Ok(Some(chunk)) = response.chunk().await {
+        if bytes.len() + chunk.len() > MAX_ERROR_BYTES {
+            return format!("{error} (HTTP {status})");
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes)
+        && let (Some(code), Some(message)) = (body["code"].as_u64(), body["message"].as_str())
+    {
+        return format!("{error} (HTTP {status}, API {code}: {message})");
+    }
+    format!("{error} (HTTP {status})")
+}
+
 #[tauri::command]
 pub async fn download_file(
     app: AppHandle,
@@ -316,9 +344,8 @@ pub async fn download_file(
             }
             response
         }
-        _ => response
-            .error_for_status()
-            .map_err(|e| to_command_error("DOWNLOAD_HTTP_ERROR", "error.download_http_error", e))?,
+        reqwest::StatusCode::OK => response,
+        _ => return Err(download_response_error(response).await),
     };
 
     // 200 路径下从头开始；206 路径下保留 resume_from。

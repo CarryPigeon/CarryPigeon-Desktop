@@ -16,6 +16,8 @@ import type { ServerInfo } from "../domain/types/serverInfo";
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 import { createLogger } from "@/shared/utils/logger";
 import { rememberServerId } from "@/shared/serverIdentity";
+import { resolveServerUrl } from "@/shared/net/http/serverOrigin";
+import { USE_MOCK_TRANSPORT } from "@/shared/config/runtime";
 
 const logger = createLogger("httpServerInfoPort");
 
@@ -38,11 +40,13 @@ type ApiServerResponse = {
  * @param raw - 原始 API 响应。
  * @returns 领域 `ServerInfo`。
  */
-function mapServerInfo(raw: ApiServerResponse): ServerInfo {
+function mapServerInfo(raw: ApiServerResponse, socket: string): ServerInfo {
   const serverId = String(raw.server_id ?? "").trim();
   const name = String(raw.name ?? "Server").trim() || "Server";
   const brief = String(raw.brief ?? "").trim();
-  const avatar = typeof raw.avatar === "string" ? raw.avatar : "";
+  const avatar = USE_MOCK_TRANSPORT
+    ? (raw.avatar ?? "")
+    : resolveServerUrl(socket, "/api/files/download/server/head");
   const apiVersion = typeof raw.api_version === "string" ? raw.api_version : undefined;
   const minSupportedApiVersion = typeof raw.min_supported_api_version === "string" ? raw.min_supported_api_version : undefined;
   const wsUrl = typeof raw.ws_url === "string" ? raw.ws_url : undefined;
@@ -71,7 +75,7 @@ export const httpServerInfoPort: ServerInfoPort = {
     const client = new HttpJsonClient({ serverSocket: socket, apiVersion: 1 });
     try {
       const raw = await client.requestJson<ApiServerResponse>("GET", "/server");
-      const info = mapServerInfo(raw);
+      const info = mapServerInfo(raw, socket);
       if (info.serverId) rememberServerId(socket, info.serverId);
       return info;
     } catch (error) {

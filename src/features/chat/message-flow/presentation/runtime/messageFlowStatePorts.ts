@@ -8,6 +8,7 @@
 import type { Ref } from "vue";
 import type {
   MessageComposerStatePort,
+  MessageContextEdges,
   MessageTimelineStatePort,
 } from "@/features/chat/message-flow/domain/ports";
 import type { ChatMessage, ChatMessageActionErrorInfo, MessageMention, MessageReplySummary, MessageSearchState } from "@/features/chat/message-flow/api-types";
@@ -33,6 +34,7 @@ function trimMessagesToWindow<T>(messages: T[]): T[] {
 export type CreateMessageTimelineStatePortDeps = {
   currentChannelId: Ref<string>;
   messagesByChannel: Record<string, ChatMessage[]>;
+  contextEdgesByChannel: Record<string, MessageContextEdges>;
   nextCursorByChannel: Record<string, string>;
   hasMoreByChannel: Record<string, boolean>;
   loadingMoreByChannel: Record<string, boolean>;
@@ -47,6 +49,13 @@ export function createMessageTimelineStatePort(
   deps: CreateMessageTimelineStatePortDeps,
 ): MessageTimelineStatePort {
   return {
+    readContextEdges(channelId) {
+      return deps.contextEdgesByChannel[channelId];
+    },
+    writeContextEdges(channelId, edges) {
+      if (edges) deps.contextEdgesByChannel[channelId] = edges;
+      else delete deps.contextEdgesByChannel[channelId];
+    },
     readCurrentChannelId(): string {
       return deps.currentChannelId.value.trim();
     },
@@ -92,10 +101,10 @@ export function createMessageTimelineStatePort(
       }
     },
     readNextCursor(channelId: string): string {
-      return String(deps.nextCursorByChannel[channelId] ?? "").trim();
+      return deps.nextCursorByChannel[channelId] ?? "";
     },
     writeNextCursor(channelId: string, nextCursor: string): void {
-      deps.nextCursorByChannel[channelId] = String(nextCursor ?? "").trim();
+      deps.nextCursorByChannel[channelId] = nextCursor;
     },
     readHasMore(channelId: string): boolean {
       return Boolean(deps.hasMoreByChannel[channelId]);

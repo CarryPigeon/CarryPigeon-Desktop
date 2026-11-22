@@ -9,11 +9,11 @@
 
 import { HttpJsonClient } from "@/shared/net/http/httpJsonClient";
 import { isApiRequestError } from "@/shared/net/http/apiErrors";
-import { getDeviceId } from "@/shared/utils/deviceId";
 import type { AuthServicePort } from "../domain/ports/AuthServicePort";
 import type { AuthLoginResult, AuthRegisterResult, TokenLoginResult } from "../domain/types/AuthTypes";
 import { AuthError, AuthRequiredPluginMissingError } from "../domain/errors/AuthErrors";
-import { buildInstalledPluginsPayload } from "./installedPluginsPayload";
+import { requiredGatePort } from "./requiredGatePort";
+import { ensureValidAccessToken } from "@/shared/net/auth/api";
 
 type ApiTokenResponse = {
   token_type: string;
@@ -21,7 +21,6 @@ type ApiTokenResponse = {
   expires_in: number;
   refresh_token: string;
   uid: string;
-  is_new_user: boolean;
 };
 
 type ApiRegisterResponse = {
@@ -93,7 +92,7 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
       refreshToken,
       expiresInSec: Number.isFinite(expiresInSec) ? Math.max(0, Math.trunc(expiresInSec)) : 0,
       uid: String(res.uid ?? "").trim(),
-      isNewUser: Boolean(res.is_new_user),
+      isNewUser: false,
     };
   }
 
@@ -104,32 +103,40 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
       if (!e || !c) throw new AuthError({ code: "missing_email_or_code", message: "Missing email or code." });
 
       try {
-        const installed_plugins = await buildInstalledPluginsPayload(serverSocket, { bestEffort: true });
-        const res = await baseClient.requestJson<ApiTokenResponse>("POST", "/auth/tokens", {
-          grant_type: "email_code",
-          email: e,
-          code: c,
-          client: {
-            device_id: getDeviceId(),
-            installed_plugins,
-          },
-        });
+        const missing = await requiredGatePort.check(serverSocket);
+        if (missing.length) {
+          throw new AuthRequiredPluginMissingError({ reason: "required_plugin_missing", missing_plugins: missing });
+        }
+        const res = await baseClient.requestJson<ApiTokenResponse>("POST", "/auth/login/email", { email: e, code: c });
         return mapTokenResponse(res, "login_failed");
       } catch (err) {
         throwIfRequiredGate(err);
         rethrowAsAuthError("login_failed", "Login failed", err);
       }
     },
-    async registerWithPassword(username: string, password: string): Promise<AuthRegisterResult> {
+    async changePassword(password: string, code: string): Promise<void> {
+      const accessToken = await ensureValidAccessToken(serverSocket);
+      if (!accessToken || !password || !code.trim()) {
+        throw new Error("An active session, new password, and verification code are required.");
+      }
+      const client = new HttpJsonClient({ serverSocket, apiVersion: 1, accessToken });
+      await client.requestJson<void>("PUT", "/auth/me/password", { password, code: code.trim() });
+    },
+    async registerWithPassword(username: string, password: string, email: string, code: string): Promise<AuthRegisterResult> {
       const u = username.trim();
       const p = password;
       if (!u || !p) {
         throw new AuthError({ code: "missing_username_or_password", message: "Missing username or password." });
       }
       try {
+        const e = email.trim();
+        const c = code.trim();
+        if (!e || !c) throw new AuthError({ code: "missing_email_or_code", message: "Missing email or code." });
         const res = await baseClient.requestJson<ApiRegisterResponse>("POST", "/auth/register", {
           username: u,
           password: p,
+          email: e,
+          code: c,
         });
         const uid = String(res.uid ?? "").trim();
         const name = String(res.username ?? "").trim() || u;
@@ -146,7 +153,7 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
         throw new AuthError({ code: "missing_username_or_password", message: "Missing username or password." });
       }
       try {
-        const res = await baseClient.requestJson<ApiTokenResponse>("POST", "/auth/login", {
+        const res = await baseClient.requestJson<ApiTokenResponse>("POST", "/auth/login/pwd", {
           username: u,
           password: p,
         });
@@ -174,7 +181,6 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
       try {
         const res = await baseClient.requestJson<ApiTokenResponse>("POST", "/auth/refresh", {
           refresh_token: rt,
-          client: { device_id: getDeviceId() },
         });
         const accessToken = String(res.access_token ?? "").trim();
         const nextRefreshToken = String(res.refresh_token ?? "").trim();
@@ -186,7 +192,7 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
           refreshToken: nextRefreshToken,
           expiresInSec: Number.isFinite(expiresInSec) ? Math.max(0, Math.trunc(expiresInSec)) : 0,
           uid: String(res.uid ?? "").trim(),
-          isNewUser: Boolean(res.is_new_user),
+          isNewUser: false,
         };
       } catch (err) {
         rethrowAsAuthError("refresh_failed", "Refresh token failed", err);
@@ -198,7 +204,6 @@ export function createHttpAuthServicePort(serverSocket: string): AuthServicePort
       try {
         await baseClient.requestJson<void>("POST", "/auth/revoke", {
           refresh_token: rt,
-          client: { device_id: getDeviceId() },
         });
       } catch (err) {
         rethrowAsAuthError("revoke_failed", "Revoke token failed", err);

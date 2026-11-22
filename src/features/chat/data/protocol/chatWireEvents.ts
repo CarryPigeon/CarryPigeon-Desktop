@@ -18,7 +18,13 @@ export type ChatWsEventWire = {
 /**
  * `message.created` 事件 payload 的 wire 结构。
  */
-export type ChatMessageCreatedEventPayloadWire = {
+export type ChatMessageSignalWire = {
+  channel_id: string;
+  message_id: string;
+  event_sequence: number;
+};
+
+export type ChatMessageCreatedEventPayloadWire = ChatMessageSignalWire | {
   cid: string;
   message: ChatMessageWire;
 };
@@ -38,7 +44,6 @@ export type ChatReadStateUpdatedEventPayloadWire = {
   cid: string;
   uid: string;
   last_read_mid: string;
-  last_read_time: number;
 };
 
 /**
@@ -55,7 +60,7 @@ export type ChatChannelChangedEventPayloadWire = {
 /**
  * 服务端目前不发布 `message.updated` 事件。本结构复用 `message.created` 形态。
  */
-export type ChatMessageUpdatedEventPayloadWire = ChatMessageCreatedEventPayloadWire;
+export type ChatMessageUpdatedEventPayloadWire = { cid: string; message: ChatMessageWire };
 
 /**
  * `message.pinned` 事件 payload。
@@ -70,10 +75,8 @@ export type ChatMessagePinnedEventPayloadWire = {
 
 /**
  * `message.recalled` 事件 payload。
- *
- * 注意：服务端事件字段为 `recall_time`，不携带 `recalled_by_uid`。
  */
-export type ChatMessageRecalledEventPayloadWire = {
+export type ChatMessageRecalledEventPayloadWire = ChatMessageSignalWire | {
   cid: string;
   mid: string;
   recall_time: number;

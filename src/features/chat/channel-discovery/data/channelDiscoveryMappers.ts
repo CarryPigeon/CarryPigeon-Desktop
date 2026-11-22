@@ -35,7 +35,7 @@ export function mapChannelDiscoverPageWire(wire: ChannelDiscoverPageWire | null 
   }
   return {
     items,
-    nextCursor: asOptionalString(wire?.next_cursor),
+    nextCursor: wire?.next_cursor ?? undefined,
     hasMore: asSafeBoolean(wire?.has_more),
   };
 }

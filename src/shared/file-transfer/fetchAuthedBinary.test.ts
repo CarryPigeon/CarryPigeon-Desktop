@@ -41,8 +41,22 @@ describe("fetchAuthedBinary", () => {
       .fn()
       .mockResolvedValueOnce(new Response("direct", { status: 200, headers: { "Content-Type": "text/plain" } }));
     vi.stubGlobal("fetch", fetchMock);
-    const blob = await fetchAuthedBinary("http://127.0.0.1:8080/api/files/download/server_avatar", "");
+    const url = "http://127.0.0.1:8080/api/files/download/server/head";
+    const blob = await fetchAuthedBinary(url, "");
     expect(await blob.text()).toBe("direct");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(url, { headers: {}, redirect: "manual" });
+  });
+
+  it("保留下载失败的 HTTP 状态和业务错误", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(
+      { code: 11001, message: "Authentication required" },
+      { status: 401, headers: { "WWW-Authenticate": "Bearer" } },
+    )));
+
+    await expect(fetchAuthedBinary("http://127.0.0.1:8080/api/files/download/shr_x", "")).rejects.toMatchObject({
+      status: 401,
+      code: 11001,
+      message: "Authentication required",
+    });
   });
 });

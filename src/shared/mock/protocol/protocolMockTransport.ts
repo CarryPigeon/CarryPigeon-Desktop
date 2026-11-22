@@ -42,6 +42,8 @@ export type MockApiResult =
  */
 export type ProtocolWsEventEnvelope = {
   type: "event";
+  id: null;
+  error: null;
   data: {
     event_id: string;
     event_type: string;
@@ -73,6 +75,9 @@ type MockUserProfile = {
   avatar: string;
   bio: string;
   backgroundUrl: string;
+  password?: string;
+  sex?: number;
+  birthday?: number;
 };
 
 type Channel = {
@@ -81,7 +86,25 @@ type Channel = {
   brief: string;
   avatar?: string;
   owner_uid: string;
+  system_channel?: boolean;
+  created_at?: number;
 };
+
+function channelSummary(channel: Channel) {
+  const { cid, name, brief, system_channel = false, created_at = 0 } = channel;
+  return { cid, name, brief, system_channel, created_at };
+}
+
+function channelOk(data: unknown): MockApiResult {
+  return { ok: true, status: 200, body: { code: 0, message: "OK", data } };
+}
+
+function channelPage<T>(items: T[], params: URLSearchParams): MockApiResult {
+  const page = Math.max(1, Math.trunc(Number(params.get("page")) || 1));
+  const page_size = Math.min(50, Math.max(1, Math.trunc(Number(params.get("page_size")) || 20)));
+  const start = (page - 1) * page_size;
+  return channelOk({ items: items.slice(start, start + page_size), page, page_size, total: items.length, has_more: start + page_size < items.length });
+}
 
 type ChannelMember = {
   uid: string;
@@ -97,7 +120,7 @@ type ChannelApplication = {
   uid: string;
   reason: string;
   apply_time: number;
-  status: "pending" | "approved" | "rejected" | string;
+  status: "pending" | "accepted" | "rejected";
 };
 
 type ChannelBan = {
@@ -115,20 +138,22 @@ type ChatMessage = {
   sender?: { uid: string; nickname: string; avatar?: string };
   send_time: number;
   domain: string;
-  domain_version: string;
+  domain_version?: string;
   data: unknown;
   preview?: string;
   reply_to_mid?: string;
-  forwarded_from?: { mid: string; cid: string; uid: string; preview: string; send_time: number };
-  forwarded_messages?: Array<{ mid: string; cid: string; uid: string; preview: string; send_time: number }>;
+  status?: "recalled";
+  mentions?: string[];
 };
 
-type MockForwardedFrom = {
-  mid: string;
+type MockMention = {
+  mention_id: string;
   cid: string;
-  uid: string;
-  preview: string;
-  send_time: number;
+  mid: string;
+  from_uid: string;
+  target: { type: "user"; uid: string };
+  created_at: number;
+  read: boolean;
 };
 
 type WsListener = {
@@ -148,10 +173,12 @@ type ServerState = {
   membersByCid: Map<string, ChannelMember[]>;
   messagesByCid: Map<string, ChatMessage[]>;
   pinsByCid: Map<string, Array<unknown>>;
-  readStateByCidUid: Map<string, number>;
+  readStateByCidUid: Map<string, string>;
+  mentionsById: Map<string, MockMention>;
+  mentionSeq: number;
   applicationsByCid: Map<string, ChannelApplication[]>;
   bansByCid: Map<string, ChannelBan[]>;
-  filesByShareKey: Map<string, { file_id: string; filename: string; mime_type: string; size_bytes: number }>;
+  filesByShareKey: Map<string, { file_id: string; filename: string; mime_type: string; size_bytes: number; sha256?: string; uploaded?: boolean }>;
 };
 
 const servers = new Map<string, ServerState>();
@@ -252,6 +279,8 @@ function getServer(serverSocket: string): ServerState {
     messagesByCid: new Map(),
     pinsByCid: new Map(),
     readStateByCidUid: new Map(),
+    mentionsById: new Map(),
+    mentionSeq: 4000,
     applicationsByCid: new Map(),
     bansByCid: new Map(),
     filesByShareKey: new Map(),
@@ -292,31 +321,35 @@ function getServer(serverSocket: string): ServerState {
 
   s.messagesByCid.set("cid-ann", [
     {
-      mid: "m-1",
+      mid: "3001",
       cid: "cid-ann",
       uid: "1",
       sender: { uid: "1", nickname: "Operator" },
       send_time: now - 1000 * 60 * 30,
-      domain: "Core:Text",
+      domain: "Core:Text:V1",
       domain_version: "1.0.0",
-      data: { text: "Welcome to Patchbay. This is the baseline text domain." },
+      mentions: [],
+      data: { content: "Welcome to Patchbay. This is the baseline text domain." },
       preview: "Welcome to Patchbay. This is the baseline text domain.",
     },
   ]);
   s.messagesByCid.set("cid-prod", [
     {
-      mid: "m-2",
+      mid: "3002",
       cid: "cid-prod",
       uid: "2",
       sender: { uid: "2", nickname: "Relay" },
       send_time: now - 1000 * 60 * 18,
-      domain: "Core:Text",
+      domain: "Core:Text:V1",
       domain_version: "1.0.0",
-      data: { text: "P0 checklist: required gate, unknown domain downgrade, hard delete disappears, weak disconnect hints." },
+      mentions: ["1"],
+      data: { content: "P0 checklist: required gate, unknown domain downgrade, hard delete disappears, weak disconnect hints." },
       preview: "P0 checklist: required gate, unknown domain downgrade, hard delete disappears, weak disconnect hints.",
     },
   ]);
 
+  const seedMentionMessage = s.messagesByCid.get("cid-prod")?.[0];
+  if (seedMentionMessage) addMockMentions(s, seedMentionMessage, ["1"], false);
   servers.set(key, s);
   return s;
 }
@@ -373,18 +406,71 @@ function requireSession(server: ServerState, headers: Record<string, string>): T
  * @param eventType - 事件类型字符串。
  * @param payload - 事件载荷。
  */
-function emitWs(server: ServerState, eventType: string, payload: unknown): void {
+function mockBusinessFailure(code: number, message: string): MockApiResult {
+  return { ok: true, status: 200, body: { code, message } };
+}
+
+function isPositiveMockId(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9]+$/.test(value) && /[1-9]/.test(value);
+}
+
+function isMockChannelMember(server: ServerState, cid: string, uid: string): boolean {
+  return server.channelsById.has(cid) && Boolean(server.membersByCid.get(cid)?.some((member) => member.uid === uid));
+}
+
+function mockReadState(server: ServerState, cid: string, uid: string) {
+  const last_read_mid = server.readStateByCidUid.get(`${cid}::${uid}`) ?? null;
+  const unread = (server.messagesByCid.get(cid) ?? []).filter((message) =>
+    message.uid !== uid && message.status !== "recalled" && (!last_read_mid || BigInt(message.mid) > BigInt(last_read_mid)));
+  return { cid, uid, last_read_mid, unread_count: Math.min(10_000, unread.length) };
+}
+
+function addMockMentions(server: ServerState, message: ChatMessage, mentions: unknown, emit = true): void {
+  if (!Array.isArray(mentions)) return;
+  for (const uid of new Set(mentions)) {
+    if (typeof uid !== "string" || !isMockChannelMember(server, message.cid, uid)) continue;
+    const row: MockMention = {
+      mention_id: String(++server.mentionSeq),
+      cid: message.cid,
+      mid: message.mid,
+      from_uid: message.uid,
+      target: { type: "user", uid },
+      created_at: message.send_time,
+      read: false,
+    };
+    server.mentionsById.set(row.mention_id, row);
+    if (emit) emitWs(server, "mention.created", {
+      mention_id: row.mention_id, cid: row.cid, mid: row.mid, from_uid: row.from_uid, uid, created_at: row.created_at,
+    }, uid);
+  }
+}
+
+function visibleMockMentions(server: ServerState, uid: string, cid?: string): MockMention[] {
+  return [...server.mentionsById.values()].filter((row) =>
+    row.target.uid === uid && (!cid || row.cid === cid) && isMockChannelMember(server, row.cid, uid) &&
+    Boolean(server.messagesByCid.get(row.cid)?.some((message) => message.mid === row.mid && message.status !== "recalled")));
+}
+
+function emitWs(server: ServerState, eventType: string, payload: unknown, recipientUid?: string): void {
   server.eventSeq += 1;
   const env: ProtocolWsEventEnvelope = {
     type: "event",
+    id: null,
+    error: null,
     data: {
-      event_id: `${server.serverId}:${server.eventSeq}`,
+      event_id: String(BigInt(Date.now()) * 1_000_000n + BigInt(server.eventSeq)),
       event_type: eventType,
       server_time: Date.now(),
       payload,
     },
   };
+  const messageChannel = eventType.startsWith("message.")
+    ? (payload as { channel_id?: string } | null)?.channel_id
+    : undefined;
   for (const l of server.wsListeners) {
+    const session = server.sessionsByAccess.get(l.token);
+    if (!session || session.expiresAtMs < Date.now() || (recipientUid && session.uid !== recipientUid)) continue;
+    if (messageChannel && !isMockChannelMember(server, messageChannel, session.uid)) continue;
     try {
       l.onEvent(env);
     } catch {
@@ -406,7 +492,7 @@ export function connectProtocolMockChatWs(
   serverSocket: string,
   accessToken: string,
   onEvent: (env: ProtocolWsEventEnvelope) => void,
-  options?: { onAuthError?: (reason: string) => void; onResumeFailed?: (reason: string) => void },
+  options?: { onAuthError?: (reason: string) => void },
 ): ProtocolWsClient {
   const server = getServer(serverSocket);
   const token = accessToken.trim();
@@ -447,16 +533,20 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       ok: true,
       status: 200,
       body: {
-        server_id: server.serverId,
-        name: server.serverSocket.startsWith("mock://") ? "Mock Rack" : "CarryPigeon Server",
-        brief: "Protocol-mock server for local UI preview (no backend required).",
-        avatar: "",
-        api_version: "1",
-        min_supported_api_version: "1",
-        ws_url: "ws://mock.local/api/ws",
-        required_plugins,
-        capabilities: { protocol_mock: true },
-        server_time: Date.now(),
+        code: 0,
+        message: "OK",
+        data: {
+          server_id: server.serverId,
+          name: server.serverSocket.startsWith("mock://") ? "Mock Rack" : "CarryPigeon Server",
+          brief: "Protocol-mock server for local UI preview (no backend required).",
+          avatar: "",
+          api_version: "1",
+          min_supported_api_version: "1",
+          ws_url: "ws://mock.local/api/ws",
+          required_plugins,
+          capabilities: { protocol_mock: true },
+          server_time: Date.now(),
+        },
       },
     };
   }
@@ -543,175 +633,91 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   // -------------------------------------------------------------------------
   // Auth (public)
   // -------------------------------------------------------------------------
-  if (method === "POST" && pathname === "/auth/email_codes") {
-    const body = req.body as { email?: string } | null;
-    const email = String(body?.email ?? "").trim().toLowerCase();
-    if (!email) return { ok: false, error: apiError(400, "invalid_request", "Missing email") };
-    return { ok: true, status: 204, body: null };
-  }
-
-  if (method === "POST" && pathname === "/auth/register") {
-    const body = req.body as { username?: string; password?: string } | null;
-    const username = String(body?.username ?? "").trim();
-    const password = String(body?.password ?? "");
-    if (!username || !password) {
-      return { ok: false, error: apiError(422, "validation_failed", "Missing username or password") };
-    }
-    const existing = [...server.usersById.values()].find((u) => String(u.nickname ?? "").trim() === username);
-    if (existing) {
-      return { ok: false, error: apiError(422, "validation_failed", "username already exists") };
-    }
-    const uid = "1";
-    const prev = server.usersById.get(uid);
-    server.usersById.set(uid, {
-      uid,
-      email: prev?.email ?? "",
-      nickname: username,
-      avatar: prev?.avatar ?? "",
-      backgroundUrl: prev?.backgroundUrl ?? "",
-      bio: prev?.bio ?? "",
-    });
-    return { ok: true, status: 201, body: { uid, username } };
-  }
-
-  if (method === "POST" && pathname === "/auth/login") {
-    const body = req.body as { username?: string; password?: string } | null;
-    const username = String(body?.username ?? "").trim();
-    const password = String(body?.password ?? "");
-    if (!username || !password) {
-      return { ok: false, error: apiError(422, "validation_failed", "Missing username or password") };
-    }
-    const uid = "1";
-    const prev = server.usersById.get(uid);
-    server.usersById.set(uid, {
-      uid,
-      email: prev?.email ?? "",
-      nickname: username,
-      avatar: prev?.avatar ?? "",
-      backgroundUrl: prev?.backgroundUrl ?? "",
-      bio: prev?.bio ?? "",
-    });
-    const now = Date.now();
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        token_type: "Bearer",
-        access_token: `mock-access:password:${username}:${now}`,
-        expires_in: 1800,
-        refresh_token: `mock-refresh:password:${username}:${now}`,
-        uid,
-        is_new_user: false,
-      },
-    };
-  }
-
-  if (method === "POST" && pathname === "/auth/tokens") {
-    const body = req.body as
-      | {
-          grant_type?: string;
-          email?: string;
-          code?: string;
-          client?: { device_id?: string; installed_plugins?: Array<{ plugin_id?: string; version?: string }> };
-        }
-      | null;
-    const grantType = String(body?.grant_type ?? "").trim();
-    const email = String(body?.email ?? "").trim().toLowerCase();
-    if (grantType !== "email_code") {
-      return { ok: false, error: apiError(400, "invalid_grant", "Unsupported grant_type", { grant_type: grantType }) };
-    }
-    if (!email) return { ok: false, error: apiError(400, "invalid_request", "Missing email") };
-
-    const required = listRequiredPluginIds();
-    const installed = new Set<string>();
-    for (const p of body?.client?.installed_plugins ?? []) {
-      const id = String(p?.plugin_id ?? "").trim();
-      if (id) installed.add(id);
-    }
-    const missing = required.filter((id) => !installed.has(id));
-    if (missing.length > 0) {
-      return {
-        ok: false,
-        error: apiError(403, "required_plugin_missing", "Required plugins missing", { missing_plugins: missing }),
-      };
-    }
-
-    const uid = "1";
-    const now = Date.now();
-    const existingUser = server.usersById.get(uid);
-    server.usersById.set(uid, {
-      uid,
-      email,
-      nickname: existingUser?.nickname ?? "Operator",
-      avatar: existingUser?.avatar ?? "",
-      bio: existingUser?.bio ?? "Protocol mock operator profile.",
-      backgroundUrl: existingUser?.backgroundUrl ?? "",
-    });
-    const access_token = `pmock-access:${uid}:${now.toString(16)}`;
-    const refresh_token = `pmock-refresh:${uid}:${now.toString(16)}`;
+  const accountOk = (data: unknown): MockApiResult => ({ ok: true, status: 200, body: { code: 0, message: "OK", data } });
+  const accountError = (code: number, message: string): MockApiResult => ({ ok: true, status: 200, body: { code, message } });
+  const issueAccountTokens = (uid: string, email: string): MockApiResult => {
+    const nonce = `${Date.now().toString(16)}:${Math.random().toString(16).slice(2)}`;
     const session: TokenSession = {
       uid,
       email,
-      accessToken: access_token,
-      refreshToken: refresh_token,
-      expiresAtMs: now + 1800 * 1000,
+      accessToken: `pmock-access:${uid}:${nonce}`,
+      refreshToken: `pmock-refresh:${uid}:${nonce}`,
+      expiresAtMs: Date.now() + 1800 * 1000,
     };
-    server.sessionsByAccess.set(access_token, session);
-    server.sessionsByRefresh.set(refresh_token, session);
+    server.sessionsByAccess.set(session.accessToken, session);
+    server.sessionsByRefresh.set(session.refreshToken, session);
+    return accountOk({ token_type: "Bearer", access_token: session.accessToken, expires_in: 1800, refresh_token: session.refreshToken, uid });
+  };
 
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        token_type: "bearer",
-        access_token,
-        expires_in: 1800,
-        refresh_token,
-        uid,
-        is_new_user: false,
-      },
-    };
+  if (method === "POST" && pathname === "/auth/email_codes") {
+    const body = req.body as { email?: string; purpose?: string } | null;
+    if (!body?.email?.trim() || !["REGISTER", "LOGIN", "CHANGE_EMAIL", "password_change"].includes(body.purpose ?? "")) {
+      return accountError(10001, "Missing email or invalid verification purpose");
+    }
+    return accountOk(null);
+  }
+
+  if (method === "POST" && pathname === "/auth/register") {
+    const body = req.body as { username?: string; password?: string; email?: string; code?: string } | null;
+    const username = String(body?.username ?? "").trim();
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    if (!username || !body?.password || !email || !body.code?.trim()) {
+      return accountError(10001, "Missing registration fields");
+    }
+    const users = [...server.usersById.values()];
+    if (users.some((user) => user.nickname === username)) return accountError(11010, "Username already exists");
+    if (users.some((user) => user.email === email)) return accountError(11011, "Email already exists");
+    const uid = String(1000 + server.usersById.size);
+    server.usersById.set(uid, {
+      uid,
+      email,
+      nickname: username,
+      password: body.password,
+      avatar: "",
+      bio: "",
+      backgroundUrl: "",
+    });
+    return accountOk({ uid, username });
+  }
+
+  if (method === "POST" && pathname === "/auth/login/pwd") {
+    const body = req.body as { username?: string; password?: string } | null;
+    const username = String(body?.username ?? "").trim();
+    const password = String(body?.password ?? "");
+    if (!username || !password) {
+      return { ok: false, error: apiError(422, "validation_failed", "Missing username or password") };
+    }
+    const user = [...server.usersById.values()].find((item) => item.nickname === username);
+    if (!user || (user.password !== undefined && user.password !== password)) {
+      return accountError(11006, "Invalid username or password");
+    }
+    return issueAccountTokens(user.uid, user.email);
+  }
+
+  if (method === "POST" && pathname === "/auth/login/email") {
+    const body = req.body as { email?: string; code?: string } | null;
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    if (!email || !body?.code?.trim()) return accountError(10001, "Missing email or verification code");
+
+    const user = [...server.usersById.values()].find((item) => item.email === email);
+    if (!user) return accountError(11009, "Account does not exist");
+    return issueAccountTokens(user.uid, user.email);
   }
 
   if (method === "POST" && pathname === "/auth/refresh") {
     const body = req.body as { refresh_token?: string } | null;
     const rt = String(body?.refresh_token ?? "").trim();
     const prev = server.sessionsByRefresh.get(rt) ?? null;
-    if (!prev) return { ok: false, error: apiError(401, "unauthorized", "Invalid refresh token") };
-
-    const now = Date.now();
-    const access_token = `pmock-access:${prev.uid}:${now.toString(16)}`;
-    const refresh_token = `pmock-refresh:${prev.uid}:${now.toString(16)}`;
-    const session: TokenSession = {
-      uid: prev.uid,
-      email: prev.email,
-      accessToken: access_token,
-      refreshToken: refresh_token,
-      expiresAtMs: now + 1800 * 1000,
-    };
-    server.sessionsByAccess.set(access_token, session);
-    server.sessionsByRefresh.set(refresh_token, session);
+    if (!prev) return accountError(11004, "Invalid refresh token");
     server.sessionsByRefresh.delete(rt);
-
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        token_type: "bearer",
-        access_token,
-        expires_in: 1800,
-        refresh_token,
-        uid: prev.uid,
-        is_new_user: false,
-      },
-    };
+    return issueAccountTokens(prev.uid, server.usersById.get(prev.uid)?.email ?? prev.email);
   }
 
   if (method === "POST" && pathname === "/auth/revoke") {
     const body = req.body as { refresh_token?: string } | null;
     const rt = String(body?.refresh_token ?? "").trim();
-    if (rt) server.sessionsByRefresh.delete(rt);
-    return { ok: true, status: 204, body: null };
+    if (!server.sessionsByRefresh.delete(rt)) return accountError(11004, "Invalid refresh token");
+    return accountOk(null);
   }
 
   // -------------------------------------------------------------------------
@@ -721,21 +727,18 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const user = server.usersById.get(session.uid);
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        uid: session.uid,
-        email: user?.email ?? session.email,
-        nickname: user?.nickname ?? "Operator",
-        avatar: user?.avatar ?? "",
-        bio: user?.bio ?? "",
-        backgroundUrl: user?.backgroundUrl ?? "",
-      },
-    };
+    return accountOk({
+      uid: session.uid,
+      email: user?.email ?? session.email,
+      username: user?.nickname ?? "Operator",
+      avatar: user?.avatar || null,
+      bio: user?.bio ?? "",
+      sex: user?.sex ?? 0,
+      birthday: user?.birthday ?? 0,
+    });
   }
 
-  if (method === "PUT" && pathname === "/users/me/email") {
+  if (method === "PUT" && pathname === "/auth/me/email") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const body = req.body as { email?: string; code?: string } | null;
@@ -753,15 +756,24 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       backgroundUrl: "",
     };
     server.usersById.set(session.uid, { ...user, email });
-    return { ok: true, status: 204, body: null };
+    return accountOk(null);
+  }
+
+  if (method === "PUT" && pathname === "/auth/me/password") {
+    const session = requireSession(server, req.headers);
+    if (!session) return accountError(11001, "Missing access token");
+    const body = req.body as { password?: string; code?: string } | null;
+    if (!body?.password || !body.code?.trim()) return accountError(10001, "Missing password or verification code");
+    const user = server.usersById.get(session.uid);
+    if (!user) return accountError(11009, "Account does not exist");
+    user.password = body.password;
+    return accountOk(null);
   }
 
   if (method === "PATCH" && pathname === "/users/me") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const body = req.body as { username?: string; avatar?: number; sex?: number; brief?: string; birthday?: number } | null;
-    const username = String(body?.username ?? "").trim();
-    if (!username) return { ok: false, error: apiError(400, "invalid_request", "Missing username") };
+    const body = req.body as { avatar?: string; sex?: number; brief?: string; birthday?: number } | null;
     const user = server.usersById.get(session.uid) ?? {
       uid: session.uid,
       email: session.email,
@@ -772,58 +784,22 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     };
     server.usersById.set(session.uid, {
       ...user,
-      nickname: username,
-      avatar: String(body?.avatar ?? user.avatar ?? ""),
-      bio: String(body?.brief ?? user.bio ?? ""),
+      avatar: body?.avatar ?? user.avatar,
+      bio: body?.brief ?? user.bio,
+      sex: body?.sex ?? user.sex,
+      birthday: body?.birthday ?? user.birthday,
     });
-    for (const members of server.membersByCid.values()) {
-      for (const member of members) {
-        if (member.uid === session.uid) member.nickname = username;
-      }
-    }
-    return { ok: true, status: 204, body: null };
+    return accountOk(null);
   }
 
-  if (method === "POST" && pathname === "/users/me/background") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const shareKey = `pmock-bg-${session.uid}-${Date.now().toString(16)}`;
-    server.filesByShareKey.set(shareKey, {
-      file_id: shareKey,
-      filename: "profile-background.svg",
-      mime_type: "image/svg+xml",
-      size_bytes: 512,
-    });
-    const backgroundUrl = buildProtocolMockDownloadUrl(server.serverSocket, shareKey);
-    const user = server.usersById.get(session.uid) ?? {
-      uid: session.uid,
-      email: session.email,
-      nickname: "Operator",
-      avatar: "",
-      bio: "",
-      backgroundUrl: "",
-    };
-    server.usersById.set(session.uid, { ...user, backgroundUrl });
-    return { ok: true, status: 200, body: { backgroundUrl } };
-  }
-  if (method === "GET" && pathname.startsWith("/users/") && pathname !== "/users/me") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const uid = decodeURIComponent(pathname.slice("/users/".length)).trim();
-    if (!uid) return { ok: false, error: apiError(400, "invalid_request", "Missing uid") };
+  const userDetailPath = /^\/users\/([^/]+)\/detail$/.exec(pathname);
+  if (method === "GET" && userDetailPath) {
+    if (!requireSession(server, req.headers)) return accountError(11001, "Missing access token");
+    const uid = decodeURIComponent(userDetailPath[1] ?? "");
     const user = server.usersById.get(uid);
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        uid,
-        nickname: user?.nickname ?? (uid === "1" ? "Operator" : "User"),
-        avatar: user?.avatar ?? "",
-        email: user?.email ?? `user${uid}@example.com`,
-        bio: user?.bio ?? "",
-        backgroundUrl: user?.backgroundUrl ?? "",
-      },
-    };
+    if (!user) return accountError(11009, "Account does not exist");
+    return accountOk({ uid, username: user.nickname, avatar: user.avatar || null, email: user.email,
+      bio: user.bio, sex: user.sex ?? 0, birthday: user.birthday ?? 0 });
   }
 
   if (method === "GET" && pathname === "/users") {
@@ -831,18 +807,11 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const csv = String(searchParams.get("ids") ?? "").trim();
     const ids = csv ? csv.split(",").map((x) => x.trim()).filter(Boolean) : [];
-    const items = ids.map((uid) => {
+    const items = ids.flatMap((uid) => {
       const user = server.usersById.get(uid);
-      return {
-        uid,
-        nickname: user?.nickname ?? (uid === "1" ? "Operator" : "User"),
-        avatar: user?.avatar ?? "",
-        email: user?.email ?? `user${uid}@example.com`,
-        bio: user?.bio ?? "",
-        backgroundUrl: user?.backgroundUrl ?? "",
-      };
+      return user ? [{ uid, username: user.nickname, avatar: user.avatar || null }] : [];
     });
-    return { ok: true, status: 200, body: { items } };
+    return accountOk({ items });
   }
 
   // -------------------------------------------------------------------------
@@ -852,31 +821,51 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
 
-    const body = req.body as { filename?: string; mime_type?: string; size_bytes?: number } | null;
+    const body = req.body as { filename?: string; sha256?: string; size_bytes?: number } | null;
     const filename = String(body?.filename ?? "").trim();
-    const mime_type = String(body?.mime_type ?? "").trim() || "application/octet-stream";
-    const size_bytes = Number(body?.size_bytes ?? 0);
-    if (!filename) return { ok: false, error: apiError(400, "invalid_request", "Missing filename") };
-    if (!Number.isFinite(size_bytes) || size_bytes <= 0) return { ok: false, error: apiError(400, "invalid_request", "Invalid size_bytes") };
+    const sha256 = String(body?.sha256 ?? "").trim();
+    const size_bytes = body?.size_bytes ?? -1;
+    if (!filename || !/^[0-9a-f]{64}$/.test(sha256) || !Number.isSafeInteger(size_bytes) || size_bytes < 0) {
+      return { ok: true, status: 200, body: { code: 10001, message: "Invalid upload request" } };
+    }
 
+    const same = [...server.filesByShareKey.values()].find((file) => file.uploaded && file.sha256 === sha256);
     const now = Date.now();
-    const file_id = `pmock-file-${now.toString(16)}`;
-    const share_key = `pmock-share-${now.toString(16)}`;
-    server.filesByShareKey.set(share_key, { file_id, filename, mime_type, size_bytes: Math.trunc(size_bytes) });
+    const file_id = same?.file_id ?? String(now * 1000 + server.filesByShareKey.size);
+    const share_key = `pmock-share-${file_id}-${server.filesByShareKey.size}`;
+    server.filesByShareKey.set(share_key, {
+      file_id, filename, mime_type: same?.mime_type ?? "application/octet-stream", size_bytes, sha256, uploaded: !!same,
+    });
     return {
       ok: true,
       status: 200,
       body: {
-        file_id,
-        share_key,
-        upload: {
-          method: "PUT",
-          url: `http://mock.local/upload/${encodeURIComponent(file_id)}`,
-          headers: { "Content-Type": mime_type },
-          expires_at: now + 3600_000,
+        code: 0,
+        message: "OK",
+        data: {
+          file_id,
+          share_key,
+          upload: {
+            method: "PUT",
+            url: `/api/files/uploads/${encodeURIComponent(share_key)}`,
+            headers: { "Content-Length": String(size_bytes) },
+            expires_at: now + 3600_000,
+            has_same: !!same,
+          },
         },
       },
     };
+  }
+
+  if (method === "PUT" && pathnameParts.length === 3 && pathname.startsWith("/files/uploads/")) {
+    if (!requireSession(server, req.headers)) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const file = server.filesByShareKey.get(pathnameParts[2]);
+    if (!file) return { ok: true, status: 200, body: { code: 40002, message: "Invalid share_key" } };
+    const size = req.body instanceof Blob ? req.body.size : req.body instanceof ArrayBuffer ? req.body.byteLength : -1;
+    if (size !== file.size_bytes) return { ok: true, status: 200, body: { code: 40007, message: "Upload size mismatch" } };
+    file.mime_type = req.headers["Content-Type"] || file.mime_type;
+    file.uploaded = true;
+    return { ok: true, status: 200, body: { code: 0, message: "OK", data: null } };
   }
 
   // -------------------------------------------------------------------------
@@ -885,25 +874,97 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   if (pathname === "/channels" && method === "GET") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const channels = Array.from(server.channelsById.values());
-    return { ok: true, status: 200, body: { channels } };
+    const channels = [...server.channelsById.values()].filter((channel) =>
+      server.membersByCid.get(channel.cid)?.some((member) => member.uid === session.uid),
+    );
+    return channelPage(channels.map(channelSummary), searchParams);
+  }
+
+  if (pathname === "/channels/discover" && method === "GET") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const query = (searchParams.get("q") ?? "").trim().toLowerCase();
+    const limit = Math.min(50, Math.max(1, Math.trunc(Number(searchParams.get("limit")) || 20)));
+    const cursor = searchParams.get("cursor");
+    const channels = [...server.channelsById.values()].filter((channel) =>
+      `${channel.name} ${channel.brief}`.toLowerCase().includes(query),
+    );
+    const cursorFor = (cid: string) => JSON.stringify([query, cid]);
+    const cursorIndex = cursor == null ? -1 : channels.findIndex((channel) => cursorFor(channel.cid) === cursor);
+    if (cursor != null && cursorIndex < 0) {
+      return { ok: true, status: 200, body: { code: 10013, message: "Invalid cursor" } };
+    }
+    const start = cursorIndex + 1;
+    const items = channels.slice(start, start + limit).map((channel) => ({
+      cid: channel.cid,
+      name: channel.name,
+      brief: channel.brief,
+      avatar: channel.avatar ?? null,
+      member_count: server.membersByCid.get(channel.cid)?.length ?? 0,
+      requires_application: true,
+    }));
+    const has_more = start + limit < channels.length;
+    return channelOk({ items, has_more, next_cursor: has_more ? cursorFor(items[items.length - 1].cid) : null });
+  }
+
+  if (pathname === "/channels/list" && method === "POST") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    if (!Array.isArray(req.body)) return { ok: true, status: 200, body: { code: 10001, message: "Invalid channel IDs" } };
+    const items = req.body.flatMap((cid) => {
+      const channel = server.channelsById.get(String(cid));
+      return channel ? [channelSummary(channel)] : [];
+    });
+    return channelOk({ total: req.body.length, items });
+  }
+
+  if (pathname === "/channels/applications" && method === "GET") {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const items = [...server.applicationsByCid.values()].flat().filter((app) => app.uid === session.uid);
+    return channelPage(items, searchParams);
+  }
+
+  if (pathnameParts.length === 3 && pathnameParts[0] === "channels" &&
+      ((pathnameParts[2] === "transfer" && method === "PUT") || (pathnameParts[2] === "quit" && method === "POST"))) {
+    const session = requireSession(server, req.headers);
+    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
+    const cid = decodeURIComponent(pathnameParts[1]);
+    const channel = server.channelsById.get(cid);
+    if (!channel) return { ok: true, status: 200, body: { code: 20001, message: "Channel not found" } };
+    const members = server.membersByCid.get(cid) ?? [];
+    if (method === "PUT") {
+      if (channel.owner_uid !== session.uid) return { ok: true, status: 200, body: { code: 20006, message: "Owner required" } };
+      const newOwner = members.find((member) => member.uid === (req.body as { new_owner?: string } | null)?.new_owner);
+      if (!newOwner) return { ok: true, status: 200, body: { code: 20003, message: "Member not found" } };
+      for (const member of members) if (member.role === "owner") member.role = "member";
+      newOwner.role = "owner";
+      channel.owner_uid = newOwner.uid;
+      emitWs(server, "channel.changed", { cid });
+    } else {
+      if (channel.owner_uid === session.uid) return { ok: true, status: 200, body: { code: 20008, message: "Transfer channel ownership first" } };
+      server.membersByCid.set(cid, members.filter((member) => member.uid !== session.uid));
+      emitWs(server, "channels.changed", { cid });
+    }
+    return channelOk(null);
   }
 
   if (pathname === "/channels" && method === "POST") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const body = req.body as { name?: string; brief?: string; avatar?: string } | null;
+    const body = req.body as { name?: string; brief?: string } | null;
     const name = String(body?.name ?? "").trim();
     if (!name) return { ok: false, error: apiError(400, "invalid_request", "Missing channel name") };
-    const cid = `cid-${Date.now().toString(16)}`;
-    const channel: Channel = { cid, name, brief: String(body?.brief ?? ""), avatar: String(body?.avatar ?? "") || undefined, owner_uid: session.uid };
+    const created_at = Date.now();
+    const cid = String(BigInt(created_at) * 10000n + BigInt(server.eventSeq % 10000));
+    const channel: Channel = { cid, name, brief: String(body?.brief ?? ""), owner_uid: session.uid, created_at };
     server.channelsById.set(cid, channel);
     server.membersByCid.set(cid, [{ uid: session.uid, nickname: "Operator", role: "owner", join_time: Date.now() }]);
     server.messagesByCid.set(cid, []);
     server.applicationsByCid.set(cid, []);
     server.bansByCid.set(cid, []);
     emitWs(server, "channels.changed", { cid });
-    return { ok: true, status: 200, body: channel };
+    return channelOk(channelSummary(channel));
   }
 
   if (pathname.startsWith("/channels/") && pathname.split("/").length === 3 && method === "GET") {
@@ -912,7 +973,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const cid = decodeURIComponent(pathname.split("/")[2] ?? "").trim();
     const channel = server.channelsById.get(cid) ?? null;
     if (!channel) return { ok: false, error: apiError(404, "not_found", "Channel not found", { cid }) };
-    return { ok: true, status: 200, body: channel };
+    return channelOk(channelSummary(channel));
   }
 
   if (pathname.startsWith("/channels/") && pathname.split("/").length === 3 && method === "PATCH") {
@@ -921,94 +982,103 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const cid = decodeURIComponent(pathname.split("/")[2] ?? "").trim();
     const channel = server.channelsById.get(cid) ?? null;
     if (!channel) return { ok: false, error: apiError(404, "not_found", "Channel not found", { cid }) };
-    const patch = req.body as Partial<Pick<Channel, "name" | "brief" | "avatar">>;
+    const role = server.membersByCid.get(cid)?.find((member) => member.uid === session.uid)?.role;
+    if (role !== "owner" && role !== "admin") {
+      return { ok: true, status: 200, body: { code: 20010, message: "Cannot edit channel" } };
+    }
+    const patch = req.body as Partial<Pick<Channel, "name" | "brief">>;
     if (typeof patch?.name === "string") channel.name = patch.name.trim() || channel.name;
     if (typeof patch?.brief === "string") channel.brief = patch.brief;
-    if (typeof patch?.avatar === "string") channel.avatar = patch.avatar;
     emitWs(server, "channel.changed", { cid });
-    return { ok: true, status: 200, body: channel };
+    return channelOk(null);
   }
 
   if (pathname.startsWith("/channels/") && pathname.split("/").length === 3 && method === "DELETE") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const cid = decodeURIComponent(pathname.split("/")[2] ?? "").trim();
+    const channel = server.channelsById.get(cid);
+    if (!channel) return { ok: true, status: 200, body: { code: 20001, message: "Channel not found" } };
+    if (channel.owner_uid !== session.uid) return { ok: true, status: 200, body: { code: 20006, message: "Owner required" } };
     server.channelsById.delete(cid);
     server.membersByCid.delete(cid);
     server.messagesByCid.delete(cid);
     server.applicationsByCid.delete(cid);
     server.bansByCid.delete(cid);
     emitWs(server, "channels.changed", { cid });
-    return { ok: true, status: 204, body: null };
+    return channelOk(null);
   }
 
   if (pathname === "/unreads" && method === "GET") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const items: Array<{ cid: string; unread_count: number; last_read_time: number }> = [];
-    for (const c of server.channelsById.values()) {
-      const key = `${c.cid}::${session.uid}`;
-      const last_read_time = server.readStateByCidUid.get(key) ?? 0;
-      const list = server.messagesByCid.get(c.cid) ?? [];
-      const unread_count = list.filter((m) => m.send_time > last_read_time).length;
-      items.push({ cid: c.cid, unread_count, last_read_time });
+    const items: Array<{ cid: string; unread_count: number }> = [];
+    for (const cid of server.channelsById.keys()) {
+      if (!isMockChannelMember(server, cid, session.uid)) continue;
+      const { unread_count } = mockReadState(server, cid, session.uid);
+      if (unread_count > 0) items.push({ cid, unread_count });
     }
-    return { ok: true, status: 200, body: { items } };
+    return { ok: true, status: 200, body: { total: items.length, items } };
   }
 
-  if (pathname.startsWith("/channels/") && pathname.includes("/messages") && method === "GET") {
+  if (pathnameParts[0] === "channels" && pathnameParts[1] === "messages" && pathnameParts.length === 3) {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-
-    const parts = pathname.split("/").filter(Boolean);
-    const cid = decodeURIComponent(parts[1] ?? "").trim();
-    if (!cid) return { ok: false, error: apiError(400, "invalid_request", "Missing cid") };
-    const limit = Math.max(1, Math.trunc(Number(searchParams.get("limit") ?? 50)));
-    const list = (server.messagesByCid.get(cid) ?? []).slice().sort((a, b) => a.send_time - b.send_time);
-    const items = list.slice(Math.max(0, list.length - limit));
-    return { ok: true, status: 200, body: { items, next_cursor: "", has_more: false } };
+    const available = [...server.messagesByCid.values()].flat().filter((msg) => isMockChannelMember(server, msg.cid, session.uid));
+    if (method === "GET") {
+      const found = available.find((msg) => msg.mid === decodeURIComponent(pathnameParts[2]));
+      return found ? channelOk(found) : mockBusinessFailure(30001, "Message not found");
+    }
+    if (method === "POST" && pathnameParts[2] === "ids") {
+      const ids = (req.body as { message_ids?: string[] } | null)?.message_ids;
+      if (!Array.isArray(ids) || !ids.length || ids.some((id) => !/^\d+$/.test(id))) {
+        return { ok: true, status: 200, body: { code: 10001, message: "Invalid message_ids" } };
+      }
+      const items = [...new Set(ids)].flatMap((id) => available.find((msg) => msg.mid === id) ?? []);
+      return channelOk({ total: items.length, items });
+    }
   }
 
-  if (pathname.startsWith("/channels/") && pathname.endsWith("/messages/attachments") && method === "POST") {
+  if (pathnameParts[0] === "channels" && pathnameParts[2] === "messages" && method === "GET" &&
+      (pathnameParts.length === 3 || (pathnameParts.length === 4 && ["before", "after", "around", "search"].includes(pathnameParts[3])))) {
+    if (pathnameParts.length === 3 && (searchParams.has("around_mid") || searchParams.has("cursor"))) {
+      return mockBusinessFailure(10001, "Use the before or around endpoint");
+    }
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const parts = pathname.split("/").filter(Boolean);
-    const cid = decodeURIComponent(parts[1] ?? "").trim();
-    if (!cid) return { ok: false, error: apiError(400, "invalid_request", "Missing cid") };
-    if (!server.channelsById.get(cid)) return { ok: false, error: apiError(404, "not_found", "Channel not found", { cid }) };
-
-    const form = typeof FormData !== "undefined" && req.body instanceof FormData ? req.body : null;
-    const file = form?.get("file") as File | Blob | string | null | undefined;
-    const messageType = String(form?.get("message_type") ?? "file").trim() || "file";
-    const isFileLike =
-      !!file &&
-      typeof file === "object" &&
-      ("size" in file || "name" in file || typeof (file as Blob).arrayBuffer === "function");
-    if (!isFileLike) {
-      return { ok: false, error: apiError(422, "validation_failed", "Missing multipart file") };
+    const cid = decodeURIComponent(pathnameParts[1] ?? "");
+    if (!isMockChannelMember(server, cid, session.uid)) return { ok: true, status: 200, body: { code: 20002, message: "Channel membership required" } };
+    const kind = pathnameParts[3] ?? "";
+    const value = (msg: ChatMessage) => BigInt(msg.mid);
+    const asc = [...(server.messagesByCid.get(cid) ?? [])].sort((a, b) => value(a) < value(b) ? -1 : value(a) > value(b) ? 1 : 0);
+    if (kind === "around") {
+      const index = asc.findIndex((msg) => msg.mid === searchParams.get("anchor_mid"));
+      if (index < 0) return mockBusinessFailure(30001, "Message not found");
+      const before = Number(searchParams.get("before") ?? 25);
+      const after = Number(searchParams.get("after") ?? 25);
+      if (![before, after].every((count) => Number.isInteger(count) && count >= 0 && count <= 50)) {
+        return mockBusinessFailure(10001, "Invalid message context size");
+      }
+      return channelOk({ items: asc.slice(Math.max(0, index - before), index + after + 1).reverse() });
     }
-    const fileObj = file as File & Blob;
-    const filename =
-      typeof fileObj.name === "string" && fileObj.name
-        ? fileObj.name
-        : messageType === "voice"
-          ? "voice.wav"
-          : "attachment.bin";
-    const mimeType = fileObj.type || (messageType === "voice" ? "audio/wav" : "application/octet-stream");
-    const size = Number(fileObj.size ?? 0) || 0;
-    const shareKey = `shr_att_${Date.now().toString(16)}`;
-    const objectKey = `channels/${cid}/messages/${messageType === "voice" ? "voice" : "file"}/accounts/${session.uid}/${shareKey}-${filename}`;
-    return {
-      ok: true,
-      status: 200,
-      body: {
-        object_key: objectKey,
-        share_key: shareKey,
-        filename,
-        mime_type: mimeType,
-        size,
-      },
-    };
+    const limit = Math.max(1, Math.min(50, Math.trunc(Number(searchParams.get("limit") ?? 20)) || 20));
+    const q = searchParams.get("q") ?? "";
+    const sender = searchParams.get("sender_uid") ?? "";
+    const domain = searchParams.get("domain") ?? "";
+    const scope = JSON.stringify([session.uid, cid, ...(kind === "search" ? ["search", q, sender, domain] : [])]);
+    const cursor = searchParams.get("cursor");
+    const prefix = `${encodeURIComponent(scope)}:`;
+    const edge = cursor?.startsWith(prefix) ? cursor.slice(prefix.length) : "";
+    if ((cursor !== null || kind === "before" || kind === "after") && !/^\d+$/.test(edge)) {
+      return { ok: true, status: 200, body: { code: 10013, message: "Invalid cursor" } };
+    }
+    let matches = kind === "after" ? asc : asc.reverse();
+    if (edge) matches = matches.filter((msg) => kind === "after" ? value(msg) > BigInt(edge) : value(msg) < BigInt(edge));
+    if (kind === "search") matches = matches.filter((msg) => msg.status !== "recalled" &&
+      (!sender || msg.uid === sender) && (!domain || msg.domain === domain) && (msg.preview ?? "").toLowerCase().includes(q.toLowerCase()));
+    const items = matches.slice(0, limit);
+    const hasMore = matches.length > items.length;
+    return channelOk({ items, next_cursor: hasMore ? `${prefix}${items[items.length - 1]?.mid}` : null, has_more: hasMore });
   }
 
   if (
@@ -1024,69 +1094,72 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!cid) return { ok: false, error: apiError(400, "invalid_request", "Missing cid") };
     if (!server.channelsById.get(cid)) return { ok: false, error: apiError(404, "not_found", "Channel not found", { cid }) };
 
-    const body = req.body as { domain?: string; domain_version?: string; data?: unknown; reply_to_mid?: string } | null;
-    const domain = String(body?.domain ?? "").trim() || "Core:Text";
-    const domain_version = String(body?.domain_version ?? "").trim() || "1.0.0";
-    const now = Date.now();
-    const mid = `m-${now.toString(16)}-${Math.random().toString(16).slice(2, 6)}`;
-    const data = body?.data ?? { text: "" };
-    const preview =
-      domain === "Core:Text" && data && typeof data === "object" && typeof (data as { text?: unknown }).text === "string"
-        ? String((data as { text: string }).text)
-        : "";
-
+    if (!isMockChannelMember(server, cid, session.uid)) return { ok: true, status: 200, body: { code: 20002, message: "Channel membership required" } };
+    const body = req.body as { domain?: string; data?: Record<string, unknown>; mentions?: unknown } | null;
+    const domain = String(body?.domain ?? "").trim();
+    if (!domain || !body?.data || (domain === "Core:Text:V1" && typeof body.data.content !== "string")) {
+      return { ok: true, status: 200, body: { code: 10001, message: "Invalid message" } };
+    }
+    const data = { ...body.data };
+    if (domain === "Core:Text:V1") {
+      data.reply_to_mid ??= null;
+      data.reply_to_user = server.messagesByCid.get(cid)?.find((msg) => msg.mid === data.reply_to_mid)?.uid ?? null;
+    }
+    const mid = String(BigInt(Date.now()) * 1_000_000n + BigInt(server.eventSeq + 1));
     const msg: ChatMessage = {
-      mid,
-      cid,
-      uid: session.uid,
-      sender: { uid: session.uid, nickname: "Operator" },
-      send_time: now,
-      domain,
-      domain_version,
-      data,
-      preview: preview || undefined,
-      reply_to_mid: String(body?.reply_to_mid ?? "").trim() || undefined,
+      mid, cid, uid: session.uid, send_time: Date.now(), domain, data,
+      preview: typeof data.content === "string" ? data.content : "",
+      mentions: Array.isArray(body.mentions) ? body.mentions.map(String) : [],
     };
     const list = server.messagesByCid.get(cid) ?? [];
     list.push(msg);
     server.messagesByCid.set(cid, list);
-
-    emitWs(server, "message.created", { cid, message: msg });
-    return { ok: true, status: 200, body: msg };
+    emitWs(server, "message.created", { channel_id: cid, message_id: mid, event_sequence: server.eventSeq + 1 });
+    addMockMentions(server, msg, body.mentions);
+    return channelOk(msg);
   }
 
-  if (pathname.startsWith("/messages/") && method === "DELETE") {
+  if (method === "POST" && pathnameParts.length === 5 && pathnameParts[0] === "channels" && pathnameParts[2] === "messages" && pathnameParts[4] === "recall") {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const mid = decodeURIComponent(pathname.slice("/messages/".length)).trim();
-    if (!mid) return { ok: false, error: apiError(400, "invalid_request", "Missing mid") };
-
-    let cid = "";
-    for (const [c, list] of server.messagesByCid.entries()) {
-      const idx = list.findIndex((m) => m.mid === mid);
-      if (idx >= 0) {
-        cid = c;
-        list.splice(idx, 1);
-        break;
-      }
+    const cid = decodeURIComponent(pathnameParts[1]);
+    const mid = decodeURIComponent(pathnameParts[3]);
+    if (!isMockChannelMember(server, cid, session.uid)) return mockBusinessFailure(20002, "Channel membership required");
+    const msg = server.messagesByCid.get(cid)?.find((entry) => entry.mid === mid);
+    if (!msg) return mockBusinessFailure(30001, "Message not found");
+    const role = server.membersByCid.get(cid)?.find((member) => member.uid === session.uid)?.role;
+    if (msg.uid !== session.uid && role !== "owner" && role !== "admin") return mockBusinessFailure(30007, "Recall is not permitted");
+    if (msg.status !== "recalled") {
+      msg.status = "recalled";
+      msg.data = null;
+      msg.preview = "";
+      msg.mentions = [];
+      emitWs(server, "message.recalled", { channel_id: cid, message_id: mid, event_sequence: server.eventSeq + 1 });
     }
-    if (!cid) return { ok: false, error: apiError(404, "not_found", "Message not found", { mid }) };
-    emitWs(server, "message.deleted", { cid, mid });
-    return { ok: true, status: 204, body: null };
+    return channelOk(null);
   }
 
-  if (pathname.startsWith("/channels/") && pathname.endsWith("/read_state") && method === "PUT") {
+  if (pathnameParts.length === 3 && pathnameParts[0] === "channels" && pathnameParts[2] === "read_state" && (method === "GET" || method === "PUT")) {
     const session = requireSession(server, req.headers);
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const parts = pathname.split("/").filter(Boolean);
-    const cid = decodeURIComponent(parts[1] ?? "").trim();
-    if (!cid) return { ok: false, error: apiError(400, "invalid_request", "Missing cid") };
-    const body = req.body as { last_read_time?: number; last_read_mid?: string } | null;
-    const t = Number(body?.last_read_time ?? 0);
-    const last_read_time = Number.isFinite(t) ? Math.trunc(t) : 0;
-    server.readStateByCidUid.set(`${cid}::${session.uid}`, last_read_time);
-    emitWs(server, "read_state.updated", { cid, uid: session.uid, last_read_time, last_read_mid: String(body?.last_read_mid ?? "") });
-    return { ok: true, status: 204, body: null };
+    const cid = decodeURIComponent(pathnameParts[1]);
+    const uid = session.uid;
+    if (!server.channelsById.has(cid)) return mockBusinessFailure(20001, "Channel not found");
+    if (!isMockChannelMember(server, cid, uid)) return mockBusinessFailure(20002, "Channel membership is required");
+    if (method === "GET") return { ok: true, status: 200, body: mockReadState(server, cid, uid) };
+    const raw = (req.body as { last_read_mid?: unknown } | null)?.last_read_mid;
+    const mid = typeof raw === "number" && Number.isSafeInteger(raw) ? String(raw) : raw;
+    if (!isPositiveMockId(mid)) return mockBusinessFailure(10001, "Invalid last_read_mid");
+    if (!server.messagesByCid.get(cid)?.some((message) => message.mid === mid)) return mockBusinessFailure(30001, "Message not found");
+    const key = `${cid}::${uid}`;
+    const previous = server.readStateByCidUid.get(key);
+    const advanced = !previous || BigInt(mid) > BigInt(previous);
+    const result = { cid, uid, last_read_mid: advanced ? mid : previous };
+    if (advanced) {
+      server.readStateByCidUid.set(key, mid);
+      emitWs(server, "read_state.updated", result, uid);
+    }
+    return { ok: true, status: 200, body: result };
   }
 
   if (pathname.startsWith("/channels/") && pathname.endsWith("/members") && method === "GET") {
@@ -1094,8 +1167,8 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const items = server.membersByCid.get(cid) ?? [];
-    return { ok: true, status: 200, body: { items } };
+    const items = (server.membersByCid.get(cid) ?? []).map(({ nickname, ...member }) => ({ ...member, username: nickname }));
+    return channelPage(items, searchParams);
   }
 
   if (pathname.includes("/members/") && method === "DELETE") {
@@ -1103,11 +1176,11 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const uid = decodeURIComponent(parts[4] ?? "").trim();
+    const uid = decodeURIComponent(parts[3] ?? "").trim();
     const list = server.membersByCid.get(cid) ?? [];
     const next = list.filter((m) => m.uid !== uid);
     server.membersByCid.set(cid, next);
-    return { ok: true, status: 204, body: null };
+    return channelOk(null);
   }
 
   if (pathname.includes("/admins/") && method === "PUT") {
@@ -1115,11 +1188,11 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const uid = decodeURIComponent(parts[4] ?? "").trim();
+    const uid = decodeURIComponent(parts[3] ?? "").trim();
     const list = server.membersByCid.get(cid) ?? [];
     for (const m of list) if (m.uid === uid) m.role = "admin";
     server.membersByCid.set(cid, list);
-    return { ok: true, status: 204, body: null };
+    return channelOk(null);
   }
 
   if (pathname.includes("/admins/") && method === "DELETE") {
@@ -1127,11 +1200,11 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const uid = decodeURIComponent(parts[4] ?? "").trim();
+    const uid = decodeURIComponent(parts[3] ?? "").trim();
     const list = server.membersByCid.get(cid) ?? [];
     for (const m of list) if (m.uid === uid) m.role = "member";
     server.membersByCid.set(cid, list);
-    return { ok: true, status: 204, body: null };
+    return channelOk(null);
   }
 
   if (pathname.startsWith("/channels/") && pathname.endsWith("/applications") && method === "POST") {
@@ -1139,10 +1212,14 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
+    if (!server.channelsById.has(cid)) return mockBusinessFailure(20001, "Channel not found");
+    if (isMockChannelMember(server, cid, session.uid)) return mockBusinessFailure(20017, "Already a member");
     const body = req.body as { reason?: string } | null;
     const reason = String(body?.reason ?? "");
+    const applyTime = Date.now();
+    const serial = [...server.applicationsByCid.values()].reduce((total, items) => total + items.length, 0);
     const app: ChannelApplication = {
-      application_id: `app-${Date.now().toString(16)}`,
+      application_id: String(BigInt(applyTime) * 10000n + BigInt(serial % 10000)),
       cid,
       uid: session.uid,
       reason,
@@ -1152,7 +1229,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const list = server.applicationsByCid.get(cid) ?? [];
     list.push(app);
     server.applicationsByCid.set(cid, list);
-    return { ok: true, status: 204, body: null };
+    return channelOk(app);
   }
 
   if (pathname.startsWith("/channels/") && pathname.endsWith("/applications") && method === "GET") {
@@ -1160,8 +1237,9 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const items = server.applicationsByCid.get(cid) ?? [];
-    return { ok: true, status: 200, body: { items } };
+    const role = server.membersByCid.get(cid)?.find((member) => member.uid === session.uid)?.role;
+    if (role !== "owner" && role !== "admin") return mockBusinessFailure(20012, "Cannot list applications");
+    return channelPage(server.applicationsByCid.get(cid) ?? [], searchParams);
   }
 
   if (pathname.includes("/applications/") && pathname.endsWith("/decisions") && method === "POST") {
@@ -1172,13 +1250,21 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const application_id = decodeURIComponent(parts[3] ?? "").trim();
     const body = req.body as { decision?: string } | null;
     const decision = String(body?.decision ?? "").trim();
-    const list = server.applicationsByCid.get(cid) ?? [];
-    for (const a of list) {
-      if (a.application_id !== application_id) continue;
-      a.status = decision === "approve" ? "approved" : "rejected";
+    const members = server.membersByCid.get(cid) ?? [];
+    const role = members.find((member) => member.uid === session.uid)?.role;
+    if (role !== "owner" && role !== "admin") return { ok: true, status: 200, body: { code: 20013, message: "Cannot decide applications" } };
+    if (decision !== "approve" && decision !== "reject") return { ok: true, status: 200, body: { code: 10001, message: "Invalid decision" } };
+    const app = server.applicationsByCid.get(cid)?.find((item) => item.application_id === application_id);
+    if (!app) return { ok: true, status: 200, body: { code: 20005, message: "Application not found" } };
+    if (app.status !== "pending") return { ok: true, status: 200, body: { code: 20016, message: "Application already decided" } };
+    if (decision === "approve") {
+      if (members.some((member) => member.uid === app.uid)) return { ok: true, status: 200, body: { code: 20017, message: "Already a member" } };
+      members.push({ uid: app.uid, nickname: server.usersById.get(app.uid)?.nickname ?? app.uid, role: "member", join_time: Date.now() });
+      server.membersByCid.set(cid, members);
+      emitWs(server, "channels.changed", { cid });
     }
-    server.applicationsByCid.set(cid, list);
-    return { ok: true, status: 204, body: null };
+    app.status = decision === "approve" ? "accepted" : "rejected";
+    return channelOk(app);
   }
 
   if (pathname.startsWith("/channels/") && pathname.endsWith("/bans") && method === "GET") {
@@ -1186,8 +1272,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const items = server.bansByCid.get(cid) ?? [];
-    return { ok: true, status: 200, body: { items } };
+    return channelPage(server.bansByCid.get(cid) ?? [], searchParams);
   }
 
   if (pathname.includes("/bans/") && method === "PUT") {
@@ -1195,7 +1280,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const uid = decodeURIComponent(parts[4] ?? "").trim();
+    const uid = decodeURIComponent(parts[3] ?? "").trim();
     const body = req.body as { until?: number; reason?: string } | null;
     const ban: ChannelBan = {
       cid,
@@ -1207,7 +1292,7 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     const list = (server.bansByCid.get(cid) ?? []).filter((b) => b.uid !== uid);
     list.push(ban);
     server.bansByCid.set(cid, list);
-    return { ok: true, status: 204, body: null };
+    return channelOk(ban);
   }
 
   if (pathname.includes("/bans/") && method === "DELETE") {
@@ -1215,10 +1300,10 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
     if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
     const parts = pathname.split("/").filter(Boolean);
     const cid = decodeURIComponent(parts[1] ?? "").trim();
-    const uid = decodeURIComponent(parts[4] ?? "").trim();
+    const uid = decodeURIComponent(parts[3] ?? "").trim();
     const list = (server.bansByCid.get(cid) ?? []).filter((b) => b.uid !== uid);
     server.bansByCid.set(cid, list);
-    return { ok: true, status: 204, body: null };
+    return channelOk(null);
   }
 
   // -------------------------------------------------------------------------
@@ -1243,91 +1328,6 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
       }
     }
     return { ok: false, error: apiError(404, "not_found", "Message not found", { mid }) };
-  }
-
-  // -------------------------------------------------------------------------
-  // Message forward (auth)
-  // -------------------------------------------------------------------------
-  if (method === "POST" && pathnameParts.length === 3 && pathnameParts[0] === "messages" && pathnameParts[2] === "forward") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const mid = decodeURIComponent(pathnameParts[1] ?? "").trim();
-    const body = req.body as { target_cid?: string; comment?: string; merged_mids?: string[] } | null;
-    const targetCid = body?.target_cid?.trim();
-    if (!targetCid) return { ok: false, error: apiError(400, "invalid_request", "Missing target_cid") };
-    const msgs = server.messagesByCid.get(targetCid);
-    if (!msgs) return { ok: false, error: apiError(404, "not_found", "Target channel not found") };
-    const newMid = `msg-${Date.now().toString(16)}`;
-
-    // 收集所有转发消息的预览（从已存在的消息中查找）
-    const mergedMids = body?.merged_mids;
-    const forwardedMessages = mergedMids && mergedMids.length > 0
-      ? (() => {
-          const result: MockForwardedFrom[] = [];
-          for (const mergedMid of mergedMids) {
-            // 在所有频道中查找原消息
-            let found: MockForwardedFrom | null = null;
-            for (const [, channelMsgs] of server.messagesByCid) {
-              const original = channelMsgs.find((m) => (m as { mid: string }).mid === mergedMid);
-              if (original) {
-                const m = original as { mid: string; cid: string; uid: string; preview?: string; send_time: number };
-                found = { mid: m.mid, cid: m.cid, uid: m.uid, preview: m.preview ?? "", send_time: m.send_time };
-                break;
-              }
-            }
-            if (found) {
-              result.push(found);
-            } else {
-              result.push({ mid: mergedMid, cid: "", uid: session.uid, preview: "", send_time: 0 });
-            }
-          }
-          return result;
-        })()
-      : undefined;
-
-    const hasMerged = Array.isArray(forwardedMessages) && forwardedMessages.length > 0;
-
-    // 单条转发：构造 forwarded_from（需填充真实来源）
-    let singleForwardedFrom: MockForwardedFrom | undefined;
-    if (!hasMerged) {
-      for (const [, channelMsgs] of server.messagesByCid) {
-        const original = channelMsgs.find((m) => (m as { mid: string }).mid === mid);
-        if (original) {
-          const m = original as { mid: string; cid: string; uid: string; preview?: string; send_time: number };
-          singleForwardedFrom = { mid: m.mid, cid: m.cid, uid: m.uid, preview: m.preview ?? "", send_time: m.send_time };
-          break;
-        }
-      }
-    }
-
-    const comment = String(body?.comment ?? "");
-    // 契约（docs/api/15-quote-reply-forward-v1.md §5.2）：forwarded_from / forwarded_messages
-    // 必须封装在 data 内，不得放在消息顶层；data.domain 固定 Core:Text（附言域）。
-    const data: Record<string, unknown> = {
-      domain: "Core:Text",
-      domain_version: "1.0.0",
-      ...(comment ? { content: { text: comment } } : {}),
-      ...(hasMerged ? { forwarded_messages: forwardedMessages } : { forwarded_from: singleForwardedFrom }),
-    };
-
-    const newMsg: Record<string, unknown> = {
-      mid: newMid,
-      cid: targetCid,
-      uid: session.uid,
-      domain: "Core:Forward",
-      domain_version: "1.0.0",
-      data,
-      send_time: Date.now(),
-      preview:
-        comment ||
-        (hasMerged
-          ? `转发 ${forwardedMessages!.length} 条消息`
-          : singleForwardedFrom?.preview ?? ""),
-    };
-
-    msgs.push(newMsg as ChatMessage);
-    emitWs(server, "message.created", { cid: targetCid, message: newMsg });
-    return { ok: true, status: 201, body: newMsg };
   }
 
   // -------------------------------------------------------------------------
@@ -1377,52 +1377,61 @@ export async function handleProtocolMockApiRequest(req: MockApiRequest): Promise
   // -------------------------------------------------------------------------
   // List mentions (auth)
   // -------------------------------------------------------------------------
-  if (method === "GET" && pathname === "/mentions") {
+  const channelMentionPath = pathnameParts[0] === "channels" && pathnameParts[2] === "mentions";
+  const listMentions = method === "GET" && (pathname === "/mentions" || (channelMentionPath && pathnameParts.length === 3));
+  const rangeMentions = method === "PUT" && (pathname === "/mentions/read" || (channelMentionPath && pathnameParts.length === 4 && pathnameParts[3] === "read"));
+  const detailMention = method === "GET" && pathnameParts[0] === "mentions" && pathnameParts.length === 2;
+  const singleRead = method === "PUT" && pathnameParts[0] === "mentions" && pathnameParts.length === 3 && pathnameParts[2] === "read";
+  const batchMentions = method === "POST" && pathname === "/mentions/ids";
+  if (listMentions || rangeMentions || detailMention || singleRead || batchMentions) {
     const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    return { ok: true, status: 200, body: { items: [], next_cursor: "", has_more: false } };
-  }
-
-  // -------------------------------------------------------------------------
-  // Mark mention read (auth)
-  // -------------------------------------------------------------------------
-  if (method === "PUT" && pathnameParts.length === 3 && pathnameParts[0] === "mentions" && pathnameParts[2] === "read") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    return { ok: true, status: 204, body: null };
-  }
-
-  // -------------------------------------------------------------------------
-  // Batch mark mentions read (auth)
-  // -------------------------------------------------------------------------
-  if (method === "PUT" && pathname === "/mentions/read_state") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    return { ok: true, status: 204, body: null };
-  }
-
-  // -------------------------------------------------------------------------
-  // Search messages (auth)
-  // -------------------------------------------------------------------------
-  if (pathnameParts.length === 4 && pathnameParts[0] === "channels" && pathnameParts[2] === "messages" && pathnameParts[3] === "search" && method === "GET") {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
-    const q = searchParams.get("q")?.trim() ?? "";
-    const msgs = server.messagesByCid.get(cid) ?? [];
-    const items = q ? msgs.filter((m) => String((m as Record<string, unknown>).preview ?? "").includes(q)) : [];
-    return { ok: true, status: 200, body: { items, next_cursor: "", has_more: false } };
-  }
-
-  // -------------------------------------------------------------------------
-  // Messages around (auth)
-  // -------------------------------------------------------------------------
-  if (pathnameParts.length === 3 && pathnameParts[0] === "channels" && pathnameParts[2] === "messages" && method === "GET" && searchParams.has("around_mid")) {
-    const session = requireSession(server, req.headers);
-    if (!session) return { ok: false, error: apiError(401, "unauthorized", "Missing access token") };
-    const cid = decodeURIComponent(pathnameParts[1] ?? "").trim();
-    const msgs = server.messagesByCid.get(cid) ?? [];
-    return { ok: true, status: 200, body: { items: msgs.slice(-50), next_cursor: "", has_more: false } };
+    if (!session) return mockBusinessFailure(11001, "Missing access token");
+    const cid = channelMentionPath ? decodeURIComponent(pathnameParts[1]) : undefined;
+    if (cid && !server.channelsById.has(cid)) return mockBusinessFailure(20001, "Channel not found");
+    if (cid && !isMockChannelMember(server, cid, session.uid)) return mockBusinessFailure(20002, "Channel membership is required");
+    const rows = visibleMockMentions(server, session.uid, cid);
+    if (detailMention || singleRead) {
+      const id = decodeURIComponent(pathnameParts[1]);
+      const row = rows.find((item) => item.mention_id === id);
+      if (!row) return mockBusinessFailure(30002, "Mention not found");
+      if (singleRead) row.read = true;
+      return { ok: true, status: 200, body: singleRead ? null : { ...row } };
+    }
+    if (batchMentions) {
+      const ids = (req.body as { mention_ids?: unknown } | null)?.mention_ids;
+      if (!Array.isArray(ids) || ids.length < 1 || ids.length > 50 || !ids.every(isPositiveMockId)) {
+        return mockBusinessFailure(10001, "Invalid mention_ids");
+      }
+      const byId = new Map(rows.map((row) => [row.mention_id, row]));
+      const items = [...new Set(ids)].flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [{ ...row }] : [];
+      });
+      return { ok: true, status: 200, body: { items } };
+    }
+    if (rangeMentions) {
+      const through = (req.body as { through_mention_id?: unknown } | null)?.through_mention_id;
+      if (req.body !== undefined && !isPositiveMockId(through)) return mockBusinessFailure(10001, "Invalid through_mention_id");
+      for (const row of rows) {
+        if (typeof through !== "string" || BigInt(row.mention_id) <= BigInt(through)) row.read = true;
+      }
+      return { ok: true, status: 200, body: null };
+    }
+    const unreadOnly = searchParams.get("unread_only") ?? "false";
+    const limit = Number(searchParams.get("limit") ?? 20);
+    if ((unreadOnly !== "true" && unreadOnly !== "false") || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+      return mockBusinessFailure(10001, "Invalid mention filters");
+    }
+    const prefix = `${session.uid}:${cid ?? ""}:${unreadOnly}:`;
+    const cursor = searchParams.get("cursor");
+    const upper = cursor?.startsWith(prefix) ? cursor.slice(prefix.length) : undefined;
+    if (cursor !== null && !isPositiveMockId(upper)) return mockBusinessFailure(10013, "Invalid mention cursor");
+    const matches = rows.filter((row) => (unreadOnly === "false" || !row.read) && (!upper || BigInt(row.mention_id) < BigInt(upper)))
+      .sort((left, right) => BigInt(left.mention_id) > BigInt(right.mention_id) ? -1 : 1);
+    const items = matches.slice(0, limit).map((row) => ({ ...row }));
+    const has_more = matches.length > limit;
+    const next_cursor = has_more ? `${prefix}${items[items.length - 1].mention_id}` : null;
+    return { ok: true, status: 200, body: { items, next_cursor, has_more } };
   }
 
   // -------------------------------------------------------------------------

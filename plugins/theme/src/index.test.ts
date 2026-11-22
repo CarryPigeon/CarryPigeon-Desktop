@@ -150,6 +150,21 @@ describe("theme 插件", () => {
     expect(appliedTheme()).toBe("dark");
   });
 
+  it("设置页保存显式主题后，系统监听和工具栏使用最新偏好", () => {
+    localStorage.setItem(HOST_THEME_STORAGE_KEY, "system");
+    const { ctx, actions, dispose } = createPluginContext();
+    currentDispose = dispose;
+    activate(ctx);
+
+    localStorage.setItem(HOST_THEME_STORAGE_KEY, "light");
+    emitSystemTheme(true);
+    expect(appliedTheme()).toBe("light");
+
+    actions[0]!.onClick(chatContext);
+    expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("dark");
+    expect(appliedTheme()).toBe("dark");
+  });
+
   it("宿主 key 缺失时迁移旧插件偏好到宿主 key，并清空旧键", async () => {
     const { ctx, storageSet, dispose } = createPluginContext(JSON.stringify({ theme: "patchbay", accent: "violet" }));
     currentDispose = dispose;

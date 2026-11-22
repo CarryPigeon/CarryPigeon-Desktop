@@ -67,7 +67,7 @@ async function dispatchBridgeRequest(payload: UserProfileRequest, router: Router
 
   switch (payload.type) {
     case "send_email_code": {
-      const outcome = await accountCapabilities.forServer(socket).sendVerificationCode(payload.email);
+      const outcome = await accountCapabilities.forServer(socket).sendVerificationCode(payload.email, "CHANGE_EMAIL");
       if (!outcome.ok) {
         await emitUserProfileResponse({
           id: requestId,
@@ -126,9 +126,10 @@ async function dispatchBridgeRequest(payload: UserProfileRequest, router: Router
         }
       }
       const profileOutcome = await accountCapabilities.forServer(socket).updateUserProfile({
-        username: payload.profile.username,
-        avatar: payload.profile.avatar != null ? String(payload.profile.avatar).trim() : "",
+        avatar: payload.profile.avatar != null ? String(payload.profile.avatar).trim() : undefined,
         brief: payload.profile.brief,
+        sex: payload.profile.sex,
+        birthday: payload.profile.birthday,
       });
       if (!profileOutcome.ok) {
         await emitUserProfileResponse({
@@ -143,20 +144,15 @@ async function dispatchBridgeRequest(payload: UserProfileRequest, router: Router
         try {
           await accountCapabilities.forServer(socket).syncCurrentUserSnapshot(accessToken);
         } catch {
-          const currentUserSnapshot = accountCapabilities.currentUser.getSnapshot();
-          accountCapabilities.currentUser.applyAuthenticatedSnapshot({
-            uid: currentUserSnapshot.id,
-            email: payload.emailUpdate?.email ?? currentUserSnapshot.email,
-          });
           accountCapabilities.currentUser.applyLocalProfilePatch({
-            username: payload.profile.username,
+            email: payload.emailUpdate?.email,
             description: payload.profile.brief,
+            avatarUrl: payload.profile.avatar != null ? String(payload.profile.avatar) : undefined,
           });
         }
       } else {
         const currentUserSnapshot = accountCapabilities.currentUser.getSnapshot();
         accountCapabilities.currentUser.applyLocalProfilePatch({
-          username: payload.profile.username,
           description: payload.profile.brief,
           email: payload.emailUpdate?.email ?? currentUserSnapshot.email,
         });

@@ -46,6 +46,7 @@ export type RoomSessionViewApplicationServiceDeps = {
   >;
   loadChannelMessages: (cid: string) => Promise<void>;
   refreshMembersRail: (cid: string) => Promise<void>;
+  refreshChannelReadState?: (cid: string) => Promise<void>;
   readStateReporter: ReadStateReporterPort;
 };
 
@@ -125,6 +126,7 @@ export class RoomSessionViewApplicationService {
     const last = list[list.length - 1];
     const lastMid = last?.id ? String(last.id) : "";
     if (!lastMid) {
+      void this.deps.refreshChannelReadState?.(cid);
       return {
         ok: true,
         kind: "chat_channel_selected",
@@ -135,12 +137,12 @@ export class RoomSessionViewApplicationService {
     const now = Date.now();
     const prevReadTime = this.deps.state.readLastReadTimeMs(cid);
     const nextReadTime = this.deps.readStateReporter.advanceLocalReadTime(cid, now);
-    this.deps.state.writeLastReadMessageId(cid, lastMid);
     const lastReportAt = this.deps.state.readLastReportAtMs(cid);
     const shouldReport =
       (prevUnread > 0 || prevReadTime <= 0 || now - lastReportAt > 60_000) &&
       this.deps.readStateReporter.canReportNow(cid, now, 1500);
     if (!shouldReport) {
+      void this.deps.refreshChannelReadState?.(cid);
       return {
         ok: true,
         kind: "chat_channel_selected",
@@ -172,7 +174,6 @@ export class RoomSessionViewApplicationService {
 
     const now = Date.now();
     const nextReadTime = this.deps.readStateReporter.advanceLocalReadTime(cid, now);
-    this.deps.state.writeLastReadMessageId(cid, lastMid);
     void this.deps.readStateReporter.reportIfAllowed(cid, lastMid, nextReadTime, now, 1500);
   }
 

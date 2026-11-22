@@ -4,7 +4,6 @@
  * @description account/auth-flow｜页面：RegisterPage。
  */
 
-import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
@@ -24,18 +23,14 @@ import ErrorBoundary from "@/shared/ui/ErrorBoundary.vue";
 const router = useRouter();
 const { t } = useI18n();
 
-const authMethod = ref<"email" | "password">("password");
-
 const {
   email,
   code,
   sending,
-  loggingIn: emailLoggingIn,
   banner: emailBanner,
   countdown,
   clearBanner: clearEmailBanner,
   handleSendCode,
-  handleLogin,
 } = useLoginEmailAuth({
   router,
   mode: "register",
@@ -51,6 +46,7 @@ const {
 } = useLoginPasswordAuth({
   router,
   mode: "register",
+  registration: { email, code },
 });
 
 const { socketDraft, stage, serverInfo, handleConnect } = useLoginConnection({
@@ -60,11 +56,6 @@ const { socketDraft, stage, serverInfo, handleConnect } = useLoginConnection({
   },
 });
 
-function switchAuthMethod(method: "email" | "password"): void {
-  authMethod.value = method;
-  clearEmailBanner();
-  clearPasswordBanner();
-}
 </script>
 
 <template>
@@ -144,34 +135,11 @@ function switchAuthMethod(method: "email" | "password"): void {
             <div class="cp-login__panelTitle">{{ t("register_create_account") }}</div>
             <div class="cp-login__panelSub">{{ t("register_create_account_desc") }}</div>
 
-            <div class="cp-login__methodTabs" role="tablist">
-              <button
-                class="cp-login__methodTab"
-                type="button"
-                role="tab"
-                :aria-selected="authMethod === 'password'"
-                :data-active="authMethod === 'password'"
-                @click="switchAuthMethod('password')"
-              >
-                {{ t("login_method_password") }}
-              </button>
-              <button
-                class="cp-login__methodTab"
-                type="button"
-                role="tab"
-                :aria-selected="authMethod === 'email'"
-                :data-active="authMethod === 'email'"
-                @click="switchAuthMethod('email')"
-              >
-                {{ t("login_method_email") }}
-              </button>
+            <div v-if="passwordBanner || emailBanner" class="cp-login__banner">
+              {{ passwordBanner || emailBanner }}
             </div>
 
-            <div v-if="authMethod === 'email' ? emailBanner : passwordBanner" class="cp-login__banner">
-              {{ authMethod === "email" ? emailBanner : passwordBanner }}
-            </div>
-
-            <div v-if="authMethod === 'password'" class="cp-login__form">
+            <div class="cp-login__form">
               <div class="cp-login__formRow">
                 <div class="cp-login__fieldLabel">{{ t("login_field_username") }}</div>
                 <t-input v-model="username" :placeholder="t('login_username_placeholder')" clearable />
@@ -182,21 +150,6 @@ function switchAuthMethod(method: "email" | "password"): void {
                 <t-input v-model="password" type="password" :placeholder="t('login_password_placeholder')" clearable />
               </div>
 
-              <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn" @click="handlePasswordAuth">
-                {{ passwordLoggingIn ? t("register_creating") : t("register_create_account") }}
-              </button>
-
-              <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">
-                <span style="font-size: 12px; color: var(--cp-text-muted);">{{ t("register_already_have") }}</span>
-                <button class="cp-login__ghost" type="button" @click="$router.push('/login')" style="margin-top: 6px;">
-                  {{ t("register_sign_in") }}
-                </button>
-              </div>
-
-              <button class="cp-login__ghost" type="button" @click="$router.push('/plugins')">{{ t("login_open_plugin_center") }}</button>
-            </div>
-
-            <div v-else class="cp-login__form">
               <div class="cp-login__formRow">
                 <div class="cp-login__fieldLabel">{{ t("login_field_email") }}</div>
                 <t-input v-model="email" :placeholder="t('login_email_placeholder')" clearable />
@@ -217,8 +170,8 @@ function switchAuthMethod(method: "email" | "password"): void {
                 </div>
               </div>
 
-              <button class="cp-login__primary" type="button" :disabled="emailLoggingIn" @click="handleLogin">
-                {{ emailLoggingIn ? t("register_creating") : t("register_create_account") }}
+              <button class="cp-login__primary" type="button" :disabled="passwordLoggingIn || !email.trim() || !code.trim()" @click="handlePasswordAuth">
+                {{ passwordLoggingIn ? t("register_creating") : t("register_create_account") }}
               </button>
 
               <div class="cp-login__formRow" style="margin-top: 8px; text-align: center;">

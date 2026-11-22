@@ -22,6 +22,7 @@ function createPort() {
   const deps = {
     currentChannelId: ref("ch1"),
     messagesByChannel: reactive<Record<string, ChatMessage[]>>({}),
+    contextEdgesByChannel: {},
     nextCursorByChannel: reactive<Record<string, string>>({}),
     hasMoreByChannel: reactive<Record<string, boolean>>({}),
     loadingMoreByChannel: reactive<Record<string, boolean>>({}),

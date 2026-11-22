@@ -17,8 +17,11 @@ function createDeps() {
     currentChannelId: ref("ch1"),
     currentMessageCount: ref(0),
     currentChannelHasMore: ref(false),
+    currentChannelHasNewer: ref(false),
     loadingMoreMessages: ref(false),
     loadMoreMessages: vi.fn().mockResolvedValue(undefined),
+    loadNewerMessages: vi.fn().mockResolvedValue(undefined),
+    loadLatestMessages: vi.fn().mockResolvedValue(undefined),
     reportCurrentReadState: vi.fn().mockResolvedValue(undefined),
     onAsyncError: vi.fn(),
   };
@@ -73,6 +76,40 @@ async function flushAsync(): Promise<void> {
 }
 
 describe("useSignalViewport", () => {
+  it("浏览锚点上下文时保留滚动位置，跳到底部时回到最新页", async () => {
+    const deps = createDeps();
+    deps.currentMessageCount.value = 5;
+    const pane = createPane(1000, 400, 600);
+    const model = useSignalViewport(deps);
+    model.setSignalPaneRef(pane);
+    await flushAsync();
+
+    deps.currentChannelHasNewer.value = true;
+    await nextTick();
+    deps.reportCurrentReadState.mockClear();
+    pane.__scrollTop = 600;
+    model.handleSignalScroll();
+    expect(deps.reportCurrentReadState).not.toHaveBeenCalled();
+    expect(model.showJumpToBottom.value).toBe(true);
+
+    deps.loadNewerMessages.mockImplementation(async () => {
+      pane.__scrollHeight = 1300;
+      deps.currentMessageCount.value = 8;
+    });
+    await model.handleLoadMoreMessages("newer");
+    expect(deps.loadNewerMessages).toHaveBeenCalledOnce();
+    expect(pane.__scrollTop).toBe(600);
+
+    deps.loadLatestMessages.mockImplementation(async () => {
+      pane.__scrollHeight = 900;
+      deps.currentChannelHasNewer.value = false;
+    });
+    model.handleJumpToBottom();
+    await flushAsync();
+    expect(deps.loadLatestMessages).toHaveBeenCalledOnce();
+    expect(pane.__scrollTop).toBe(900);
+  });
+
   it("自己发送消息后：即使视口停在历史位置，也强制跳到最底部", async () => {
     const deps = createDeps();
     deps.currentMessageCount.value = 5;

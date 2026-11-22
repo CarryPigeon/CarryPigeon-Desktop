@@ -14,7 +14,9 @@ import type { ChatMessageRecord } from "./chatApiModels";
  */
 export type ChatMessageCreatedEvent = {
   channelId: string;
-  message: ChatMessageRecord;
+  messageId?: string;
+  eventSequence?: number;
+  message?: ChatMessageRecord;
 };
 
 /**
@@ -32,7 +34,6 @@ export type ChatReadStateUpdatedEvent = {
   channelId: string;
   userId: string;
   lastReadMessageId: string;
-  lastReadTime: number;
 };
 
 /**
@@ -98,6 +99,7 @@ export type ChatMessageRecalledEvent = {
   messageId: string;
   recalledAt: number;
   recalledByUserId: string;
+  eventSequence?: number;
 };
 
 /** 频道分类变更事件。 */
@@ -219,7 +221,7 @@ export type ChatEventsClient = {
  */
 export type ChatEventsConnectOptions = {
   wsUrlOverride?: string;
-  onResumeFailed?: (reason: string) => void;
+  onAuthenticated?: (reconnect: boolean) => void;
   onAuthError?: (reason: string) => void;
   /**
    * 连接持续失败（连续多次未能完成认证）时回调一次。

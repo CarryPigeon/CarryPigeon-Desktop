@@ -39,6 +39,7 @@ export type ChatMessageFlowRuntimeDeps = {
   api: ChatApiGateway;
   currentChannelId: ChatMessageFlowStateSlice["currentChannelId"];
   messagesByChannel: ChatMessageFlowStateSlice["messagesByChannel"];
+  contextEdgesByChannel: ChatMessageFlowStateSlice["contextEdgesByChannel"];
   nextCursorByChannel: ChatMessageFlowStateSlice["nextCursorByChannel"];
   hasMoreByChannel: ChatMessageFlowStateSlice["hasMoreByChannel"];
   loadingMoreByChannel: ChatMessageFlowStateSlice["loadingMoreByChannel"];
@@ -69,6 +70,7 @@ export function createChatMessageFlowRuntime(
     api,
     currentChannelId,
     messagesByChannel,
+    contextEdgesByChannel,
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
@@ -91,6 +93,7 @@ export function createChatMessageFlowRuntime(
   const timelineState = createMessageTimelineStatePort({
     currentChannelId,
     messagesByChannel,
+    contextEdgesByChannel,
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
@@ -156,7 +159,7 @@ export function createChatMessageFlowRuntime(
     compareMessages,
     loadChannelMessages: (channelId) => applicationService.loadChannelMessages(channelId),
     refreshChannelLatestPage: (channelId) => applicationService.refreshChannelLatestPage(channelId),
-    loadMoreMessages: () => applicationService.loadMoreMessages(),
+    loadMoreMessages: (direction) => applicationService.loadMoreMessages(direction),
     recallMessage: (messageId) => applicationService.recallMessage(messageId),
     startReply: (message) => applicationService.startReply(message),
     cancelReply: () => applicationService.cancelReply(),

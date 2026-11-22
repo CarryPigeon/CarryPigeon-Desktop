@@ -7,16 +7,14 @@
  * 不承担频道切换、连接恢复、读状态上报等其他会话职责。
  */
 
-import type { ChatUnreadState } from "@/features/chat/domain/types/chatApiModels";
 import type { ChatChannel } from "@/features/chat/room-session/domain/contracts";
 import type {
   SessionChannelCatalogApiPort,
   SessionDirectoryStatePort,
-  SessionMessageCachePort,
   SessionReadMarkerStatePort,
   SessionScopePort,
 } from "../ports";
-import { recomputeChannelUnread } from "../utils/unreadRecompute";
+import { compareMessageIdForReadOrder } from "@/features/chat/domain/utils/readMarker";
 import { createLogger } from "@/shared/utils/logger";
 
 const logger = createLogger("room-session-catalog");
@@ -27,15 +25,16 @@ const logger = createLogger("room-session-catalog");
 export type RoomSessionCatalogApplicationServiceDeps = {
   api: SessionChannelCatalogApiPort;
   scope: SessionScopePort;
-  directoryState: SessionDirectoryStatePort;
-  readMarkerState: SessionReadMarkerStatePort;
-  messageCache: SessionMessageCachePort;
+  directoryState: Pick<SessionDirectoryStatePort, "listChannels" | "replaceChannels" | "readUnreadCount" | "incrementChannelUnread">;
+  readMarkerState: Pick<SessionReadMarkerStatePort, "readLastReadMessageId" | "writeLastReadMessageId">;
 };
 
 /**
  * room-session 子域中负责“目录刷新”的 application service。
  */
 export class RoomSessionCatalogApplicationService {
+  private readonly readRequests = new Map<string, symbol>();
+
   constructor(private readonly deps: RoomSessionCatalogApplicationServiceDeps) {}
 
   /**
@@ -43,8 +42,7 @@ export class RoomSessionCatalogApplicationService {
    *
    * 写回内容包括：
    * - 频道基础信息
-   * - unread 角标
-   * - lastReadTime 基线
+   * - 服务端未读角标
    */
   async refreshChannels(): Promise<void> {
     const [socket, token] = await this.deps.scope.getSocketAndValidToken();
@@ -55,36 +53,18 @@ export class RoomSessionCatalogApplicationService {
     const list = await this.deps.api.listChannels(socket, token);
     const unreads = await this.deps.api.getUnreads(socket, token).catch((error) => {
       logger.warn("Action: chat_room_session_unreads_fetch_failed", { error: String(error) });
-      return [] as ChatUnreadState[];
+      return undefined;
     });
     if (this.isScopeStale(requestSocket, requestScopeVersion)) return;
 
-    const unreadByCid: Record<string, { unread: number; lastReadTime: number }> = {};
-    for (const unread of unreads) {
-      unreadByCid[String(unread.channelId ?? "").trim()] = {
-        unread: Number(unread.unreadCount ?? 0),
-        lastReadTime: Number(unread.lastReadTime ?? 0),
-      };
-    }
+    const unreadByCid = new Map(unreads?.map((entry) => [entry.channelId, entry.unreadCount]));
+    const previousByCid = new Map(this.deps.directoryState.listChannels().map((entry) => [entry.id, entry.unread]));
 
     const next: ChatChannel[] = [];
     for (const channel of list) {
       const cid = String(channel.id ?? "").trim();
       if (!cid) continue;
-      const unread = unreadByCid[cid];
-      if (unread && Number.isFinite(unread.lastReadTime)) {
-        this.deps.readMarkerState.writeLastReadTimeMs(cid, unread.lastReadTime);
-      }
-      const serverUnread = unread ? Math.max(0, Math.trunc(unread.unread)) : 0;
-      // 本地已加载时间线的频道，以可见消息重算覆盖服务端值（已删除/撤回消息不再计入）。
-      const localTimeline = this.deps.messageCache.listMessages(cid);
-      const recomputed = recomputeChannelUnread({
-        serverUnread,
-        messages: localTimeline,
-        lastReadTimeMs: this.deps.readMarkerState.readLastReadTimeMs(cid),
-        lastReadMessageId: this.deps.readMarkerState.readLastReadMessageId(cid),
-      });
-      const displayUnread = recomputed == null ? serverUnread : recomputed;
+      const displayUnread = (unreads ? unreadByCid.get(cid) : previousByCid.get(cid)) ?? 0;
       next.push({
         id: cid,
         name: String(channel.name ?? cid).trim() || cid,
@@ -92,12 +72,36 @@ export class RoomSessionCatalogApplicationService {
         unread: displayUnread,
         joined: true,
         joinRequested: false,
+        channelType: channel.systemChannel ? "system" : channel.type,
         categoryId: channel.categoryId ? String(channel.categoryId).trim() : undefined,
         categoryName: channel.categoryName ? String(channel.categoryName).trim() : undefined,
         order: Number.isFinite(channel.order) ? Math.trunc(channel.order as number) : undefined,
       });
     }
     this.deps.directoryState.replaceChannels(next);
+  }
+
+  /** 同步某频道的服务端已读锚点和权威未读数。 */
+  async refreshChannelReadState(cid: string): Promise<void> {
+    const version = this.deps.scope.getActiveScopeVersion();
+    const request = Symbol();
+    this.readRequests.set(cid, request);
+    try {
+      const [socket, token] = await this.deps.scope.getSocketAndValidToken();
+      if (!socket || !token || this.isScopeStale(socket, version)) return;
+      const state = await this.deps.api.getChannelReadState(socket, token, cid);
+      if (this.isScopeStale(socket, version) || this.readRequests.get(cid) !== request) return;
+      const mid = state.lastReadMid ?? "";
+      const previous = this.deps.readMarkerState.readLastReadMessageId(cid);
+      if (compareMessageIdForReadOrder(mid, previous) < 0) return;
+      if (mid) this.deps.readMarkerState.writeLastReadMessageId(cid, mid);
+      const existing = this.deps.directoryState.readUnreadCount(cid);
+      this.deps.directoryState.incrementChannelUnread(cid, state.unreadCount - existing);
+    } catch (error) {
+      logger.warn("Action: chat_room_session_read_state_fetch_failed", { channelId: cid, error: String(error) });
+    } finally {
+      if (this.readRequests.get(cid) === request) this.readRequests.delete(cid);
+    }
   }
 
   /**

@@ -70,6 +70,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     currentChannelId,
     currentMessages,
     currentChannelHasMore,
+    currentChannelHasNewer,
     currentChannelLoadingMore,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
@@ -106,6 +107,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     currentChannelId,
     currentMessages,
     currentChannelHasMore,
+    currentChannelHasNewer,
     loadingMoreMessages: currentChannelLoadingMore,
     currentChannelLastReadTimeMs,
     currentChannelLastReadMid,
@@ -118,6 +120,7 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     reportCurrentReadState: session.reportCurrentReadState,
     markChannelReadLocally: session.markChannelReadLocally,
     loadMoreMessages: messageFlow.loadMoreMessages,
+    loadLatestMessages: () => messageFlow.loadChannelMessages(currentChannelId.value),
     applyJoin: governance.applyJoin,
     updateChannelMeta: governance.updateChannelMeta,
     updateAnnouncement: governance.updateAnnouncement,
@@ -127,6 +130,9 @@ export function createChatRuntimeStore(deps: ChatRuntimeStoreDeps): ChatRuntimeA
     sendComposerMessage: messageFlow.sendComposerMessage,
     forwardMessage: async () => {
       throw new Error("forwardMessage: not available in live mode — use httpChatApiPort.forwardMessage directly");
+    },
+    sendForwardComment: () => {
+      throw new Error("sendForwardComment: not available in live mode — use httpChatApiPort.sendChannelMessage directly");
     },
     listMentionCandidates: messageFlow.listMentionCandidates,
     searchCurrentChannel: messageFlow.searchCurrentChannel,

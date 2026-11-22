@@ -19,7 +19,7 @@
  * 支持输入（示例）：
  * - `https://127.0.0.1:8443`
  * - `http://localhost:8080`
- * - `127.0.0.1:8080` → `http://127.0.0.1:8080`（本机默认 HTTP 端口，对齐 CarryPigeon-Server）
+ * - `127.0.0.1:18080` → `http://127.0.0.1:18080`（新版默认 HTTP 端口）
  * - `127.0.0.1:8443` → `https://127.0.0.1:8443`
  * - `tls://127.0.0.1:9443` → `https://127.0.0.1:9443`（best-effort 映射）
  * - `wss://example.com/api/ws` → `https://example.com`（剥离 path）
@@ -27,8 +27,7 @@
  * 说明：
  * - 这是面向自托管场景的“务实型”归一化器；若需要更严格的校验/提示，请在 UI 层（server editor）
  *   增加校验逻辑与错误反馈。
- * - 无 scheme 的 `host:port` 默认按 HTTPS 处理；本机回环 + 明文 HTTP 端口（80/8080）走 HTTP，
- *   避免把 CarryPigeon-Server 默认的 `127.0.0.1:8080` 误当成 TLS。
+ * - 无 scheme 的 `host:port` 默认按 HTTPS 处理；本机回环的 18080 和旧版 8080 走 HTTP。
  *
  * @param serverSocket - 来自 UI/存储的原始 server socket 字符串。
  * @returns 不带尾部 `/` 的 HTTP origin（例如 `https://example.com:443`）。
@@ -58,7 +57,7 @@ export function toHttpOrigin(serverSocket: string): string {
   // 已是 http(s) origin（可能带 path）：剥离 path。
   if (raw.startsWith("http://") || raw.startsWith("https://")) return stripPath(raw);
 
-  // 仅 host[:port]：默认 https；本机明文 HTTP 端口对齐服务端默认 8080。
+  // 仅 host[:port]：默认 HTTPS，本机常用明文端口除外。
   return stripPath(`${inferBareHostScheme(raw)}://${raw}`);
 }
 
@@ -72,7 +71,7 @@ function inferBareHostScheme(hostPort: string): "http" | "https" {
   const { host, port } = splitHostPort(hostPort);
   const isLoopback = host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
   if (port === "80") return "http";
-  if (isLoopback && (port === "8080" || port === "")) return "http";
+  if (isLoopback && (port === "18080" || port === "8080" || port === "")) return "http";
   return "https";
 }
 

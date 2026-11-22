@@ -49,6 +49,7 @@ const tdGlobalConfig = computed(() => ({ icon: TD_ICON_OVERRIDES }));
   --cp-panel: rgba(255, 253, 248, 0.82);
   --cp-panel-solid: #fffdf8;
   --cp-panel-muted: rgba(238, 236, 229, 0.72);
+  --cp-chat-message-bg: transparent;
 
   --cp-border: rgba(20, 32, 29, 0.14);
   --cp-border-light: rgba(20, 32, 29, 0.09);
@@ -236,6 +237,8 @@ const tdGlobalConfig = computed(() => ({ icon: TD_ICON_OVERRIDES }));
   --cp-hover-bg-2: rgba(148, 163, 184, 0.14);
   --cp-scroll-thumb: rgba(148, 163, 184, 0.18);
   --cp-scroll-thumb-hover: rgba(148, 163, 184, 0.26);
+  --cp-glow-a: rgba(56, 189, 248, 0.10);
+  --cp-glow-b: rgba(34, 197, 94, 0.10);
 
   /* 阴影层级（Elevation） */
   --cp-shadow: 0 18px 56px rgba(0, 0, 0, 0.56);
@@ -262,62 +265,110 @@ const tdGlobalConfig = computed(() => ({ icon: TD_ICON_OVERRIDES }));
   --td-font-family: var(--cp-font-body);
 }
 
-/* 强调色（独立于主题）：patchbay 翡翠绿 + 天空蓝的品牌色组合。
-   可与任何 theme 组合（亮色/暗色），让聊天等页面在用户偏好的背景下仍保留品牌识别色。 */
-:root[data-accent="patchbay"] {
-  --cp-accent: #22c55e;
-  --cp-accent-hover: #16a34a;
-  --cp-accent-soft: rgba(34, 197, 94, 0.16);
-  --cp-accent-2: #38bdf8;
-  --cp-accent-2-soft: rgba(56, 189, 248, 0.16);
-  --cp-info: #38bdf8;
-  --cp-accent-shadow: rgba(34, 197, 94, 0.22);
-  --cp-success: #22c55e;
-  --cp-primary: #38bdf8;
-  --cp-ring: 0 0 0 3px rgba(56, 189, 248, 0.28);
+/* 翡翠配色：沿用暗色主题未存储强调色时的默认行为。 */
+:root:is([data-accent="patchbay"], [data-theme="dark"]:not([data-accent])) {
+  --cp-bg: #e7eeea;
+  --cp-bg-2: #eef2ef;
+  --cp-surface: #f1f5f3;
+  --cp-chat-message-bg: #fcfdfb;
+  --cp-panel: #f8fbf9;
+  --cp-panel-solid: #fcfdfb;
+  --cp-panel-muted: #eaf0ed;
+  --cp-text: #1a2923;
+  --cp-text-muted: #4f6259;
+  --cp-text-light: #596c63;
 
-  /* 领域（Domain）线缆颜色（patchbay 配色版本） */
-  --cp-domain-core: #2dd4bf;
-  --cp-domain-ext-a: #60a5fa;
-  --cp-domain-ext-b: #f472b6;
-  --cp-domain-ext-c: #a78bfa;
-  --cp-domain-unknown: #94a3b8;
+  --cp-accent: #146b50;
+  --cp-accent-hover: #105a43;
+  --cp-on-accent: #fff;
+  --cp-accent-2: var(--cp-accent);
+  --cp-accent-soft: color-mix(in oklab, var(--cp-accent) 14%, transparent);
+  --cp-accent-2-soft: var(--cp-accent-soft);
+  --cp-accent-shadow: color-mix(in oklab, var(--cp-accent) 18%, transparent);
+  --cp-primary: var(--cp-accent);
+  --cp-info: #216784;
+  --cp-warn: #93430a;
+  --cp-success: #28704d;
 
-  /* 光晕（Glow） */
-  --cp-glow-a: rgba(56, 189, 248, 0.10);
-  --cp-glow-b: rgba(34, 197, 94, 0.10);
-  --cp-glow-c: rgba(244, 114, 182, 0.08);
+  --cp-highlight: var(--cp-accent);
+  --cp-highlight-bg: #deefe6;
+  --cp-highlight-bg-strong: color-mix(in oklab, var(--cp-accent) 9%, var(--cp-highlight-bg));
+  --cp-focus-border: var(--cp-accent);
+  --cp-ring: var(--cp-highlight-ring);
+  --cp-send-bg: var(--cp-accent);
+  --cp-send-hover: var(--cp-accent-hover);
+  --cp-send-disabled-bg: var(--cp-panel-muted);
+  --cp-send-disabled-opacity: 1;
 
-  /* 组件库（TDesign）品牌色 */
-  --td-brand-color: rgba(56, 189, 248, 1);
-  --td-brand-color-hover: rgba(125, 211, 252, 1);
-  --td-brand-color-focus: rgba(56, 189, 248, 0.28);
+  --cp-field-bg: var(--cp-panel-solid);
+  --cp-field-bg-hover: var(--cp-panel);
+  --cp-field-bg-disabled: var(--cp-panel-muted);
+  --cp-field-placeholder: var(--cp-text-light);
+  --cp-domain-core: var(--cp-accent);
+  --cp-glow-a: rgba(95, 126, 110, 0.10);
+  --cp-glow-b: rgba(117, 138, 126, 0.07);
+  --cp-glow-c: rgba(109, 135, 122, 0.05);
+
+  --td-brand-color: var(--cp-accent);
+  --td-brand-color-hover: var(--cp-accent-hover);
+  --td-brand-color-active: var(--cp-accent-hover);
+  --td-brand-color-focus: var(--cp-accent-soft);
+  --td-brand-color-disabled: color-mix(in oklab, var(--cp-accent) 26%, var(--cp-panel-muted));
+  --td-brand-color-light: var(--cp-highlight-bg);
+  --td-brand-color-light-hover: var(--cp-highlight-bg-strong);
+  --td-text-color-brand: var(--cp-accent);
+  --td-text-color-link: var(--cp-accent);
+  --td-bg-color-input: var(--cp-field-bg);
+  --td-bg-color-container: var(--cp-panel-solid);
+  --td-bg-color-container-hover: var(--cp-panel-muted);
+  --td-bg-color-container-active: var(--cp-highlight-bg);
+  --td-bg-color-container-select: var(--cp-panel-solid);
+  --td-bg-color-secondarycontainer: var(--cp-panel-muted);
+  --td-bg-color-secondarycontainer-hover: var(--cp-highlight-bg);
+  --td-bg-color-secondarycontainer-active: var(--cp-highlight-bg-strong);
+  --td-component-stroke: var(--cp-border-light);
+  --td-component-border: var(--cp-field-border);
 }
 
-/* 兼容：暗色主题且未显式选择 default 强调色时，沿用 patchbay 品牌强调色。
-   新逻辑下，用户独立设置 accent，可选 default/patchbay 来覆盖这里。 */
-:root[data-theme="dark"]:not([data-accent="default"]) {
-  --cp-accent: #22c55e;
-  --cp-accent-hover: #16a34a;
-  --cp-accent-soft: rgba(34, 197, 94, 0.16);
-  --cp-accent-2: #38bdf8;
-  --cp-accent-2-soft: rgba(56, 189, 248, 0.16);
-  --cp-info: #38bdf8;
-  --cp-accent-shadow: rgba(34, 197, 94, 0.22);
-  --cp-success: #22c55e;
-  --cp-primary: #38bdf8;
-  --cp-ring: 0 0 0 3px rgba(56, 189, 248, 0.28);
-  --cp-domain-core: #2dd4bf;
+:root[data-theme="dark"]:is([data-accent="patchbay"], :not([data-accent])) {
+  --cp-bg: #0e1613;
+  --cp-bg-2: #151f1a;
+  --cp-surface: #182521;
+  --cp-chat-message-bg: #101917;
+  --cp-panel: #1c2b25;
+  --cp-panel-solid: #1c2b25;
+  --cp-panel-muted: #23322c;
+  --cp-field-bg-hover: var(--cp-panel-muted);
+  --cp-text: #e5eee9;
+  --cp-text-muted: #afc2b9;
+  --cp-text-light: #a1b6ac;
+
+  --cp-accent: #72d3ae;
+  --cp-accent-hover: #92e3c5;
+  --cp-on-accent: #10261d;
+  --cp-highlight-bg: #253f35;
+  --cp-info: #7ac8e6;
+  --cp-warn: #f2ba69;
+  --cp-danger: #ff8580;
+  --cp-success: #8ac997;
+
   --cp-domain-ext-a: #60a5fa;
   --cp-domain-ext-b: #f472b6;
   --cp-domain-ext-c: #a78bfa;
   --cp-domain-unknown: #94a3b8;
-  --cp-glow-a: rgba(56, 189, 248, 0.10);
-  --cp-glow-b: rgba(34, 197, 94, 0.10);
-  --cp-glow-c: rgba(244, 114, 182, 0.08);
-  --td-brand-color: rgba(56, 189, 248, 1);
-  --td-brand-color-hover: rgba(125, 211, 252, 1);
-  --td-brand-color-focus: rgba(56, 189, 248, 0.28);
+  --cp-glow-a: rgba(84, 116, 99, 0.09);
+  --cp-glow-b: rgba(103, 126, 113, 0.07);
+}
+
+/* 仅在品牌填色控件上应用反色文字，保留语义按钮的前景色。 */
+:root:is([data-accent="patchbay"], [data-theme="dark"]:not([data-accent])) :is(
+  .t-button--theme-primary.t-button--variant-base,
+  .t-checkbox.t-is-checked .t-checkbox__input,
+  .t-checkbox.t-is-indeterminate .t-checkbox__input,
+  .t-radio-button.t-is-checked,
+  .t-switch.t-is-checked
+) {
+  --td-text-color-anti: var(--cp-on-accent);
 }
 
 *,
@@ -338,9 +389,9 @@ body {
   font-family: var(--cp-font-body);
   color: var(--cp-text);
   background:
-    radial-gradient(1200px 700px at 6% 4%, rgba(15, 118, 110, 0.22), transparent 60%),
-    radial-gradient(980px 720px at 94% 10%, rgba(194, 65, 12, 0.14), transparent 62%),
-    radial-gradient(900px 700px at 50% 115%, rgba(2, 132, 199, 0.1), transparent 58%),
+    radial-gradient(1200px 700px at 6% 4%, var(--cp-glow-a), transparent 60%),
+    radial-gradient(980px 720px at 94% 10%, var(--cp-glow-b), transparent 62%),
+    radial-gradient(900px 700px at 50% 115%, var(--cp-glow-c), transparent 58%),
     linear-gradient(180deg, var(--cp-bg), var(--cp-bg-2));
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -348,23 +399,12 @@ body {
   overflow: hidden;
 }
 
-/* 主题（亮色模式）背景（暖纸 + 柔和光晕） */
-:root[data-theme="light"] body {
-  background:
-    radial-gradient(1200px 700px at 6% 4%, rgba(15, 118, 110, 0.22), transparent 60%),
-    radial-gradient(980px 720px at 94% 10%, rgba(194, 65, 12, 0.14), transparent 62%),
-    radial-gradient(900px 700px at 50% 115%, rgba(2, 132, 199, 0.1), transparent 58%),
-    linear-gradient(180deg, var(--cp-bg), var(--cp-bg-2));
-  background-attachment: fixed;
-}
-
 /* 主题（暗色模式）背景（石墨 + 网格） */
 :root[data-theme="dark"] body {
-  background:
-    radial-gradient(900px 600px at 12% 0%, rgba(56, 189, 248, 0.10), transparent 60%),
-    radial-gradient(1000px 760px at 92% 18%, rgba(34, 197, 94, 0.10), transparent 62%),
+  background-image:
+    radial-gradient(900px 600px at 12% 0%, var(--cp-glow-a), transparent 60%),
+    radial-gradient(1000px 760px at 92% 18%, var(--cp-glow-b), transparent 62%),
     linear-gradient(180deg, var(--cp-bg), var(--cp-bg-2));
-  background-attachment: fixed;
 }
 
 /* 细微“纸纹”质感 + 网格（低透明度） */
@@ -442,6 +482,11 @@ body::before {
 
 :root[data-theme="dark"] ::selection {
   background: rgba(56, 189, 248, 0.28);
+}
+
+:root:is([data-accent="patchbay"], [data-theme="dark"]:not([data-accent])) ::selection {
+  background: var(--cp-highlight-bg-strong);
+  color: var(--cp-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

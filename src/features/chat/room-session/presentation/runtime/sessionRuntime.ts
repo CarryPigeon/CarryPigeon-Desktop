@@ -50,6 +50,7 @@ export type ChatSessionRuntimeDeps = {
   lastReadTimeMsByChannel: ChatSessionStateSlice["lastReadTimeMsByChannel"];
   lastReadMidByChannel: ChatSessionStateSlice["lastReadMidByChannel"];
   lastReadReportAtMsByChannel: ChatSessionStateSlice["lastReadReportAtMsByChannel"];
+  contextEdgesByChannel: ChatSessionStateSlice["contextEdgesByChannel"];
   nextCursorByChannel: ChatSessionStateSlice["nextCursorByChannel"];
   hasMoreByChannel: ChatSessionStateSlice["hasMoreByChannel"];
   loadingMoreByChannel: ChatSessionStateSlice["loadingMoreByChannel"];
@@ -63,6 +64,7 @@ export type ChatSessionRuntimeDeps = {
   messageFlow: ChatMessageFlowRuntimePort;
   scope: ChatRuntimeScopePort;
   readStateReporter: ChatReadStateReporterPort;
+  refreshChannelReadState: (cid: string) => Promise<void>;
   onWsEvent: (env: ChatEventEnvelope) => void;
   /**
    * 列出生效通知级别非 all 的频道 id（mentions_only / muted）。
@@ -90,6 +92,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     lastReadTimeMsByChannel,
     lastReadMidByChannel,
     lastReadReportAtMsByChannel,
+    contextEdgesByChannel,
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
@@ -114,6 +117,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     lastReadTimeMsByChannel,
     lastReadMidByChannel,
     lastReadReportAtMsByChannel,
+    contextEdgesByChannel,
     nextCursorByChannel,
     hasMoreByChannel,
     loadingMoreByChannel,
@@ -145,6 +149,7 @@ export function createChatSessionRuntime(deps: ChatSessionRuntimeDeps): ChatSess
     state: sessionState,
     loadChannelMessages: messageFlow.loadChannelMessages,
     refreshMembersRail: governance.refreshMembersRail,
+    refreshChannelReadState: deps.refreshChannelReadState,
     readStateReporter,
   });
 

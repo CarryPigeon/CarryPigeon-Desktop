@@ -38,6 +38,8 @@ type LoggerLike = {
 export type ChatWsEventRouterDeps = {
   logger: LoggerLike;
   getServerSocket: () => string;
+  getScopeVersion?: () => number;
+  loadMessage?: (mid: string) => Promise<ChatMessageRecord | undefined>;
   getCurrentUserId: () => string;
   timelineState: Pick<
     MessageTimelineStatePort,
@@ -53,6 +55,7 @@ export type ChatWsEventRouterDeps = {
     | "markChannelReadLocally"
   >;
   refreshChannels: () => Promise<void>;
+  refreshChannelReadState: (cid: string) => void;
   refreshChannelLatestPage: (cid: string) => Promise<void>;
   refreshMembersRail: (cid: string) => Promise<void>;
   refreshMentionInbox: () => void | Promise<void>;
@@ -88,6 +91,9 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     scope: {
       getActiveServerSocket: deps.getServerSocket,
     },
+    getScopeVersion: deps.getScopeVersion,
+    loadMessage: deps.loadMessage,
+    onLoadError: (error) => deps.logger.debug("Action: chat_ws_message_load_failed", { error: String(error) }),
     timelineState: deps.timelineState,
     unreadProjection: deps.unreadProjection,
     mapWireMessage: deps.mapWireMessage,
@@ -98,6 +104,7 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
   const routeReadStateEvent = createReadStateEventRouter({
     getCurrentUserId: deps.getCurrentUserId,
     state: deps.readStateProjection,
+    refreshChannelReadState: deps.refreshChannelReadState,
   });
 
   /**
@@ -111,6 +118,11 @@ export function createChatEventRouter(deps: ChatWsEventRouterDeps) {
     const payload = env.payload && typeof env.payload === "object" ? (env.payload as Record<string, unknown>) : null;
 
     if (routeGovernanceEvent(eventType, payload)) return;
+    if (eventType === "message.pinned" || eventType === "message.unpinned") {
+      const cid = String(payload?.channelId ?? "").trim();
+      if (cid) deps.emitChannelProjectionChanged(cid, "messages");
+      return;
+    }
     if (routeMessageEvent(eventType, payload)) return;
 
     // 服务端 realtime 会按通知偏好过滤 mentions_only/muted 频道的 message.created，

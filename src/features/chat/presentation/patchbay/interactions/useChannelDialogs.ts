@@ -21,6 +21,7 @@ type ChannelLike = {
 export type UseChannelDialogsDeps = {
   currentChannelId: RefLike<string>;
   currentUserId: RefLike<string>;
+  currentUserRole?: RefLike<string>;
   channels: RefLike<readonly ChannelLike[]>;
   findChannelById(channelId: string): ChannelLike | null | undefined;
   selectChannel(channelId: string): Promise<ChannelSelectionOutcome>;
@@ -40,8 +41,9 @@ export function useChannelDialogs(deps: UseChannelDialogsDeps) {
 
   const canDeleteCurrentChannel = computed(() => {
     const channel = deps.findChannelById(deps.currentChannelId.value);
-    if (!channel?.ownerUserId) return false;
-    return channel.ownerUserId === deps.currentUserId.value;
+    if (!channel) return false;
+    if (deps.currentUserRole) return deps.currentUserRole.value === "owner";
+    return Boolean(channel.ownerUserId && channel.ownerUserId === deps.currentUserId.value);
   });
 
   function setShowCreateChannel(visible: boolean): void {
