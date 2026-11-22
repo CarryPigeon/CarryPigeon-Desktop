@@ -1,5 +1,3 @@
 # cargo audit 配置
-# - RUSTSEC-2023-0071：项目仅使用 SQLite，sqlx-mysql 中的 rsa 漏洞无实际触发路径且无上游修复。
-# - RUSTSEC-2026-0235：rust_decimal 仍可选依赖已停更的 rkyv 0.7；本应用不反序列化不可信 rkyv 归档。
 [advisories]
 ignore = []
