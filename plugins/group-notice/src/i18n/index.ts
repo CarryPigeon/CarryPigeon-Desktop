@@ -11,7 +11,10 @@ const zhCn: Dict = {
   group_notice_unread: "未读",
   group_notice_read: "已读",
   group_notice_empty: "暂无通知",
-  group_notice_load_failed: "通知加载失败",
+  group_notice_load_failed: "公告加载失败，请重试。",
+  group_notice_refresh_failed: "刷新失败，以下是上次加载的公告。",
+  group_notice_choose_channel: "请先打开一个频道，再查看群公告。",
+  group_notice_retry: "重试",
   group_notice_loading: "加载中…",
 };
 
@@ -23,7 +26,10 @@ const en: Dict = {
   group_notice_unread: "Unread",
   group_notice_read: "Read",
   group_notice_empty: "No notices yet",
-  group_notice_load_failed: "Failed to load notices",
+  group_notice_load_failed: "Couldn't load notices. Try again.",
+  group_notice_refresh_failed: "Couldn't refresh. Showing previously loaded notices.",
+  group_notice_choose_channel: "Open a channel to view its group notices.",
+  group_notice_retry: "Retry",
   group_notice_loading: "Loading…",
 };
 

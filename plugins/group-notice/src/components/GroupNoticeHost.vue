@@ -22,11 +22,16 @@
         </div>
       </div>
       <div class="group-notice-panel__body">
-        <div v-if="errorText" class="group-notice-panel__error">{{ errorText }}</div>
-        <div v-else-if="loading && notices.length === 0" class="group-notice-panel__hint">
+        <div v-if="errorText" class="group-notice-panel__error">
+          <div role="alert">{{ errorText }}</div>
+          <t-button v-if="currentChannelId" size="small" variant="text" @click="refresh(currentChannelId)">
+            {{ t("group_notice_retry") }}
+          </t-button>
+        </div>
+        <div v-if="loading && notices.length === 0" class="group-notice-panel__hint" role="status">
           {{ t("group_notice_loading") }}
         </div>
-        <div v-else-if="notices.length === 0" class="group-notice-panel__hint">
+        <div v-else-if="!errorText && notices.length === 0" class="group-notice-panel__hint" role="status">
           {{ t("group_notice_empty") }}
         </div>
         <template v-else>
@@ -60,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { getContext } from "../host/bridge";
 import { createLogger } from "../shared/logger";
 import { diffNewNotices, parseGroupNoticesResponse, type GroupNotice } from "../domain/groupNotice";
@@ -106,41 +111,54 @@ async function loadReadIds(channelId: string): Promise<Set<string>> {
   return new Set();
 }
 
-/** 拉取并刷新通知列表（工具栏点击 / 面板刷新按钮共用）。 */
+let requestId = 0;
+
+/** 拉取并刷新公告；切换频道、关闭面板以及新的请求都会使旧请求失效。 */
 async function refresh(channelId: string): Promise<void> {
   const ch = String(channelId ?? "").trim();
-  visible.value = true;
-  if (!ch) {
-    logger.warn("group_notice_refresh_no_channel");
-    errorText.value = t("group_notice_load_failed");
-    return;
+  if (visible.value && loading.value && currentChannelId.value === ch) return;
+
+  const id = ++requestId;
+  if (currentChannelId.value !== ch) {
+    notices.value = [];
+    readIds.value = new Set();
   }
   currentChannelId.value = ch;
-  loading.value = true;
-  errorText.value = "";
+  visible.value = true;
+  loading.value = Boolean(ch);
+  errorText.value = ch ? "" : t("group_notice_choose_channel");
+  if (!ch) return;
+
+  const setLoadError = (): void => {
+    errorText.value = t(notices.value.length ? "group_notice_refresh_failed" : "group_notice_load_failed");
+  };
   try {
-    readIds.value = await loadReadIds(ch);
-    // 网络能力由 "network" 权限注入；相对路径会被宿主拼接到当前 server origin。
+    const savedReadIds = await loadReadIds(ch);
+    if (id !== requestId) return;
+    // 网络能力由宿主按当前服务器解析相对路径。
     const res = await getContext().network?.fetch(
       `/api/group/notices?channel_id=${encodeURIComponent(ch)}`,
     );
+    if (id !== requestId) return;
     if (!res || !res.ok) {
       logger.warn("group_notice_fetch_failed", { status: res?.status ?? -1 });
-      errorText.value = t("group_notice_load_failed");
+      setLoadError();
       return;
     }
     const parsed = parseGroupNoticesResponse(res.bodyText);
     if (!parsed.ok) {
       logger.warn("group_notice_parse_failed", { error: parsed.error });
-      errorText.value = t("group_notice_load_failed");
+      setLoadError();
       return;
     }
+    readIds.value = new Set([...savedReadIds, ...readIds.value]);
     notices.value = parsed.notices;
   } catch (e) {
+    if (id !== requestId) return;
     logger.error("group_notice_refresh_error", { error: String(e) });
-    errorText.value = t("group_notice_load_failed");
+    setLoadError();
   } finally {
-    loading.value = false;
+    if (id === requestId) loading.value = false;
   }
 }
 
@@ -159,8 +177,22 @@ async function markAllRead(): Promise<void> {
 }
 
 function close(): void {
+  requestId++;
   visible.value = false;
+  loading.value = false;
 }
+
+watch(() => {
+  try {
+    return getContext().server.getCid();
+  } catch {
+    return "";
+  }
+}, (channelId) => {
+  if (visible.value && channelId !== currentChannelId.value) close();
+}, { flush: "sync" });
+
+onBeforeUnmount(close);
 
 defineExpose({
   refresh,
@@ -177,8 +209,8 @@ defineExpose({
 }
 
 .group-notice-panel {
-  width: 320px;
-  max-height: 420px;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 64px));
   display: flex;
   flex-direction: column;
   border: 1px solid var(--cp-border);

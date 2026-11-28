@@ -49,7 +49,7 @@ export function apply(ctx: Context): void {
     const host = overlayHandle.instance as { refresh?: (channelId: string) => Promise<void> } | null;
     if (!host?.refresh) {
       logger.warn("group_notice_toolbar_host_missing");
-      return;
+      throw new Error("Group notice panel is not ready");
     }
     void host.refresh(chatCtx.channelId);
   }

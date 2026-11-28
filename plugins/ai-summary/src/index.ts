@@ -55,15 +55,15 @@ export function apply(ctx: Context): void {
     ctx.ui?.mountOverlay(AiSummaryHost, {}) ?? { unmount: () => {}, instance: null };
 
   // 工具栏点击：转发到面板 exposed 的 summarize(channelId)。
-  function openPanel(chatCtx: { channelId: string }): void {
+  function openPanel(chatCtx: { channelId: string }): Promise<void> {
     const host = overlayHandle.instance as {
       summarize?: (channelId: string) => Promise<void>;
     } | null;
     if (!host?.summarize) {
       logger.warn("ai_summary_toolbar_host_missing");
-      return;
+      throw new Error("AI summary panel is not ready");
     }
-    void host.summarize(chatCtx.channelId);
+    return host.summarize(chatCtx.channelId);
   }
 
   const action: ToolbarAction = {

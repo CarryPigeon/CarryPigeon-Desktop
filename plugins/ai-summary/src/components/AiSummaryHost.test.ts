@@ -173,7 +173,7 @@ function chatOkResponse(summary: string, model = "deepseek-flash"): FetchRespons
  * @returns 模拟响应。
  */
 function routedFetch(input: string): Promise<FetchResponse> {
-  if (input.startsWith("/api/ai/summarize")) {
+  if (input.startsWith("https://chat.example.test/api/ai/summarize")) {
     return Promise.resolve(serverOkResponse("默认总结", 2));
   }
   if (input.endsWith("/chat/completions")) {
@@ -197,7 +197,7 @@ function bindStubContext(): void {
       }
     : undefined;
   const ctx = {
-    server: { lang: "zh_cn", getUid: () => "", getCid: () => "", serverSocket: "", serverId: "" },
+    server: { lang: "zh_cn", getUid: () => "", getCid: () => messagesState.channelId, serverSocket: "https://chat.example.test", serverId: "" },
     storage: {
       async get(key: string) {
         return storage.get(key) ?? null;
@@ -250,8 +250,17 @@ async function mountHost(): Promise<{
   };
   return {
     wrapper,
-    summarize: (channelId: string) => vm.summarize(channelId),
+    summarize: async (channelId: string) => {
+      await vm.summarize(channelId);
+      await confirmIfReady(wrapper);
+    },
   };
+}
+
+async function confirmIfReady(wrapper: ReturnType<typeof mount>, wait = true): Promise<void> {
+  const confirm = wrapper.find(".ai-summary-panel__confirm-send");
+  if (confirm.exists()) await confirm.trigger("click");
+  if (wait) await flushPromises();
 }
 
 /**
@@ -262,6 +271,7 @@ async function mountHost(): Promise<{
 async function clickLoadMore(wrapper: ReturnType<typeof mount>): Promise<void> {
   await wrapper.find(".ai-summary-panel__load-more").trigger("click");
   await flushPromises();
+  await confirmIfReady(wrapper);
 }
 
 /**
@@ -272,6 +282,7 @@ async function clickLoadMore(wrapper: ReturnType<typeof mount>): Promise<void> {
 async function clickRun(wrapper: ReturnType<typeof mount>): Promise<void> {
   await wrapper.find(".ai-summary-panel__run").trigger("click");
   await flushPromises();
+  await confirmIfReady(wrapper);
 }
 
 /**
@@ -356,6 +367,22 @@ describe("AiSummaryHost", () => {
     expect(fetchCalls).toHaveLength(0);
   });
 
+  it("确认前不发送；取消保留范围且不发送", async () => {
+    const { wrapper } = await mountHost();
+    const vm = wrapper.vm as unknown as { summarize(channelId: string): Promise<void> };
+    await vm.summarize("c1");
+    await flushPromises();
+    expect(fetchCalls).toHaveLength(0);
+    expect(wrapper.text()).toContain("https://chat.example.test/api/ai/summarize");
+    const cancel = wrapper.findAll(".ai-summary-panel__confirm button").find((button) => button.text() === "取消");
+    expect(cancel).toBeDefined();
+    await cancel!.trigger("click");
+    expect(fetchCalls).toHaveLength(0);
+    expect(wrapper.text()).toContain("共 2 条消息");
+    await clickRun(wrapper);
+    expect(fetchCalls).toHaveLength(1);
+  });
+
   it("频道无消息：提示且不发起请求", async () => {
     messagesState = snapshotOf([]);
     const { wrapper, summarize } = await mountHost();
@@ -375,7 +402,7 @@ describe("AiSummaryHost", () => {
     expect(wrapper.text()).toContain("研发");
     expect(wrapper.text()).toContain("共 2 条消息");
     expect(fetchCalls).toHaveLength(1);
-    expect(fetchCalls[0]!.input).toBe("/api/ai/summarize");
+    expect(fetchCalls[0]!.input).toBe("https://chat.example.test/api/ai/summarize");
     expect(JSON.parse(String(fetchCalls[0]!.init?.body))).toEqual({
       channel_id: "c1",
       messages: ["Alice: 第一条", "Alice: 第二条"],
@@ -544,7 +571,7 @@ describe("AiSummaryHost", () => {
 
     await summarize("c1");
 
-    expect(wrapper.text()).toContain("总结请求失败（HTTP 503）");
+    expect(wrapper.text()).toContain("摘要服务暂不可用");
   });
 
   describe("自配 provider（插件自管）", () => {
@@ -586,7 +613,7 @@ describe("AiSummaryHost", () => {
 
       expect(secretStatusCalls).toBe(0);
       expect(fetchCalls).toHaveLength(1);
-      expect(fetchCalls[0]!.input).toBe("/api/ai/summarize");
+      expect(fetchCalls[0]!.input).toBe("https://chat.example.test/api/ai/summarize");
       expect(wrapper.text()).toContain("默认总结");
       expect(wrapper.text()).toContain("来源：聊天服务端 /api/ai/summarize");
     });
@@ -627,7 +654,8 @@ describe("AiSummaryHost", () => {
       await summarize("c1");
 
       expect(fetchCalls).toHaveLength(1);
-      expect(wrapper.text()).toContain("DeepSeek: invalid api key (HTTP 401)");
+      expect(wrapper.text()).toContain("HTTP 401");
+      expect(wrapper.text()).not.toContain("invalid api key");
     });
 
     it("宿主未注入 network（旧宿主）：给出失败提示，不崩溃", async () => {
@@ -636,7 +664,7 @@ describe("AiSummaryHost", () => {
 
       await summarize("c1");
 
-      expect(wrapper.text()).toContain("总结请求失败");
+      expect(wrapper.text()).toContain("摘要服务暂不可用");
     });
   });
 
@@ -658,7 +686,7 @@ describe("AiSummaryHost", () => {
       await summarize("c1");
 
       expect(fetchCalls).toHaveLength(1);
-      expect(fetchCalls[0]!.input).toBe("/api/ai/summarize");
+      expect(fetchCalls[0]!.input).toBe("https://chat.example.test/api/ai/summarize");
       expect(wrapper.text()).toContain("默认总结");
       expect(wrapper.text()).toContain("来源：聊天服务端 /api/ai/summarize");
       expect(wrapper.text()).not.toContain("设置 → 插件设置");

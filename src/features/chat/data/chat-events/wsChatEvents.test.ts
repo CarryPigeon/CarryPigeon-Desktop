@@ -79,14 +79,6 @@ function authOkFrame(): unknown {
   return { type: "auth.ok", id: "req-1", data: { uid: "1000" } };
 }
 
-function authErrFrame(reason = "unauthorized"): unknown {
-  return { type: "auth.err", id: "req-1", error: { reason, message: "denied" } };
-}
-
-function reauthErrFrame(reason = "unauthorized"): unknown {
-  return { type: "reauth.err", id: "req-2", error: { reason, message: "denied" } };
-}
-
 describe("wsChatEvents 连接健康度", () => {
   beforeEach(() => {
     vi.stubGlobal("WebSocket", FakeWs as unknown as typeof WebSocket);
@@ -120,7 +112,7 @@ describe("wsChatEvents 连接健康度", () => {
     expect(second).not.toBe(first);
     second.open();
     expect(JSON.parse(second.sent[0]).data).toEqual({ access_token: "token" });
-    second.serverPush(authOkFrame());
+    second.serverPush({ type: "auth.ok", id: "req-1", code: 0, data: { uid: "1000" } });
     second.serverPush(frame("9"));
     second.serverPush({ type: "reauth.ok" });
     expect(onAuthenticated.mock.calls).toEqual([[false], [true]]);
@@ -128,29 +120,59 @@ describe("wsChatEvents 连接健康度", () => {
     handle.close();
   });
 
-  it("首次 auth.err 会关闭当前连接并回调 onAuthError（不静默保活）", () => {
+  it.each([
+    { frame: { type: "auth.err", id: "req-1", code: 11001 }, reason: "unauthorized" },
+    { frame: { type: "auth.err", id: "req-1", code: 11003 }, reason: "invalid_access_token" },
+    { frame: { type: "auth.err", id: null, code: 19999 }, reason: "api_error_19999" },
+  ])("首次 auth.err 会关闭当前连接并回调 onAuthError ($reason)", ({ frame, reason }) => {
     const onAuthError = vi.fn();
     connectChatWs("host-a:8080", "token", () => {}, { onAuthError });
     const client = currentClient();
     client.open();
-    client.serverPush(authErrFrame());
+    client.serverPush(frame);
 
     expect(onAuthError).toHaveBeenCalledTimes(1);
-    expect(onAuthError).toHaveBeenCalledWith("unauthorized");
+    expect(onAuthError).toHaveBeenCalledWith(reason);
     // 未认证链路被主动关闭，交由退避重连重新认证
     expect(client.readyState).toBe(WebSocket.CLOSED);
   });
 
-  it("已认证连接收到 reauth.err 只回调，不断开现有会话", () => {
+  it("已认证连接收到 reauth.err 会回调并保持连接", () => {
     const onAuthError = vi.fn();
     connectChatWs("host-b:8080", "token", () => {}, { onAuthError });
     const client = currentClient();
     client.open();
     client.serverPush(authOkFrame());
-    client.serverPush(reauthErrFrame());
+    client.serverPush({ type: "reauth.err", id: "req-2", code: 11002 });
 
     expect(onAuthError).toHaveBeenCalledTimes(1);
+    expect(onAuthError).toHaveBeenCalledWith("access_token_expired");
     expect(client.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it("缺少顶层业务码的 auth.err 不会触发鉴权恢复", () => {
+    const onAuthError = vi.fn();
+    const handle = connectChatWs("host-no-code:8080", "token", () => {}, { onAuthError });
+    const client = currentClient();
+    client.open();
+    client.serverPush({ type: "auth.err", id: "req-1", error: { reason: "unauthorized" } });
+
+    expect(onAuthError).not.toHaveBeenCalled();
+    expect(client.readyState).toBe(WebSocket.OPEN);
+    handle.close();
+  });
+
+  it("普通命令失败不会触发鉴权恢复", () => {
+    const onAuthError = vi.fn();
+    const handle = connectChatWs("host-command:8080", "token", () => {}, { onAuthError });
+    const client = currentClient();
+    client.open();
+    client.serverPush(authOkFrame());
+    client.serverPush({ type: "command.err", id: "req-2", code: 10001 });
+
+    expect(onAuthError).not.toHaveBeenCalled();
+    expect(client.readyState).toBe(WebSocket.OPEN);
+    handle.close();
   });
 
   it("连续 3 次未认证断开只触发一次 onConnectionLost；认证成功后触发一次 onConnectionRestored", async () => {
@@ -219,7 +241,7 @@ describe("wsChatEvents 连接健康度", () => {
 
     for (let i = 0; i < 6; i += 1) {
       await vi.advanceTimersByTimeAsync(30_000);
-      client.serverPush({ type: "pong", id: null, data: null, error: null });
+      client.serverPush({ type: "pong", id: null, code: 0 });
     }
 
     expect(client.readyState).toBe(WebSocket.OPEN);

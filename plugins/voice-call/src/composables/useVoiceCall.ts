@@ -108,8 +108,34 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     startRingCountdown();
   }
 
+  let resetHandle: ReturnType<typeof setTimeout> | undefined;
+  let endingCall = false;
+
+  function scheduleIdle(sessionId: string) {
+    clearTimeout(resetHandle);
+    resetHandle = setTimeout(() => {
+      if (callState.value !== "ended" || activeSession.value?.sessionId !== sessionId) return;
+      activeSession.value = null;
+      participants.value = [];
+      callState.value = "idle";
+    }, 500);
+  }
+
+  async function endCurrentCall(end: (sessionId: string) => Promise<void>, reason: string) {
+    const session = activeSession.value;
+    if (!session || endingCall || callState.value === "ended") return;
+    endingCall = true;
+    try {
+      await end(session.sessionId);
+      if (activeSession.value?.sessionId !== session.sessionId || activeSession.value.state === "ended") return;
+      syncState("ended", { ...session, state: "ended" }, reason);
+    } finally {
+      endingCall = false;
+    }
+  }
+
   /** 外部状态变更同步（被动更新本地状态） */
-  function syncState(state: CallState, session: CallSession | null) {
+  function syncState(state: CallState, session: CallSession | null, reason = "remotely_ended") {
     if (state === "ringing" && session) {
       onIncomingCall(session);
     } else if (state === "ended" && session) {
@@ -123,12 +149,9 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
         sessionId: session.sessionId,
         kind: session.kind,
         duration: duration.value,
-        disconnectReason: "remotely_ended",
+        disconnectReason: reason,
       };
-      setTimeout(() => {
-        callState.value = "idle";
-        activeSession.value = null;
-      }, 500);
+      scheduleIdle(session.sessionId);
     } else if (session) {
       callState.value = state;
       activeSession.value = session;
@@ -141,80 +164,75 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     }
   }
 
-  async function startDirectCall(targetUserId: string, roomIdOverride?: string): Promise<CallSession> {
-    callState.value = "dialing";
-    const session = await statePort.startCall("direct", roomIdOverride ?? roomId(), targetUserId);
-    activeSession.value = session;
-    startPoll();
-    ringtone.play();
-    startRingCountdown();
-    return session;
+  let placingCall = false;
+
+  function canStartCall(): boolean {
+    const storedState = statePort.getActiveSession()?.state;
+    return !placingCall && callState.value === "idle" && (!storedState || storedState === "ended" || storedState === "idle");
   }
 
-  async function startConference(roomIdOverride?: string): Promise<CallSession> {
+  async function startOutgoing(kind: "direct" | "conference", targetRoomId: string, targetUserId?: string): Promise<CallSession | undefined> {
+    if (!canStartCall()) return;
+    placingCall = true;
     callState.value = "dialing";
-    const session = await statePort.startCall("conference", roomIdOverride ?? roomId());
-    activeSession.value = session;
-    startPoll();
-    ringtone.play();
-    startRingCountdown();
-    return session;
+    try {
+      const session = await statePort.startCall(kind, targetRoomId, targetUserId);
+      // 来电或宿主状态事件可能先于命令响应；不要覆盖已有会话。
+      if (activeSession.value) {
+        return activeSession.value.sessionId === session.sessionId ? activeSession.value : undefined;
+      }
+      activeSession.value = session;
+      participants.value = session.participants;
+      callState.value = session.state;
+      startPoll();
+      if (session.state === "dialing") {
+        ringtone.play();
+        startRingCountdown();
+      }
+      return session;
+    } catch (error) {
+      if (callState.value === "dialing" && !activeSession.value) callState.value = "idle";
+      throw error;
+    } finally {
+      placingCall = false;
+    }
+  }
+
+  function startDirectCall(targetUserId: string, roomIdOverride?: string) {
+    return startOutgoing("direct", roomIdOverride ?? roomId(), targetUserId);
+  }
+
+  function startConference(roomIdOverride?: string) {
+    return startOutgoing("conference", roomIdOverride ?? roomId());
   }
 
   async function acceptCall(): Promise<void> {
     const session = activeSession.value;
-    if (!session) return;
+    if (!session || callState.value !== "ringing") return;
     callState.value = "connecting";
-    await statePort.acceptCall(session.sessionId);
+    try {
+      await statePort.acceptCall(session.sessionId);
+    } catch (error) {
+      if (activeSession.value?.sessionId === session.sessionId && callState.value === "connecting") {
+        callState.value = "ringing";
+      }
+      throw error;
+    }
     startPoll();
     ringtone.stop();
     stopRingCountdown();
   }
 
-  async function rejectCall(reason?: string): Promise<void> {
-    const session = activeSession.value;
-    if (!session) return;
-    callState.value = "ended";
-    await statePort.rejectCall(session.sessionId, reason);
-    stopTimer();
-    stopPoll();
-    ringtone.stop();
-    stopRingCountdown();
-    activeSummary.value = {
-      sessionId: session.sessionId,
-      kind: session.kind,
-      duration: duration.value,
-      disconnectReason: reason ?? "declined",
-    };
-    setTimeout(() => {
-      callState.value = "idle";
-      activeSession.value = null;
-    }, 500);
+  function rejectCall(reason?: string): Promise<void> {
+    return endCurrentCall((id) => statePort.rejectCall(id, reason), reason ?? "declined");
   }
 
   async function hangup(): Promise<void> {
     await rejectCall("manual");
   }
 
-  async function cancelCall(): Promise<void> {
-    const session = activeSession.value;
-    if (!session) return;
-    callState.value = "ended";
-    await statePort.cancelCall(session.sessionId);
-    stopTimer();
-    stopPoll();
-    ringtone.stop();
-    stopRingCountdown();
-    activeSummary.value = {
-      sessionId: session.sessionId,
-      kind: session.kind,
-      duration: duration.value,
-      disconnectReason: "cancelled",
-    };
-    setTimeout(() => {
-      callState.value = "idle";
-      activeSession.value = null;
-    }, 500);
+  function cancelCall(): Promise<void> {
+    return endCurrentCall((id) => statePort.cancelCall(id), "cancelled");
   }
 
   async function toggleMute(): Promise<boolean> {
@@ -334,24 +352,8 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   }
 
   async function leaveConference(): Promise<void> {
-    const session = activeSession.value;
-    if (!session || !statePort.leaveConference) return;
-    callState.value = "ended";
-    await statePort.leaveConference(session.sessionId);
-    stopTimer();
-    stopPoll();
-    ringtone.stop();
-    stopRingCountdown();
-    activeSummary.value = {
-      sessionId: session.sessionId,
-      kind: session.kind,
-      duration: duration.value,
-      disconnectReason: "left",
-    };
-    setTimeout(() => {
-      callState.value = "idle";
-      activeSession.value = null;
-    }, 500);
+    const leave = statePort.leaveConference;
+    if (leave) await endCurrentCall((id) => leave(id), "left");
   }
 
   const isConferenceHost = computed(() =>
@@ -369,6 +371,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
   });
 
   onUnmounted(() => {
+    clearTimeout(resetHandle);
     stopTimer();
     stopPoll();
     stopRingCountdown();
@@ -389,6 +392,7 @@ export function useVoiceCall(options: UseVoiceCallOptions) {
     ringTimeoutMs,
 
     connectSignaling,
+    canStartCall,
     startDirectCall,
     startConference,
     acceptCall,

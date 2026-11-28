@@ -5,7 +5,7 @@
  * - apply 时读取宿主主题偏好 key（`carrypigeon:theme`），按宿主规则解析并应用
  *   `data-theme`（`system` 时跟随系统配色，并监听系统配色变化实时同步）；
  * - 首次激活时把旧版插件私有偏好（`theme.preference`）一次性迁移到宿主 key；
- * - 注册工具栏动作（contrast 图标，order 60）点击循环切换「亮 → 暗 → 跟随系统」并写回宿主 key；
+ * - 注册工具栏动作（contrast 图标，order 60），直接选择「浅色 / 深色 / 跟随系统」并写回宿主 key；
  * - 强调色（`data-accent`）由宿主设置页独占，本插件**永不**读写；
  * - 偏好缺失/无法识别时保持当前 DOM 主题不变，避免用插件的默认值覆盖宿主主题；
  * - dispose 时仅摘除工具栏入口与系统配色监听，不回滚主题（主题归宿主所有）。
@@ -23,7 +23,6 @@ import { themeManifest } from "./manifest";
 import {
   HOST_THEME_STORAGE_KEY,
   LEGACY_THEME_STORAGE_KEY,
-  nextThemePreference,
   parseThemePreference,
   resolveThemeName,
   toThemeAttributes,
@@ -31,6 +30,7 @@ import {
   type ThemePreference,
 } from "./domain/themes";
 import { createLogger } from "./shared/logger";
+import ThemePicker from "./components/ThemePicker.vue";
 import "./styles/theme.css";
 
 const logger = createLogger("plugin");
@@ -149,7 +149,7 @@ export function apply(ctx: Context): void {
       .get(LEGACY_THEME_STORAGE_KEY)
       .then((raw) => {
         // 仅当仍处于激活状态时迁移，避免 dispose 后的迟到写入。
-        if (disposed) return;
+        if (disposed || readHostPreference()) return;
         const migrated = parseThemePreference(raw);
         if (!migrated) return;
         setPreference(migrated, true);
@@ -164,19 +164,27 @@ export function apply(ctx: Context): void {
       });
   }
 
-  /** 点击主题图标：亮 → 暗 → 跟随系统 → 亮，并写回宿主 key。 */
-  function cycle(): void {
-    const next = nextThemePreference(readHostPreference() ?? current ?? readAppliedTheme());
-    setPreference(next, true);
-    logger.info("theme_switched", { theme: next });
-  }
+  const overlay = ctx.ui?.mountOverlay(ThemePicker, {
+    props: {
+      readPreference: () => readHostPreference() ?? current ?? readAppliedTheme(),
+      selectPreference: (preference: ThemePreference) => {
+        if (disposed) return;
+        setPreference(preference, true);
+        logger.info("theme_switched", { theme: preference });
+      },
+    },
+  });
 
   const action: ToolbarAction = {
     id: "theme.cycle",
     label: "",
     icon: ThemeIcon,
     order: 60,
-    onClick: () => cycle(),
+    onClick: () => {
+      const picker = overlay?.instance as { open?: () => Promise<void> } | null | undefined;
+      if (!picker?.open) throw new Error("Theme picker is not ready");
+      return picker.open();
+    },
   };
 
   ctx.ui?.registerToolbarAction(action);

@@ -49,6 +49,7 @@ type DisposeRunner = { dispose(): void };
 function createPluginContext(legacyValue: unknown = null): {
   ctx: Context;
   actions: ToolbarAction[];
+  picker: { open: ReturnType<typeof vi.fn>; props?: { readPreference(): string; selectPreference(preference: "light" | "dark" | "system"): void } };
   storageGet: ReturnType<typeof vi.fn>;
   storageSet: ReturnType<typeof vi.fn>;
 } & DisposeRunner {
@@ -56,6 +57,10 @@ function createPluginContext(legacyValue: unknown = null): {
   const storageSet = vi.fn(async () => {});
   const actions: ToolbarAction[] = [];
   const disposeCallbacks: Array<() => void> = [];
+  const picker = {
+    open: vi.fn(),
+    props: undefined as { readPreference(): string; selectPreference(preference: "light" | "dark" | "system"): void } | undefined,
+  };
   const ctx = {
     server: { lang: "zh_cn", getUid: () => "", getCid: () => "", serverSocket: "", serverId: "" },
     storage: { get: storageGet, set: storageSet },
@@ -69,7 +74,10 @@ function createPluginContext(legacyValue: unknown = null): {
         disposeCallbacks.push(cancel);
         return cancel;
       },
-      mountOverlay: () => ({ unmount: () => {}, instance: null }),
+      mountOverlay: (_component: unknown, options: { props: typeof picker.props }) => {
+        picker.props = options.props;
+        return { unmount: () => {}, instance: picker };
+      },
     },
     on: (event: string, cb: () => void): (() => boolean) => {
       if (event === "dispose") disposeCallbacks.push(cb);
@@ -79,6 +87,7 @@ function createPluginContext(legacyValue: unknown = null): {
   return {
     ctx,
     actions,
+    picker,
     storageGet,
     storageSet,
     dispose() {
@@ -152,7 +161,7 @@ describe("theme 插件", () => {
 
   it("设置页保存显式主题后，系统监听和工具栏使用最新偏好", () => {
     localStorage.setItem(HOST_THEME_STORAGE_KEY, "system");
-    const { ctx, actions, dispose } = createPluginContext();
+    const { ctx, actions, picker, dispose } = createPluginContext();
     currentDispose = dispose;
     activate(ctx);
 
@@ -161,8 +170,9 @@ describe("theme 插件", () => {
     expect(appliedTheme()).toBe("light");
 
     actions[0]!.onClick(chatContext);
-    expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("dark");
-    expect(appliedTheme()).toBe("dark");
+    expect(picker.open).toHaveBeenCalledOnce();
+    expect(picker.props?.readPreference()).toBe("light");
+    expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("light");
   });
 
   it("宿主 key 缺失时迁移旧插件偏好到宿主 key，并清空旧键", async () => {
@@ -199,35 +209,29 @@ describe("theme 插件", () => {
     expect(mediaListeners.size).toBe(0);
   });
 
-  it("工具栏动作按 亮→暗→跟随系统 循环并写回宿主 key", () => {
+  it("工具栏直接选择指定模式并写回宿主 key", () => {
     localStorage.setItem(HOST_THEME_STORAGE_KEY, "light");
-    const { ctx, actions, dispose } = createPluginContext();
+    const { ctx, actions, picker, dispose } = createPluginContext();
     currentDispose = dispose;
     activate(ctx);
-    expect(actions).toHaveLength(1);
 
     actions[0]!.onClick(chatContext);
-    expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("dark");
-    expect(appliedTheme()).toBe("dark");
-
-    actions[0]!.onClick(chatContext);
+    expect(picker.open).toHaveBeenCalledOnce();
+    picker.props?.selectPreference("system");
     expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("system");
-
-    actions[0]!.onClick(chatContext);
-    expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("light");
+    emitSystemTheme(true);
+    expect(appliedTheme()).toBe("dark");
+    picker.props?.selectPreference("light");
     expect(appliedTheme()).toBe("light");
+    expect(mediaListeners.size).toBe(0);
   });
 
-  it("无存储偏好时切换起点取当前生效主题", () => {
-    document.documentElement.dataset.theme = "light";
-    const { ctx, actions, dispose } = createPluginContext();
+  it("无存储偏好时读取当前生效主题", () => {
+    document.documentElement.dataset.theme = "dark";
+    const { ctx, picker, dispose } = createPluginContext();
     currentDispose = dispose;
     activate(ctx);
-
-    actions[0]!.onClick(chatContext);
-
-    expect(localStorage.getItem(HOST_THEME_STORAGE_KEY)).toBe("dark");
-    expect(appliedTheme()).toBe("dark");
+    expect(picker.props?.readPreference()).toBe("dark");
   });
 
   it("dispose 摘除工具栏入口与系统配色监听", () => {

@@ -3,6 +3,44 @@ import type { VoiceCallStatePort } from "../domain/ports";
 import { invokeVoiceCall } from "../host/bridge";
 import { activeSession, participants } from "../runtime/voiceCallStoreAccess";
 
+type NativeCallSession = {
+  session_id: string;
+  call_kind: CallKind;
+  state: CallSession["state"];
+  initiator: string;
+  participants: Array<{ user_id: string; display_name: string; is_muted: boolean; is_speaking: boolean; audio_level: number; joined_at: number | null }>;
+  room_id: string;
+  started_at: number | null;
+  ended_at: number | null;
+  media_settings: { input_device_id: string | null; output_device_id: string | null; noise_suppression: boolean; echo_cancellation: boolean };
+};
+
+function fromNativeSession(session: NativeCallSession): CallSession {
+  return {
+    sessionId: session.session_id,
+    kind: session.call_kind,
+    state: session.state,
+    initiator: session.initiator,
+    participants: session.participants.map((p) => ({
+      userId: p.user_id, displayName: p.display_name, isMuted: p.is_muted,
+      isSpeaking: p.is_speaking, audioLevel: p.audio_level, joinedAt: p.joined_at,
+    })),
+    roomId: session.room_id,
+    startedAt: session.started_at,
+    endedAt: session.ended_at,
+    mediaSettings: {
+      inputDeviceId: session.media_settings.input_device_id,
+      outputDeviceId: session.media_settings.output_device_id,
+      noiseSuppression: session.media_settings.noise_suppression,
+      echoCancellation: session.media_settings.echo_cancellation,
+    },
+  };
+}
+
+async function invokeSession(command: string, args: Record<string, unknown>): Promise<CallSession> {
+  return fromNativeSession(await invokeVoiceCall(command, args) as NativeCallSession);
+}
+
 export function createVoiceCallStatePort(): VoiceCallStatePort {
   return {
     async connectSignaling(wsUrl: string, accessToken: string, userId: string, displayName: string) {
@@ -15,12 +53,13 @@ export function createVoiceCallStatePort(): VoiceCallStatePort {
     },
 
     async startCall(kind: CallKind, roomId: string, targetUserId?: string) {
-      if (kind === "direct" && targetUserId) {
+      if (kind === "direct") {
+        if (!targetUserId?.trim()) throw new Error("Direct call requires a target user");
         const sessionId = `call-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        return invokeVoiceCall("voice_call:start_direct_call", { sessionId, targetUserId, roomId }) as Promise<CallSession>;
+        return invokeSession("voice_call:start_direct_call", { sessionId, targetUserId, roomId });
       }
       const sessionId = `conf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      return invokeVoiceCall("voice_call:start_conference", { sessionId, roomId }) as Promise<CallSession>;
+      return invokeSession("voice_call:start_conference", { sessionId, roomId });
     },
 
     async acceptCall(sessionId: string) {
@@ -75,7 +114,7 @@ export function createVoiceCallStatePort(): VoiceCallStatePort {
     },
 
     async joinConference(sessionId: string, initiatorId?: string) {
-      return invokeVoiceCall("voice_call:join_conference", { sessionId, initiatorId: initiatorId ?? null }) as Promise<CallSession>;
+      return invokeSession("voice_call:join_conference", { sessionId, initiatorId: initiatorId ?? null });
     },
 
     async leaveConference(sessionId: string) {

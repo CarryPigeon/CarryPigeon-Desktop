@@ -48,33 +48,29 @@ export function useVideoCall(initialSessionId: string) {
   }
 
   async function startCall() {
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false,
-      });
-      localStream.value = stream;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.error("Action: chat_voice_call_start_failed", { error: msg });
+    const sid = sessionId.value;
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    if (sid !== sessionId.value) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
-    const p = await ensurePC();
-    stream.getTracks().forEach((t) => p.addTrack(t, stream));
-
-    const offer = await p.createOffer();
-    await p.setLocalDescription(offer);
-
-    await invokeVoiceCall("voice_call:send_video_signaling", {
-      sessionId: sessionId.value,
-      signalType: "offer",
-      payload: {
-        sdp: offer.sdp,
-        type: offer.type,
-        candidates: [],
-      },
-    });
+    localStream.value = stream;
+    try {
+      const p = await ensurePC();
+      stream.getTracks().forEach((track) => p.addTrack(track, stream));
+      const offer = await p.createOffer();
+      await p.setLocalDescription(offer);
+      if (sid !== sessionId.value) return;
+      await invokeVoiceCall("voice_call:send_video_signaling", {
+        sessionId: sid,
+        signalType: "offer",
+        payload: { sdp: offer.sdp, type: offer.type, candidates: [] },
+      });
+    } catch (error) {
+      if (sid !== sessionId.value) return;
+      hangup();
+      throw error;
+    }
   }
 
   async function acceptCall(remoteOffer: any) {
@@ -167,21 +163,21 @@ export function useVideoCall(initialSessionId: string) {
 
   setupListener();
 
-  async function hangup() {
-    localStream.value?.getTracks().forEach((t) => t.stop());
+  function hangup() {
+    sessionId.value = "";
+    localStream.value?.getTracks().forEach((track) => track.stop());
+    localStream.value = undefined;
+    remoteStream.value = undefined;
     pc?.close();
     pc = null;
-    unlisten?.();
+    cameraEnabled.value = true;
     connected.value = false;
   }
 
-  function cleanup() {
-    localStream.value?.getTracks().forEach((t) => t.stop());
-    pc?.close();
+  onUnmounted(() => {
+    hangup();
     unlisten?.();
-  }
-
-  onUnmounted(cleanup);
+  });
 
   function getPeerConnection(): RTCPeerConnection | null {
     return pc;

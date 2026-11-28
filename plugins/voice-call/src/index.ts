@@ -7,7 +7,9 @@
  */
 
 import { h, defineComponent } from "vue";
-import { Icon } from "tdesign-vue-next";
+import { Icon, MessagePlugin } from "tdesign-vue-next";
+import { getCallEntry, type CallEntryKind } from "./shared/callFeedback";
+import { t } from "./i18n";
 import type { Component } from "vue";
 import type { PluginChatContext, ToolbarAction } from "@/features/plugins/api-types";
 import type { Context } from "@/features/plugins/sdk";
@@ -50,25 +52,26 @@ export function apply(ctx: Context): void {
     }) ?? { unmount: () => {}, instance: null };
 
   // 将工具栏点击转发到 VoiceCallHost 的 exposed 方法，携带实时频道上下文（roomId/targetUserId）。
-  function startCall(kind: "video" | "audio" | "conference", chatCtx?: PluginChatContext): void {
+  function startCall(kind: CallEntryKind, chatCtx?: PluginChatContext): void {
+    const entry = getCallEntry(kind, chatCtx);
+    if (entry.error) {
+      void MessagePlugin.warning(t(entry.error));
+      return;
+    }
     const host = overlayHandle.instance as {
-      startVideoCall?: (targetUserId: string | undefined, roomId: string) => void;
-      startDirectCall?: (targetUserId: string | undefined, roomId: string) => void;
-      startConference?: (roomId: string) => void;
+      startVideoCall: (targetUserId: string | undefined, roomId: string) => void;
+      startDirectCall: (targetUserId: string | undefined, roomId: string) => void;
+      startConference: (roomId: string) => void;
     } | null;
     if (!host) {
       logger.warn("voice_call_toolbar_host_missing", { kind });
+      void MessagePlugin.warning(t("voice_call_not_ready"));
       return;
     }
-    const roomId = chatCtx?.channelId ?? "";
-    if (!roomId) {
-      logger.warn("voice_call_toolbar_no_channel", { kind });
-      return;
-    }
-    const targetUserId = chatCtx?.targetUserId;
-    if (kind === "video") host.startVideoCall?.(targetUserId, roomId);
-    else if (kind === "audio") host.startDirectCall?.(targetUserId, roomId);
-    else host.startConference?.(roomId);
+    const { roomId, targetUserId } = entry;
+    if (kind === "video") host.startVideoCall(targetUserId, roomId);
+    else if (kind === "audio") host.startDirectCall(targetUserId, roomId);
+    else host.startConference(roomId);
   }
 
   const actions: ToolbarAction[] = [

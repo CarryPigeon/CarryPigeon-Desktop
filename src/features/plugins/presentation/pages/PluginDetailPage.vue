@@ -33,6 +33,15 @@ function computePluginId(): string {
 
 const pluginId = computed(computePluginId);
 
+const usageKeys: ReadonlyMap<string, string> = new Map([
+  ["markdown", "module_usage_markdown"],
+  ["group-notice", "module_usage_group_notice"],
+  ["voice-call", "module_usage_voice_call"],
+  ["ai-summary", "module_usage_ai_summary"],
+  ["theme", "module_usage_theme"],
+]);
+const usageKey = computed(() => usageKeys.get(pluginId.value));
+
 const { socket: serverSocket, serverInfoStore, serverId, refreshServerInfo } = usePluginsServerWorkspace();
 const requiredPluginsDeclared = computed(() => serverInfoStore.value.info.value?.requiredPlugins ?? null);
 const { catalogStore, installStore, refreshCatalog, refreshInstalled } = createPluginContext({ socket: serverSocket, requiredPluginsDeclared });
@@ -175,6 +184,14 @@ onMounted(handleMounted);
         <div class="cp-plugin-detail__card">
           <div class="cp-plugin-detail__k">{{ t("module_detail_description") }}</div>
           <div class="cp-plugin-detail__v">{{ plugin.description }}</div>
+        </div>
+
+        <div v-if="usageKey" class="cp-plugin-detail__card">
+          <div class="cp-plugin-detail__k">{{ t("module_usage_heading") }}</div>
+          <div class="cp-plugin-detail__v">{{ t(usageKey) }}</div>
+          <RouterLink v-if="pluginId === 'ai-summary' || pluginId === 'theme'" :to="{ name: 'settings' }">
+            {{ t("module_usage_open_settings") }}
+          </RouterLink>
         </div>
 
         <div class="cp-plugin-detail__card">

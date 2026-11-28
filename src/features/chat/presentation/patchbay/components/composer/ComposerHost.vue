@@ -46,7 +46,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:domainId", v: string): void;
   (e: "update:draft", v: string): void;
-  (e: "send", payload?: ComposerSubmitPayload): void;
+  (e: "send", payload?: ComposerSubmitPayload, onSettled?: (ok: boolean) => void): void;
   (e: "cancelReply"): void;
   (e: "cancel-quote-reply"): void;
   (e: "mentionQuery", query: string): void;
@@ -332,8 +332,8 @@ function handleKeydown(_: string | number, event: { e: KeyboardEvent }): void {
  * @param payload - 需要发送的插件 payload。
  * @returns 无返回值。
  */
-function handlePluginSubmit(payload: ComposerSubmitPayload): void {
-  emit("send", payload);
+function handlePluginSubmit(payload: ComposerSubmitPayload, onSettled?: (ok: boolean) => void): void {
+  emit("send", payload, typeof onSettled === "function" ? onSettled : undefined);
 }
 
 /**

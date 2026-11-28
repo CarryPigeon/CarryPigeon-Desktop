@@ -102,8 +102,13 @@
             {{ result ? t("ai_summary_regenerate") : t("ai_summary_run") }}
           </t-button>
         </div>
+        <div v-if="pendingRequest" class="ai-summary-panel__confirm ai-summary-panel__hint">
+          <p>{{ t("ai_summary_confirm_destination", { count: pendingRequest.messages.length, destination: pendingRequest.destination }) }}</p>
+          <t-button class="ai-summary-panel__confirm-send" size="small" @click="confirmSummary">{{ t("ai_summary_confirm_send") }}</t-button>
+          <t-button size="small" variant="text" @click="pendingRequest = null">{{ t("ai_summary_cancel_send") }}</t-button>
+        </div>
         <div v-if="noticeText" class="ai-summary-panel__hint">{{ noticeText }}</div>
-        <div v-if="errorText" class="ai-summary-panel__error">{{ errorText }}</div>
+        <div v-if="errorText" class="ai-summary-panel__error" role="alert">{{ errorText }}</div>
         <div v-if="result" class="ai-summary-panel__result">
           <div class="ai-summary-panel__result-title">
             {{ t("ai_summary_result_title") }}
@@ -124,25 +129,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import type {
   PluginChannelMessage,
   PluginCurrentChannelMessagesSnapshot,
 } from "@/features/plugins/api-types";
 import { getContext } from "../host/bridge";
-import { ensureBackendLoaded, useBackendPreference } from "../host/backendPreference";
-import { summarizeWithProvider } from "../host/clientAi";
-import { ensureProviderLoaded } from "../host/providerConfig";
+import { useBackendPreference } from "../host/backendPreference";
+import { prepareSummary, sendPreparedSummary, type PreparedSummary } from "../host/summaryTransport";
 import type { PluginMessagesService, PluginNetworkService } from "@/features/plugins/sdk";
 import { createLogger } from "../shared/logger";
-import { resolveBackendPlan, shouldFallbackToServer, type ClientAiFailureCode } from "../domain/summarizeBackend";
 import {
-  buildChannelMessageLines,
-  buildSummarizeRequestBody,
   isCacheFresh,
   latestMessageIdOf,
   parseCachedSummary,
-  parseSummarizeResponse,
   type CachedSummary,
   type SummarizeResult,
   type SummarySource,
@@ -492,27 +492,6 @@ function failedText(status?: number): string {
 }
 
 /**
- * 把自配 provider 的失败分类转成可操作文案。
- *
- * @param code - 失败分类。
- * @param error - 原始（已脱敏）错误描述。
- * @param status - 上游状态码。
- * @param provider - provider 展示名。
- * @returns 展示用错误文案。
- */
-function clientFailureText(
-  code: ClientAiFailureCode,
-  error: string,
-  status?: number,
-  provider?: string,
-): string {
-  if (code === "incomplete-config") return t("ai_summary_incomplete_config");
-  if (code === "api-key-missing") return t("ai_summary_api_key_missing", { provider: provider ?? "" });
-  const suffix = typeof status === "number" && status > 0 ? ` / HTTP ${status}` : "";
-  return `${t("ai_summary_failed")}（${provider ? `${provider}: ` : ""}${error}${suffix}）`;
-}
-
-/**
  * 读取宿主当前频道的消息快照，并同步面板状态。
  *
  * 频道变化时清空上一频道的结果、来源与范围设置，避免跨频道残留。
@@ -556,79 +535,67 @@ async function readSnapshot(
   }
 }
 
-/**
- * 执行总结请求。
- *
- * 顺序（受「AI 摘要后端」设置项控制，见 `domain/summarizeBackend.ts`）：
- * 1. `client` / `auto`：自配 provider（插件经 `ctx.network.fetch` 直连 OpenAI 兼容端点，
- *    API Key 由宿主 Rust 侧从系统凭据管理器注入请求头）；
- * 2. `auto` 且未配置 provider（`not-configured`）→ 回退服务端 `/api/ai/summarize`；
- * 3. `client` 且未配置 → 给出可操作提示，**不回退**（否则用户会误以为自选模型在生效）；
- * 4. `server` → 直接走服务端端点。
- *
- * @param channelId - 频道 id。
- * @param messages - 参与总结的频道消息（已按范围收敛）。
- */
-async function requestSummary(
-  channelId: string,
-  messages: readonly PluginChannelMessage[],
-): Promise<void> {
+/** 暂存待确认的请求；范围或频道变化后不再允许发送旧载荷。 */
+const pendingRequest = shallowRef<PreparedSummary | null>(null);
+let requestVersion = 0;
+
+function invalidateRequest(): void {
+  requestVersion++;
+  pendingRequest.value = null;
+}
+
+watch([scopeMode, timeRange, snapshot], invalidateRequest, { flush: "sync" });
+watch(() => {
+  try { return getContext().server.getCid(); } catch { return ""; }
+}, close, { flush: "sync" });
+
+async function requestSummary(channelId: string, messages: readonly PluginChannelMessage[]): Promise<void> {
+  const version = ++requestVersion;
+  loading.value = true;
+  pendingRequest.value = null;
+  try {
+    const prepared = await prepareSummary(channelId, messages);
+    if (!visible.value || version !== requestVersion) return;
+    if (prepared.ok) {
+      pendingRequest.value = prepared.request;
+      return;
+    }
+    const reason = prepared.reason;
+    errorText.value = reason === "empty" ? t("ai_summary_empty_messages")
+      : reason === "unavailable" ? t("ai_summary_unavailable")
+      : reason === "not-configured" ? t("ai_summary_client_required_missing")
+      : reason === "incomplete-config" ? t("ai_summary_incomplete_config")
+      : reason === "api-key-missing" ? t("ai_summary_api_key_missing", { provider: prepared.provider ?? "" })
+      : t("ai_summary_check_settings");
+  } catch {
+    if (version === requestVersion) errorText.value = t("ai_summary_unavailable");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function confirmSummary(): Promise<void> {
+  const request = pendingRequest.value;
+  if (!request || loading.value) return;
+  if (request.context.server.getCid() !== request.channelId) {
+    close();
+    return;
+  }
+  pendingRequest.value = null;
+  const version = ++requestVersion;
   loading.value = true;
   try {
-    // 载入用户选择的总结后端与 provider 配置（失败时保持默认，即历史行为）。
-    const backendMode = await ensureBackendLoaded();
-    await ensureProviderLoaded();
-    const network = getHostNetwork();
-    const plan = resolveBackendPlan(backendMode, network !== undefined);
-    if (plan.useClient) {
-      const client = await summarizeWithProvider(buildChannelMessageLines(messages));
-      if (client.ok) {
-        result.value = {
-          summary: client.summary,
-          channelId,
-          messageCount: messages.length,
-        };
-        fromCache.value = false;
-        source.value = { kind: "client", provider: client.provider, model: client.model };
-        await saveResult(client.summary, messages.length, messages, source.value);
-        return;
-      }
-      if (!shouldFallbackToServer(client.code, plan)) {
-        logger.warn("ai_summary_client_failed", { code: client.code, status: client.status ?? -1 });
-        errorText.value =
-          client.code === "not-configured"
-            ? t("ai_summary_client_required_missing")
-            : clientFailureText(client.code, client.error, client.status, client.provider);
-        return;
-      }
-      // not-configured 且允许回退：继续走下面的服务端端点。
-    }
-
-    // 服务端端点：网络能力由 "network" 权限注入；相对路径会被宿主拼接到当前 server origin。
-    const requestBody = buildSummarizeRequestBody(channelId, messages);
-    const res = await getContext().network?.fetch("/api/ai/summarize", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-    if (!res || !res.ok) {
-      logger.warn("ai_summary_fetch_failed", { status: res?.status ?? -1 });
-      errorText.value = failedText(res?.status);
+    const outcome = await sendPreparedSummary(request);
+    if (!visible.value || version !== requestVersion) return;
+    if (!outcome.ok) {
+      errorText.value = outcome.reason === "timeout" ? t("ai_summary_timeout")
+        : outcome.reason === "unavailable" ? t("ai_summary_unavailable") : failedText(outcome.status);
       return;
     }
-    const parsed = parseSummarizeResponse(res.bodyText);
-    if (!parsed.ok) {
-      logger.warn("ai_summary_parse_failed", { error: parsed.error });
-      errorText.value = failedText(res.status);
-      return;
-    }
-    result.value = parsed.result;
+    result.value = outcome.result;
     fromCache.value = false;
-    source.value = { kind: "server" };
-    await saveResult(parsed.result.summary, messages.length, messages, source.value);
-  } catch (e) {
-    logger.error("ai_summary_request_error", { error: String(e) });
-    errorText.value = failedText();
+    source.value = outcome.source;
+    await saveResult(outcome.result.summary, outcome.result.messageCount, request.messages, outcome.source);
   } finally {
     loading.value = false;
   }
@@ -758,6 +725,7 @@ async function handleLoadMore(): Promise<void> {
 }
 
 function close(): void {
+  invalidateRequest();
   visible.value = false;
 }
 

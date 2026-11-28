@@ -158,7 +158,7 @@ type ChatCenterRawModel = {
   handleCancelQuoteReply(): void;
   handleFileUploaded(result: { fileId: string; shareKey: string }): void;
   handleFileUploadError(error: string): void;
-  handleSend(payload?: ComposerSubmitPayload): void;
+  handleSend(payload?: ComposerSubmitPayload, onSettled?: (ok: boolean) => void): void;
   safeLoadMore(direction?: "older" | "newer"): Promise<void>;
   handleMentionQuery(query: string): Promise<void>;
   handleSelectMention(mention: { userId: string; displayName: string; type?: "everyone" | "here" }): void;
@@ -868,7 +868,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     );
   }
 
-  function handleSend(payload?: ComposerSubmitPayload): void {
+  function handleSend(payload?: ComposerSubmitPayload, onSettled?: (ok: boolean) => void): void {
     if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
     const lp = linkPreview.value;
     const mergedPayload: ComposerSubmitPayload | undefined = payload
@@ -883,6 +883,7 @@ export function useChatCenterModel(deps: UseChatCenterModelDeps): ChatCenterMode
     // 记录发送时所在频道：发送期间用户可能切换频道，此时不应触发跳底。
     const sentFromCid = currentSessionSnapshot.value.currentChannelId;
     void deps.messageComposer.sendMessage(mergedPayload).then((outcome) => {
+      onSettled?.(outcome.ok);
       if (outcome.ok) {
         deps.dismissLinkPreview?.();
         // 自己发送的消息：若仍停留在发送时的频道，则通知视口自动跳到最底部。

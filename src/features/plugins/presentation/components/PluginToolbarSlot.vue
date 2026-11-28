@@ -1,8 +1,32 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import { toast } from "@/shared/utils/toast";
 import type { PluginChatContext, ToolbarAction } from "@/features/plugins/api-types";
 
 const props = defineProps<{ actions: ToolbarAction[]; chatContext?: PluginChatContext }>();
+const { t } = useI18n();
+const builtinLabels = new Map([
+  ["theme.cycle", "plugin_action_theme"],
+  ["group-notice.open", "plugin_action_notices"],
+  ["ai-summary.open", "plugin_action_summary"],
+  ["voice-call.audio", "plugin_action_audio"],
+  ["voice-call.video", "plugin_action_video"],
+  ["voice-call.conference", "plugin_action_conference"],
+]);
+
+function actionName(action: ToolbarAction): string {
+  const key = builtinLabels.get(action.id);
+  return labelOf(action) || (key ? t(key) : action.id);
+}
+
+async function invokeAction(action: ToolbarAction): Promise<void> {
+  try {
+    await action.onClick(props.chatContext ?? { channelId: "" });
+  } catch {
+    toast.warning(t("plugin_action_unavailable", { action: actionName(action) }));
+  }
+}
 const sorted = computed(() =>
   [...props.actions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
 );
@@ -22,7 +46,9 @@ function labelOf(action: ToolbarAction): string {
       :class="{ 'plugin-toolbar-slot__btn--iconOnly': labelOf(a).length === 0 }"
       size="small"
       variant="text"
-      @click="a.onClick(props.chatContext ?? { channelId: '' })"
+      :title="actionName(a)"
+      :aria-label="actionName(a)"
+      @click="invokeAction(a)"
     >
       <template v-if="a.icon" #icon><component :is="a.icon" /></template>
       <!-- 无标签时不输出默认插槽：模板里的空白/空插值会变成只含空格的文本节点，

@@ -23,10 +23,10 @@
       :remote-stream="videoCall.remoteStream.value"
       :camera-enabled="videoCall.cameraEnabled.value"
       :is-sharing="screenShare.isSharing.value"
-      @toggle-mute="toggleMute"
-      @toggle-noise-suppression="toggleNoiseSuppression"
-      @select-input-device="selectInputDevice"
-      @select-output-device="selectOutputDevice"
+      @toggle-mute="runCallAction(toggleMute)"
+      @toggle-noise-suppression="runCallAction(toggleNoiseSuppression)"
+      @select-input-device="runCallAction(() => selectInputDevice($event))"
+      @select-output-device="runCallAction(() => selectOutputDevice($event))"
       @toggle-camera="handleToggleCamera"
       @toggle-screen-share="handleToggleScreenShare"
       @hangup="handleHangup"
@@ -36,6 +36,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { MessagePlugin } from "tdesign-vue-next";
+import { callFailureKey } from "../shared/callFeedback";
 import { onVoiceCallEvent, getContext } from "../host/bridge";
 import { createLogger } from "../shared/logger";
 import { useVoiceCall } from "../composables/useVoiceCall";
@@ -80,6 +82,7 @@ const {
   inputDevices,
   outputDevices,
   ringRemainingSecs,
+  canStartCall,
   startDirectCall,
   startConference,
   acceptCall,
@@ -104,7 +107,7 @@ const {
 });
 
 const videoCall = useVideoCall("");
-const screenShare = useScreenShare("");
+const screenShare = useScreenShare(() => activeSession.value?.sessionId ?? "");
 
 watch(
   () => activeSession.value?.sessionId,
@@ -140,40 +143,50 @@ const currentOutputDeviceId = computed(() => {
   return outputDevices.value.find((d) => d.isDefault)?.deviceId ?? outputDevices.value[0]?.deviceId ?? null;
 });
 
+async function runCallAction<T>(action: () => Promise<T>, medium: "audio" | "camera" | "screen" = "audio") {
+  try {
+    return await action();
+  } catch (error) {
+    const key = callFailureKey(error, medium);
+    logger.warn("voice_call_action_failed", { key });
+    void MessagePlugin.error(t(key));
+  }
+}
+
 function handleAccept() {
-  acceptCall();
+  void runCallAction(acceptCall);
 }
 
 function handleReject() {
-  rejectCall("declined");
+  void runCallAction(() => rejectCall("declined"));
 }
 
 function handleHangup() {
   // 未拨通（dialing/connecting）时取消通话，断开原因记为 cancelled；
   // 已拨通则挂断。会议在连接中也走离开会议逻辑。
-  if (callState.value === "dialing" || callState.value === "connecting") {
-    cancelCall();
-  } else if (isConference.value) {
-    void leaveConference();
+  if (isConference.value) {
+    void runCallAction(leaveConference);
+  } else if (callState.value === "dialing" || callState.value === "connecting") {
+    void runCallAction(cancelCall);
   } else {
-    hangup();
+    void runCallAction(hangup);
   }
 }
 
 function handleToggleCamera() {
-  videoCall.toggleCamera();
+  void runCallAction(videoCall.toggleCamera, "camera");
 }
 
 function handleToggleScreenShare() {
   if (screenShare.isSharing.value) {
-    screenShare.stopScreenShare();
+    void runCallAction(screenShare.stopScreenShare, "screen");
   } else {
     const pc = videoCall.getPeerConnection();
     if (pc) {
       screenShare.setPeerConnection(pc);
-      screenShare.startScreenShare();
+      void runCallAction(screenShare.startScreenShare, "screen");
     } else {
-      logger.warn("Action: chat_voice_call_screen_share_blocked", { reason: "no_peer_connection" });
+      void MessagePlugin.warning(t("voice_call_screen_failed"));
     }
   }
 }
@@ -181,6 +194,10 @@ function handleToggleScreenShare() {
 const memberAvatarMap = ref<Map<string, string>>(new Map());
 
 watch(callState, (s, prev) => {
+  if (s === "ended") {
+    screenShare.cleanup();
+    videoCall.hangup();
+  }
   if (s !== prev) emit("stateChange", s);
 });
 
@@ -250,20 +267,20 @@ let unlistenStateChange: (() => void) | null = null;
 onMounted(() => {
   try {
     unlistenIncoming = onVoiceCallEvent<{
-      session_id: string;
-      call_kind: string;
-      from_user_id: string;
-      from_display_name: string;
-      room_id: string;
+      sessionId: string;
+      callKind: CallSession["kind"];
+      fromUserId: string;
+      fromDisplayName: string;
+      roomId: string;
       timestamp: number;
     }>("voice_call:incoming", (w) => {
       const session: CallSession = {
-        sessionId: w.session_id,
-        kind: (w.call_kind as CallSession["kind"]) || "direct",
+        sessionId: w.sessionId,
+        kind: w.callKind,
         state: "ringing",
-        initiator: w.from_user_id,
-        participants: [],
-        roomId: w.room_id,
+        initiator: w.fromUserId,
+        participants: [{ userId: w.fromUserId, displayName: w.fromDisplayName, isMuted: false, isSpeaking: false, audioLevel: 0, joinedAt: null }],
+        roomId: w.roomId,
         startedAt: w.timestamp,
         endedAt: null,
         mediaSettings: {
@@ -281,16 +298,16 @@ onMounted(() => {
 
   try {
     unlistenStateChange = onVoiceCallEvent<{
-      session_id: string;
-      new_state: string;
-      reason?: string;
+      sessionId: string;
+      newState: CallState;
+      reason: string | null;
     }>("voice_call:state_change", (s) => {
       const session = activeSession.value;
-      if (session && session.sessionId === s.session_id) {
-        syncState(s.new_state as CallState, {
-          ...session,
-          state: s.new_state as CallSession["state"],
-        });
+      if (session && session.sessionId === s.sessionId) {
+        if (s.newState === "ended" && s.reason === "signaling_disconnected") {
+          void MessagePlugin.error(t("voice_call_connection_error"));
+        }
+        syncState(s.newState, { ...session, state: s.newState }, s.reason ?? undefined);
       }
     });
   } catch {
@@ -302,27 +319,36 @@ onUnmounted(() => {
   unlistenIncoming?.();
   unlistenStateChange?.();
   stopDevicePoll();
-  if (screenShare.isSharing.value) {
-    screenShare.stopScreenShare();
-  }
+  screenShare.cleanup();
   videoCall.hangup();
 });
 
+function checkCallAvailability(): boolean {
+  if (canStartCall()) return true;
+  void MessagePlugin.warning(t("voice_call_busy"));
+  return false;
+}
+
 function startCall(targetUserId?: string, roomId?: string) {
-  const uid = targetUserId || props.targetUserId || "";
-  return startDirectCall(uid, roomId);
+  const uid = targetUserId || props.targetUserId;
+  if (!uid?.trim()) {
+    void MessagePlugin.warning(t("voice_call_no_target"));
+    return;
+  }
+  if (!checkCallAvailability()) return;
+  return runCallAction(() => startDirectCall(uid, roomId));
 }
 
 async function startVideoCall(targetUserId?: string, roomId?: string) {
-  const uid = targetUserId || props.targetUserId || "";
-  await startDirectCall(uid, roomId);
-  setTimeout(() => {
-    videoCall.startCall();
-  }, 1000);
+  const session = await startCall(targetUserId, roomId);
+  if (!session || activeSession.value?.sessionId !== session.sessionId || !["dialing", "connecting", "active"].includes(callState.value)) return;
+  videoCall.setSessionId(session.sessionId);
+  await runCallAction(videoCall.startCall, "camera");
 }
 
 function startConferenceCall(roomId?: string) {
-  return startConference(roomId);
+  if (!checkCallAvailability()) return;
+  return runCallAction(() => startConference(roomId));
 }
 
 defineExpose({

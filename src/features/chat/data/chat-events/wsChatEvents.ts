@@ -8,6 +8,7 @@
  * - `docs/api/12-WebSocket事件清单（v1，标准版）.md`
  */
 
+import { parseApiErrorEnvelope } from "@/shared/net/http/apiErrors";
 import { getDevProxiedWsUrl, shouldUseDevApiProxy } from "@/shared/net/http/devApiProxy";
 import { toHttpOrigin } from "@/shared/net/http/serverOrigin";
 import { createLogger } from "@/shared/utils/logger";
@@ -53,35 +54,14 @@ export type WsEventEnvelope = {
 };
 
 /**
- * 命令成功响应（`*.ok`）。
+ * 服务端入站帧，命令失败通过顶层 `code` 表示。
  */
-export type WsCommandOk = {
+type WsInbound = {
   type: string;
-  id?: string;
+  id?: string | null;
+  code?: number;
   data?: unknown;
 };
-
-/**
- * 命令失败响应（`*.err`）。
- */
-export type WsCommandErr = {
-  type: string;
-  id?: string;
-  error?: { reason?: string; message?: string };
-};
-
-/**
- * 断点续传（resume）失败响应（服务端无法回放事件）。
- */
-export type WsResumeFailed = {
-  type: "resume.failed";
-  data?: { reason?: string };
-};
-
-/**
- * 入站消息联合类型。
- */
-export type WsInbound = WsEventEnvelope | WsCommandOk | WsCommandErr;
 
 /**
  * WS 客户端句柄。
@@ -102,9 +82,7 @@ export type ChatWsConnectOptions = {
    */
   wsUrlOverride?: string;
   /**
-   * 当服务端返回 `resume.failed` 时回调。
-   *
-   * 约定：客户端必须走 HTTP 补拉（频道列表 / 未读 / 消息列表）。
+   * 完成首次鉴权或重连鉴权时回调。
    */
   onAuthenticated?: (reconnect: boolean) => void;
   /**
@@ -365,31 +343,17 @@ export function connectChatWs(
       return;
     }
 
-    if (parsed?.type === "event") {
-      const env = parsed as WsEventEnvelope;
-      if (!hasAuthenticated || !env.data?.event_id || !env.data.event_type) return;
-      try {
-        onEvent(env);
-      } catch (error) {
-        logger.warn("Action: chat_ws_event_handler_failed", { wsUrl, error: String(error) });
-      }
-      return;
-    }
+    if (!parsed || typeof parsed.type !== "string") return;
 
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      typeof (parsed as WsCommandErr).error === "object" &&
-      (parsed as WsCommandErr).error !== null
-    ) {
-      const e = parsed as WsCommandErr;
-      logger.warn("Action: chat_ws_command_failed", { type: e.type, id: e.id ?? "", reason: e.error?.reason ?? "" });
-      if (e.type === "auth.err" || e.type === "reauth.err") {
-        const reason = String(e.error?.reason ?? "").trim() || "unauthorized";
-        if (e.type === "auth.err" && !hasAuthenticated) {
+    const { code } = parsed;
+    if (typeof code === "number" && Number.isInteger(code) && code !== 0) {
+      const { reason } = parseApiErrorEnvelope({ code }).error;
+      logger.warn("Action: chat_ws_command_failed", { type: parsed.type, id: parsed.id ?? "", code, reason });
+      if (parsed.type === "auth.err" || parsed.type === "reauth.err") {
+        if (parsed.type === "auth.err" && !hasAuthenticated) {
           // 首次认证失败：主动关闭当前连接，让退避重连用（可能已更新的）token 重新认证，
           // 避免在一条未注册的链路上静默保活、永远收不到事件。
-          logger.warn("Action: chat_ws_auth_failed_closing_socket", { wsUrl, reason });
+          logger.warn("Action: chat_ws_auth_failed_closing_socket", { wsUrl, code, reason });
           try {
             ws?.close();
           } catch {
@@ -401,11 +365,20 @@ export function connectChatWs(
       return;
     }
 
-    if (!parsed || typeof parsed !== "object") return;
-    const ok = parsed as WsCommandOk;
-    logger.debug("Action: chat_ws_message_received", { type: ok.type, id: ok.id ?? "" });
+    if (parsed.type === "event") {
+      const env = parsed as WsEventEnvelope;
+      if (!hasAuthenticated || !env.data?.event_id || !env.data.event_type) return;
+      try {
+        onEvent(env);
+      } catch (error) {
+        logger.warn("Action: chat_ws_event_handler_failed", { wsUrl, error: String(error) });
+      }
+      return;
+    }
 
-    if (ok.type === "auth.ok" && !hasAuthenticated) {
+    logger.debug("Action: chat_ws_message_received", { type: parsed.type, id: parsed.id ?? "" });
+
+    if (parsed.type === "auth.ok" && !hasAuthenticated) {
       const reconnect = everAuthenticated;
       everAuthenticated = true;
       markAuthenticated();
@@ -415,8 +388,8 @@ export function connectChatWs(
     // 兜底恢复 `server_id`：服务端在 `auth.ok` 帧中回显 `data.server_id`。
     // 当 `GET /api/server` 因某条路径被跳过或失败时，这里作为恢复作用域隔离的备用来源；
     // 仅在当前未知 `server_id` 时填入，不覆盖已建立的作用域，避免迁移副作用。
-    if (ok.type === "auth.ok" && ok.data && typeof ok.data === "object") {
-      const dataRecord = ok.data as Record<string, unknown>;
+    if (parsed.type === "auth.ok" && parsed.data && typeof parsed.data === "object") {
+      const dataRecord = parsed.data as Record<string, unknown>;
       const serverId = typeof dataRecord.server_id === "string" ? dataRecord.server_id.trim() : "";
       if (serverId && !getKnownServerId(socket)) {
         rememberServerId(socket, serverId);
@@ -526,8 +499,7 @@ export function connectChatWs(
     const next = String(nextAccessToken ?? "").trim();
     if (!next) return;
     token = next;
-    // 协议约定：`reauth` 仅限已完成认证的连接；未鉴权/未打开的链路上发送会被服务端
-    // 以 auth.err/unauthorized 关闭。此时只更新本地 token，由重连后的 sendAuth 使用。
+    // `reauth` 仅用于已完成鉴权的连接。连接尚未就绪时只更新本地 token，供下次 auth 使用。
     if (!hasAuthenticated || !ws || ws.readyState !== WebSocket.OPEN) return;
     try {
       ws.send(JSON.stringify({ type: "reauth", id: createRequestId(), data: { access_token: token } }));
